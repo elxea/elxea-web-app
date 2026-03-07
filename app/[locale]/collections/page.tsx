@@ -48,9 +48,9 @@ async function CollectionsContent() {
                 </div>
               )}
             </div>
-            <h3 className="text-[14px] font-medium group-hover:underline">
+            <h2 className="text-[14px] font-medium group-hover:underline">
               {collection.title}
-            </h3>
+            </h2>
             {collection.description && (
               <p className="text-[13px] text-muted mt-1 line-clamp-2">
                 {collection.description}

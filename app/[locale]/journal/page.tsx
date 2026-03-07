@@ -80,12 +80,12 @@ async function ArticlesList() {
                     {article.category.title}
                   </p>
                 )}
-                <h3 className="text-[14px] font-medium leading-snug group-hover:underline">
+                <h2 className="text-[14px] font-medium leading-snug group-hover:underline">
                   {article.memberOnly && (
                     <span className="text-[12px] text-muted mr-1.5">[{tCommon("memberOnly")}]</span>
                   )}
                   {article.title}
-                </h3>
+                </h2>
                 {article.excerpt && (
                   <p className="text-[13px] text-muted line-clamp-2">
                     {article.excerpt}
