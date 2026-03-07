@@ -1,0 +1,44 @@
+{
+  "common": {
+    "home": "ホーム",
+    "products": "商品一覧",
+    "collections": "コレクション",
+    "journal": "ジャーナル",
+    "farmers": "農家",
+    "events": "イベント",
+    "cart": "カート",
+    "search": "検索",
+    "account": "マイページ",
+    "login": "ログイン",
+    "logout": "ログアウト",
+    "memberOnly": "会員限定",
+    "viewAll": "すべて見る",
+    "readMore": "続きを読む",
+    "addToCart": "カートに追加",
+    "checkout": "購入手続きへ",
+    "subtotal": "小計",
+    "quantity": "数量",
+    "remove": "削除",
+    "emptyCart": "カートは空です",
+    "soldOut": "売り切れ",
+    "language": "言語"
+  },
+  "home": {
+    "hero": "スペシャルティコーヒー & ティー",
+    "featuredProducts": "おすすめ商品",
+    "latestJournal": "最新の記事",
+    "upcomingEvents": "近日開催のイベント"
+  },
+  "product": {
+    "price": "価格",
+    "description": "商品説明",
+    "relatedProducts": "関連商品"
+  },
+  "journal": {
+    "title": "ジャーナル",
+    "description": "コーヒーとお茶にまつわるストーリー"
+  },
+  "footer": {
+    "copyright": "© {year} elxea. All rights reserved."
+  }
+}

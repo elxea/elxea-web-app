@@ -1,0 +1,55 @@
+@import "tailwindcss";
+
+@theme {
+  /* Brand Colors — warm neutrals inspired by Aesop's tone */
+  --color-cream: #FFFEF2;
+  --color-charcoal: #333333;
+  --color-muted: #666666;
+  --color-light: #999999;
+  --color-border: #E5E3D8;
+  --color-surface: #F5F4EE;
+  --color-error: #B80220;
+
+  /* Font Family */
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+
+  /* Spacing scale — generous whitespace */
+  --spacing-section: 6rem;
+  --spacing-block: 3rem;
+}
+
+/* Base styles */
+body {
+  background-color: var(--color-cream);
+  color: var(--color-charcoal);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Typography — restrained, hierarchy through weight not size */
+h1 {
+  font-size: 1.875rem;
+  font-weight: 400;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+
+h2 {
+  font-size: 1.25rem;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+h3 {
+  font-size: 1rem;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+/* No border-radius anywhere — clean, architectural */
+button, input, select, textarea, a {
+  border-radius: 0;
+}

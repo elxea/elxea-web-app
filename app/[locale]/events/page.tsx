@@ -1,0 +1,131 @@
+import Image from "next/image";
+import { useTranslations } from "next-intl";
+import { getLocale } from "next-intl/server";
+import { Link } from "@/i18n/navigation";
+import { getClient } from "@/sanity/lib/client";
+import { EVENTS_QUERY } from "@/sanity/lib/queries";
+import { urlFor } from "@/sanity/lib/image";
+
+export default function EventsPage() {
+  const t = useTranslations("common");
+
+  return (
+    <div className="max-w-7xl mx-auto px-6 py-16">
+      <h1 className="mb-12">{t("events")}</h1>
+      <EventsList />
+    </div>
+  );
+}
+
+async function EventsList() {
+  const locale = await getLocale();
+
+  try {
+    const client = getClient();
+    const events = await client.fetch(EVENTS_QUERY, { language: locale });
+
+    if (!events || events.length === 0) {
+      return (
+        <p className="text-muted text-[14px]">
+          現在予定されているイベントはありません。
+        </p>
+      );
+    }
+
+    return (
+      <div className="space-y-12">
+        {events.map(
+          (event: {
+            _id: string;
+            slug: { current: string };
+            image?: { asset: object; alt?: string };
+            title: string;
+            date: string;
+            endDate?: string;
+            location?: string;
+            memberOnly?: boolean;
+            externalUrl?: string;
+          }) => {
+            const cardClass =
+              "group grid grid-cols-1 md:grid-cols-[1fr_2fr] gap-6";
+            const inner = (
+              <>
+                <div className="aspect-[4/3] bg-surface overflow-hidden">
+                  {event.image?.asset ? (
+                    <Image
+                      src={urlFor(event.image).width(400).height(300).url()}
+                      alt={event.title}
+                      width={400}
+                      height={300}
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-light text-[13px]">
+                      {event.title}
+                    </div>
+                  )}
+                </div>
+                <div className="flex flex-col justify-center">
+                  <p className="text-[12px] text-light mb-2">
+                    {new Date(event.date).toLocaleDateString("ja-JP", {
+                      year: "numeric",
+                      month: "long",
+                      day: "numeric",
+                    })}
+                    {event.endDate &&
+                      ` — ${new Date(event.endDate).toLocaleDateString("ja-JP", {
+                        year: "numeric",
+                        month: "long",
+                        day: "numeric",
+                      })}`}
+                  </p>
+                  <h3 className="text-lg font-medium group-hover:underline mb-2">
+                    {event.memberOnly && (
+                      <span className="text-[12px] text-muted mr-1.5">
+                        [会員限定]
+                      </span>
+                    )}
+                    {event.title}
+                  </h3>
+                  {event.location && (
+                    <p className="text-[13px] text-muted">{event.location}</p>
+                  )}
+                </div>
+              </>
+            );
+
+            if (event.externalUrl) {
+              return (
+                <a
+                  key={event._id}
+                  href={event.externalUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={cardClass}
+                >
+                  {inner}
+                </a>
+              );
+            }
+
+            return (
+              <Link
+                key={event._id}
+                href={`/events/${event.slug.current}`}
+                className={cardClass}
+              >
+                {inner}
+              </Link>
+            );
+          }
+        )}
+      </div>
+    );
+  } catch {
+    return (
+      <p className="text-muted text-[14px]">
+        イベント情報を読み込めませんでした。
+      </p>
+    );
+  }
+}

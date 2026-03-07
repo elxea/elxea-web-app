@@ -1,0 +1,44 @@
+{
+  "common": {
+    "home": "Home",
+    "products": "Products",
+    "collections": "Collections",
+    "journal": "Journal",
+    "farmers": "Farmers",
+    "events": "Events",
+    "cart": "Cart",
+    "search": "Search",
+    "account": "My Account",
+    "login": "Login",
+    "logout": "Logout",
+    "memberOnly": "Members Only",
+    "viewAll": "View All",
+    "readMore": "Read More",
+    "addToCart": "Add to Cart",
+    "checkout": "Checkout",
+    "subtotal": "Subtotal",
+    "quantity": "Quantity",
+    "remove": "Remove",
+    "emptyCart": "Your cart is empty",
+    "soldOut": "Sold Out",
+    "language": "Language"
+  },
+  "home": {
+    "hero": "Specialty Coffee & Tea",
+    "featuredProducts": "Featured Products",
+    "latestJournal": "Latest Articles",
+    "upcomingEvents": "Upcoming Events"
+  },
+  "product": {
+    "price": "Price",
+    "description": "Description",
+    "relatedProducts": "Related Products"
+  },
+  "journal": {
+    "title": "Journal",
+    "description": "Stories about coffee and tea"
+  },
+  "footer": {
+    "copyright": "© {year} elxea. All rights reserved."
+  }
+}
