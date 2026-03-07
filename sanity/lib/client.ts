@@ -24,8 +24,8 @@ function createSanityClient(options?: { preview?: boolean }): SanityClient {
     projectId,
     dataset,
     apiVersion,
-    useCdn: false,
-    token: options?.preview ? process.env.SANITY_API_READ_TOKEN : undefined,
+    useCdn: !options?.preview,
+    token: process.env.SANITY_API_READ_TOKEN || undefined,
   });
 }
 
