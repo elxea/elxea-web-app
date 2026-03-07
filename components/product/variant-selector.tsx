@@ -61,6 +61,8 @@ export function VariantSelector({
                   key={value}
                   onClick={() => handleSelect(option.name, value)}
                   disabled={!available}
+                  aria-pressed={selected}
+                  aria-label={`${option.name}: ${value}`}
                   className={`px-4 py-2.5 text-[13px] border transition-colors ${
                     selected
                       ? "border-charcoal bg-charcoal text-cream"

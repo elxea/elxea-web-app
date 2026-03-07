@@ -21,22 +21,63 @@
     "remove": "Remove",
     "emptyCart": "Your cart is empty",
     "soldOut": "Sold Out",
-    "language": "Language"
+    "language": "Language",
+    "noImage": "No Image",
+    "loadError": "Failed to load.",
+    "notFound": "Page not found",
+    "notFoundDescription": "The page you're looking for doesn't exist or has been moved.",
+    "backToHome": "Back to Home",
+    "errorTitle": "Something went wrong",
+    "errorDescription": "An error occurred. Please try again.",
+    "retry": "Try Again"
   },
   "home": {
     "hero": "Specialty Coffee & Tea",
     "featuredProducts": "Featured Products",
     "latestJournal": "Latest Articles",
-    "upcomingEvents": "Upcoming Events"
+    "upcomingEvents": "Upcoming Events",
+    "journalPlaceholder": "Articles coming soon.",
+    "eventsPlaceholder": "Events coming soon.",
+    "productsPlaceholder": "Products coming soon."
   },
   "product": {
     "price": "Price",
     "description": "Description",
-    "relatedProducts": "Related Products"
+    "relatedProducts": "Related Products",
+    "loadError": "Could not load product.",
+    "noProducts": "No products found"
+  },
+  "collection": {
+    "empty": "No collections available",
+    "loadError": "Could not load collections."
+  },
+  "search": {
+    "results": "{count} results",
+    "loadError": "Search failed."
   },
   "journal": {
     "title": "Journal",
-    "description": "Stories about coffee and tea"
+    "description": "Stories about coffee and tea",
+    "empty": "No articles yet.",
+    "loadError": "Could not load articles."
+  },
+  "farmer": {
+    "empty": "No farmer profiles yet.",
+    "loadError": "Could not load farmer profiles."
+  },
+  "event": {
+    "empty": "No upcoming events.",
+    "loadError": "Could not load events.",
+    "detailsLink": "Details & Register →"
+  },
+  "page": {
+    "loadError": "Could not load page."
+  },
+  "account": {
+    "loginRequired": "Please log in to view your account.",
+    "orderHistory": "Order History",
+    "noOrders": "You have no orders yet.",
+    "memberOnlyDescription": "This content is for members only. Log in to access the full content."
   },
   "footer": {
     "copyright": "© {year} elxea. All rights reserved."

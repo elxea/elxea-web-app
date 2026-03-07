@@ -1,11 +1,14 @@
+import { useTranslations } from "next-intl";
 import type { Product } from "@/lib/shopify/types";
 import { ProductCard } from "./product-card";
 
 export function ProductGrid({ products }: { products: Product[] }) {
+  const t = useTranslations("product");
+
   if (products.length === 0) {
     return (
       <p className="text-muted text-[14px] py-12">
-        商品が見つかりませんでした
+        {t("noProducts")}
       </p>
     );
   }

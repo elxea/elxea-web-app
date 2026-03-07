@@ -1,13 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import { Link, usePathname } from "@/i18n/navigation";
+import { useLocale } from "next-intl";
 
 export function Header() {
   const t = useTranslations("common");
   const pathname = usePathname();
+  const locale = useLocale();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  useEffect(() => {
+    setIsLoggedIn(document.cookie.includes("shop_auth=1"));
+  }, [pathname]);
 
   const navItems = [
     { href: "/products", label: t("products") },
@@ -26,6 +33,7 @@ export function Header() {
             className="md:hidden p-2 -ml-2 text-charcoal"
             onClick={() => setMobileOpen(!mobileOpen)}
             aria-label="Menu"
+            aria-expanded={mobileOpen}
           >
             {mobileOpen ? (
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -54,12 +62,21 @@ export function Header() {
             >
               {t("search")}
             </Link>
-            <Link
-              href="/account"
-              className="text-[13px] text-muted hover:text-charcoal transition-colors hidden sm:block"
-            >
-              {t("account")}
-            </Link>
+            {isLoggedIn ? (
+              <Link
+                href="/account"
+                className="text-[13px] text-muted hover:text-charcoal transition-colors hidden sm:block"
+              >
+                {t("account")}
+              </Link>
+            ) : (
+              <a
+                href={`/api/auth/login?locale=${locale}`}
+                className="text-[13px] text-muted hover:text-charcoal transition-colors hidden sm:block"
+              >
+                {t("login")}
+              </a>
+            )}
             <Link
               href="/cart"
               className="text-[13px] text-muted hover:text-charcoal transition-colors"
@@ -113,13 +130,23 @@ export function Header() {
               >
                 {t("search")}
               </Link>
-              <Link
-                href="/account"
-                className="block text-sm text-muted sm:hidden"
-                onClick={() => setMobileOpen(false)}
-              >
-                {t("account")}
-              </Link>
+              {isLoggedIn ? (
+                <Link
+                  href="/account"
+                  className="block text-sm text-muted sm:hidden"
+                  onClick={() => setMobileOpen(false)}
+                >
+                  {t("account")}
+                </Link>
+              ) : (
+                <a
+                  href={`/api/auth/login?locale=${locale}`}
+                  className="block text-sm text-muted sm:hidden"
+                  onClick={() => setMobileOpen(false)}
+                >
+                  {t("login")}
+                </a>
+              )}
             </div>
           </div>
         </nav>

@@ -1,6 +1,6 @@
 import Image from "next/image";
 import { useTranslations } from "next-intl";
-import { getLocale } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import { getClient } from "@/sanity/lib/client";
 import { ARTICLES_QUERY } from "@/sanity/lib/queries";
@@ -8,6 +8,7 @@ import { urlFor } from "@/sanity/lib/image";
 
 export default function JournalPage() {
   const t = useTranslations("journal");
+  const tCommon = useTranslations("common");
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-16">
@@ -20,6 +21,8 @@ export default function JournalPage() {
 
 async function ArticlesList() {
   const locale = await getLocale();
+  const t = await getTranslations("journal");
+  const tCommon = await getTranslations("common");
 
   try {
     const client = getClient();
@@ -32,7 +35,7 @@ async function ArticlesList() {
     if (!articles || articles.length === 0) {
       return (
         <p className="text-muted text-[14px]">
-          まだ記事がありません。Sanity Studio から記事を作成してください。
+          {t("empty")}
         </p>
       );
     }
@@ -62,6 +65,7 @@ async function ArticlesList() {
                     alt={article.mainImage.alt || article.title}
                     width={600}
                     height={400}
+                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                   />
                 ) : (
@@ -78,7 +82,7 @@ async function ArticlesList() {
                 )}
                 <h3 className="text-[14px] font-medium leading-snug group-hover:underline">
                   {article.memberOnly && (
-                    <span className="text-[12px] text-muted mr-1.5">[会員限定]</span>
+                    <span className="text-[12px] text-muted mr-1.5">[{tCommon("memberOnly")}]</span>
                   )}
                   {article.title}
                 </h3>
@@ -89,7 +93,7 @@ async function ArticlesList() {
                 )}
                 {article.publishedAt && (
                   <p className="text-[12px] text-light">
-                    {new Date(article.publishedAt).toLocaleDateString("ja-JP")}
+                    {new Date(article.publishedAt).toLocaleDateString(locale)}
                   </p>
                 )}
               </div>
@@ -101,7 +105,7 @@ async function ArticlesList() {
   } catch {
     return (
       <p className="text-muted text-[14px]">
-        記事を読み込めませんでした。Sanity の接続設定を確認してください。
+        {t("loadError")}
       </p>
     );
   }

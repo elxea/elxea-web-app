@@ -74,11 +74,12 @@ export function CartContent() {
                     )
                   }
                   disabled={isPending}
+                  aria-label={`${t("quantity")} -1`}
                   className="w-8 h-8 border border-border text-[13px] hover:border-charcoal transition-colors disabled:opacity-50"
                 >
                   -
                 </button>
-                <span className="text-[13px] w-6 text-center">
+                <span className="text-[13px] w-6 text-center" aria-label={t("quantity")}>
                   {item.quantity}
                 </span>
                 <button
@@ -90,6 +91,7 @@ export function CartContent() {
                     )
                   }
                   disabled={isPending}
+                  aria-label={`${t("quantity")} +1`}
                   className="w-8 h-8 border border-border text-[13px] hover:border-charcoal transition-colors disabled:opacity-50"
                 >
                   +

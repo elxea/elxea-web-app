@@ -1,6 +1,31 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 import { getCollectionByHandle } from "@/lib/shopify";
 import { ProductGrid } from "@/components/product/product-grid";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ handle: string }>;
+}): Promise<Metadata> {
+  const { handle } = await params;
+  try {
+    const collection = await getCollectionByHandle(handle);
+    if (!collection) return {};
+    return {
+      title: collection.title,
+      description: collection.seo.description || collection.description?.slice(0, 160),
+      openGraph: {
+        title: collection.title,
+        description: collection.seo.description || collection.description?.slice(0, 160),
+        images: collection.image ? [{ url: collection.image.url }] : [],
+      },
+    };
+  } catch {
+    return {};
+  }
+}
 
 export default async function CollectionPage({
   params,
@@ -8,6 +33,7 @@ export default async function CollectionPage({
   params: Promise<{ handle: string }>;
 }) {
   const { handle } = await params;
+  const t = await getTranslations("collection");
 
   let collection;
   try {
@@ -15,7 +41,7 @@ export default async function CollectionPage({
   } catch {
     return (
       <div className="max-w-7xl mx-auto px-6 py-16">
-        <p className="text-muted">コレクションを読み込めませんでした。</p>
+        <p className="text-muted">{t("loadError")}</p>
       </div>
     );
   }

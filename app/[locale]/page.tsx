@@ -53,7 +53,7 @@ export default function HomePage() {
           </Link>
         </div>
         <p className="text-muted text-[14px]">
-          Sanity 接続後に記事が表示されます
+          {t("home.journalPlaceholder")}
         </p>
       </section>
 
@@ -69,7 +69,7 @@ export default function HomePage() {
           </Link>
         </div>
         <p className="text-muted text-[14px]">
-          Sanity 接続後にイベントが表示されます
+          {t("home.eventsPlaceholder")}
         </p>
       </section>
     </>
@@ -85,9 +85,11 @@ async function FeaturedProducts() {
     const { products } = await getProducts({ first: 6 });
     return <ProductGrid products={products} />;
   } catch {
+    const { getTranslations } = await import("next-intl/server");
+    const t = await getTranslations("home");
     return (
       <p className="text-muted text-[14px]">
-        Shopify API 接続後に商品が表示されます
+        {t("productsPlaceholder")}
       </p>
     );
   }

@@ -21,22 +21,63 @@
     "remove": "削除",
     "emptyCart": "カートは空です",
     "soldOut": "売り切れ",
-    "language": "言語"
+    "language": "言語",
+    "noImage": "画像なし",
+    "loadError": "読み込みに失敗しました。",
+    "notFound": "ページが見つかりませんでした。",
+    "notFoundDescription": "お探しのページは存在しないか、移動した可能性があります。",
+    "backToHome": "ホームに戻る",
+    "errorTitle": "エラーが発生しました",
+    "errorDescription": "問題が発生しました。もう一度お試しください。",
+    "retry": "再試行"
   },
   "home": {
     "hero": "スペシャルティコーヒー & ティー",
     "featuredProducts": "おすすめ商品",
     "latestJournal": "最新の記事",
-    "upcomingEvents": "近日開催のイベント"
+    "upcomingEvents": "近日開催のイベント",
+    "journalPlaceholder": "まもなく記事を公開します。",
+    "eventsPlaceholder": "まもなくイベント情報を公開します。",
+    "productsPlaceholder": "まもなく商品を公開します。"
   },
   "product": {
     "price": "価格",
     "description": "商品説明",
-    "relatedProducts": "関連商品"
+    "relatedProducts": "関連商品",
+    "loadError": "商品を読み込めませんでした。",
+    "noProducts": "商品が見つかりませんでした"
+  },
+  "collection": {
+    "empty": "コレクションがありません",
+    "loadError": "コレクションを読み込めませんでした。"
+  },
+  "search": {
+    "results": "{count} 件の結果",
+    "loadError": "検索できませんでした。"
   },
   "journal": {
     "title": "ジャーナル",
-    "description": "コーヒーとお茶にまつわるストーリー"
+    "description": "コーヒーとお茶にまつわるストーリー",
+    "empty": "まだ記事がありません。",
+    "loadError": "記事を読み込めませんでした。"
+  },
+  "farmer": {
+    "empty": "農家プロフィールはまだ登録されていません。",
+    "loadError": "農家プロフィールを読み込めませんでした。"
+  },
+  "event": {
+    "empty": "現在予定されているイベントはありません。",
+    "loadError": "イベント情報を読み込めませんでした。",
+    "detailsLink": "詳細・申し込み →"
+  },
+  "page": {
+    "loadError": "ページを読み込めませんでした。"
+  },
+  "account": {
+    "loginRequired": "マイページを表示するにはログインが必要です。",
+    "orderHistory": "注文履歴",
+    "noOrders": "注文履歴はまだありません。",
+    "memberOnlyDescription": "この内容は会員限定です。ログインしてすべてのコンテンツをお楽しみください。"
   },
   "footer": {
     "copyright": "© {year} elxea. All rights reserved."

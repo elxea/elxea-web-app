@@ -1,9 +1,11 @@
 import Image from "next/image";
+import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { formatPrice } from "@/lib/utils";
 import type { Product } from "@/lib/shopify/types";
 
 export function ProductCard({ product }: { product: Product }) {
+  const t = useTranslations("common");
   const price = product.priceRange.minVariantPrice;
   const comparePrice = product.variants[0]?.compareAtPrice;
 
@@ -17,11 +19,12 @@ export function ProductCard({ product }: { product: Product }) {
             alt={product.featuredImage.altText || product.title}
             width={600}
             height={600}
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-light text-[13px]">
-            No Image
+            {t("noImage")}
           </div>
         )}
       </div>
@@ -45,7 +48,7 @@ export function ProductCard({ product }: { product: Product }) {
           )}
         </div>
         {!product.availableForSale && (
-          <p className="text-[12px] text-error">Sold Out</p>
+          <p className="text-[12px] text-error">{t("soldOut")}</p>
         )}
       </div>
     </Link>

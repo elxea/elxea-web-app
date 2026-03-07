@@ -1,10 +1,35 @@
+import type { Metadata } from "next";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 import { getProductByHandle } from "@/lib/shopify";
 import { formatPrice } from "@/lib/utils";
 import { ImageGallery } from "@/components/product/image-gallery";
 import { VariantSelector } from "@/components/product/variant-selector";
 import { AddToCartButton } from "@/components/product/add-to-cart-button";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ handle: string }>;
+}): Promise<Metadata> {
+  const { handle } = await params;
+  try {
+    const product = await getProductByHandle(handle);
+    if (!product) return {};
+    return {
+      title: product.title,
+      description: product.seo.description || product.description?.slice(0, 160),
+      openGraph: {
+        title: product.title,
+        description: product.seo.description || product.description?.slice(0, 160),
+        images: product.featuredImage ? [{ url: product.featuredImage.url }] : [],
+      },
+    };
+  } catch {
+    return {};
+  }
+}
 
 export default async function ProductPage({
   params,
@@ -15,6 +40,7 @@ export default async function ProductPage({
 }) {
   const { handle } = await params;
   const currentSearchParams = await searchParams;
+  const t = await getTranslations("product");
 
   let product;
   try {
@@ -22,7 +48,7 @@ export default async function ProductPage({
   } catch {
     return (
       <div className="max-w-7xl mx-auto px-6 py-16">
-        <p className="text-muted">商品を読み込めませんでした。</p>
+        <p className="text-muted">{t("loadError")}</p>
       </div>
     );
   }

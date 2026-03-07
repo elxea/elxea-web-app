@@ -18,9 +18,11 @@ export function SearchForm({ initialQuery }: { initialQuery: string }) {
   }
 
   return (
-    <form onSubmit={handleSubmit}>
+    <form onSubmit={handleSubmit} role="search">
       <div className="relative">
+        <label htmlFor="search-input" className="sr-only">{t("search")}</label>
         <input
+          id="search-input"
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}

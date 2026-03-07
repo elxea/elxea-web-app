@@ -1,10 +1,10 @@
 import Image from "next/image";
-import { useTranslations } from "next-intl";
+import { getTranslations } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import { getCollections } from "@/lib/shopify";
 
-export default function CollectionsPage() {
-  const t = useTranslations("common");
+export default async function CollectionsPage() {
+  const t = await getTranslations("common");
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-16">
@@ -15,10 +15,13 @@ export default function CollectionsPage() {
 }
 
 async function CollectionsContent() {
+  const { getTranslations } = await import("next-intl/server");
+
   try {
     const collections = await getCollections();
     if (collections.length === 0) {
-      return <p className="text-muted text-[14px]">コレクションがありません</p>;
+      const t = await getTranslations("collection");
+      return <p className="text-muted text-[14px]">{t("empty")}</p>;
     }
 
     return (
@@ -36,6 +39,7 @@ async function CollectionsContent() {
                   alt={collection.image.altText || collection.title}
                   width={600}
                   height={450}
+                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                   className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                 />
               ) : (
@@ -57,9 +61,10 @@ async function CollectionsContent() {
       </div>
     );
   } catch {
+    const t = await getTranslations("collection");
     return (
       <p className="text-muted text-[14px]">
-        コレクションを読み込めませんでした。
+        {t("loadError")}
       </p>
     );
   }

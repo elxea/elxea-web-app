@@ -1,6 +1,6 @@
 import Image from "next/image";
 import { useTranslations } from "next-intl";
-import { getLocale } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import { getClient } from "@/sanity/lib/client";
 import { EVENTS_QUERY } from "@/sanity/lib/queries";
@@ -19,6 +19,8 @@ export default function EventsPage() {
 
 async function EventsList() {
   const locale = await getLocale();
+  const t = await getTranslations("event");
+  const tCommon = await getTranslations("common");
 
   try {
     const client = getClient();
@@ -27,7 +29,7 @@ async function EventsList() {
     if (!events || events.length === 0) {
       return (
         <p className="text-muted text-[14px]">
-          現在予定されているイベントはありません。
+          {t("empty")}
         </p>
       );
     }
@@ -57,6 +59,7 @@ async function EventsList() {
                       alt={event.title}
                       width={400}
                       height={300}
+                      sizes="(max-width: 768px) 100vw, 33vw"
                       className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                     />
                   ) : (
@@ -67,13 +70,13 @@ async function EventsList() {
                 </div>
                 <div className="flex flex-col justify-center">
                   <p className="text-[12px] text-light mb-2">
-                    {new Date(event.date).toLocaleDateString("ja-JP", {
+                    {new Date(event.date).toLocaleDateString(locale, {
                       year: "numeric",
                       month: "long",
                       day: "numeric",
                     })}
                     {event.endDate &&
-                      ` — ${new Date(event.endDate).toLocaleDateString("ja-JP", {
+                      ` — ${new Date(event.endDate).toLocaleDateString(locale, {
                         year: "numeric",
                         month: "long",
                         day: "numeric",
@@ -82,7 +85,7 @@ async function EventsList() {
                   <h3 className="text-lg font-medium group-hover:underline mb-2">
                     {event.memberOnly && (
                       <span className="text-[12px] text-muted mr-1.5">
-                        [会員限定]
+                        [{tCommon("memberOnly")}]
                       </span>
                     )}
                     {event.title}
@@ -124,7 +127,7 @@ async function EventsList() {
   } catch {
     return (
       <p className="text-muted text-[14px]">
-        イベント情報を読み込めませんでした。
+        {t("loadError")}
       </p>
     );
   }

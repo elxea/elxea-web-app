@@ -1,6 +1,6 @@
 import Image from "next/image";
 import { useTranslations } from "next-intl";
-import { getLocale } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import { getClient } from "@/sanity/lib/client";
 import { FARMERS_QUERY } from "@/sanity/lib/queries";
@@ -19,6 +19,7 @@ export default function FarmersPage() {
 
 async function FarmersList() {
   const locale = await getLocale();
+  const t = await getTranslations("farmer");
 
   try {
     const client = getClient();
@@ -27,7 +28,7 @@ async function FarmersList() {
     if (!farmers || farmers.length === 0) {
       return (
         <p className="text-muted text-[14px]">
-          農家プロフィールはまだ登録されていません。
+          {t("empty")}
         </p>
       );
     }
@@ -55,6 +56,7 @@ async function FarmersList() {
                     alt={farmer.photo.alt || farmer.name}
                     width={600}
                     height={600}
+                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                   />
                 ) : (
@@ -79,7 +81,7 @@ async function FarmersList() {
   } catch {
     return (
       <p className="text-muted text-[14px]">
-        農家プロフィールを読み込めませんでした。
+        {t("loadError")}
       </p>
     );
   }
