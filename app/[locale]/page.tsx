@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 
@@ -38,7 +39,9 @@ export default function HomePage() {
             {t("common.viewAll")} →
           </Link>
         </div>
-        <FeaturedProducts />
+        <Suspense fallback={<FeaturedProductsSkeleton />}>
+          <FeaturedProducts />
+        </Suspense>
       </section>
 
       {/* Journal */}
@@ -73,6 +76,23 @@ export default function HomePage() {
         </p>
       </section>
     </>
+  );
+}
+
+function FeaturedProductsSkeleton() {
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <div key={i} className="animate-pulse">
+          <div className="aspect-square bg-surface mb-4" />
+          <div className="space-y-2">
+            <div className="h-3 bg-surface w-1/3" />
+            <div className="h-4 bg-surface w-2/3" />
+            <div className="h-4 bg-surface w-1/4" />
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
 
