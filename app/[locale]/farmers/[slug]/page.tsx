@@ -52,7 +52,7 @@ export default async function FarmerPage({
   } catch {
     return (
       <div className="max-w-3xl mx-auto px-6 py-16">
-        <p className="text-muted">{t("loadError")}</p>
+        <p className="text-muted-foreground">{t("loadError")}</p>
       </div>
     );
   }
@@ -64,7 +64,7 @@ export default async function FarmerPage({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16">
         {/* Photo */}
         {farmer.photo?.asset ? (
-          <div className="aspect-square bg-surface overflow-hidden">
+          <div className="aspect-square bg-muted overflow-hidden">
             <Image
               src={urlFor(farmer.photo).width(800).height(800).url()}
               alt={farmer.photo.alt || farmer.name}
@@ -76,13 +76,13 @@ export default async function FarmerPage({
             />
           </div>
         ) : (
-          <div className="aspect-square bg-surface" />
+          <div className="aspect-square bg-muted" />
         )}
 
         {/* Info */}
         <div>
           {(farmer.region || farmer.country) && (
-            <p className="text-[12px] text-light uppercase tracking-wider mb-4">
+            <p className="text-xs text-muted-foreground uppercase tracking-wider mb-4">
               {[farmer.region, farmer.country].filter(Boolean).join(", ")}
             </p>
           )}

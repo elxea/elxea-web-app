@@ -4,6 +4,16 @@ import { useState, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import { Link, usePathname } from "@/i18n/navigation";
 import { useLocale } from "next-intl";
+import { Button } from "@/components/ui/button";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import { Separator } from "@/components/ui/separator";
+import { Menu } from "lucide-react";
 
 export function Header() {
   const t = useTranslations("common");
@@ -24,27 +34,91 @@ export function Header() {
   ];
 
   return (
-    <header className="border-b border-border bg-cream sticky top-0 z-50">
+    <header className="border-b border-border bg-background sticky top-0 z-50">
       {/* Main header */}
       <div className="max-w-7xl mx-auto px-6">
         <div className="flex items-center justify-between h-16">
           {/* Mobile menu button */}
-          <button
-            className="md:hidden p-2 -ml-2 text-charcoal"
-            onClick={() => setMobileOpen(!mobileOpen)}
-            aria-label="Menu"
-            aria-expanded={mobileOpen}
-          >
-            {mobileOpen ? (
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <path d="M4 4l12 12M16 4L4 16" />
-              </svg>
-            ) : (
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <path d="M2 5h16M2 10h16M2 15h16" />
-              </svg>
-            )}
-          </button>
+          <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+            <SheetTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="md:hidden -ml-2"
+                aria-label="Menu"
+              >
+                <Menu className="size-5" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="left" className="w-72">
+              <SheetHeader>
+                <SheetTitle className="text-xl tracking-[0.15em] font-light uppercase">
+                  elxea
+                </SheetTitle>
+              </SheetHeader>
+              <nav className="flex flex-col gap-1 mt-6">
+                {navItems.map((item) => (
+                  <Button
+                    key={item.href}
+                    variant="ghost"
+                    className={`justify-start ${
+                      pathname.startsWith(item.href)
+                        ? "text-foreground font-medium"
+                        : "text-muted-foreground"
+                    }`}
+                    asChild
+                  >
+                    <Link
+                      href={item.href}
+                      onClick={() => setMobileOpen(false)}
+                    >
+                      {item.label}
+                    </Link>
+                  </Button>
+                ))}
+                <Separator className="my-2" />
+                <Button
+                  variant="ghost"
+                  className="justify-start text-muted-foreground sm:hidden"
+                  asChild
+                >
+                  <Link
+                    href="/search"
+                    onClick={() => setMobileOpen(false)}
+                  >
+                    {t("search")}
+                  </Link>
+                </Button>
+                {isLoggedIn ? (
+                  <Button
+                    variant="ghost"
+                    className="justify-start text-muted-foreground sm:hidden"
+                    asChild
+                  >
+                    <Link
+                      href="/account"
+                      onClick={() => setMobileOpen(false)}
+                    >
+                      {t("account")}
+                    </Link>
+                  </Button>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    className="justify-start text-muted-foreground sm:hidden"
+                    asChild
+                  >
+                    <a
+                      href={`/api/auth/login?locale=${locale}`}
+                      onClick={() => setMobileOpen(false)}
+                    >
+                      {t("login")}
+                    </a>
+                  </Button>
+                )}
+              </nav>
+            </SheetContent>
+          </Sheet>
 
           {/* Logo — centered */}
           <Link
@@ -55,102 +129,64 @@ export function Header() {
           </Link>
 
           {/* Right actions */}
-          <div className="flex items-center gap-5 ml-auto">
-            <Link
-              href="/search"
-              className="text-[13px] text-muted hover:text-charcoal transition-colors hidden sm:block"
+          <div className="flex items-center gap-1 ml-auto">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground hidden sm:inline-flex"
+              asChild
             >
-              {t("search")}
-            </Link>
+              <Link href="/search">{t("search")}</Link>
+            </Button>
             {isLoggedIn ? (
-              <Link
-                href="/account"
-                className="text-[13px] text-muted hover:text-charcoal transition-colors hidden sm:block"
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-muted-foreground hidden sm:inline-flex"
+                asChild
               >
-                {t("account")}
-              </Link>
+                <Link href="/account">{t("account")}</Link>
+              </Button>
             ) : (
-              <a
-                href={`/api/auth/login?locale=${locale}`}
-                className="text-[13px] text-muted hover:text-charcoal transition-colors hidden sm:block"
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-muted-foreground hidden sm:inline-flex"
+                asChild
               >
-                {t("login")}
-              </a>
+                <a href={`/api/auth/login?locale=${locale}`}>{t("login")}</a>
+              </Button>
             )}
-            <Link
-              href="/cart"
-              className="text-[13px] text-muted hover:text-charcoal transition-colors"
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground"
+              asChild
             >
-              {t("cart")}
-            </Link>
+              <Link href="/cart">{t("cart")}</Link>
+            </Button>
           </div>
         </div>
 
         {/* Desktop navigation */}
-        <nav className="hidden md:flex items-center justify-center gap-8 pb-4">
+        <nav className="hidden md:flex items-center justify-center gap-1 pb-4">
           {navItems.map((item) => (
-            <Link
+            <Button
               key={item.href}
-              href={item.href}
-              className={`text-[13px] font-medium transition-colors ${
+              variant="ghost"
+              size="sm"
+              className={
                 pathname.startsWith(item.href)
-                  ? "text-charcoal"
-                  : "text-muted hover:text-charcoal"
-              }`}
+                  ? "text-foreground font-medium"
+                  : "text-muted-foreground"
+              }
+              asChild
             >
-              {item.label}
-            </Link>
+              <Link href={item.href}>{item.label}</Link>
+            </Button>
           ))}
         </nav>
       </div>
-
-      {/* Mobile navigation */}
-      {mobileOpen && (
-        <nav className="md:hidden border-t border-border bg-cream">
-          <div className="px-6 py-6 space-y-4">
-            {navItems.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`block text-sm ${
-                  pathname.startsWith(item.href)
-                    ? "text-charcoal font-medium"
-                    : "text-muted"
-                }`}
-                onClick={() => setMobileOpen(false)}
-              >
-                {item.label}
-              </Link>
-            ))}
-            <div className="pt-4 border-t border-border space-y-4">
-              <Link
-                href="/search"
-                className="block text-sm text-muted sm:hidden"
-                onClick={() => setMobileOpen(false)}
-              >
-                {t("search")}
-              </Link>
-              {isLoggedIn ? (
-                <Link
-                  href="/account"
-                  className="block text-sm text-muted sm:hidden"
-                  onClick={() => setMobileOpen(false)}
-                >
-                  {t("account")}
-                </Link>
-              ) : (
-                <a
-                  href={`/api/auth/login?locale=${locale}`}
-                  className="block text-sm text-muted sm:hidden"
-                  onClick={() => setMobileOpen(false)}
-                >
-                  {t("login")}
-                </a>
-              )}
-            </div>
-          </div>
-        </nav>
-      )}
     </header>
   );
 }

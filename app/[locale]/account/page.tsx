@@ -1,6 +1,8 @@
 import { getTranslations, getLocale } from "next-intl/server";
 import { getCustomerFromSession } from "@/lib/shopify/auth";
 import { Link } from "@/i18n/navigation";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
 
 function formatPrice(amount: string, currency: string, locale: string) {
   return new Intl.NumberFormat(locale, {
@@ -33,13 +35,10 @@ export default async function AccountPage() {
     return (
       <div className="max-w-2xl mx-auto px-6 py-16 text-center">
         <h1 className="text-2xl mb-6">{tCommon("account")}</h1>
-        <p className="text-muted mb-8">{t("loginRequired")}</p>
-        <a
-          href={`/api/auth/login?locale=${locale}`}
-          className="inline-block border border-charcoal px-8 py-3 text-[13px] font-medium hover:bg-charcoal hover:text-cream transition-colors"
-        >
-          {tCommon("login")}
-        </a>
+        <p className="text-muted-foreground mb-8">{t("loginRequired")}</p>
+        <Button variant="outline" asChild>
+          <a href={`/api/auth/login?locale=${locale}`}>{tCommon("login")}</a>
+        </Button>
       </div>
     );
   }
@@ -56,16 +55,13 @@ export default async function AccountPage() {
       <div className="mb-12">
         <h1 className="text-2xl mb-2">{tCommon("account")}</h1>
         {displayName && (
-          <p className="text-[15px] text-charcoal">{displayName}</p>
+          <p className="text-sm text-foreground">{displayName}</p>
         )}
-        {email && <p className="text-[13px] text-muted">{email}</p>}
+        {email && <p className="text-sm text-muted-foreground">{email}</p>}
 
-        <a
-          href={`/api/auth/logout?locale=${locale}`}
-          className="inline-block mt-6 text-[13px] text-muted underline hover:text-charcoal transition-colors"
-        >
-          {tCommon("logout")}
-        </a>
+        <Button variant="link" className="mt-6 p-0 h-auto text-muted-foreground" asChild>
+          <a href={`/api/auth/logout?locale=${locale}`}>{tCommon("logout")}</a>
+        </Button>
       </div>
 
       {/* Order history */}
@@ -75,7 +71,7 @@ export default async function AccountPage() {
         </h2>
 
         {orders.length === 0 ? (
-          <p className="text-muted text-[14px]">{t("noOrders")}</p>
+          <p className="text-muted-foreground text-sm">{t("noOrders")}</p>
         ) : (
           <div className="space-y-4">
             {orders.map(({ node: order }) => (
@@ -84,13 +80,13 @@ export default async function AccountPage() {
                 className="flex items-center justify-between py-4 border-b border-border"
               >
                 <div>
-                  <p className="text-[14px] font-medium">{order.name}</p>
-                  <p className="text-[12px] text-light">
+                  <p className="text-sm font-medium">{order.name}</p>
+                  <p className="text-xs text-muted-foreground">
                     {formatDate(order.processedAt, locale)}
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-[14px]">
+                  <p className="text-sm">
                     {formatPrice(
                       order.totalPrice.amount,
                       order.totalPrice.currencyCode,
@@ -105,20 +101,15 @@ export default async function AccountPage() {
       </section>
 
       {/* Quick links */}
-      <section className="mt-12 pt-8 border-t border-border">
-        <div className="flex flex-wrap gap-6">
-          <Link
-            href="/products"
-            className="text-[13px] text-muted hover:text-charcoal underline transition-colors"
-          >
-            {tCommon("products")}
-          </Link>
-          <Link
-            href="/journal"
-            className="text-[13px] text-muted hover:text-charcoal underline transition-colors"
-          >
-            {tCommon("journal")}
-          </Link>
+      <Separator className="mt-12" />
+      <section className="pt-8">
+        <div className="flex flex-wrap gap-4">
+          <Button variant="link" className="p-0 h-auto text-muted-foreground" asChild>
+            <Link href="/products">{tCommon("products")}</Link>
+          </Button>
+          <Button variant="link" className="p-0 h-auto text-muted-foreground" asChild>
+            <Link href="/journal">{tCommon("journal")}</Link>
+          </Button>
         </div>
       </section>
     </div>

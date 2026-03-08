@@ -1,8 +1,12 @@
 "use client";
 
+import * as Sentry from "@sentry/nextjs";
 import { useTranslations } from "next-intl";
+import { useEffect } from "react";
+import { Button } from "@/components/ui/button";
 
 export default function Error({
+  error,
   reset,
 }: {
   error: Error & { digest?: string };
@@ -10,18 +14,19 @@ export default function Error({
 }) {
   const t = useTranslations("common");
 
+  useEffect(() => {
+    Sentry.captureException(error);
+  }, [error]);
+
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] px-6 text-center">
       <h1 className="text-2xl mb-4">{t("errorTitle")}</h1>
-      <p className="text-muted text-[14px] mb-10 max-w-md">
+      <p className="text-muted-foreground text-sm mb-10 max-w-md">
         {t("errorDescription")}
       </p>
-      <button
-        onClick={reset}
-        className="inline-block border border-charcoal px-8 py-3 text-[13px] font-medium hover:bg-charcoal hover:text-cream transition-colors"
-      >
+      <Button variant="outline" onClick={reset}>
         {t("retry")}
-      </button>
+      </Button>
     </div>
   );
 }

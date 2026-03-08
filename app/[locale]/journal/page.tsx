@@ -13,7 +13,7 @@ export default function JournalPage() {
   return (
     <div className="max-w-7xl mx-auto px-6 py-16">
       <h1 className="mb-2">{t("title")}</h1>
-      <p className="text-muted text-[14px] mb-12">{t("description")}</p>
+      <p className="text-muted-foreground text-sm mb-12">{t("description")}</p>
       <ArticlesList />
     </div>
   );
@@ -34,7 +34,7 @@ async function ArticlesList() {
 
     if (!articles || articles.length === 0) {
       return (
-        <p className="text-muted text-[14px]">
+        <p className="text-muted-foreground text-sm">
           {t("empty")}
         </p>
       );
@@ -58,7 +58,7 @@ async function ArticlesList() {
               href={`/journal/${article.slug.current}`}
               className="group block"
             >
-              <div className="aspect-[3/2] bg-surface mb-4 overflow-hidden">
+              <div className="aspect-[3/2] bg-muted mb-4 overflow-hidden">
                 {article.mainImage?.asset ? (
                   <Image
                     src={urlFor(article.mainImage).width(600).height(400).url()}
@@ -69,30 +69,30 @@ async function ArticlesList() {
                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                   />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center text-light text-[13px]">
+                  <div className="w-full h-full flex items-center justify-center text-muted-foreground text-sm">
                     {article.title}
                   </div>
                 )}
               </div>
               <div className="space-y-1.5">
                 {article.category && (
-                  <p className="text-[12px] text-light uppercase tracking-wider">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider">
                     {article.category.title}
                   </p>
                 )}
-                <h2 className="text-[14px] font-medium leading-snug group-hover:underline">
+                <h2 className="text-sm font-medium leading-snug group-hover:underline">
                   {article.memberOnly && (
-                    <span className="text-[12px] text-muted mr-1.5">[{tCommon("memberOnly")}]</span>
+                    <span className="text-xs text-muted-foreground mr-1.5">[{tCommon("memberOnly")}]</span>
                   )}
                   {article.title}
                 </h2>
                 {article.excerpt && (
-                  <p className="text-[13px] text-muted line-clamp-2">
+                  <p className="text-sm text-muted-foreground line-clamp-2">
                     {article.excerpt}
                   </p>
                 )}
                 {article.publishedAt && (
-                  <p className="text-[12px] text-light">
+                  <p className="text-xs text-muted-foreground">
                     {new Date(article.publishedAt).toLocaleDateString(locale)}
                   </p>
                 )}
@@ -104,7 +104,7 @@ async function ArticlesList() {
     );
   } catch {
     return (
-      <p className="text-muted text-[14px]">
+      <p className="text-muted-foreground text-sm">
         {t("loadError")}
       </p>
     );

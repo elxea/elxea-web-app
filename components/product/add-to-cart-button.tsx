@@ -2,35 +2,53 @@
 
 import { useTranslations } from "next-intl";
 import { useCart } from "@/components/cart/cart-context";
+import { trackAddToCart } from "@/lib/analytics";
+import { Button } from "@/components/ui/button";
 
 export function AddToCartButton({
   merchandiseId,
   availableForSale,
+  productName,
+  price,
+  currency,
+  variant,
 }: {
   merchandiseId: string;
   availableForSale: boolean;
+  productName: string;
+  price: string;
+  currency: string;
+  variant?: string;
 }) {
   const t = useTranslations("common");
   const { addToCart, isPending } = useCart();
 
   if (!availableForSale) {
     return (
-      <button
-        disabled
-        className="w-full h-12 bg-light text-cream text-[14px] font-medium cursor-not-allowed"
-      >
+      <Button variant="secondary" size="lg" className="w-full h-12" disabled>
         {t("soldOut")}
-      </button>
+      </Button>
     );
   }
 
   return (
-    <button
-      onClick={() => addToCart(merchandiseId)}
+    <Button
+      size="lg"
+      className="w-full h-12"
+      onClick={() => {
+        addToCart(merchandiseId);
+        trackAddToCart({
+          id: merchandiseId,
+          name: productName,
+          price: parseFloat(price),
+          currency,
+          quantity: 1,
+          variant,
+        });
+      }}
       disabled={isPending}
-      className="w-full h-12 bg-charcoal text-cream text-[14px] font-medium hover:bg-charcoal/90 transition-colors disabled:opacity-50"
     >
       {isPending ? "..." : t("addToCart")}
-    </button>
+    </Button>
   );
 }

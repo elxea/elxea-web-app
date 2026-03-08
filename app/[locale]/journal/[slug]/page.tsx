@@ -8,6 +8,8 @@ import { urlFor } from "@/sanity/lib/image";
 import { PortableText } from "@/components/sanity/portable-text";
 import { isAuthenticated } from "@/lib/shopify/auth";
 import { MemberGate } from "@/components/ui/member-gate";
+import { ArticleJsonLd } from "@/components/seo/json-ld";
+import { Breadcrumb } from "@/components/seo/breadcrumb";
 
 export async function generateMetadata({
   params,
@@ -55,7 +57,7 @@ export default async function ArticlePage({
   } catch {
     return (
       <div className="max-w-3xl mx-auto px-6 py-16">
-        <p className="text-muted">{t("loadError")}</p>
+        <p className="text-muted-foreground">{t("loadError")}</p>
       </div>
     );
   }
@@ -66,26 +68,45 @@ export default async function ArticlePage({
   const isMemberOnly = article.memberOnly === true;
   const loggedIn = isMemberOnly ? await isAuthenticated() : true;
 
+  const imageUrl = article.mainImage?.asset
+    ? urlFor(article.mainImage).width(1200).url()
+    : undefined;
+
   return (
     <article className="max-w-3xl mx-auto px-6 py-16">
+      <ArticleJsonLd
+        title={article.title}
+        description={article.excerpt}
+        image={imageUrl}
+        url={`https://elxea.com/${locale}/journal/${slug}`}
+        datePublished={article.publishedAt || new Date().toISOString()}
+        author={article.author?.name}
+      />
+      <Breadcrumb
+        items={[
+          { label: t("title"), href: "/journal" },
+          { label: article.title },
+        ]}
+        locale={locale}
+      />
       {/* Header */}
       <header className="mb-12">
         {article.category && (
-          <p className="text-[12px] text-light uppercase tracking-wider mb-4">
+          <p className="text-xs text-muted-foreground uppercase tracking-wider mb-4">
             {article.category.title}
           </p>
         )}
         <h1 className="mb-4">{article.title}</h1>
         {article.excerpt && (
-          <p className="text-muted text-[14px] leading-relaxed">{article.excerpt}</p>
+          <p className="text-muted-foreground text-sm leading-relaxed">{article.excerpt}</p>
         )}
-        <div className="flex items-center gap-4 mt-6 text-[12px] text-light">
+        <div className="flex items-center gap-4 mt-6 text-xs text-muted-foreground">
           {article.author && <span>{article.author.name}</span>}
           {article.publishedAt && (
             <time>{new Date(article.publishedAt).toLocaleDateString(locale)}</time>
           )}
           {isMemberOnly && (
-            <span className="text-muted">[{tCommon("memberOnly")}]</span>
+            <span className="text-muted-foreground">[{tCommon("memberOnly")}]</span>
           )}
         </div>
       </header>

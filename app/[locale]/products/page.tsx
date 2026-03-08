@@ -1,6 +1,12 @@
+import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { getProducts } from "@/lib/shopify";
 import { ProductGrid } from "@/components/product/product-grid";
+
+export const metadata: Metadata = {
+  title: "Products",
+  description: "Browse our specialty coffee and tea collection.",
+};
 
 export default async function ProductsPage() {
   const t = await getTranslations("common");
@@ -21,7 +27,7 @@ async function ProductsContent() {
     const { getTranslations } = await import("next-intl/server");
     const t = await getTranslations("product");
     return (
-      <p className="text-muted text-[14px]">
+      <p className="text-muted-foreground text-sm">
         {t("loadError")}
       </p>
     );

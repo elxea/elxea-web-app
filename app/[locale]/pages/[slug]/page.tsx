@@ -38,7 +38,7 @@ export default async function GenericPage({
   } catch {
     return (
       <div className="max-w-3xl mx-auto px-6 py-16">
-        <p className="text-muted">{t("loadError")}</p>
+        <p className="text-muted-foreground">{t("loadError")}</p>
       </div>
     );
   }

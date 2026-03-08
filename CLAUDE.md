@@ -103,6 +103,113 @@ Done / Partial / Blocked / Reverted とその補足
 
 N/A（プロジェクトごとに設定）
 
+## React / Next.js ベストプラクティス（Vercel Engineering 準拠）
+
+コードの作成・レビュー・リファクタリング時に以下を常に適用する。出典: vercel-labs/agent-skills (MIT)
+
+### CRITICAL: ウォーターフォール排除
+- `await` は実際に使う分岐まで遅延させる
+- 独立した非同期処理は `Promise.all()` で並列化
+- API Routes でも promise を早期開始、await は最後
+- `<Suspense>` 境界でストリーミング配信
+
+### CRITICAL: バンドルサイズ最適化
+- バレルファイル（index.ts）経由の import 禁止 → 直接 import
+- 重いコンポーネントは `next/dynamic` で遅延読み込み
+- アナリティクス等の非クリティカルライブラリはハイドレーション後に読み込み
+- hover/focus 時に `preload` で体感速度向上
+
+### HIGH: サーバーサイドパフォーマンス
+- Server Actions にも認証チェック必須
+- `React.cache()` でリクエスト内の重複排除
+- RSC props で渡すデータは最小限にシリアライズ
+- 静的 I/O（フォント、ロゴ）はモジュールレベルに巻き上げ
+- `after()` で非ブロッキング処理
+
+### MEDIUM: Re-render 最適化
+- コールバックでのみ使う state は subscribe しない
+- 高コスト処理は `React.memo` でラップ
+- デフォルト値の非プリミティブ props は巻き上げ
+- 派生 state は `useEffect` ではなくレンダー中に計算
+- `startTransition` で非緊急更新を遅延
+
+### MEDIUM: レンダリングパフォーマンス
+- SVG アニメーションは `<g>` ラッパーに適用
+- 長いリスト（50+）は `content-visibility: auto` または仮想化
+- 条件付きレンダリングは `&&` ではなく三項演算子
+- 静的 JSX はコンポーネント外に抽出
+
+## Web UI ガイドライン（Vercel Web Interface Guidelines 準拠）
+
+### アクセシビリティ
+- アイコンのみのボタンには `aria-label` 必須
+- フォームコントロールに `<label>` または `aria-label`
+- インタラクティブ要素にはキーボードハンドラ（`onKeyDown`/`onKeyUp`）
+- アクションには `<button>`、ナビゲーションには `<a>`/`<Link>`（`<div onClick>` 禁止）
+- 画像に `alt` テキスト（装飾画像は `alt=""`）
+- 見出しは階層的（`<h1>`〜`<h6>`）、skip link 追加
+- セマンティック HTML 優先、ARIA は補助
+
+### フォーム
+- `autocomplete` と正しい `type`/`inputmode` 設定
+- ペースト禁止（`onPaste` + `preventDefault`）は NG
+- 送信ボタンはリクエスト開始まで有効、処理中はスピナー表示
+- エラーはフィールド横にインライン表示、送信時は最初のエラーにフォーカス
+- 未保存の変更がある場合はナビゲーション前に警告
+
+### パフォーマンス
+- `<img>` に `width`/`height` 明示（CLS 防止）
+- ファーストビュー外の画像は `loading="lazy"`
+- レンダー中のレイアウト読み取り（`getBoundingClientRect` 等）禁止
+- CDN/アセットドメインに `<link rel="preconnect">`
+- フォントは `<link rel="preload">` + `font-display: swap`
+
+### アニメーション
+- `prefers-reduced-motion` 対応必須
+- `transform`/`opacity` のみアニメーション（コンポジター対応）
+- `transition: all` 禁止 → プロパティ明示
+
+### ダークモード・テーマ
+- `color-scheme: dark` を `<html>` に設定
+- `<meta name="theme-color">` をページ背景色に合わせる
+
+### ナビゲーション・状態
+- URL にフィルター・タブ・ページネーション等の状態を反映
+- リンクは `<a>`/`<Link>`（Cmd+Click、中クリック対応）
+- 破壊的操作は確認モーダルまたは Undo — 即時実行禁止
+
+### アンチパターン（検出したら修正）
+- `user-scalable=no` / `maximum-scale=1`（ズーム無効化）
+- `outline-none` に focus-visible 代替なし
+- `<div>`/`<span>` にクリックハンドラ（`<button>` を使う）
+- ラベルなしのフォーム入力
+- 寸法なしの画像
+- ハードコードされた日付/数値フォーマット（`Intl.*` を使う）
+
+## コード変更の品質ルール
+
+一括置換・リファクタリング・デザインシステム移行など、広範なコード変更を行う場合は以下を厳守する。
+
+### 1. 変更前：スコープの全件列挙
+- 変更対象パターンを grep で洗い出し、該当ファイル・行数を一覧化してから着手する
+- 「見つけた分だけ直す」ではなく「全量を把握してから着手する」
+- 関連パターンも網羅する（例：`charcoal` を直すなら `cream`, `surface`, `light`, `error` 等も同時に列挙）
+
+### 2. 変更後：残存ゼロの機械的検証
+- 一括置換の後、同じパターン + 関連パターンで grep → `No matches found` を確認してから完了報告
+- 二重置換（例：`text-muted-foreground-foreground`）などの副作用も検索対象に含める
+- パターンマッチだけでなく「未変換ファイルの洗い出し」も行う（例：移行作業なら、移行対象の全ファイルをリストアップし、各ファイルが変換済みか確認する）
+
+### 3. ビルド通過を完了の必須条件にする
+- `pnpm build`（またはプロジェクトのビルドコマンド）が成功しない限り「完了」と報告しない
+
+### 4. 「完全に」「すべて」「一つも残さず」は最高警戒レベル
+- この種の指示を受けたら、部分対応ではなく全量対応
+- 確認も二重に行う（パターン検索 + ビルド）
+
+### 5. 完了報告時に検証結果を添える
+- 「修正しました」だけではなく、grep 結果（残存ゼロ）とビルド成功のエビデンスを必ず添える
+
 ## 制約・既知の問題
 
 - 本番デプロイは全件 Setaka 承認必須
