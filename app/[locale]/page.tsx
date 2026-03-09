@@ -1,7 +1,6 @@
 import { Suspense } from "react";
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
-import { OrganizationJsonLd } from "@/components/seo/json-ld";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -10,7 +9,6 @@ export default function HomePage() {
 
   return (
     <>
-      <OrganizationJsonLd />
       {/* Hero */}
       <section className="flex items-center justify-center min-h-[70vh] px-6">
         <div className="text-center max-w-xl">

@@ -1,15 +1,12 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
-import { getTranslations, getLocale } from "next-intl/server";
+import { getTranslations } from "next-intl/server";
 import { getProductByHandle } from "@/lib/shopify";
 import { formatPrice } from "@/lib/utils";
 import { ImageGallery } from "@/components/product/image-gallery";
 import { VariantSelector } from "@/components/product/variant-selector";
 import { AddToCartButton } from "@/components/product/add-to-cart-button";
-import { ProductJsonLd } from "@/components/seo/json-ld";
-import { Breadcrumb } from "@/components/seo/breadcrumb";
-import { ProductViewTracker } from "@/components/product/product-view-tracker";
 
 export async function generateMetadata({
   params,
@@ -44,9 +41,6 @@ export default async function ProductPage({
   const { handle } = await params;
   const currentSearchParams = await searchParams;
   const t = await getTranslations("product");
-  const ct = await getTranslations("common");
-  const bt = await getTranslations("breadcrumb");
-  const locale = await getLocale();
 
   let product;
   try {
@@ -71,32 +65,6 @@ export default async function ProductPage({
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-16">
-      <ProductViewTracker
-        id={product.id}
-        name={product.title}
-        price={parseFloat(selectedVariant.price.amount)}
-        currency={selectedVariant.price.currencyCode}
-        brand={product.vendor}
-        variant={selectedVariant.title !== "Default Title" ? selectedVariant.title : undefined}
-      />
-      <ProductJsonLd
-        name={product.title}
-        description={product.description}
-        image={product.featuredImage?.url}
-        url={`https://elxea.com/${locale}/products/${handle}`}
-        price={selectedVariant.price.amount}
-        currency={selectedVariant.price.currencyCode}
-        availability={selectedVariant.availableForSale}
-        brand={product.vendor}
-      />
-      <Breadcrumb
-        items={[
-          { label: bt("home"), href: "/" },
-          { label: ct("products"), href: "/products" },
-          { label: product.title },
-        ]}
-        locale={locale}
-      />
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16">
         {/* Images */}
         <ImageGallery images={product.images} />
@@ -128,10 +96,6 @@ export default async function ProductPage({
           <AddToCartButton
             merchandiseId={selectedVariant.id}
             availableForSale={selectedVariant.availableForSale}
-            productName={product.title}
-            price={selectedVariant.price.amount}
-            currency={selectedVariant.price.currencyCode}
-            variant={selectedVariant.title !== "Default Title" ? selectedVariant.title : undefined}
           />
 
           {product.description && (

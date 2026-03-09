@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
-import { Breadcrumb } from "@/components/seo/breadcrumb";
-import { OrganizationJsonLd } from "@/components/seo/json-ld";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -14,17 +12,9 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function AboutPage() {
   const t = await getTranslations("about");
-  const bt = await getTranslations("breadcrumb");
 
   return (
     <div className="max-w-3xl mx-auto px-6 py-16">
-      <OrganizationJsonLd />
-      <Breadcrumb
-        items={[
-          { label: bt("home"), href: "/" },
-          { label: t("title") },
-        ]}
-      />
       <h1 className="mb-4">{t("title")}</h1>
       <p className="text-muted-foreground text-sm mb-16">{t("subtitle")}</p>
 

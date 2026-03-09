@@ -3,7 +3,6 @@
 import { useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { useState } from "react";
-import { trackSearch } from "@/lib/analytics";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -16,7 +15,6 @@ export function SearchForm({ initialQuery }: { initialQuery: string }) {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (query.trim()) {
-      trackSearch(query.trim());
       router.push(`/${locale}/search?q=${encodeURIComponent(query.trim())}`);
     }
   }

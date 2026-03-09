@@ -8,7 +8,6 @@ import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
 import { CartProviderWrapper } from "@/components/cart/cart-provider-wrapper";
 import { CookieConsent } from "@/components/ui/cookie-consent";
-import { GoogleTagManager } from "@/components/analytics/gtm";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -51,7 +50,6 @@ export default async function LocaleLayout({
         <meta name="facebook-domain-verification" content="so8t14i6xbm14emy15c8f2zz3kap2c" />
       </head>
       <body className="min-h-screen flex flex-col bg-background text-foreground">
-        <GoogleTagManager />
         <NextIntlClientProvider messages={messages}>
           <CartProviderWrapper>
             <Header />

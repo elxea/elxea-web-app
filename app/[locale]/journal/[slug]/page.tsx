@@ -8,8 +8,6 @@ import { urlFor } from "@/sanity/lib/image";
 import { PortableText } from "@/components/sanity/portable-text";
 import { isAuthenticated } from "@/lib/shopify/auth";
 import { MemberGate } from "@/components/ui/member-gate";
-import { ArticleJsonLd } from "@/components/seo/json-ld";
-import { Breadcrumb } from "@/components/seo/breadcrumb";
 
 export async function generateMetadata({
   params,
@@ -74,21 +72,6 @@ export default async function ArticlePage({
 
   return (
     <article className="max-w-3xl mx-auto px-6 py-16">
-      <ArticleJsonLd
-        title={article.title}
-        description={article.excerpt}
-        image={imageUrl}
-        url={`https://elxea.com/${locale}/journal/${slug}`}
-        datePublished={article.publishedAt || new Date().toISOString()}
-        author={article.author?.name}
-      />
-      <Breadcrumb
-        items={[
-          { label: t("title"), href: "/journal" },
-          { label: article.title },
-        ]}
-        locale={locale}
-      />
       {/* Header */}
       <header className="mb-12">
         {article.category && (

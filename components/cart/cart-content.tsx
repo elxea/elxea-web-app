@@ -5,7 +5,6 @@ import { useTranslations } from "next-intl";
 import { useCart } from "./cart-context";
 import { formatPrice } from "@/lib/utils";
 import { Link } from "@/i18n/navigation";
-import { trackRemoveFromCart, trackBeginCheckout } from "@/lib/analytics";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 
@@ -108,16 +107,7 @@ export function CartContent() {
                 variant="link"
                 size="sm"
                 className="text-muted-foreground h-auto p-0"
-                onClick={() => {
-                  trackRemoveFromCart({
-                    id: item.merchandise.id,
-                    name: item.merchandise.product.title,
-                    price: parseFloat(item.merchandise.price.amount),
-                    currency: item.merchandise.price.currencyCode,
-                    quantity: item.quantity,
-                  });
-                  removeFromCart(item.id);
-                }}
+                onClick={() => removeFromCart(item.id)}
                 disabled={isPending}
               >
                 {t("remove")}
@@ -147,21 +137,7 @@ export function CartContent() {
         </div>
 
         <Button size="lg" className="w-full h-12" asChild>
-          <a
-            href={cart.checkoutUrl}
-            onClick={() => {
-              trackBeginCheckout(
-                cart.lines.map((item) => ({
-                  id: item.merchandise.id,
-                  name: item.merchandise.product.title,
-                  price: parseFloat(item.merchandise.price.amount),
-                  quantity: item.quantity,
-                })),
-                cart.cost.subtotalAmount.currencyCode,
-                parseFloat(cart.cost.subtotalAmount.amount)
-              );
-            }}
-          >
+          <a href={cart.checkoutUrl}>
             {t("checkout")}
           </a>
         </Button>
