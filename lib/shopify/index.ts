@@ -20,6 +20,9 @@ import type {
   Cart,
   CartItem,
   Image,
+  SellingPlan,
+  SellingPlanGroup,
+  SellingPlanAllocation,
   ShopifyConnection,
 } from "./types";
 
@@ -31,19 +34,40 @@ function flattenConnection<T>(connection: ShopifyConnection<T>): T[] {
 // Reshape product from GraphQL response
 function reshapeProduct(raw: Record<string, unknown>): Product {
   const product = raw as Product & {
-    variants: ShopifyConnection<ProductVariant>;
+    variants: ShopifyConnection<ProductVariant & {
+      sellingPlanAllocations: ShopifyConnection<SellingPlanAllocation>;
+    }>;
     images?: ShopifyConnection<Image>;
+    sellingPlanGroups: ShopifyConnection<Omit<SellingPlanGroup, "sellingPlans"> & {
+      sellingPlans: ShopifyConnection<SellingPlan>;
+    }>;
   };
+
   return {
     ...product,
     variants: flattenConnection(
-      product.variants as unknown as ShopifyConnection<ProductVariant>
-    ),
+      product.variants as unknown as ShopifyConnection<ProductVariant & {
+        sellingPlanAllocations: ShopifyConnection<SellingPlanAllocation>;
+      }>
+    ).map((v) => ({
+      ...v,
+      sellingPlanAllocations: v.sellingPlanAllocations
+        ? flattenConnection(v.sellingPlanAllocations as unknown as ShopifyConnection<SellingPlanAllocation>)
+        : [],
+    })),
     images: product.images
       ? flattenConnection(product.images as unknown as ShopifyConnection<Image>)
       : product.featuredImage
         ? [product.featuredImage]
         : [],
+    sellingPlanGroups: product.sellingPlanGroups
+      ? flattenConnection(product.sellingPlanGroups as unknown as ShopifyConnection<Omit<SellingPlanGroup, "sellingPlans"> & {
+          sellingPlans: ShopifyConnection<SellingPlan>;
+        }>).map((g) => ({
+          ...g,
+          sellingPlans: flattenConnection(g.sellingPlans as unknown as ShopifyConnection<SellingPlan>),
+        }))
+      : [],
   };
 }
 
@@ -153,7 +177,7 @@ export async function getCart(cartId: string) {
 }
 
 export async function createCart(
-  lines: { merchandiseId: string; quantity: number }[]
+  lines: { merchandiseId: string; quantity: number; sellingPlanId?: string }[]
 ) {
   const data = await shopifyFetch<{
     cartCreate: { cart: Cart; userErrors: { field: string; message: string }[] };
@@ -168,7 +192,7 @@ export async function createCart(
 
 export async function addToCart(
   cartId: string,
-  lines: { merchandiseId: string; quantity: number }[]
+  lines: { merchandiseId: string; quantity: number; sellingPlanId?: string }[]
 ) {
   const data = await shopifyFetch<{
     cartLinesAdd: { cart: Cart; userErrors: { field: string; message: string }[] };

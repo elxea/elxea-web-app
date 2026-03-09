@@ -17,6 +17,37 @@ export type SEO = {
   description: string | null;
 };
 
+export type SellingPlanPriceAdjustment = {
+  adjustmentValue:
+    | { adjustmentPercentage: number }
+    | { adjustmentAmount: Money }
+    | { price: Money };
+};
+
+export type SellingPlan = {
+  id: string;
+  name: string;
+  description: string | null;
+  recurringDeliveries: boolean;
+  options: { name: string; value: string }[];
+  priceAdjustments: SellingPlanPriceAdjustment[];
+};
+
+export type SellingPlanGroup = {
+  name: string;
+  options: { name: string; values: string[] }[];
+  sellingPlans: SellingPlan[];
+};
+
+export type SellingPlanAllocation = {
+  sellingPlan: Pick<SellingPlan, "id" | "name">;
+  priceAdjustments: {
+    price: Money;
+    compareAtPrice: Money;
+    perDeliveryPrice: Money;
+  }[];
+};
+
 export type ProductVariant = {
   id: string;
   title: string;
@@ -25,6 +56,7 @@ export type ProductVariant = {
   price: Money;
   compareAtPrice: Money | null;
   image: Image | null;
+  sellingPlanAllocations: SellingPlanAllocation[];
 };
 
 export type Product = {
@@ -48,6 +80,7 @@ export type Product = {
   productType: string;
   createdAt: string;
   updatedAt: string;
+  sellingPlanGroups: SellingPlanGroup[];
 };
 
 export type Collection = {
@@ -73,6 +106,9 @@ export type CartItem = {
   cost: {
     totalAmount: Money;
   };
+  sellingPlanAllocation: {
+    sellingPlan: { id: string; name: string };
+  } | null;
 };
 
 export type Cart = {

@@ -18,7 +18,7 @@ type CartAction =
 type CartContextType = {
   cart: Cart | null;
   isPending: boolean;
-  addToCart: (merchandiseId: string, quantity?: number) => Promise<void>;
+  addToCart: (merchandiseId: string, quantity?: number, sellingPlanId?: string) => Promise<void>;
   updateQuantity: (lineId: string, merchandiseId: string, quantity: number) => Promise<void>;
   removeFromCart: (lineId: string) => Promise<void>;
 };
@@ -89,7 +89,7 @@ export function CartProvider({
   );
   const [isPending, startTransition] = useTransition();
 
-  async function handleAddToCart(merchandiseId: string, quantity = 1) {
+  async function handleAddToCart(merchandiseId: string, quantity = 1, sellingPlanId?: string) {
     startTransition(async () => {
       setOptimisticCart({
         type: "ADD",
@@ -104,9 +104,10 @@ export function CartProvider({
             price: { amount: "0", currencyCode: "JPY" },
           },
           cost: { totalAmount: { amount: "0", currencyCode: "JPY" } },
+          sellingPlanAllocation: null,
         },
       });
-      await addItem(merchandiseId, quantity);
+      await addItem(merchandiseId, quantity, sellingPlanId);
     });
   }
 

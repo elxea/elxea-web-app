@@ -26,16 +26,21 @@ async function setCartId(cartId: string) {
   });
 }
 
-export async function addItem(merchandiseId: string, quantity = 1) {
+export async function addItem(merchandiseId: string, quantity = 1, sellingPlanId?: string) {
   const cartId = await getCartId();
 
+  const line = sellingPlanId
+    ? { merchandiseId, quantity, sellingPlanId }
+    : { merchandiseId, quantity };
+
   if (!cartId) {
-    const cart = await createCart([{ merchandiseId, quantity }]);
+    const cart = await createCart([line]);
+    if (!cart?.id) throw new Error("Failed to create cart");
     await setCartId(cart.id);
     return cart;
   }
 
-  return addToCart(cartId, [{ merchandiseId, quantity }]);
+  return addToCart(cartId, [line]);
 }
 
 export async function updateItem(

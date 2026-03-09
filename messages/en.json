@@ -21,6 +21,7 @@
     "remove": "Remove",
     "emptyCart": "Your cart is empty",
     "soldOut": "Sold Out",
+    "subscribe": "Subscribe",
     "language": "Language",
     "noImage": "No Image",
     "loadError": "Failed to load.",
@@ -29,9 +30,14 @@
     "backToHome": "Back to Home",
     "errorTitle": "Something went wrong",
     "errorDescription": "An error occurred. Please try again.",
-    "retry": "Try Again"
+    "retry": "Try Again",
+    "about": "About elxea",
+    "faq": "FAQ",
+    "contact": "Contact",
+    "shipping": "Shipping"
   },
   "home": {
+    "tagline": "Specialty Coffee & Tea",
     "hero": "Specialty Coffee & Tea",
     "featuredProducts": "Featured Products",
     "latestJournal": "Latest Articles",
@@ -45,7 +51,12 @@
     "description": "Description",
     "relatedProducts": "Related Products",
     "loadError": "Could not load product.",
-    "noProducts": "No products found"
+    "noProducts": "No products found",
+    "purchaseType": "Purchase type",
+    "oneTimePurchase": "One-time purchase",
+    "subscription": "Subscribe",
+    "deliveryFrequency": "Delivery frequency",
+    "subscriptionPrice": "{price} (Regular price {compareAtPrice})"
   },
   "collection": {
     "empty": "No collections available",
@@ -79,7 +90,93 @@
     "noOrders": "You have no orders yet.",
     "memberOnlyDescription": "This content is for members only. Log in to access the full content."
   },
+  "legal": {
+    "tokushoho": "Specified Commercial Transactions Act",
+    "privacy": "Privacy Policy",
+    "terms": "Terms of Service",
+    "returns": "Return & Exchange Policy"
+  },
+  "about": {
+    "title": "About elxea",
+    "subtitle": "A new specialty tea experience connecting farmers and consumers",
+    "mission": "Our Mission",
+    "missionText": "elxea is a D2C brand that delivers specialty teas, carefully cultivated by tea farmers across Japan, directly to your doorstep. Through transparent transactions where you can see the faces of the producers, we create new value and experiences in tea.",
+    "story": "Our Story",
+    "storyText": "Japanese tea culture has a history spanning centuries, yet many remarkable tea farmers remain unknown to consumers. elxea was born to directly connect these farmers with consumers, offering rich experiences through tea.\n\nWe visit farms, deeply understand the local climate and production methods, and carefully select the highest quality tea leaves. Through our subscription service, we deliver seasonal teas and introduce you to the profound world of Japanese tea.",
+    "values": "Our Values",
+    "value1Title": "Transparency",
+    "value1Text": "We disclose all producer, origin, and production information. We deliver tea you can choose with confidence.",
+    "value2Title": "Sustainability",
+    "value2Text": "We support sustainable farming practices and contribute to the future of Japanese tea culture.",
+    "value3Title": "Quality",
+    "value3Text": "We handle only specialty-grade tea leaves and deliver them in optimal condition."
+  },
+  "faq": {
+    "title": "Frequently Asked Questions",
+    "subtitle": "If you have any questions, please don't hesitate to contact us.",
+    "q1": "What is the subscription service?",
+    "a1": "Our subscription delivers carefully selected specialty teas monthly or bimonthly. We send seasonal teas directly from farmers to your door.",
+    "q2": "Can I cancel my subscription?",
+    "a2": "Yes, you can cancel anytime. Please manage your subscription from your account page. Cancel at least 3 days before the next delivery date.",
+    "q3": "How much is shipping?",
+    "a3": "Flat rate of ¥550 (tax included) nationwide. Free shipping on orders over ¥5,000. Subscriptions always ship free.",
+    "q4": "How long does delivery take?",
+    "a4": "Orders are typically shipped within 3-5 business days. Delivery takes 1-3 days after shipping (varies by region).",
+    "q5": "What payment methods are accepted?",
+    "a5": "We accept credit cards (Visa, Mastercard, American Express, JCB), Apple Pay, Google Pay, and Shop Pay.",
+    "q6": "Can I return or exchange items?",
+    "a6": "As food products, we cannot accept returns for customer convenience. If you receive a defective product, please contact us within 7 days of delivery for a replacement or refund.",
+    "q7": "Is gift wrapping available?",
+    "a7": "Currently in preparation. Please stay tuned for future updates.",
+    "q8": "Can I change my delivery address or frequency?",
+    "a8": "Yes, you can change your delivery address and frequency (monthly ↔ bimonthly) from your account page. Please make changes at least 3 days before the next delivery date."
+  },
+  "contact": {
+    "title": "Contact Us",
+    "subtitle": "If you have any questions or requests, please feel free to reach out using the form below.",
+    "name": "Name",
+    "email": "Email Address",
+    "subject": "Subject",
+    "message": "Message",
+    "submit": "Send",
+    "success": "Your inquiry has been received. We will respond within 2 business days.",
+    "emailDirect": "Email Us Directly",
+    "emailAddress": "support@elxea.com",
+    "responseTime": "We typically respond within 2 business days."
+  },
+  "shippingInfo": {
+    "title": "Shipping Information",
+    "subtitle": "Shipping rates and delivery information",
+    "domestic": "Domestic Shipping",
+    "domesticRate": "Flat rate ¥550 (tax included) nationwide",
+    "freeShipping": "Free shipping on orders over ¥5,000",
+    "subscriptionFree": "Subscriptions always ship free",
+    "deliveryTime": "Delivery Time",
+    "deliveryTimeText": "Orders are typically shipped within 3-5 business days after confirmation. Estimated delivery after shipping:",
+    "region1": "Kanto, Chubu, Kansai",
+    "region1Days": "1-2 days after shipping",
+    "region2": "Hokkaido, Tohoku, Chugoku, Shikoku, Kyushu",
+    "region2Days": "2-3 days after shipping",
+    "region3": "Okinawa & remote islands",
+    "region3Days": "3-5 days after shipping",
+    "packaging": "Packaging",
+    "packagingText": "To preserve tea quality, we use light-blocking, airtight packaging. Cushioning materials are used to protect against shipping impacts.",
+    "note": "* Delivery may be delayed due to weather or traffic conditions. Thank you for your understanding."
+  },
+  "cookie": {
+    "message": "We use cookies to improve your browsing experience and analyze site traffic.",
+    "accept": "Accept All",
+    "decline": "Essential Only",
+    "learnMore": "Learn More"
+  },
+  "breadcrumb": {
+    "home": "Home"
+  },
   "footer": {
+    "shop": "Shop",
+    "content": "Content",
+    "legal": "Legal",
+    "support": "Support",
     "copyright": "© {year} elxea. All rights reserved."
   }
 }
