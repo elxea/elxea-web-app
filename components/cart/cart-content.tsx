@@ -7,6 +7,7 @@ import { formatPrice } from "@/lib/utils";
 import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { trackBeginCheckout, trackRemoveFromCart } from "@/lib/analytics";
 
 export function CartContent() {
   const t = useTranslations("common");
@@ -54,6 +55,11 @@ export function CartContent() {
               {item.merchandise.title !== "Default Title" && (
                 <p className="text-sm text-muted-foreground mt-0.5">
                   {item.merchandise.title}
+                </p>
+              )}
+              {item.sellingPlanAllocation && (
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {item.sellingPlanAllocation.sellingPlan.name}
                 </p>
               )}
               <p className="text-sm mt-2">
@@ -107,7 +113,16 @@ export function CartContent() {
                 variant="link"
                 size="sm"
                 className="text-muted-foreground h-auto p-0"
-                onClick={() => removeFromCart(item.id)}
+                onClick={() => {
+                  trackRemoveFromCart({
+                    id: item.merchandise.id,
+                    name: item.merchandise.product.title,
+                    price: parseFloat(item.merchandise.price.amount),
+                    currency: item.merchandise.price.currencyCode,
+                    quantity: item.quantity,
+                  });
+                  removeFromCart(item.id);
+                }}
                 disabled={isPending}
               >
                 {t("remove")}
@@ -136,7 +151,23 @@ export function CartContent() {
           </p>
         </div>
 
-        <Button size="lg" className="w-full h-12" asChild>
+        <Button
+          size="lg"
+          className="w-full h-12"
+          asChild
+          onClick={() => {
+            trackBeginCheckout(
+              cart.lines.map((item) => ({
+                id: item.merchandise.id,
+                name: item.merchandise.product.title,
+                price: parseFloat(item.merchandise.price.amount),
+                quantity: item.quantity,
+              })),
+              cart.cost.subtotalAmount.currencyCode,
+              parseFloat(cart.cost.subtotalAmount.amount)
+            );
+          }}
+        >
           <a href={cart.checkoutUrl}>
             {t("checkout")}
           </a>
