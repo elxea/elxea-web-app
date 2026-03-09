@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { LanguageSwitcher } from "./language-switcher";
@@ -14,9 +15,13 @@ export function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-5 gap-12">
           {/* Brand */}
           <div>
-            <p className="text-xl tracking-[0.15em] font-light uppercase mb-4">
-              elxea
-            </p>
+            <Image
+              src="/logo.png"
+              alt="elxea"
+              width={100}
+              height={24}
+              className="mb-4"
+            />
             <p className="text-sm text-muted-foreground leading-relaxed">
               {t("home.tagline")}
             </p>

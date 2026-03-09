@@ -44,7 +44,9 @@
     "upcomingEvents": "Upcoming Events",
     "journalPlaceholder": "Articles coming soon.",
     "eventsPlaceholder": "Events coming soon.",
-    "productsPlaceholder": "Products coming soon."
+    "productsPlaceholder": "Products coming soon.",
+    "storyHeading": "A cup of tea that sparks wonder in your everyday life.",
+    "approachHeading": "For our community and the future of our planet."
   },
   "product": {
     "price": "Price",

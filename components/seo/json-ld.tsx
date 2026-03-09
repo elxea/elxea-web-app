@@ -59,7 +59,7 @@ export function OrganizationJsonLd() {
     url: "https://elxea.com",
     description:
       "日本各地の茶農家が丹精込めて育てたスペシャルティティーを直接お届けするD2Cブランド",
-    logo: "https://elxea.com/logo.svg",
+    logo: "https://elxea.com/logo.png",
     sameAs: [],
     contactPoint: {
       "@type": "ContactPoint",
@@ -104,7 +104,7 @@ export function ArticleJsonLd({
     publisher: {
       "@type": "Organization",
       name: "elxea",
-      logo: { "@type": "ImageObject", url: "https://elxea.com/logo.svg" },
+      logo: { "@type": "ImageObject", url: "https://elxea.com/logo.png" },
     },
   };
   return <JsonLd data={data} />;

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Image from "next/image";
 import { useTranslations } from "next-intl";
 import { Link, usePathname } from "@/i18n/navigation";
 import { useLocale } from "next-intl";
@@ -52,8 +53,8 @@ export function Header() {
             </SheetTrigger>
             <SheetContent side="left" className="w-72">
               <SheetHeader>
-                <SheetTitle className="text-xl tracking-[0.15em] font-light uppercase">
-                  elxea
+                <SheetTitle>
+                  <Image src="/logo.png" alt="elxea" width={80} height={19} />
                 </SheetTitle>
               </SheetHeader>
               <nav className="flex flex-col gap-1 mt-6">
@@ -123,9 +124,15 @@ export function Header() {
           {/* Logo — centered */}
           <Link
             href="/"
-            className="absolute left-1/2 -translate-x-1/2 text-xl tracking-[0.15em] font-light uppercase"
+            className="absolute left-1/2 -translate-x-1/2"
           >
-            elxea
+            <Image
+              src="/logo.png"
+              alt="elxea"
+              width={100}
+              height={24}
+              priority
+            />
           </Link>
 
           {/* Right actions */}

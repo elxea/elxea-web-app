@@ -46,5 +46,6 @@ next-env.d.ts
 # playwright mcp logs
 .playwright-mcp/
 
-# screenshots
+# screenshots (exclude root-level, allow public/)
 *.png
+!public/**/*.png

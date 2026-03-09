@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
 import { NextIntlClientProvider, hasLocale } from "next-intl";
 import { getMessages } from "next-intl/server";
 import { notFound } from "next/navigation";
@@ -8,11 +7,6 @@ import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
 import { CartProviderWrapper } from "@/components/cart/cart-provider-wrapper";
 import { CookieConsent } from "@/components/ui/cookie-consent";
-
-const inter = Inter({
-  subsets: ["latin"],
-  display: "swap",
-});
 
 export const metadata: Metadata = {
   title: {
@@ -32,11 +26,11 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     siteName: "elxea",
-    images: [{ url: "/og-image.png", width: 1200, height: 630, alt: "elxea - Specialty Coffee & Tea" }],
+    images: [{ url: "/og-image.jpg", width: 1000, height: 628, alt: "elxea - Specialty Coffee & Tea" }],
   },
   twitter: {
     card: "summary_large_image",
-    images: ["/og-image.png"],
+    images: ["/og-image.jpg"],
   },
   other: {
     "theme-color": "#333333",
@@ -59,8 +53,10 @@ export default async function LocaleLayout({
   const alternateLocale = locale === "ja" ? "en" : "ja";
 
   return (
-    <html lang={locale} className={inter.className}>
+    <html lang={locale}>
       <head>
+        <script async src="https://use.typekit.net/fwg7gtf.js" />
+        <script dangerouslySetInnerHTML={{ __html: "try{Typekit.load({async:true})}catch(e){}" }} />
         <link rel="alternate" hrefLang={locale} href={`https://elxea.com/${locale}`} />
         <link rel="alternate" hrefLang={alternateLocale} href={`https://elxea.com/${alternateLocale}`} />
         <link rel="alternate" hrefLang="x-default" href="https://elxea.com/ja" />

@@ -44,7 +44,9 @@
     "upcomingEvents": "近日開催のイベント",
     "journalPlaceholder": "まもなく記事を公開します。",
     "eventsPlaceholder": "まもなくイベント情報を公開します。",
-    "productsPlaceholder": "まもなく商品を公開します。"
+    "productsPlaceholder": "まもなく商品を公開します。",
+    "storyHeading": "日常の中にきらめきを感じる一杯をあなたにも。",
+    "approachHeading": "私たちのコミュニティと地球の未来のために。"
   },
   "product": {
     "price": "価格",
