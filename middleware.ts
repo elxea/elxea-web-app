@@ -4,8 +4,32 @@ import { routing } from "./i18n/routing";
 
 const intlMiddleware = createMiddleware(routing);
 
+const SITE_PASSWORD = process.env.SITE_PASSWORD;
+
+function checkSitePassword(request: NextRequest): NextResponse | null {
+  if (!SITE_PASSWORD) return null;
+
+  const authCookie = request.cookies.get("site_auth")?.value;
+  if (authCookie === SITE_PASSWORD) return null;
+
+  const { pathname } = request.nextUrl;
+
+  // POST = password submission
+  if (request.method === "POST" && pathname === "/password") {
+    return null; // handled by route
+  }
+
+  // Redirect to password page
+  const passwordUrl = new URL("/password", request.url);
+  return NextResponse.redirect(passwordUrl);
+}
+
 export default function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // Site-wide password protection (staging/preview)
+  const passwordResponse = checkSitePassword(request);
+  if (passwordResponse) return passwordResponse;
 
   // Check if this is an /account route that needs auth
   const accountMatch = pathname.match(/^\/(ja|en)\/account/);
