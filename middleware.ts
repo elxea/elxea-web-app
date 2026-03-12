@@ -52,6 +52,6 @@ export const config = {
     // - /api routes
     // - /_next (Next.js internals)
     // - Static files
-    "/((?!studio|api|_next|.*\\..*).*)",
+    "/((?!studio|api|password|_next|.*\\..*).*)",
   ],
 };
