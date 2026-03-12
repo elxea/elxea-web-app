@@ -14,10 +14,8 @@ function checkSitePassword(request: NextRequest): NextResponse | null {
 
   const { pathname } = request.nextUrl;
 
-  // POST = password submission
-  if (request.method === "POST" && pathname === "/password") {
-    return null; // handled by route
-  }
+  // Allow access to password page itself
+  if (pathname === "/password") return null;
 
   // Redirect to password page
   const passwordUrl = new URL("/password", request.url);
