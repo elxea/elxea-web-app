@@ -7,7 +7,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const entries: MetadataRoute.Sitemap = [];
 
   // Static pages
-  const staticPages = ["", "/products", "/collections", "/journal", "/farmers", "/events"];
+  const staticPages = [
+    "", "/products", "/collections", "/journal", "/farmers", "/events",
+    "/tea-menu", "/playlists", "/elxea-journal", "/about", "/faq", "/contact",
+  ];
   for (const locale of locales) {
     for (const page of staticPages) {
       entries.push({
@@ -92,6 +95,66 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
           lastModified: new Date(farmer._updatedAt),
           changeFrequency: "monthly",
           priority: 0.5,
+        });
+      }
+    }
+
+    // Tea menus
+    const teaMenus = await client.fetch<{ slug: string; _updatedAt: string }[]>(
+      `*[_type == "teaMenu" && defined(slug.current)]{ "slug": slug.current, _updatedAt }`
+    );
+    for (const tea of teaMenus) {
+      for (const locale of locales) {
+        entries.push({
+          url: `${BASE_URL}/${locale}/tea-menu/${tea.slug}`,
+          lastModified: new Date(tea._updatedAt),
+          changeFrequency: "monthly",
+          priority: 0.6,
+        });
+      }
+    }
+
+    // Playlists
+    const playlists = await client.fetch<{ slug: string; _updatedAt: string }[]>(
+      `*[_type == "playlist" && defined(slug.current)]{ "slug": slug.current, _updatedAt }`
+    );
+    for (const pl of playlists) {
+      for (const locale of locales) {
+        entries.push({
+          url: `${BASE_URL}/${locale}/playlists/${pl.slug}`,
+          lastModified: new Date(pl._updatedAt),
+          changeFrequency: "monthly",
+          priority: 0.5,
+        });
+      }
+    }
+
+    // elxea Journals
+    const journals = await client.fetch<{ slug: string; _updatedAt: string }[]>(
+      `*[_type == "journal" && defined(slug.current)]{ "slug": slug.current, _updatedAt }`
+    );
+    for (const j of journals) {
+      for (const locale of locales) {
+        entries.push({
+          url: `${BASE_URL}/${locale}/elxea-journal/${j.slug}`,
+          lastModified: new Date(j._updatedAt),
+          changeFrequency: "monthly",
+          priority: 0.5,
+        });
+      }
+    }
+
+    // Authors/People
+    const authors = await client.fetch<{ slug: string; _updatedAt: string }[]>(
+      `*[_type == "author" && defined(slug.current)]{ "slug": slug.current, _updatedAt }`
+    );
+    for (const author of authors) {
+      for (const locale of locales) {
+        entries.push({
+          url: `${BASE_URL}/${locale}/people/${author.slug}`,
+          lastModified: new Date(author._updatedAt),
+          changeFrequency: "monthly",
+          priority: 0.4,
         });
       }
     }

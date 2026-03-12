@@ -34,7 +34,9 @@
     "about": "About elxea",
     "faq": "FAQ",
     "contact": "Contact",
-    "shipping": "Shipping"
+    "shipping": "Shipping",
+    "teaMenu": "Tea Menu",
+    "playlists": "Playlists"
   },
   "home": {
     "tagline": "Specialty Coffee & Tea",
@@ -72,7 +74,47 @@
     "title": "Journal",
     "description": "Stories about coffee and tea",
     "empty": "No articles yet.",
-    "loadError": "Could not load articles."
+    "loadError": "Could not load articles.",
+    "writtenBy": "Written by",
+    "relatedArticles": "Related Articles",
+    "media": "Video / Audio",
+    "ctaButton": "Learn More"
+  },
+  "teaMenu": {
+    "title": "Tea Menu",
+    "description": "Our curated selection of specialty teas",
+    "empty": "No tea items yet.",
+    "loadError": "Could not load tea menu.",
+    "variety": "Variety",
+    "origin": "Origin",
+    "season": "Season",
+    "netWeight": "Net weight",
+    "brewingGuide": "Brewing Guide",
+    "temperature": "Temperature",
+    "water": "Water",
+    "time": "Brew time",
+    "buyNow": "Buy Now",
+    "relatedArticle": "Related Article"
+  },
+  "playlist": {
+    "title": "Sound from Nature",
+    "description": "Playlists inspired by the sounds of nature",
+    "empty": "No playlists yet.",
+    "loadError": "Could not load playlists.",
+    "recorded": "Recorded"
+  },
+  "elxeaJournal": {
+    "title": "elxea Journal",
+    "description": "A newsletter about seasonal tea and everyday life",
+    "empty": "No journals yet.",
+    "loadError": "Could not load journals.",
+    "relatedTea": "Related Tea",
+    "relatedPlaylist": "Playlist",
+    "relatedPost": "Related Article"
+  },
+  "people": {
+    "loadError": "Could not load profile.",
+    "articlesByAuthor": "Articles by this author"
   },
   "farmer": {
     "empty": "No farmer profiles yet.",
@@ -90,7 +132,25 @@
     "loginRequired": "Please log in to view your account.",
     "orderHistory": "Order History",
     "noOrders": "You have no orders yet.",
-    "memberOnlyDescription": "This content is for members only. Log in to access the full content."
+    "memberOnlyDescription": "This content is for members only. Log in to access the full content.",
+    "subscriptions": "Subscriptions",
+    "noSubscriptions": "You have no active subscriptions.",
+    "subscriptionActive": "Active",
+    "subscriptionPaused": "Paused",
+    "subscriptionCancelled": "Cancelled",
+    "nextDelivery": "Next delivery",
+    "deliveryInterval": "Delivery frequency",
+    "intervalMonth": "Every {count} month(s)",
+    "intervalWeek": "Every {count} week(s)",
+    "intervalDay": "Every {count} day(s)",
+    "manageSubscription": "Manage subscription",
+    "subscriptionNote": "To change frequency or products, please visit your Shopify account page.",
+    "skipNext": "Skip next",
+    "pauseSubscription": "Pause",
+    "resumeSubscription": "Resume",
+    "cancelSubscription": "Cancel",
+    "confirmCancel": "Confirm cancel",
+    "actionError": "Action failed. Please try again."
   },
   "legal": {
     "tokushoho": "Specified Commercial Transactions Act",

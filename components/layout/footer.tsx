@@ -64,6 +64,30 @@ export function Footer() {
               </li>
               <li>
                 <Link
+                  href="/tea-menu"
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {t("common.teaMenu")}
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/playlists"
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {t("common.playlists")}
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/elxea-journal"
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  elxea Journal
+                </Link>
+              </li>
+              <li>
+                <Link
                   href="/farmers"
                   className="text-sm text-muted-foreground hover:text-foreground transition-colors"
                 >

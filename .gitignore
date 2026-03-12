@@ -46,6 +46,21 @@ next-env.d.ts
 # playwright mcp logs
 .playwright-mcp/
 
-# screenshots (exclude root-level, allow public/)
+# screenshots & reference images
 *.png
 !public/**/*.png
+*.jpeg
+*.jpg
+!public/**/*.jpeg
+!public/**/*.jpg
+.mcp.json
+
+# dev notes
+gtm-tag-name.md
+shopify-app-settings.md
+
+# backups
+backup-before-cleanup/
+
+# vercel env pull
+.env.vercel

@@ -34,7 +34,9 @@
     "about": "elxeaについて",
     "faq": "よくあるご質問",
     "contact": "お問い合わせ",
-    "shipping": "送料について"
+    "shipping": "送料について",
+    "teaMenu": "お茶メニュー",
+    "playlists": "プレイリスト"
   },
   "home": {
     "tagline": "Specialty Coffee & Tea",
@@ -72,7 +74,47 @@
     "title": "ジャーナル",
     "description": "コーヒーとお茶にまつわるストーリー",
     "empty": "まだ記事がありません。",
-    "loadError": "記事を読み込めませんでした。"
+    "loadError": "記事を読み込めませんでした。",
+    "writtenBy": "執筆",
+    "relatedArticles": "関連する記事",
+    "media": "動画 / 音声",
+    "ctaButton": "詳しく見る"
+  },
+  "teaMenu": {
+    "title": "お茶メニュー",
+    "description": "elxeaが厳選したスペシャルティティーのラインナップ",
+    "empty": "お茶メニューはまだ登録されていません。",
+    "loadError": "お茶メニューを読み込めませんでした。",
+    "variety": "品種",
+    "origin": "産地",
+    "season": "収穫時期",
+    "netWeight": "内容量",
+    "brewingGuide": "淹れ方ガイド",
+    "temperature": "温度",
+    "water": "湯量",
+    "time": "抽出時間",
+    "buyNow": "購入する",
+    "relatedArticle": "関連記事"
+  },
+  "playlist": {
+    "title": "Sound from Nature",
+    "description": "自然の音を感じるプレイリスト",
+    "empty": "プレイリストはまだ登録されていません。",
+    "loadError": "プレイリストを読み込めませんでした。",
+    "recorded": "録音日"
+  },
+  "elxeaJournal": {
+    "title": "elxea Journal",
+    "description": "季節のお茶と暮らしを届けるニュースレター",
+    "empty": "ジャーナルはまだ登録されていません。",
+    "loadError": "ジャーナルを読み込めませんでした。",
+    "relatedTea": "関連するお茶",
+    "relatedPlaylist": "プレイリスト",
+    "relatedPost": "関連記事"
+  },
+  "people": {
+    "loadError": "プロフィールを読み込めませんでした。",
+    "articlesByAuthor": "この人の記事"
   },
   "farmer": {
     "empty": "農家プロフィールはまだ登録されていません。",
@@ -90,7 +132,25 @@
     "loginRequired": "マイページを表示するにはログインが必要です。",
     "orderHistory": "注文履歴",
     "noOrders": "注文履歴はまだありません。",
-    "memberOnlyDescription": "この内容は会員限定です。ログインしてすべてのコンテンツをお楽しみください。"
+    "memberOnlyDescription": "この内容は会員限定です。ログインしてすべてのコンテンツをお楽しみください。",
+    "subscriptions": "定期便",
+    "noSubscriptions": "ご契約中の定期便はありません。",
+    "subscriptionActive": "契約中",
+    "subscriptionPaused": "一時停止中",
+    "subscriptionCancelled": "解約済み",
+    "nextDelivery": "次回お届け日",
+    "deliveryInterval": "お届け頻度",
+    "intervalMonth": "{count}ヶ月ごと",
+    "intervalWeek": "{count}週間ごと",
+    "intervalDay": "{count}日ごと",
+    "manageSubscription": "定期便を管理する",
+    "subscriptionNote": "頻度変更・商品変更はShopifyのマイページから手続きいただけます。",
+    "skipNext": "次回スキップ",
+    "pauseSubscription": "一時停止",
+    "resumeSubscription": "再開",
+    "cancelSubscription": "解約",
+    "confirmCancel": "本当に解約する",
+    "actionError": "操作に失敗しました。もう一度お試しください。"
   },
   "legal": {
     "tokushoho": "特定商取引法に基づく表記",

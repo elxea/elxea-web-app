@@ -60,6 +60,9 @@ importers:
       '@eslint/eslintrc':
         specifier: ^3.3.5
         version: 3.3.5
+      '@notionhq/client':
+        specifier: ^2.3.0
+        version: 2.3.0
       '@playwright/test':
         specifier: ^1.58.2
         version: 1.58.2
@@ -87,6 +90,9 @@ importers:
       tailwindcss:
         specifier: ^4.2.1
         version: 4.2.1
+      tsx:
+        specifier: ^4.19.0
+        version: 4.21.0
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
@@ -1662,6 +1668,10 @@ packages:
   '@nolyfill/is-core-module@1.0.39':
     resolution: {integrity: sha512-nn5ozdjYQpUCZlWGuxcJY/KpxkWQs4DcbMCmKojjyrYDEAGy4Ce19NN4v5MduafTwJlbKc99UA8YhSVqq9yPZA==}
     engines: {node: '>=12.4.0'}
+
+  '@notionhq/client@2.3.0':
+    resolution: {integrity: sha512-l7WqTCpQqC+HibkB9chghONQTYcxNQT0/rOJemBfmuKQRTu2vuV8B3yA395iKaUdDo7HI+0KvQaz9687Xskzkw==}
+    engines: {node: '>=12'}
 
   '@oclif/core@4.8.3':
     resolution: {integrity: sha512-f7Rc1JBZO0wNMyDmNzP5IFOv5eM97S9pO4JUFdu2OLyk73YeBI9wog1Yyf666NOQvyptkbG1xh8inzMDQLNTyQ==}
@@ -3647,6 +3657,9 @@ packages:
 
   '@types/mysql@2.15.27':
     resolution: {integrity: sha512-YfWiV16IY0OeBfBCk8+hXKmdTKrKlwKN1MNKAPBu5JYxLwBEZl7QzeEpGnlZb3VMGJrrGmB84gXiH+ofs/TezA==}
+
+  '@types/node-fetch@2.6.13':
+    resolution: {integrity: sha512-QGpRVpzSaUs30JBSGPjOg4Uveu384erbHBoT1zeONvyCfwQxIkUshLAOqN/k9EjGviPRmWTTe6aH2qySWKTVSw==}
 
   '@types/node@25.3.5':
     resolution: {integrity: sha512-oX8xrhvpiyRCQkG1MFchB09f+cXftgIXb3a7UUa4Y3wpmZPw5tyZGTLWhlESOLq1Rq6oDlc8npVU2/9xiCuXMA==}
@@ -9607,6 +9620,13 @@ snapshots:
 
   '@nolyfill/is-core-module@1.0.39': {}
 
+  '@notionhq/client@2.3.0':
+    dependencies:
+      '@types/node-fetch': 2.6.13
+      node-fetch: 2.7.0
+    transitivePeerDependencies:
+      - encoding
+
   '@oclif/core@4.8.3':
     dependencies:
       ansi-escapes: 4.3.2
@@ -12009,6 +12029,11 @@ snapshots:
     dependencies:
       '@types/node': 25.3.5
 
+  '@types/node-fetch@2.6.13':
+    dependencies:
+      '@types/node': 25.3.5
+      form-data: 4.0.5
+
   '@types/node@25.3.5':
     dependencies:
       undici-types: 7.18.2
@@ -13367,7 +13392,6 @@ snapshots:
       '@esbuild/win32-arm64': 0.27.3
       '@esbuild/win32-ia32': 0.27.3
       '@esbuild/win32-x64': 0.27.3
-    optional: true
 
   escalade@3.2.0: {}
 
@@ -16462,7 +16486,6 @@ snapshots:
       get-tsconfig: 4.13.6
     optionalDependencies:
       fsevents: 2.3.3
-    optional: true
 
   tunnel-agent@0.6.0:
     dependencies:

@@ -1,9 +1,13 @@
 import { Suspense } from "react";
 import Image from "next/image";
 import { useTranslations } from "next-intl";
+import { getLocale, getTranslations } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getClient } from "@/sanity/lib/client";
+import { FEATURED_ARTICLES_QUERY } from "@/sanity/lib/queries";
+import { ArticleCard } from "@/components/journal/article-card";
 
 export default function HomePage() {
   const t = useTranslations();
@@ -81,9 +85,9 @@ export default function HomePage() {
             <Link href="/journal">{t("common.viewAll")} →</Link>
           </Button>
         </div>
-        <p className="text-muted-foreground text-sm">
-          {t("home.journalPlaceholder")}
-        </p>
+        <Suspense fallback={<ArticlesSkeleton />}>
+          <FeaturedArticles />
+        </Suspense>
       </section>
 
       {/* Events */}
@@ -142,6 +146,22 @@ function FeaturedProductsSkeleton() {
   );
 }
 
+function ArticlesSkeleton() {
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div key={i}>
+          <Skeleton className="aspect-[3/2] w-full mb-4" />
+          <div className="space-y-2">
+            <Skeleton className="h-3 w-16" />
+            <Skeleton className="h-4 w-3/4" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 async function FeaturedProducts() {
   try {
     const { getProducts } = await import("@/lib/shopify");
@@ -156,6 +176,58 @@ async function FeaturedProducts() {
     return (
       <p className="text-muted-foreground text-sm">
         {t("productsPlaceholder")}
+      </p>
+    );
+  }
+}
+
+async function FeaturedArticles() {
+  const locale = await getLocale();
+  const t = await getTranslations();
+
+  try {
+    const client = getClient();
+    const articles = await client.fetch(FEATURED_ARTICLES_QUERY, {
+      language: locale,
+    });
+
+    if (!articles || articles.length === 0) {
+      return (
+        <p className="text-muted-foreground text-sm">
+          {t("home.journalPlaceholder")}
+        </p>
+      );
+    }
+
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-8">
+        {articles.map(
+          (article: {
+            _id: string;
+            slug: { current: string };
+            title: string;
+            excerpt?: string;
+            thumbnail?: { asset: object; alt?: string };
+            mainImage?: { asset: object; alt?: string };
+            publishedAt?: string;
+            memberOnly?: boolean;
+            category?: { title: string; slug: { current: string } };
+            author?: { name: string; image?: { asset: object } };
+          }) => (
+            <ArticleCard
+              key={article._id}
+              article={article}
+              locale={locale}
+              memberOnlyLabel={t("common.memberOnly")}
+            />
+          )
+        )}
+      </div>
+    );
+  } catch {
+    return (
+      <p className="text-muted-foreground text-sm">
+        {t("home.journalPlaceholder")}
       </p>
     );
   }

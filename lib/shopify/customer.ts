@@ -138,6 +138,30 @@ export type Customer = {
   };
 };
 
+export type SubscriptionContract = {
+  id: string;
+  status: string;
+  createdAt: string;
+  nextBillingDate: string | null;
+  deliveryPolicy: {
+    interval: string;
+    intervalCount: number;
+  };
+  lines: {
+    edges: {
+      node: {
+        id: string;
+        title: string;
+        variantTitle: string | null;
+        quantity: number;
+        currentPrice: { amount: string; currencyCode: string };
+        productId: string;
+        variantImage: { url: string; altText: string | null } | null;
+      };
+    }[];
+  };
+};
+
 const CUSTOMER_QUERY = /* GraphQL */ `
   query {
     customer {
@@ -154,6 +178,40 @@ const CUSTOMER_QUERY = /* GraphQL */ `
             processedAt
             financialStatus
             totalPrice { amount currencyCode }
+          }
+        }
+      }
+    }
+  }
+`;
+
+const SUBSCRIPTION_CONTRACTS_QUERY = /* GraphQL */ `
+  query {
+    customer {
+      subscriptionContracts(first: 20) {
+        edges {
+          node {
+            id
+            status
+            createdAt
+            nextBillingDate
+            deliveryPolicy {
+              interval
+              intervalCount
+            }
+            lines(first: 10) {
+              edges {
+                node {
+                  id
+                  title
+                  variantTitle
+                  quantity
+                  currentPrice { amount currencyCode }
+                  productId
+                  variantImage { url altText }
+                }
+              }
+            }
           }
         }
       }
@@ -182,6 +240,185 @@ export async function getCustomer(accessToken: string): Promise<Customer | null>
     return null;
   }
   return json.data?.customer ?? null;
+}
+
+export async function getSubscriptionContracts(
+  accessToken: string
+): Promise<SubscriptionContract[]> {
+  const res = await fetch(CUSTOMER_API_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: accessToken,
+    },
+    body: JSON.stringify({ query: SUBSCRIPTION_CONTRACTS_QUERY }),
+  });
+
+  if (!res.ok) {
+    console.error("Subscription API error:", res.status);
+    return [];
+  }
+
+  const json = await res.json();
+  if (json.errors) {
+    // Customer Account API may not support subscriptionContracts on all plans
+    console.error("Subscription API GraphQL errors:", JSON.stringify(json.errors));
+    return [];
+  }
+
+  const edges = json.data?.customer?.subscriptionContracts?.edges ?? [];
+  return edges.map((e: { node: SubscriptionContract }) => e.node);
+}
+
+// --- Subscription management mutations ---
+
+const SUBSCRIPTION_PAUSE_MUTATION = /* GraphQL */ `
+  mutation subscriptionContractPause($subscriptionContractId: ID!) {
+    subscriptionContractPause(subscriptionContractId: $subscriptionContractId) {
+      contract {
+        id
+        status
+      }
+      userErrors {
+        field
+        message
+      }
+    }
+  }
+`;
+
+const SUBSCRIPTION_ACTIVATE_MUTATION = /* GraphQL */ `
+  mutation subscriptionContractActivate($subscriptionContractId: ID!) {
+    subscriptionContractActivate(subscriptionContractId: $subscriptionContractId) {
+      contract {
+        id
+        status
+      }
+      userErrors {
+        field
+        message
+      }
+    }
+  }
+`;
+
+const SUBSCRIPTION_CANCEL_MUTATION = /* GraphQL */ `
+  mutation subscriptionContractCancel($subscriptionContractId: ID!) {
+    subscriptionContractCancel(subscriptionContractId: $subscriptionContractId) {
+      contract {
+        id
+        status
+      }
+      userErrors {
+        field
+        message
+      }
+    }
+  }
+`;
+
+const SUBSCRIPTION_BILLING_SKIP_MUTATION = /* GraphQL */ `
+  mutation subscriptionBillingCycleSkip($subscriptionContractId: ID!, $billingCycleIndex: Int!) {
+    subscriptionBillingCycleSkip(
+      subscriptionContractId: $subscriptionContractId
+      billingCycleIndex: $billingCycleIndex
+    ) {
+      billingCycle {
+        skipped
+      }
+      userErrors {
+        field
+        message
+      }
+    }
+  }
+`;
+
+type SubscriptionMutationResult = {
+  success: boolean;
+  error?: string;
+};
+
+async function executeSubscriptionMutation(
+  accessToken: string,
+  query: string,
+  variables: Record<string, unknown>
+): Promise<SubscriptionMutationResult> {
+  const res = await fetch(CUSTOMER_API_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: accessToken,
+    },
+    body: JSON.stringify({ query, variables }),
+  });
+
+  if (!res.ok) {
+    return { success: false, error: `API error: ${res.status}` };
+  }
+
+  const json = await res.json();
+  // Check for userErrors in any mutation response
+  const data = json.data;
+  if (data) {
+    const mutationKey = Object.keys(data)[0];
+    if (mutationKey) {
+      const result = data[mutationKey];
+      if (result?.userErrors?.length > 0) {
+        return {
+          success: false,
+          error: result.userErrors.map((e: { message: string }) => e.message).join(", "),
+        };
+      }
+    }
+  }
+
+  if (json.errors) {
+    return {
+      success: false,
+      error: json.errors.map((e: { message: string }) => e.message).join(", "),
+    };
+  }
+
+  return { success: true };
+}
+
+export async function pauseSubscription(
+  accessToken: string,
+  subscriptionContractId: string
+): Promise<SubscriptionMutationResult> {
+  return executeSubscriptionMutation(accessToken, SUBSCRIPTION_PAUSE_MUTATION, {
+    subscriptionContractId,
+  });
+}
+
+export async function activateSubscription(
+  accessToken: string,
+  subscriptionContractId: string
+): Promise<SubscriptionMutationResult> {
+  return executeSubscriptionMutation(accessToken, SUBSCRIPTION_ACTIVATE_MUTATION, {
+    subscriptionContractId,
+  });
+}
+
+export async function cancelSubscription(
+  accessToken: string,
+  subscriptionContractId: string
+): Promise<SubscriptionMutationResult> {
+  return executeSubscriptionMutation(accessToken, SUBSCRIPTION_CANCEL_MUTATION, {
+    subscriptionContractId,
+  });
+}
+
+export async function skipNextBillingCycle(
+  accessToken: string,
+  subscriptionContractId: string,
+  billingCycleIndex: number = 0
+): Promise<SubscriptionMutationResult> {
+  return executeSubscriptionMutation(accessToken, SUBSCRIPTION_BILLING_SKIP_MUTATION, {
+    subscriptionContractId,
+    billingCycleIndex,
+  });
 }
 
 // --- Token encryption/decryption ---

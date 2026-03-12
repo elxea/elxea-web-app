@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "sync:notion": "tsx scripts/sync-notion-to-sanity.ts",
+    "sync:notion:dry": "tsx scripts/sync-notion-to-sanity.ts --dry-run"
   },
   "dependencies": {
     "@portabletext/react": "^6.0.3",
@@ -38,6 +40,8 @@
     "eslint-config-next": "^15.5.12",
     "postcss": "^8.5.8",
     "tailwindcss": "^4.2.1",
+    "@notionhq/client": "^2.3.0",
+    "tsx": "^4.19.0",
     "typescript": "^5.9.3"
   },
   "packageManager": "pnpm@10.30.0"

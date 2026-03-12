@@ -55,6 +55,51 @@ const nextConfig: NextConfig = {
         destination: "/ja/products",
         permanent: true,
       },
+      // Webflow tea menus → tea-menu
+      {
+        source: "/tea-menus/:slug",
+        destination: "/ja/tea-menu/:slug",
+        permanent: true,
+      },
+      {
+        source: "/tea-menus",
+        destination: "/ja/tea-menu",
+        permanent: true,
+      },
+      // Webflow experience → playlists
+      {
+        source: "/experience/:slug",
+        destination: "/ja/playlists/:slug",
+        permanent: true,
+      },
+      {
+        source: "/experience",
+        destination: "/ja/playlists",
+        permanent: true,
+      },
+      // Webflow elxea journals
+      {
+        source: "/elxea-journals/:slug",
+        destination: "/ja/elxea-journal/:slug",
+        permanent: true,
+      },
+      {
+        source: "/elxea-journals",
+        destination: "/ja/elxea-journal",
+        permanent: true,
+      },
+      // Webflow people → people
+      {
+        source: "/people/:slug",
+        destination: "/ja/people/:slug",
+        permanent: true,
+      },
+      // Webflow post categories
+      {
+        source: "/blog/category/:slug",
+        destination: "/ja/journal?category=:slug",
+        permanent: true,
+      },
       // Webflow privacy/terms
       {
         source: "/privacy-policy",

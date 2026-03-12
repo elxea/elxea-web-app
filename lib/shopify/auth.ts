@@ -4,7 +4,9 @@ import {
   refreshAccessToken,
   encryptToken,
   getCustomer,
+  getSubscriptionContracts,
   type Customer,
+  type SubscriptionContract,
 } from "./customer";
 
 const ACCESS_TOKEN_COOKIE = "shop_at";
@@ -65,6 +67,17 @@ export async function getCustomerFromSession(): Promise<Customer | null> {
   } catch (e) {
     console.error("getCustomerFromSession error:", e);
     return null;
+  }
+}
+
+export async function getSubscriptionsFromSession(): Promise<SubscriptionContract[]> {
+  try {
+    const session = await getSession();
+    if (!session) return [];
+    return await getSubscriptionContracts(session.accessToken);
+  } catch (e) {
+    console.error("getSubscriptionsFromSession error:", e);
+    return [];
   }
 }
 

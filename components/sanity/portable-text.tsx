@@ -76,6 +76,41 @@ const components: PortableTextComponents = {
         </figure>
       );
     },
+    ctaBlock: ({ value }) => {
+      if (!value) return null;
+      const href = value.url || (value.shopifyHandle ? `/products/${value.shopifyHandle}` : null);
+      const image = value.image;
+
+      return (
+        <div className="my-10 border border-border rounded-lg overflow-hidden">
+          {image?.asset && (
+            <Image
+              src={urlFor(image).width(800).height(400).url()}
+              alt={value.title || ""}
+              width={800}
+              height={400}
+              sizes="(max-width: 768px) 100vw, 768px"
+              className="w-full object-cover"
+            />
+          )}
+          <div className="p-6">
+            {value.title && (
+              <p className="text-sm font-medium mb-3">{value.title}</p>
+            )}
+            {href && (
+              <a
+                href={href}
+                target={value.url?.startsWith("http") ? "_blank" : undefined}
+                rel={value.url?.startsWith("http") ? "noopener noreferrer" : undefined}
+                className="inline-block text-xs font-medium border border-foreground px-4 py-2 hover:bg-foreground hover:text-background transition-colors"
+              >
+                {value.title || "詳しく見る"}
+              </a>
+            )}
+          </div>
+        </div>
+      );
+    },
   },
 };
 

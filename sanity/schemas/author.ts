@@ -25,9 +25,19 @@ export const author = defineType({
       options: { hotspot: true },
     }),
     defineField({
+      name: "role",
+      title: "役割",
+      type: "string",
+    }),
+    defineField({
       name: "bio",
       title: "自己紹介",
       type: "text",
+    }),
+    defineField({
+      name: "website",
+      title: "Webサイト",
+      type: "url",
     }),
   ],
   preview: {
