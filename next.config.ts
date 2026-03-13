@@ -21,6 +21,12 @@ const nextConfig: NextConfig = {
   // MS10.4: Webflow → Next.js redirects (old site URL structure → new)
   async redirects() {
     return [
+      // Shopify checkout: DNS now points to Vercel, redirect to Shopify
+      {
+        source: "/cart/c/:path*",
+        destination: "https://elxea.myshopify.com/cart/c/:path*",
+        permanent: false,
+      },
       // Webflow blog posts → journal
       {
         source: "/blog/:slug",
