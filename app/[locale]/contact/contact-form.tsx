@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,11 +11,23 @@ import { Card, CardContent } from "@/components/ui/card";
 export function ContactForm() {
   const t = useTranslations("contact");
   const [submitted, setSubmitted] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    // TODO: Integrate with email service (e.g., Resend, SendGrid, or form service)
-    setSubmitted(true);
+    setSending(true);
+    setError(false);
+
+    try {
+      // TODO: Integrate with email service (e.g., Resend, SendGrid, or form service)
+      await new Promise((r) => setTimeout(r, 500));
+      setSubmitted(true);
+    } catch {
+      setError(true);
+    } finally {
+      setSending(false);
+    }
   };
 
   if (submitted) {
@@ -36,6 +49,7 @@ export function ContactForm() {
           id="name"
           name="name"
           required
+          disabled={sending}
         />
       </div>
 
@@ -46,6 +60,7 @@ export function ContactForm() {
           id="email"
           name="email"
           required
+          disabled={sending}
         />
       </div>
 
@@ -56,6 +71,7 @@ export function ContactForm() {
           id="subject"
           name="subject"
           required
+          disabled={sending}
         />
       </div>
 
@@ -66,12 +82,17 @@ export function ContactForm() {
           name="message"
           rows={6}
           required
+          disabled={sending}
           className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
         />
       </div>
 
-      <Button type="submit" variant="outline">
-        {t("submit")}
+      {error && (
+        <p className="text-sm text-destructive">{t("error")}</p>
+      )}
+
+      <Button type="submit" variant="outline" disabled={sending}>
+        {sending ? <Loader2 className="size-4 animate-spin" /> : t("submit")}
       </Button>
     </form>
   );

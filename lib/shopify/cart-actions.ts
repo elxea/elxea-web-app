@@ -1,6 +1,7 @@
 "use server";
 
 import { cookies } from "next/headers";
+import { revalidatePath } from "next/cache";
 import {
   createCart,
   addToCart,
@@ -37,10 +38,13 @@ export async function addItem(merchandiseId: string, quantity = 1, sellingPlanId
     const cart = await createCart([line]);
     if (!cart?.id) throw new Error("Failed to create cart");
     await setCartId(cart.id);
+    revalidatePath("/", "layout");
     return cart;
   }
 
-  return addToCart(cartId, [line]);
+  const result = await addToCart(cartId, [line]);
+  revalidatePath("/", "layout");
+  return result;
 }
 
 export async function updateItem(
@@ -52,15 +56,21 @@ export async function updateItem(
   if (!cartId) throw new Error("No cart found");
 
   if (quantity === 0) {
-    return removeFromCart(cartId, [lineId]);
+    const result = await removeFromCart(cartId, [lineId]);
+    revalidatePath("/", "layout");
+    return result;
   }
 
-  return updateCart(cartId, [{ id: lineId, merchandiseId, quantity }]);
+  const result = await updateCart(cartId, [{ id: lineId, merchandiseId, quantity }]);
+  revalidatePath("/", "layout");
+  return result;
 }
 
 export async function removeItem(lineId: string) {
   const cartId = await getCartId();
   if (!cartId) throw new Error("No cart found");
 
-  return removeFromCart(cartId, [lineId]);
+  const result = await removeFromCart(cartId, [lineId]);
+  revalidatePath("/", "layout");
+  return result;
 }

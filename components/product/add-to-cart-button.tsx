@@ -1,6 +1,8 @@
 "use client";
 
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
+import { toast } from "sonner";
+import { Loader2 } from "lucide-react";
 import { useCart } from "@/components/cart/cart-context";
 import { Button } from "@/components/ui/button";
 import { trackAddToCart } from "@/lib/analytics";
@@ -21,6 +23,7 @@ export function AddToCartButton({
   currencyCode?: string;
 }) {
   const t = useTranslations("common");
+  const locale = useLocale();
   const { addToCart, isPending } = useCart();
 
   if (!availableForSale) {
@@ -35,7 +38,7 @@ export function AddToCartButton({
     <Button
       size="lg"
       className="w-full h-12"
-      onClick={() => {
+      onClick={async () => {
         trackAddToCart({
           id: merchandiseId,
           name: productName || "",
@@ -43,11 +46,21 @@ export function AddToCartButton({
           currency: currencyCode || "JPY",
           quantity: 1,
         });
-        addToCart(merchandiseId, 1, sellingPlanId);
+        await addToCart(merchandiseId, 1, sellingPlanId);
+        toast(t("addedToCart"), {
+          action: {
+            label: t("viewCart"),
+            onClick: () => {
+              window.location.href = `/${locale}/cart`;
+            },
+          },
+        });
       }}
       disabled={isPending}
     >
-      {isPending ? "..." : sellingPlanId ? t("subscribe") : t("addToCart")}
+      {isPending ? (
+        <Loader2 className="size-4 animate-spin" />
+      ) : sellingPlanId ? t("subscribe") : t("addToCart")}
     </Button>
   );
 }

@@ -8,6 +8,7 @@ import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { trackBeginCheckout, trackRemoveFromCart } from "@/lib/analytics";
+import { toast } from "sonner";
 
 export function CartContent() {
   const t = useTranslations("common");
@@ -113,7 +114,7 @@ export function CartContent() {
                 variant="link"
                 size="sm"
                 className="text-muted-foreground h-auto p-0"
-                onClick={() => {
+                onClick={async () => {
                   trackRemoveFromCart({
                     id: item.merchandise.id,
                     name: item.merchandise.product.title,
@@ -121,7 +122,8 @@ export function CartContent() {
                     currency: item.merchandise.price.currencyCode,
                     quantity: item.quantity,
                   });
-                  removeFromCart(item.id);
+                  await removeFromCart(item.id);
+                  toast(t("removedFromCart"));
                 }}
                 disabled={isPending}
               >

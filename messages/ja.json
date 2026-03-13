@@ -15,6 +15,9 @@
     "viewAll": "すべて見る",
     "readMore": "続きを読む",
     "addToCart": "カートに追加",
+    "addedToCart": "カートに追加しました",
+    "viewCart": "カートを見る",
+    "removedFromCart": "カートから削除しました",
     "checkout": "購入手続きへ",
     "subtotal": "小計",
     "quantity": "数量",
@@ -202,6 +205,7 @@
     "message": "お問い合わせ内容",
     "submit": "送信する",
     "success": "お問い合わせを受け付けました。2営業日以内にご返信いたします。",
+    "error": "送信に失敗しました。もう一度お試しください。",
     "emailDirect": "メールでのお問い合わせ",
     "emailAddress": "support@elxea.com",
     "responseTime": "通常2営業日以内にご返信いたします。"

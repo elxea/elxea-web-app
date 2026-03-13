@@ -7,6 +7,8 @@ import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
 import { CartProviderWrapper } from "@/components/cart/cart-provider-wrapper";
 import { CookieConsent } from "@/components/ui/cookie-consent";
+import { Toaster } from "@/components/ui/sonner";
+import { ScrollToTop } from "@/components/ui/scroll-to-top";
 
 export const metadata: Metadata = {
   title: {
@@ -69,6 +71,8 @@ export default async function LocaleLayout({
             <main className="flex-1">{children}</main>
             <Footer />
             <CookieConsent />
+            <Toaster />
+            <ScrollToTop />
           </CartProviderWrapper>
         </NextIntlClientProvider>
       </body>

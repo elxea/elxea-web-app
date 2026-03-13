@@ -15,6 +15,9 @@
     "viewAll": "View All",
     "readMore": "Read More",
     "addToCart": "Add to Cart",
+    "addedToCart": "Added to cart",
+    "viewCart": "View Cart",
+    "removedFromCart": "Removed from cart",
     "checkout": "Checkout",
     "subtotal": "Subtotal",
     "quantity": "Quantity",
@@ -202,6 +205,7 @@
     "message": "Message",
     "submit": "Send",
     "success": "Your inquiry has been received. We will respond within 2 business days.",
+    "error": "Failed to send. Please try again.",
     "emailDirect": "Email Us Directly",
     "emailAddress": "support@elxea.com",
     "responseTime": "We typically respond within 2 business days."

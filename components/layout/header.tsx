@@ -14,6 +14,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
+import { useCart } from "@/components/cart/cart-context";
 import { Menu } from "lucide-react";
 
 export function Header() {
@@ -22,6 +23,8 @@ export function Header() {
   const locale = useLocale();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const { cart } = useCart();
+  const cartCount = cart?.totalQuantity ?? 0;
 
   useEffect(() => {
     setIsLoggedIn(document.cookie.includes("shop_auth=1"));
@@ -169,10 +172,17 @@ export function Header() {
             <Button
               variant="ghost"
               size="sm"
-              className="text-muted-foreground"
+              className="text-muted-foreground relative"
               asChild
             >
-              <Link href="/cart">{t("cart")}</Link>
+              <Link href="/cart">
+                {t("cart")}
+                {cartCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-foreground text-background text-[10px] font-medium size-4 flex items-center justify-center">
+                    {cartCount > 99 ? "99+" : cartCount}
+                  </span>
+                )}
+              </Link>
             </Button>
           </div>
         </div>
