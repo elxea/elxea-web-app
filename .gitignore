@@ -64,3 +64,4 @@ backup-before-cleanup/
 
 # vercel env pull
 .env.vercel
+.env.staging

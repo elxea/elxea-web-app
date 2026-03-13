@@ -19,9 +19,22 @@ export function ContactForm() {
     setSending(true);
     setError(false);
 
+    const form = e.currentTarget;
+    const formData = new FormData(form);
+
     try {
-      // TODO: Integrate with email service (e.g., Resend, SendGrid, or form service)
-      await new Promise((r) => setTimeout(r, 500));
+      const res = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: formData.get("name"),
+          email: formData.get("email"),
+          subject: formData.get("subject"),
+          message: formData.get("message"),
+        }),
+      });
+
+      if (!res.ok) throw new Error("Failed to send");
       setSubmitted(true);
     } catch {
       setError(true);
