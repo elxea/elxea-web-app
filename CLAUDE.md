@@ -71,11 +71,12 @@ N/A（構築前）
 4. 「メモしておいて」「作業ログを残して」「記録して」等の指示 → Devlog エントリの作成（タスクページへの書き込みではない）
 
 ### 必須プロパティ
-- **Name**: 作業内容を端的に
-- **Type**: `Devlog`（プラン記録は `Proposal`、調査記録は `Research`）
+グローバル CLAUDE.md の「記録ルール」に準拠。以下はエージェント固有の補足：
+- **Name**: Type の値と同じ文字列を入れる（例: Type が Devlog なら Name も「Devlog」）。詳細は Note またはページ本文に記載
+- **Type**: `Devlog` / `Proposal` / `Research` / `Spec` / `Design` / `Review`（グローバル CLAUDE.md の判定基準に従う）
 - **Project**: 下記「Project の決定方法」に従う
 - **Assignee**: Developer（People List: `31c70c9d-064c-8154-bf27-f0e059e2b952`）
-- **Date**: 作業日
+- **Date**: `date` コマンドで JST 取得 → UTC 変換（JST-9h）→ `date:Data:start` に ISO-8601 datetime を分単位で設定、`is_datetime: 1`
 
 ### Project の決定方法（優先順）
 1. **タスク起点の作業**: 作業対象タスク（All Tasks List）の Project リレーションをそのまま引き継ぐ
@@ -252,3 +253,7 @@ N/A（プロジェクトごとに設定）
 - 他エージェントのリポのコードを勝手に変更しない（Boss が指示、Developer が実行）
 - 新しいクラウドサービスを追加する場合は Setaka に事前確認（無料枠運用の原則）
 - `--force` や `--no-verify` は原則禁止
+
+## Notion DB 操作ルール
+
+Notion DB への記録・更新を行う前に、必ずグローバル CLAUDE.md（`~/.claude/CLAUDE.md`）の「記録ルール」「All Tasks DB 運用ルール」セクションを参照・遵守すること。
