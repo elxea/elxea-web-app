@@ -459,3 +459,37 @@ export function decryptToken(encrypted: string): string | null {
     return null;
   }
 }
+
+// --- id_token helpers ---
+
+/**
+ * Extract the numeric Shopify Customer ID from a Shopify Customer Account API id_token.
+ *
+ * The id_token is a JWT. Its payload contains:
+ *   sub: "gid://shopify/Customer/12345"  (Customer GID)
+ *
+ * We decode the JWT payload without verifying the signature (the access_token
+ * already proves the session is valid). This avoids an extra API round-trip on
+ * every authenticated request.
+ *
+ * Returns the numeric portion (e.g. "12345") or null if decoding fails.
+ */
+export function extractCustomerIdFromIdToken(idToken: string): string | null {
+  try {
+    const parts = idToken.split(".");
+    if (parts.length < 2) return null;
+
+    // Base64url → Base64 → JSON
+    const payload = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const json = JSON.parse(Buffer.from(payload, "base64").toString("utf8"));
+
+    const sub: string | undefined = json.sub;
+    if (!sub) return null;
+
+    // sub is a GID: "gid://shopify/Customer/12345"
+    const match = sub.match(/(\d+)$/);
+    return match ? match[1] : null;
+  } catch {
+    return null;
+  }
+}

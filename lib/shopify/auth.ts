@@ -157,6 +157,7 @@ export async function clearSession(): Promise<void> {
   cookieStore.delete(REFRESH_TOKEN_COOKIE);
   cookieStore.delete(EXPIRES_AT_COOKIE);
   cookieStore.delete(AUTH_FLAG_COOKIE);
+  cookieStore.delete("shop_cid"); // cached customer ID from id_token
 }
 
 /**

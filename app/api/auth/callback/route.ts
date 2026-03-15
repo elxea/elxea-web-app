@@ -1,9 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { exchangeToken, encryptToken, getCustomer } from "@/lib/shopify/customer";
+import {
+  exchangeToken,
+  encryptToken,
+  getCustomer,
+  extractCustomerIdFromIdToken,
+} from "@/lib/shopify/customer";
 import { sendWelcomeEmail } from "@/lib/email/welcome";
 
 export async function GET(request: NextRequest) {
-  const { searchParams, origin } = request.nextUrl;
+  const { searchParams } = request.nextUrl;
+  // NEXT_PUBLIC_APP_URL allows overriding the app base URL (e.g. for tunnels in local dev)
+  const origin = process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin;
   const code = searchParams.get("code");
   const state = searchParams.get("state");
 
@@ -52,6 +59,17 @@ export async function GET(request: NextRequest) {
       path: "/",
       maxAge: tokens.expires_in,
     });
+
+    // Cache the Shopify Customer ID extracted from the id_token JWT.
+    // This avoids an extra Shopify Customer API call on every authenticated request.
+    // The numeric customer ID (e.g. "7654321") is encrypted and stored as shop_cid.
+    const customerId = extractCustomerIdFromIdToken(tokens.id_token);
+    if (customerId) {
+      response.cookies.set("shop_cid", encryptToken(customerId), {
+        ...cookieOptions,
+        maxAge: 60 * 60 * 24 * 30, // 30 days (same as refresh token)
+      });
+    }
 
     // Clean up PKCE cookies
     response.cookies.delete("shop_cv");
