@@ -28,11 +28,11 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     siteName: "elxea",
-    images: [{ url: "/og-image.jpg", width: 1000, height: 628, alt: "elxea - Specialty Coffee & Tea" }],
+    images: [{ url: "/og-image.png", width: 1200, height: 630, alt: "elxea - Specialty Coffee & Tea" }],
   },
   twitter: {
     card: "summary_large_image",
-    images: ["/og-image.jpg"],
+    images: ["/og-image.png"],
   },
   other: {
     "theme-color": "#333333",

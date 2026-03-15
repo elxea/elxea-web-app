@@ -2,7 +2,6 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import {
   pauseSubscriptionAction,
@@ -18,18 +17,40 @@ type FrequencyOption = {
   intervalCount: number;
 };
 
+export type SubscriptionActionLabels = {
+  skipNext: string;
+  changeFrequency: string;
+  pauseSubscription: string;
+  cancelSubscription: string;
+  confirmCancel: string;
+  resumeSubscription: string;
+  selectFrequency: string;
+  cancel: string;
+  actionError: string;
+  frequencyChanged: string;
+  frequencyChangeError: string;
+  frequencyOptions: {
+    everyWeek: string;
+    every2Weeks: string;
+    everyMonth: string;
+    every2Months: string;
+    every3Months: string;
+  };
+};
+
 export function SubscriptionActions({
   contractId,
   status,
   currentInterval,
   currentIntervalCount,
+  labels,
 }: {
   contractId: string;
   status: string;
   currentInterval?: string;
   currentIntervalCount?: number;
+  labels: SubscriptionActionLabels;
 }) {
-  const t = useTranslations("account");
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -38,11 +59,11 @@ export function SubscriptionActions({
   const [showFrequencyPicker, setShowFrequencyPicker] = useState(false);
 
   const frequencyOptions: FrequencyOption[] = [
-    { label: t("frequencyEveryWeek"), interval: "WEEK", intervalCount: 1 },
-    { label: t("frequencyEvery2Weeks"), interval: "WEEK", intervalCount: 2 },
-    { label: t("frequencyEveryMonth"), interval: "MONTH", intervalCount: 1 },
-    { label: t("frequencyEvery2Months"), interval: "MONTH", intervalCount: 2 },
-    { label: t("frequencyEvery3Months"), interval: "MONTH", intervalCount: 3 },
+    { label: labels.frequencyOptions.everyWeek, interval: "WEEK", intervalCount: 1 },
+    { label: labels.frequencyOptions.every2Weeks, interval: "WEEK", intervalCount: 2 },
+    { label: labels.frequencyOptions.everyMonth, interval: "MONTH", intervalCount: 1 },
+    { label: labels.frequencyOptions.every2Months, interval: "MONTH", intervalCount: 2 },
+    { label: labels.frequencyOptions.every3Months, interval: "MONTH", intervalCount: 3 },
   ];
 
   function isCurrentFrequency(option: FrequencyOption): boolean {
@@ -78,7 +99,7 @@ export function SubscriptionActions({
       }
 
       if (result && !result.success) {
-        setError(result.error ?? t("actionError"));
+        setError(result.error ?? labels.actionError);
       } else {
         setConfirmAction(null);
         router.refresh();
@@ -100,10 +121,10 @@ export function SubscriptionActions({
 
       if (result.success) {
         setShowFrequencyPicker(false);
-        setSuccessMessage(t("frequencyChanged"));
+        setSuccessMessage(labels.frequencyChanged);
         router.refresh();
       } else {
-        setError(result.error ?? t("frequencyChangeError"));
+        setError(result.error ?? labels.frequencyChangeError);
       }
     });
   }
@@ -119,7 +140,7 @@ export function SubscriptionActions({
               disabled={isPending}
               onClick={() => handleAction("skip")}
             >
-              {t("skipNext")}
+              {labels.skipNext}
             </Button>
             <Button
               variant="outline"
@@ -130,7 +151,7 @@ export function SubscriptionActions({
                 setConfirmAction(null);
               }}
             >
-              {t("changeFrequency")}
+              {labels.changeFrequency}
             </Button>
             <Button
               variant="outline"
@@ -138,7 +159,7 @@ export function SubscriptionActions({
               disabled={isPending}
               onClick={() => handleAction("pause")}
             >
-              {t("pauseSubscription")}
+              {labels.pauseSubscription}
             </Button>
             {confirmAction === "cancel" ? (
               <Button
@@ -147,7 +168,7 @@ export function SubscriptionActions({
                 disabled={isPending}
                 onClick={() => handleAction("cancel")}
               >
-                {t("confirmCancel")}
+                {labels.confirmCancel}
               </Button>
             ) : (
               <Button
@@ -157,7 +178,7 @@ export function SubscriptionActions({
                 className="text-muted-foreground"
                 onClick={() => handleAction("cancel")}
               >
-                {t("cancelSubscription")}
+                {labels.cancelSubscription}
               </Button>
             )}
           </>
@@ -169,7 +190,7 @@ export function SubscriptionActions({
             disabled={isPending}
             onClick={() => handleAction("activate")}
           >
-            {t("resumeSubscription")}
+            {labels.resumeSubscription}
           </Button>
         )}
       </div>
@@ -178,7 +199,7 @@ export function SubscriptionActions({
       {showFrequencyPicker && status === "ACTIVE" && (
         <div className="mt-4 p-4 border border-border bg-muted/30">
           <p className="text-xs text-muted-foreground mb-3">
-            {t("selectFrequency")}
+            {labels.selectFrequency}
           </p>
           <div className="flex flex-wrap gap-2">
             {frequencyOptions.map((option) => {
@@ -205,7 +226,7 @@ export function SubscriptionActions({
               disabled={isPending}
               className="text-muted-foreground"
             >
-              {t("cancel")}
+              {labels.cancel}
             </Button>
           </div>
         </div>

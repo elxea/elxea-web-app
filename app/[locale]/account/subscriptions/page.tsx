@@ -4,7 +4,7 @@ import { getCustomerFromSession, getSubscriptionsFromSession } from "@/lib/shopi
 import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
 import type { SubscriptionContract } from "@/lib/shopify/customer";
-import { SubscriptionActions } from "@/components/account/subscription-actions";
+import { SubscriptionActions, type SubscriptionActionLabels } from "@/components/account/subscription-actions";
 
 function formatPrice(amount: string, currency: string, locale: string) {
   return new Intl.NumberFormat(locale, {
@@ -119,7 +119,8 @@ function SubscriptionCard({
   const statusLabel = statusMap[subscription.status] ?? subscription.status;
   const statusColor = statusColorMap[subscription.status] ?? "text-muted-foreground bg-muted";
 
-  const { interval, intervalCount } = subscription.deliveryPolicy;
+  const { interval, intervalCount: intervalCountObj } = subscription.deliveryPolicy;
+  const intervalCount = intervalCountObj.count;
   const intervalKey =
     interval === "MONTH"
       ? "intervalMonth"
@@ -189,6 +190,26 @@ function SubscriptionCard({
             status={subscription.status}
             currentInterval={interval}
             currentIntervalCount={intervalCount}
+            labels={{
+              skipNext: t("skipNext"),
+              changeFrequency: t("changeFrequency"),
+              pauseSubscription: t("pauseSubscription"),
+              cancelSubscription: t("cancelSubscription"),
+              confirmCancel: t("confirmCancel"),
+              resumeSubscription: t("resumeSubscription"),
+              selectFrequency: t("selectFrequency"),
+              cancel: t("cancel"),
+              actionError: t("actionError"),
+              frequencyChanged: t("frequencyChanged"),
+              frequencyChangeError: t("frequencyChangeError"),
+              frequencyOptions: {
+                everyWeek: t("frequencyEveryWeek"),
+                every2Weeks: t("frequencyEvery2Weeks"),
+                everyMonth: t("frequencyEveryMonth"),
+                every2Months: t("frequencyEvery2Months"),
+                every3Months: t("frequencyEvery3Months"),
+              },
+            }}
           />
         )}
       </div>

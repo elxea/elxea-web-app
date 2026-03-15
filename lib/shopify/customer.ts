@@ -148,7 +148,7 @@ export type SubscriptionContract = {
   nextBillingDate: string | null;
   deliveryPolicy: {
     interval: string;
-    intervalCount: number;
+    intervalCount: { count: number };
   };
   lines: {
     edges: {
@@ -158,7 +158,6 @@ export type SubscriptionContract = {
         variantTitle: string | null;
         quantity: number;
         currentPrice: { amount: string; currencyCode: string };
-        productId: string;
         variantImage: { url: string; altText: string | null } | null;
       };
     }[];
@@ -201,7 +200,9 @@ const SUBSCRIPTION_CONTRACTS_QUERY = /* GraphQL */ `
             nextBillingDate
             deliveryPolicy {
               interval
-              intervalCount
+              intervalCount {
+                count
+              }
             }
             lines(first: 10) {
               edges {
@@ -211,7 +212,6 @@ const SUBSCRIPTION_CONTRACTS_QUERY = /* GraphQL */ `
                   variantTitle
                   quantity
                   currentPrice { amount currencyCode }
-                  productId
                   variantImage { url altText }
                 }
               }
