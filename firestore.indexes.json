@@ -17,6 +17,14 @@
         { "fieldPath": "type", "order": "ASCENDING" },
         { "fieldPath": "targetId", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "favorites",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "type", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []
