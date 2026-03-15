@@ -19,8 +19,7 @@ test.describe("Smoke tests", () => {
     // Latest journal section
     await expect(page.getByText("最新の記事")).toBeVisible();
 
-    // Upcoming events section
-    await expect(page.getByText("近日開催のイベント")).toBeVisible();
+    // Upcoming events section is shown only when events exist in Sanity CMS (conditional)
   });
 
   test("root / redirects to /ja", async ({ page }) => {
