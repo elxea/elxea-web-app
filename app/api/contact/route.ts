@@ -1,13 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
-import nodemailer from "nodemailer";
+import { Resend } from "resend";
 
+let _resend: Resend | null = null;
+
+function getResend(): Resend {
+  if (!_resend) {
+    const key = process.env.RESEND_API_KEY;
+    if (!key) {
+      throw new Error("RESEND_API_KEY is not configured");
+    }
+    _resend = new Resend(key);
+  }
+  return _resend;
+}
+
+const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "info@elxea.com";
 const TO_EMAIL = process.env.CONTACT_TO_EMAIL || "info@elxea.com";
-const GMAIL_USER = process.env.GMAIL_USER;
-const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD;
 
 export async function POST(request: NextRequest) {
   try {
-    if (!GMAIL_USER || !GMAIL_APP_PASSWORD) {
+    if (!process.env.RESEND_API_KEY) {
       return NextResponse.json(
         { error: "Email service not configured" },
         { status: 503 }
@@ -32,21 +44,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: {
-        user: GMAIL_USER,
-        pass: GMAIL_APP_PASSWORD,
-      },
-    });
-
-    await transporter.sendMail({
-      from: `elxea Contact <${GMAIL_USER}>`,
-      to: TO_EMAIL,
+    const { error } = await getResend().emails.send({
+      from: `elxea Contact <${FROM_EMAIL}>`,
+      to: [TO_EMAIL],
       replyTo: email,
       subject: `[お問い合わせ] ${subject}`,
       text: `名前: ${name}\nメール: ${email}\n件名: ${subject}\n\n${message}`,
     });
+
+    if (error) {
+      console.error("Resend error:", error);
+      return NextResponse.json(
+        { error: "Failed to send email" },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

@@ -119,12 +119,15 @@ export async function refreshAccessToken(refreshToken: string): Promise<TokenRes
 
 // --- Customer Account API queries ---
 
+export type MembershipTier = "none" | "standard" | "premium";
+
 export type Customer = {
   id: string;
   firstName: string | null;
   lastName: string | null;
   emailAddress: { emailAddress: string } | null;
   phoneNumber: { phoneNumber: string } | null;
+  tags: string[];
   orders: {
     edges: {
       node: {
@@ -170,6 +173,7 @@ const CUSTOMER_QUERY = /* GraphQL */ `
       lastName
       emailAddress { emailAddress }
       phoneNumber { phoneNumber }
+      tags
       orders(first: 10, sortKey: PROCESSED_AT, reverse: true) {
         edges {
           node {

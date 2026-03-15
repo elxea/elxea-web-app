@@ -117,9 +117,24 @@ export const article = defineType({
     }),
     defineField({
       name: "memberOnly",
-      title: "会員限定",
+      title: "会員限定（レガシー）",
       type: "boolean",
       initialValue: false,
+      hidden: true,
+    }),
+    defineField({
+      name: "requiredTier",
+      title: "閲覧に必要な会員ティア",
+      type: "string",
+      options: {
+        list: [
+          { title: "全員公開", value: "none" },
+          { title: "スタンダード会員以上", value: "standard" },
+          { title: "プレミアム会員のみ", value: "premium" },
+        ],
+        layout: "radio",
+      },
+      initialValue: "none",
     }),
     defineField({
       name: "publishedAt",
@@ -149,10 +164,11 @@ export const article = defineType({
       title: "title",
       media: "mainImage",
       memberOnly: "memberOnly",
+      requiredTier: "requiredTier",
     },
-    prepare({ title, media, memberOnly }) {
+    prepare({ title, media, memberOnly, requiredTier }) {
       return {
-        title: `${memberOnly ? "🔒 " : ""}${title}`,
+        title: `${memberOnly || requiredTier !== "none" ? "🔒 " : ""}${title}`,
         media,
       };
     },

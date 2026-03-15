@@ -1,0 +1,107 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─── Helper functions ─────────────────────────────────────────────
+
+    // Check if the request is authenticated (any valid token)
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Check if the authenticated user owns this resource
+    // customerId in path corresponds to the numeric portion of Shopify Customer GID
+    function isOwner(customerId) {
+      return isAuthenticated() && request.auth.uid == customerId;
+    }
+
+    // Validate string field: non-empty, within max length
+    function isValidString(field, maxLen) {
+      return field is string && field.size() > 0 && field.size() <= maxLen;
+    }
+
+    // Validate that a timestamp field is a server timestamp
+    function isServerTimestamp(field) {
+      return field == request.time;
+    }
+
+    // ─── Users collection ─────────────────────────────────────────────
+    // users/{customerId}
+    // User document is auto-created; no direct writes needed.
+    match /users/{customerId} {
+      // Users can only read their own document
+      allow read: if isOwner(customerId);
+      // No direct writes to user document (managed by server)
+      allow write: if false;
+
+      // ─── Favorites subcollection ──────────────────────────────────
+      // users/{customerId}/favorites/{docId}
+      match /favorites/{docId} {
+        allow read: if isOwner(customerId);
+        allow create: if isOwner(customerId)
+          && isValidString(request.resource.data.type, 20)
+          && request.resource.data.type in ['product', 'article']
+          && isValidString(request.resource.data.targetId, 255)
+          && isValidString(request.resource.data.title, 500)
+          && isServerTimestamp(request.resource.data.createdAt);
+        allow delete: if isOwner(customerId);
+        // No updates to favorites (delete and recreate)
+        allow update: if false;
+      }
+
+      // ─── Follows subcollection ────────────────────────────────────
+      // users/{customerId}/follows/{docId}
+      match /follows/{docId} {
+        allow read: if isOwner(customerId);
+        allow create: if isOwner(customerId)
+          && isValidString(request.resource.data.farmerSlug, 255)
+          && isValidString(request.resource.data.farmerName, 255)
+          && isServerTimestamp(request.resource.data.createdAt);
+        allow delete: if isOwner(customerId);
+        allow update: if false;
+      }
+
+      // ─── Event registrations subcollection ────────────────────────
+      // users/{customerId}/eventRegistrations/{docId}
+      match /eventRegistrations/{docId} {
+        allow read: if isOwner(customerId);
+        allow create: if isOwner(customerId)
+          && isValidString(request.resource.data.eventSlug, 255)
+          && isValidString(request.resource.data.eventTitle, 500)
+          && isServerTimestamp(request.resource.data.registeredAt);
+        allow delete: if isOwner(customerId);
+        allow update: if false;
+      }
+    }
+
+    // ─── Comments collection (top-level) ──────────────────────────────
+    // comments/{docId}
+    // Readable by anyone (approved comments are public).
+    // Only the author can create; only the author can delete their own.
+    match /comments/{docId} {
+      // Anyone can read approved comments
+      allow read: if resource.data.status == 'approved' || isOwner(resource.data.authorId);
+
+      allow create: if isAuthenticated()
+        && request.resource.data.authorId == request.auth.uid
+        && request.resource.data.targetType in ['article', 'farmer']
+        && isValidString(request.resource.data.targetId, 255)
+        && isValidString(request.resource.data.authorName, 255)
+        && isValidString(request.resource.data.body, 500)
+        && request.resource.data.status == 'approved'
+        && isServerTimestamp(request.resource.data.createdAt);
+
+      // Only the author can delete their own comment
+      allow delete: if isOwner(resource.data.authorId);
+
+      // No client-side updates (moderation is server-side via Admin SDK)
+      allow update: if false;
+    }
+
+    // ─── Deny all other paths ─────────────────────────────────────────
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

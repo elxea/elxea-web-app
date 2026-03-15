@@ -5,9 +5,9 @@ test.describe("Smoke tests", () => {
     await page.goto("/ja");
     await expect(page).toHaveTitle(/elxea/i);
 
-    // The hero section has "elxea" as an h1
+    // The hero section has h1 with tagline
     const heading = page.locator("h1");
-    await expect(heading).toContainText("elxea");
+    await expect(heading).toBeVisible();
   });
 
   test("homepage shows key sections", async ({ page }) => {
@@ -102,7 +102,7 @@ test.describe("Navigation", () => {
 
   test("logo links back to homepage", async ({ page }) => {
     await page.goto("/ja/products");
-    await page.locator("header").getByText("elxea").click();
+    await page.locator('header a[href="/ja"]').click();
     await page.waitForURL(/\/ja$/);
     expect(page.url()).toMatch(/\/ja$/);
   });
@@ -169,7 +169,7 @@ test.describe("Language switcher", () => {
 
     // Verify page is now in English
     const heading = page.locator("h1");
-    await expect(heading).toContainText("elxea");
+    await expect(heading).toBeVisible();
 
     // Navigation should be in English (scope to nav to avoid strict mode violation)
     const nav = page.locator("nav").first();

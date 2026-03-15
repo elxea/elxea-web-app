@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { exchangeToken, encryptToken } from "@/lib/shopify/customer";
+import { exchangeToken, encryptToken, getCustomer } from "@/lib/shopify/customer";
+import { sendWelcomeEmail } from "@/lib/email/welcome";
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = request.nextUrl;
@@ -57,6 +58,33 @@ export async function GET(request: NextRequest) {
     response.cookies.delete("shop_state");
     response.cookies.delete("shop_nonce");
     response.cookies.delete("shop_locale");
+
+    // Send welcome email for new members (no order history = first registration)
+    // Run async without blocking the redirect
+    void (async () => {
+      try {
+        const customer = await getCustomer(tokens.access_token);
+        if (customer) {
+          const isNewMember = customer.orders.edges.length === 0;
+          if (isNewMember) {
+            const customerName =
+              [customer.firstName, customer.lastName].filter(Boolean).join(" ") ||
+              "Guest";
+            const customerEmail = customer.emailAddress?.emailAddress;
+            if (customerEmail) {
+              await sendWelcomeEmail({
+                customerEmail,
+                customerName,
+                locale: locale as "ja" | "en",
+              });
+            }
+          }
+        }
+      } catch (err) {
+        // Non-blocking: welcome email failure should not affect login
+        console.error("[Auth Callback] Welcome email error:", err);
+      }
+    })();
 
     return response;
   } catch (error) {

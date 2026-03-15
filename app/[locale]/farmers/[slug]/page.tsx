@@ -6,6 +6,8 @@ import { getClient } from "@/sanity/lib/client";
 import { FARMER_BY_SLUG_QUERY } from "@/sanity/lib/queries";
 import { urlFor } from "@/sanity/lib/image";
 import { PortableText } from "@/components/sanity/portable-text";
+import { FollowButton } from "@/components/farmers/follow-button";
+import { CommentSection } from "@/components/community/comment-section";
 
 export async function generateMetadata({
   params,
@@ -41,6 +43,8 @@ export default async function FarmerPage({
   const { slug } = await params;
   const locale = await getLocale();
   const t = await getTranslations("farmer");
+  const tCommon = await getTranslations("common");
+  const tComment = await getTranslations("comment");
 
   let farmer;
   try {
@@ -87,9 +91,51 @@ export default async function FarmerPage({
             </p>
           )}
           <h1 className="mb-8">{farmer.name}</h1>
+
+          {/* Follow button */}
+          <div className="mb-8">
+            <FollowButton
+              farmerSlug={slug}
+              farmerName={farmer.name}
+              farmerImageUrl={
+                farmer.photo?.asset
+                  ? urlFor(farmer.photo).width(80).height(80).url()
+                  : null
+              }
+              followLabel={t("follow")}
+              unfollowLabel={t("unfollow")}
+              followedMessage={t("followedMessage")}
+              unfollowedMessage={t("unfollowedMessage")}
+              errorMessage={tCommon("error")}
+              loginRequiredMessage={tCommon("loginRequired")}
+            />
+          </div>
+
           {farmer.bio && <PortableText value={farmer.bio} />}
         </div>
       </div>
+
+      {/* Comment section for farmer profile */}
+      <CommentSection
+        targetType="farmer"
+        targetId={slug}
+        locale={locale}
+        i18n={{
+          title: tComment("title"),
+          placeholder: tComment("placeholder"),
+          submit: tComment("submit"),
+          submitting: tComment("submitting"),
+          loginRequired: tComment("loginRequired"),
+          postedMessage: tComment("postedMessage"),
+          deletedMessage: tComment("deletedMessage"),
+          errorPosting: tComment("errorPosting"),
+          errorDeleting: tComment("errorDeleting"),
+          noComments: tComment("noComments"),
+          delete: tComment("delete"),
+          characterCount: tComment("characterCount"),
+          moderation: tComment("moderation"),
+        }}
+      />
     </div>
   );
 }
