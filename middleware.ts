@@ -32,11 +32,9 @@ export default function middleware(request: NextRequest) {
   // Check if this is an /account route that needs auth
   const accountMatch = pathname.match(/^\/(ja|en)\/account/);
   if (accountMatch) {
-    // Preview mode: skip Shopify auth when PREVIEW_BYPASS is enabled
-    const isPreviewBypass = process.env.PREVIEW_BYPASS === "true";
     const hasSession =
       request.cookies.has("shop_at") && request.cookies.has("shop_rt");
-    if (!hasSession && !isPreviewBypass) {
+    if (!hasSession) {
       const locale = accountMatch[1];
       const loginUrl = new URL("/api/auth/login", request.url);
       loginUrl.searchParams.set("locale", locale);
