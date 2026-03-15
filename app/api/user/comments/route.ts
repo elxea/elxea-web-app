@@ -31,8 +31,16 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const comments = await getComments(targetType, targetId, limit);
-  return NextResponse.json({ comments });
+  try {
+    const comments = await getComments(targetType, targetId, limit);
+    return NextResponse.json({ comments });
+  } catch (err) {
+    console.error("[GET /api/user/comments]", err);
+    return NextResponse.json(
+      { error: "Internal server error", detail: err instanceof Error ? err.message : String(err) },
+      { status: 500 }
+    );
+  }
 }
 
 /**
@@ -40,40 +48,48 @@ export async function GET(request: NextRequest) {
  * Body: { targetType, targetId, body }
  */
 export async function POST(request: NextRequest) {
-  const auth = await requireAuth();
-  if (!auth.authenticated) {
-    return NextResponse.json({ error: auth.error }, { status: auth.status });
-  }
+  try {
+    const auth = await requireAuth();
+    if (!auth.authenticated) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
 
-  const reqBody = await request.json();
-  const { targetType, targetId, body } = reqBody;
+    const reqBody = await request.json();
+    const { targetType, targetId, body } = reqBody;
 
-  if (!targetType || !targetId || !body) {
+    if (!targetType || !targetId || !body) {
+      return NextResponse.json(
+        { error: "Missing required fields: targetType, targetId, body" },
+        { status: 400 }
+      );
+    }
+
+    if (targetType !== "article" && targetType !== "farmer") {
+      return NextResponse.json(
+        { error: "Invalid targetType. Must be 'article' or 'farmer'" },
+        { status: 400 }
+      );
+    }
+
+    const result = await addComment(auth.customerId, {
+      targetType,
+      targetId,
+      authorName: auth.customerName,
+      body,
+    });
+
+    if (!result.success) {
+      return NextResponse.json({ error: result.error }, { status: 400 });
+    }
+
+    return NextResponse.json(result);
+  } catch (err) {
+    console.error("[POST /api/user/comments]", err);
     return NextResponse.json(
-      { error: "Missing required fields: targetType, targetId, body" },
-      { status: 400 }
+      { error: "Internal server error", detail: err instanceof Error ? err.message : String(err) },
+      { status: 500 }
     );
   }
-
-  if (targetType !== "article" && targetType !== "farmer") {
-    return NextResponse.json(
-      { error: "Invalid targetType. Must be 'article' or 'farmer'" },
-      { status: 400 }
-    );
-  }
-
-  const result = await addComment(auth.customerId, {
-    targetType,
-    targetId,
-    authorName: auth.customerName,
-    body,
-  });
-
-  if (!result.success) {
-    return NextResponse.json({ error: result.error }, { status: 400 });
-  }
-
-  return NextResponse.json(result);
 }
 
 /**
@@ -81,29 +97,37 @@ export async function POST(request: NextRequest) {
  * Body: { commentId }
  */
 export async function DELETE(request: NextRequest) {
-  const auth = await requireAuth();
-  if (!auth.authenticated) {
-    return NextResponse.json({ error: auth.error }, { status: auth.status });
-  }
+  try {
+    const auth = await requireAuth();
+    if (!auth.authenticated) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
 
-  const reqBody = await request.json();
-  const { commentId } = reqBody;
+    const reqBody = await request.json();
+    const { commentId } = reqBody;
 
-  if (!commentId) {
+    if (!commentId) {
+      return NextResponse.json(
+        { error: "Missing required field: commentId" },
+        { status: 400 }
+      );
+    }
+
+    const result = await deleteComment(auth.customerId, commentId);
+
+    if (!result.success) {
+      return NextResponse.json(
+        { error: result.error },
+        { status: result.error === "Not authorized to delete this comment" ? 403 : 404 }
+      );
+    }
+
+    return NextResponse.json(result);
+  } catch (err) {
+    console.error("[DELETE /api/user/comments]", err);
     return NextResponse.json(
-      { error: "Missing required field: commentId" },
-      { status: 400 }
+      { error: "Internal server error", detail: err instanceof Error ? err.message : String(err) },
+      { status: 500 }
     );
   }
-
-  const result = await deleteComment(auth.customerId, commentId);
-
-  if (!result.success) {
-    return NextResponse.json(
-      { error: result.error },
-      { status: result.error === "Not authorized to delete this comment" ? 403 : 404 }
-    );
-  }
-
-  return NextResponse.json(result);
 }

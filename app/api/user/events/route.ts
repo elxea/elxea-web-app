@@ -12,21 +12,29 @@ import {
  * Query params: ?check=eventSlug (optional)
  */
 export async function GET(request: NextRequest) {
-  const auth = await requireAuth();
-  if (!auth.authenticated) {
-    return NextResponse.json({ error: auth.error }, { status: auth.status });
+  try {
+    const auth = await requireAuth();
+    if (!auth.authenticated) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+
+    const { searchParams } = request.nextUrl;
+    const checkSlug = searchParams.get("check");
+
+    if (checkSlug) {
+      const registered = await isRegisteredForEvent(auth.customerId, checkSlug);
+      return NextResponse.json({ registered });
+    }
+
+    const registrations = await getEventRegistrations(auth.customerId);
+    return NextResponse.json({ registrations });
+  } catch (err) {
+    console.error("[GET /api/user/events]", err);
+    return NextResponse.json(
+      { error: "Internal server error", detail: err instanceof Error ? err.message : String(err) },
+      { status: 500 }
+    );
   }
-
-  const { searchParams } = request.nextUrl;
-  const checkSlug = searchParams.get("check");
-
-  if (checkSlug) {
-    const registered = await isRegisteredForEvent(auth.customerId, checkSlug);
-    return NextResponse.json({ registered });
-  }
-
-  const registrations = await getEventRegistrations(auth.customerId);
-  return NextResponse.json({ registrations });
 }
 
 /**
@@ -34,29 +42,37 @@ export async function GET(request: NextRequest) {
  * Body: { eventSlug, eventTitle, eventDate, eventImageUrl }
  */
 export async function POST(request: NextRequest) {
-  const auth = await requireAuth();
-  if (!auth.authenticated) {
-    return NextResponse.json({ error: auth.error }, { status: auth.status });
-  }
+  try {
+    const auth = await requireAuth();
+    if (!auth.authenticated) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
 
-  const body = await request.json();
-  const { eventSlug, eventTitle, eventDate, eventImageUrl } = body;
+    const body = await request.json();
+    const { eventSlug, eventTitle, eventDate, eventImageUrl } = body;
 
-  if (!eventSlug || !eventTitle) {
+    if (!eventSlug || !eventTitle) {
+      return NextResponse.json(
+        { error: "Missing required fields: eventSlug, eventTitle" },
+        { status: 400 }
+      );
+    }
+
+    const result = await registerForEvent(auth.customerId, {
+      eventSlug,
+      eventTitle,
+      eventDate: eventDate ?? null,
+      eventImageUrl: eventImageUrl ?? null,
+    });
+
+    return NextResponse.json(result);
+  } catch (err) {
+    console.error("[POST /api/user/events]", err);
     return NextResponse.json(
-      { error: "Missing required fields: eventSlug, eventTitle" },
-      { status: 400 }
+      { error: "Internal server error", detail: err instanceof Error ? err.message : String(err) },
+      { status: 500 }
     );
   }
-
-  const result = await registerForEvent(auth.customerId, {
-    eventSlug,
-    eventTitle,
-    eventDate: eventDate ?? null,
-    eventImageUrl: eventImageUrl ?? null,
-  });
-
-  return NextResponse.json(result);
 }
 
 /**
@@ -64,21 +80,29 @@ export async function POST(request: NextRequest) {
  * Body: { eventSlug }
  */
 export async function DELETE(request: NextRequest) {
-  const auth = await requireAuth();
-  if (!auth.authenticated) {
-    return NextResponse.json({ error: auth.error }, { status: auth.status });
-  }
+  try {
+    const auth = await requireAuth();
+    if (!auth.authenticated) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
 
-  const body = await request.json();
-  const { eventSlug } = body;
+    const body = await request.json();
+    const { eventSlug } = body;
 
-  if (!eventSlug) {
+    if (!eventSlug) {
+      return NextResponse.json(
+        { error: "Missing required field: eventSlug" },
+        { status: 400 }
+      );
+    }
+
+    const result = await cancelEventRegistration(auth.customerId, eventSlug);
+    return NextResponse.json(result);
+  } catch (err) {
+    console.error("[DELETE /api/user/events]", err);
     return NextResponse.json(
-      { error: "Missing required field: eventSlug" },
-      { status: 400 }
+      { error: "Internal server error", detail: err instanceof Error ? err.message : String(err) },
+      { status: 500 }
     );
   }
-
-  const result = await cancelEventRegistration(auth.customerId, eventSlug);
-  return NextResponse.json(result);
 }
