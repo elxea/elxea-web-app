@@ -2,6 +2,7 @@
  * Server-side Firestore operations using Firebase Admin SDK.
  * These are called from API routes (not directly from client components).
  */
+import type { Query } from "firebase-admin/firestore";
 import { getAdminFirestore } from "./admin";
 import { COLLECTIONS, favoritesCol, followsCol, eventRegistrationsCol } from "./collections";
 import type {
@@ -74,10 +75,12 @@ export async function getFavorites(customerId: string, type?: FavoriteType) {
   const db = getAdminFirestore();
   const colPath = favoritesCol(customerId);
 
-  let query = db.collection(colPath).orderBy("createdAt", "desc");
+  // Firestore requires where() before orderBy() when filtering on a different field
+  let query: Query = db.collection(colPath);
   if (type) {
     query = query.where("type", "==", type);
   }
+  query = query.orderBy("createdAt", "desc");
 
   const snapshot = await query.get();
   return snapshot.docs.map((doc) => ({

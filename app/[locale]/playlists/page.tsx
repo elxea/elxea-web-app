@@ -40,7 +40,7 @@ async function PlaylistGrid() {
             albumImage?: { asset: object; alt?: string };
             description?: string;
             artist?: { name: string };
-            colors?: { color1?: string };
+            colors?: { color1?: string; primary?: string };
           }) => (
             <Link
               key={pl._id}
@@ -49,7 +49,7 @@ async function PlaylistGrid() {
             >
               <div
                 className="aspect-square bg-muted mb-4 overflow-hidden"
-                style={pl.colors?.color1 ? { backgroundColor: pl.colors.color1 } : undefined}
+                style={(pl.colors?.color1 || pl.colors?.primary) ? { backgroundColor: pl.colors?.color1 || pl.colors?.primary } : undefined}
               >
                 {pl.albumImage?.asset ? (
                   <Image
