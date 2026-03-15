@@ -6,8 +6,9 @@ import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getClient } from "@/sanity/lib/client";
-import { FEATURED_ARTICLES_QUERY } from "@/sanity/lib/queries";
+import { FEATURED_ARTICLES_QUERY, EVENTS_QUERY } from "@/sanity/lib/queries";
 import { ArticleCard } from "@/components/journal/article-card";
+import { urlFor } from "@/sanity/lib/image";
 
 export default function HomePage() {
   const t = useTranslations();
@@ -91,17 +92,9 @@ export default function HomePage() {
       </section>
 
       {/* Events */}
-      <section className="max-w-7xl mx-auto px-6 py-20">
-        <div className="flex items-end justify-between mb-10">
-          <h2>{t("home.upcomingEvents")}</h2>
-          <Button variant="link" className="p-0 h-auto text-muted-foreground" asChild>
-            <Link href="/events">{t("common.viewAll")} →</Link>
-          </Button>
-        </div>
-        <p className="text-muted-foreground text-sm">
-          {t("home.eventsPlaceholder")}
-        </p>
-      </section>
+      <Suspense fallback={null}>
+        <UpcomingEvents />
+      </Suspense>
 
       {/* Approach — full-width image section */}
       <section className="relative min-h-[50vh] flex items-center justify-center">
@@ -160,6 +153,74 @@ function ArticlesSkeleton() {
       ))}
     </div>
   );
+}
+
+async function UpcomingEvents() {
+  const locale = await getLocale();
+  const t = await getTranslations();
+
+  try {
+    const client = getClient();
+    const events = await client.fetch(EVENTS_QUERY, { language: locale });
+
+    if (!events || events.length === 0) {
+      return null;
+    }
+
+    const upcomingEvents = events.slice(0, 3) as Array<{
+      _id: string;
+      slug: { current: string };
+      image?: { asset: object; alt?: string };
+      title: string;
+      date: string;
+      endDate?: string;
+      location?: string;
+    }>;
+
+    return (
+      <section className="max-w-7xl mx-auto px-6 py-20">
+        <div className="flex items-end justify-between mb-10">
+          <h2>{t("home.upcomingEvents")}</h2>
+          <Button variant="link" className="p-0 h-auto text-muted-foreground" asChild>
+            <Link href="/events">{t("common.viewAll")} →</Link>
+          </Button>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {upcomingEvents.map((event) => (
+            <Link key={event._id} href={`/events/${event.slug.current}`} className="group block">
+              <div className="aspect-[4/3] bg-muted overflow-hidden mb-4">
+                {event.image?.asset ? (
+                  <Image
+                    src={urlFor(event.image).width(400).height(300).url()}
+                    alt={event.title}
+                    width={400}
+                    height={300}
+                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-muted-foreground text-sm">
+                    {event.title}
+                  </div>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground mb-1">
+                {new Date(event.date).toLocaleDateString(locale, {
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                })}
+                {event.location && ` · ${event.location}`}
+              </p>
+              <p className="text-sm">{event.title}</p>
+            </Link>
+          ))}
+        </div>
+      </section>
+    );
+  } catch {
+    return null;
+  }
 }
 
 async function FeaturedProducts() {
