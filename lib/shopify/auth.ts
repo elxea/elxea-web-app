@@ -60,13 +60,80 @@ export async function isAuthenticated(): Promise<boolean> {
   return session !== null;
 }
 
+// Mock data for preview/staging bypass (no real Shopify session)
+function getMockCustomer(): Customer {
+  return {
+    id: "gid://shopify/Customer/preview",
+    firstName: "Preview",
+    lastName: "User",
+    emailAddress: { emailAddress: "preview@elxea.com" },
+    phoneNumber: null,
+    tags: ["member-standard"],
+    orders: {
+      edges: [
+        {
+          node: {
+            id: "gid://shopify/Order/preview-1",
+            name: "#1001",
+            processedAt: new Date(Date.now() - 7 * 86400000).toISOString(),
+            financialStatus: "PAID",
+            totalPrice: { amount: "3240", currencyCode: "JPY" },
+          },
+        },
+        {
+          node: {
+            id: "gid://shopify/Order/preview-2",
+            name: "#1002",
+            processedAt: new Date(Date.now() - 2 * 86400000).toISOString(),
+            financialStatus: "PAID",
+            totalPrice: { amount: "5400", currencyCode: "JPY" },
+          },
+        },
+      ],
+    },
+  };
+}
+
+function getMockSubscriptions(): SubscriptionContract[] {
+  return [
+    {
+      id: "gid://shopify/SubscriptionContract/preview-1",
+      status: "ACTIVE",
+      createdAt: new Date(Date.now() - 30 * 86400000).toISOString(),
+      nextBillingDate: new Date(Date.now() + 14 * 86400000).toISOString(),
+      deliveryPolicy: { interval: "MONTH", intervalCount: 1 },
+      lines: {
+        edges: [
+          {
+            node: {
+              id: "gid://shopify/SubscriptionLine/preview-1",
+              title: "和紅茶 定期便",
+              variantTitle: "50g",
+              quantity: 1,
+              currentPrice: { amount: "2700", currencyCode: "JPY" },
+              productId: "gid://shopify/Product/preview-1",
+              variantImage: null,
+            },
+          },
+        ],
+      },
+    },
+  ];
+}
+
+const isPreviewBypass = process.env.PREVIEW_BYPASS === "true";
+
 export async function getCustomerFromSession(): Promise<Customer | null> {
   try {
     const session = await getSession();
-    if (!session) return null;
+    if (!session) {
+      if (isPreviewBypass) return getMockCustomer();
+      return null;
+    }
     return await getCustomer(session.accessToken);
   } catch (e) {
     console.error("getCustomerFromSession error:", e);
+    if (isPreviewBypass) return getMockCustomer();
     return null;
   }
 }
@@ -74,10 +141,14 @@ export async function getCustomerFromSession(): Promise<Customer | null> {
 export async function getSubscriptionsFromSession(): Promise<SubscriptionContract[]> {
   try {
     const session = await getSession();
-    if (!session) return [];
+    if (!session) {
+      if (isPreviewBypass) return getMockSubscriptions();
+      return [];
+    }
     return await getSubscriptionContracts(session.accessToken);
   } catch (e) {
     console.error("getSubscriptionsFromSession error:", e);
+    if (isPreviewBypass) return getMockSubscriptions();
     return [];
   }
 }
