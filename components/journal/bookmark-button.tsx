@@ -5,6 +5,7 @@ import { Bookmark } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { trackFavoriteAdd } from "@/lib/firebase/behavior-tracker";
 
 type BookmarkButtonProps = {
   /** Sanity article slug — used as targetId in Firestore */
@@ -112,6 +113,8 @@ export function BookmarkButton({
 
         setIsBookmarked(true);
         toast(addedMessage);
+        // Track favorite add behavior event
+        trackFavoriteAdd({ contentId: articleSlug, type: "article" });
       }
     } catch {
       toast.error(errorMessage);

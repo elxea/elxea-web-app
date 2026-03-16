@@ -161,7 +161,10 @@ export type BehaviorAction =
   | "view_product"
   | "purchase"
   | "line_message"
-  | "search";
+  | "search"
+  | "tea_mention"
+  | "flavor_preference"
+  | "topic_interest";
 
 export type BehaviorChannel = "line" | "web";
 

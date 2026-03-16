@@ -13,6 +13,7 @@ import { AuthorProfile } from "@/components/journal/author-profile";
 import { BookmarkButton } from "@/components/journal/bookmark-button";
 import { RelatedArticles } from "@/components/journal/related-articles";
 import { CommentSection } from "@/components/community/comment-section";
+import { ArticleReadTracker } from "@/components/journal/article-read-tracker";
 import { Link } from "@/i18n/navigation";
 
 export async function generateMetadata({
@@ -97,6 +98,12 @@ export default async function ArticlePage({
 
   return (
     <article className="max-w-3xl mx-auto px-6 py-16">
+      {/* Behavior tracking — fires page_view on mount, article_read on 30s or 80% scroll */}
+      <ArticleReadTracker
+        articleSlug={slug}
+        category={article.category?.slug?.current}
+      />
+
       {/* Header */}
       <header className="mb-12">
         {article.category && (

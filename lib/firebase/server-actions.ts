@@ -4,10 +4,14 @@
  */
 import type { Query } from "firebase-admin/firestore";
 import { getAdminFirestore } from "./admin";
-import { COLLECTIONS, favoritesCol, followsCol, eventRegistrationsCol } from "./collections";
+import { COLLECTIONS, favoritesCol, followsCol, eventRegistrationsCol, behaviorLogCol } from "./collections";
 import type {
   FavoriteType,
   CommentTargetType,
+  BehaviorAction,
+  BehaviorChannel,
+  BehaviorEventMetadata,
+  PersonaType,
 } from "./types";
 
 const COMMENT_MAX_LENGTH = 500;
@@ -371,4 +375,84 @@ export async function getUserDashboardData(customerId: string) {
     follows,
     eventRegistrations: registrations,
   };
+}
+
+// ---------------------------------------------------------------------------
+// BehaviorLog (behavior event tracking)
+// ---------------------------------------------------------------------------
+
+/**
+ * Infer persona signal from action and metadata.
+ * Lightweight heuristic for initial categorization.
+ */
+function inferPersonaSignal(
+  action: BehaviorAction,
+  metadata: BehaviorEventMetadata,
+): PersonaType | null {
+  // view_content with category hints
+  if (action === "view_content") {
+    const contentId = metadata.contentId ?? "";
+    if (contentId.includes("relax") || contentId.includes("hojicha") || contentId.includes("green")) {
+      return "serenity";
+    }
+    if (contentId.includes("region") || contentId.includes("origin") || contentId.includes("new")) {
+      return "explorer";
+    }
+    if (contentId.includes("flavor") || contentId.includes("pairing") || contentId.includes("taste")) {
+      return "sensory";
+    }
+  }
+
+  // view_product — explorer signal (browsing new products)
+  if (action === "view_product") {
+    return "explorer";
+  }
+
+  // search — explorer signal
+  if (action === "search") {
+    return "explorer";
+  }
+
+  // tap_button — context dependent, no strong signal
+  return null;
+}
+
+/**
+ * Add a behavior event to the user's behaviorLog subcollection.
+ *
+ * @param customerId Shopify numeric customer ID
+ * @param action BehaviorAction type
+ * @param channel Channel (web or line)
+ * @param metadata Event-specific metadata
+ */
+export async function addBehaviorLog(
+  customerId: string,
+  action: BehaviorAction,
+  channel: BehaviorChannel,
+  metadata: BehaviorEventMetadata,
+): Promise<{ success: boolean; id?: string }> {
+  const db = getAdminFirestore();
+  const colPath = behaviorLogCol(customerId);
+
+  const personaSignal = inferPersonaSignal(action, metadata);
+
+  const docRef = await db.collection(colPath).add({
+    action,
+    channel,
+    metadata,
+    personaSignal,
+    createdAt: new Date(),
+  });
+
+  return { success: true, id: docRef.id };
+}
+
+/**
+ * Count behavior events in the user's behaviorLog subcollection.
+ */
+export async function getBehaviorEventCount(customerId: string): Promise<number> {
+  const db = getAdminFirestore();
+  const colPath = behaviorLogCol(customerId);
+  const snapshot = await db.collection(colPath).count().get();
+  return snapshot.data().count;
 }
