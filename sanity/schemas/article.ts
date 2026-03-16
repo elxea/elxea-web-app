@@ -158,6 +158,87 @@ export const article = defineType({
       },
       initialValue: "ja",
     }),
+
+    // ── Persona / personalization fields (MS1-3) ─────────────────────────────
+    // All fields are optional to preserve backward compatibility with existing articles.
+    // They will be required in a future migration once the editorial workflow is ready.
+
+    defineField({
+      name: "contentPersona",
+      title: "コンテンツペルソナ",
+      description:
+        "このコンテンツが最も響くペルソナタイプを選んでください（最大2つ）。",
+      type: "array",
+      of: [{ type: "string" }],
+      options: {
+        list: [
+          { title: "静寂派 (Serenity)", value: "serenity" },
+          { title: "知的好奇心派 (Explorer)", value: "explorer" },
+          { title: "感覚派 (Sensory)", value: "sensory" },
+        ],
+      },
+      validation: (rule) => rule.max(2),
+    }),
+
+    defineField({
+      name: "depthLevel",
+      title: "深度レベル",
+      description: "記事の内容の深さを示します。",
+      type: "string",
+      options: {
+        list: [
+          { title: "入口 — お茶を知り始めた人向け (entry)", value: "entry" },
+          { title: "探索 — 飲み比べ・品種に興味がある人向け (explore)", value: "explore" },
+          { title: "没入 — 製法・産地を深く掘る人向け (deep)", value: "deep" },
+        ],
+        layout: "radio",
+      },
+    }),
+
+    defineField({
+      name: "targetLayer",
+      title: "ターゲット層",
+      description:
+        "レコメンドの参考情報です。主軸は contentPersona を使用します（複数選択可）。",
+      type: "array",
+      of: [{ type: "string" }],
+      options: {
+        list: [
+          { title: "お茶好き層 (tea_lover)", value: "tea_lover" },
+          { title: "ウェルビーイング層 (wellbeing)", value: "wellbeing" },
+          { title: "グルメ層 (gourmet)", value: "gourmet" },
+        ],
+      },
+    }),
+
+    defineField({
+      name: "contextTime",
+      title: "コンテキスト：時間帯",
+      description: "この記事が特に合う時間帯（任意）。",
+      type: "string",
+      options: {
+        list: [
+          { title: "朝 (morning)", value: "morning" },
+          { title: "午後 (afternoon)", value: "afternoon" },
+          { title: "夜 (evening)", value: "evening" },
+        ],
+      },
+    }),
+
+    defineField({
+      name: "contextSeason",
+      title: "コンテキスト：季節",
+      description: "この記事が特に合う季節（任意）。",
+      type: "string",
+      options: {
+        list: [
+          { title: "春 (spring)", value: "spring" },
+          { title: "夏 (summer)", value: "summer" },
+          { title: "秋 (autumn)", value: "autumn" },
+          { title: "冬 (winter)", value: "winter" },
+        ],
+      },
+    }),
   ],
   preview: {
     select: {
