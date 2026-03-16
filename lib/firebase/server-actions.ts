@@ -4,7 +4,7 @@
  */
 import type { Query } from "firebase-admin/firestore";
 import { getAdminFirestore } from "./admin";
-import { COLLECTIONS, favoritesCol, followsCol, eventRegistrationsCol, behaviorLogCol } from "./collections";
+import { COLLECTIONS, favoritesCol, followsCol, eventRegistrationsCol, behaviorLogCol, userDoc } from "./collections";
 import type {
   FavoriteType,
   CommentTargetType,
@@ -455,4 +455,49 @@ export async function getBehaviorEventCount(customerId: string): Promise<number>
   const colPath = behaviorLogCol(customerId);
   const snapshot = await db.collection(colPath).count().get();
   return snapshot.data().count;
+}
+
+// ---------------------------------------------------------------------------
+// LINE account linking
+// ---------------------------------------------------------------------------
+
+/**
+ * Link a LINE user ID to the customer's Firestore user document.
+ * Called from the LIFF page after successful LINE authentication.
+ *
+ * @param customerId Shopify numeric customer ID
+ * @param lineUserId LINE user ID obtained via liff.getProfile()
+ */
+export async function linkLineUser(
+  customerId: string,
+  lineUserId: string
+): Promise<{ success: boolean; action: "linked" | "already_linked" }> {
+  const db = getAdminFirestore();
+  const docPath = userDoc(customerId);
+  const docRef = db.doc(docPath);
+
+  const snapshot = await docRef.get();
+
+  if (snapshot.exists) {
+    const existing = snapshot.data()?.lineUserId;
+    if (existing === lineUserId) {
+      return { success: true, action: "already_linked" };
+    }
+    await docRef.update({ lineUserId, lastActiveAt: new Date() });
+  } else {
+    // Create the user document if it doesn't exist yet
+    await docRef.set({ lineUserId, createdAt: new Date(), lastActiveAt: new Date() });
+  }
+
+  return { success: true, action: "linked" };
+}
+
+/**
+ * Retrieve the LINE user ID linked to a customer (if any).
+ */
+export async function getLinkedLineUserId(customerId: string): Promise<string | null> {
+  const db = getAdminFirestore();
+  const docRef = db.doc(userDoc(customerId));
+  const snapshot = await docRef.get();
+  return snapshot.data()?.lineUserId ?? null;
 }
