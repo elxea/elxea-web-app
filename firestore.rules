@@ -28,11 +28,10 @@ service cloud.firestore {
 
     // ─── Users collection ─────────────────────────────────────────────
     // users/{customerId}
-    // User document is auto-created; no direct writes needed.
     match /users/{customerId} {
-      // Users can only read their own document
+      // Users can read their own document (for persona / tasteProfile display)
       allow read: if isOwner(customerId);
-      // No direct writes to user document (managed by server)
+      // No direct client-side writes to the root document (managed by server / agents)
       allow write: if false;
 
       // ─── Favorites subcollection ──────────────────────────────────
@@ -72,6 +71,32 @@ service cloud.firestore {
           && isServerTimestamp(request.resource.data.registeredAt);
         allow delete: if isOwner(customerId);
         allow update: if false;
+      }
+
+      // ─── BehaviorLog subcollection (NEW) ──────────────────────────
+      // users/{customerId}/behaviorLog/{docId}
+      // Read: owner only. Write: server only (Admin SDK / Cloud Functions).
+      // elxea-agent writes via Firestore REST API with service account credentials.
+      match /behaviorLog/{docId} {
+        allow read: if isOwner(customerId);
+        // No client-side writes — all writes go through server-side agents
+        allow write: if false;
+      }
+
+      // ─── Conversations subcollection (NEW) ────────────────────────
+      // users/{customerId}/conversations/{docId}
+      // Migrated from Supabase. Read: owner only. Write: server only.
+      match /conversations/{docId} {
+        allow read: if isOwner(customerId);
+        allow write: if false;
+      }
+
+      // ─── Orders subcollection (NEW) ───────────────────────────────
+      // users/{customerId}/orders/{orderId}
+      // Mirrored from Shopify via Webhook + Cloud Functions. Read-only for owner.
+      match /orders/{orderId} {
+        allow read: if isOwner(customerId);
+        allow write: if false;
       }
     }
 
