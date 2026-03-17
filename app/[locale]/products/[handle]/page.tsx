@@ -7,6 +7,7 @@ import { formatPrice } from "@/lib/utils";
 import { ImageGallery } from "@/components/product/image-gallery";
 import { VariantSelector } from "@/components/product/variant-selector";
 import { AddToCartButton } from "@/components/product/add-to-cart-button";
+import { ProductPurchaseOptions } from "@/components/product/product-purchase-options";
 
 export async function generateMetadata({
   params,
@@ -93,10 +94,25 @@ export default async function ProductPage({
             />
           </Suspense>
 
-          <AddToCartButton
-            merchandiseId={selectedVariant.id}
-            availableForSale={selectedVariant.availableForSale}
-          />
+          {product.sellingPlanGroups.length > 0 ? (
+            <ProductPurchaseOptions
+              merchandiseId={selectedVariant.id}
+              availableForSale={selectedVariant.availableForSale}
+              sellingPlanGroups={product.sellingPlanGroups}
+              sellingPlanAllocations={selectedVariant.sellingPlanAllocations}
+              productName={product.title}
+              price={selectedVariant.price.amount}
+              currencyCode={selectedVariant.price.currencyCode}
+            />
+          ) : (
+            <AddToCartButton
+              merchandiseId={selectedVariant.id}
+              availableForSale={selectedVariant.availableForSale}
+              productName={product.title}
+              price={selectedVariant.price.amount}
+              currencyCode={selectedVariant.price.currencyCode}
+            />
+          )}
 
           {product.description && (
             <div className="pt-8 border-t border-border">

@@ -27,6 +27,30 @@ export const PRODUCT_VARIANT_FRAGMENT = /* GraphQL */ `
     image {
       ...ImageFields
     }
+    sellingPlanAllocations(first: 10) {
+      edges {
+        node {
+          sellingPlan {
+            id
+            name
+          }
+          priceAdjustments {
+            price {
+              amount
+              currencyCode
+            }
+            compareAtPrice {
+              amount
+              currencyCode
+            }
+            perDeliveryPrice {
+              amount
+              currencyCode
+            }
+          }
+        }
+      }
+    }
   }
 `;
 
@@ -65,6 +89,50 @@ export const PRODUCT_FRAGMENT = /* GraphQL */ `
     productType
     createdAt
     updatedAt
+    sellingPlanGroups(first: 10) {
+      edges {
+        node {
+          name
+          options {
+            name
+            values
+          }
+          sellingPlans(first: 10) {
+            edges {
+              node {
+                id
+                name
+                description
+                recurringDeliveries
+                options {
+                  name
+                  value
+                }
+                priceAdjustments {
+                  adjustmentValue {
+                    ... on SellingPlanPercentagePriceAdjustment {
+                      adjustmentPercentage
+                    }
+                    ... on SellingPlanFixedAmountPriceAdjustment {
+                      adjustmentAmount {
+                        amount
+                        currencyCode
+                      }
+                    }
+                    ... on SellingPlanFixedPriceAdjustment {
+                      price {
+                        amount
+                        currencyCode
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
   }
 `;
 
@@ -119,6 +187,12 @@ export const CART_FRAGMENT = /* GraphQL */ `
             totalAmount {
               amount
               currencyCode
+            }
+          }
+          sellingPlanAllocation {
+            sellingPlan {
+              id
+              name
             }
           }
         }

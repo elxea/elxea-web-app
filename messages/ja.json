@@ -22,6 +22,7 @@
     "remove": "削除",
     "emptyCart": "カートは空です",
     "soldOut": "売り切れ",
+    "subscribe": "定期購入する",
     "language": "言語",
     "noImage": "画像なし",
     "loadError": "読み込みに失敗しました。",
@@ -46,7 +47,12 @@
     "description": "商品説明",
     "relatedProducts": "関連商品",
     "loadError": "商品を読み込めませんでした。",
-    "noProducts": "商品が見つかりませんでした"
+    "noProducts": "商品が見つかりませんでした",
+    "purchaseType": "購入方法",
+    "oneTimePurchase": "通常購入",
+    "subscription": "定期購入",
+    "deliveryFrequency": "お届け頻度",
+    "subscriptionPrice": "{price}（通常価格 {compareAtPrice}）"
   },
   "collection": {
     "empty": "コレクションがありません",

@@ -22,6 +22,7 @@
     "remove": "Remove",
     "emptyCart": "Your cart is empty",
     "soldOut": "Sold Out",
+    "subscribe": "Subscribe",
     "language": "Language",
     "noImage": "No Image",
     "loadError": "Failed to load.",
@@ -46,7 +47,12 @@
     "description": "Description",
     "relatedProducts": "Related Products",
     "loadError": "Could not load product.",
-    "noProducts": "No products found"
+    "noProducts": "No products found",
+    "purchaseType": "Purchase type",
+    "oneTimePurchase": "One-time purchase",
+    "subscription": "Subscribe",
+    "deliveryFrequency": "Delivery frequency",
+    "subscriptionPrice": "{price} (Regular price {compareAtPrice})"
   },
   "collection": {
     "empty": "No collections available",

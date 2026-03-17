@@ -6,9 +6,17 @@ import { useCart } from "@/components/cart/cart-context";
 export function AddToCartButton({
   merchandiseId,
   availableForSale,
+  sellingPlanId,
+  productName,
+  price,
+  currencyCode,
 }: {
   merchandiseId: string;
   availableForSale: boolean;
+  sellingPlanId?: string;
+  productName?: string;
+  price?: string;
+  currencyCode?: string;
 }) {
   const t = useTranslations("common");
   const { addToCart, isPending } = useCart();
@@ -26,7 +34,7 @@ export function AddToCartButton({
 
   return (
     <button
-      onClick={() => addToCart(merchandiseId)}
+      onClick={() => addToCart(merchandiseId, 1, sellingPlanId)}
       disabled={isPending}
       className="w-full h-12 bg-charcoal text-cream text-[14px] font-medium hover:bg-charcoal/90 transition-colors disabled:opacity-50"
     >
