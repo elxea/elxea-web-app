@@ -80,12 +80,14 @@ export default async function ProductPage({
 
           <h1>{product.title}</h1>
 
-          <p className="text-lg">
-            {formatPrice(
-              selectedVariant.price.amount,
-              selectedVariant.price.currencyCode
-            )}
-          </p>
+          {product.sellingPlanGroups.length === 0 && (
+            <p className="text-lg">
+              {formatPrice(
+                selectedVariant.price.amount,
+                selectedVariant.price.currencyCode
+              )}
+            </p>
+          )}
 
           <Suspense fallback={null}>
             <VariantSelector
@@ -103,6 +105,7 @@ export default async function ProductPage({
               productName={product.title}
               price={selectedVariant.price.amount}
               currencyCode={selectedVariant.price.currencyCode}
+              subscriptionOnly
             />
           ) : (
             <AddToCartButton

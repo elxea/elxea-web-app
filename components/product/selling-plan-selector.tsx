@@ -9,11 +9,13 @@ export function SellingPlanSelector({
   sellingPlanAllocations,
   selectedPlanId,
   onSelectPlan,
+  subscriptionOnly = false,
 }: {
   sellingPlanGroups: SellingPlanGroup[];
   sellingPlanAllocations: SellingPlanAllocation[];
   selectedPlanId: string | null;
   onSelectPlan: (planId: string | null) => void;
+  subscriptionOnly?: boolean;
 }) {
   const t = useTranslations("product");
 
@@ -26,30 +28,32 @@ export function SellingPlanSelector({
     <div className="space-y-4">
       <p className="text-sm font-medium">{t("purchaseType")}</p>
 
-      <div className="flex gap-3">
-        <button
-          type="button"
-          className={`flex-1 border px-4 py-3 text-sm transition-colors ${
-            selectedPlanId === null
-              ? "border-foreground bg-foreground text-background"
-              : "border-border hover:border-foreground"
-          }`}
-          onClick={() => onSelectPlan(null)}
-        >
-          {t("oneTimePurchase")}
-        </button>
-        <button
-          type="button"
-          className={`flex-1 border px-4 py-3 text-sm transition-colors ${
-            selectedPlanId !== null
-              ? "border-foreground bg-foreground text-background"
-              : "border-border hover:border-foreground"
-          }`}
-          onClick={() => onSelectPlan(allPlans[0]!.id)}
-        >
-          {t("subscription")}
-        </button>
-      </div>
+      {!subscriptionOnly && (
+        <div className="flex gap-3">
+          <button
+            type="button"
+            className={`flex-1 border px-4 py-3 text-sm transition-colors ${
+              selectedPlanId === null
+                ? "border-foreground bg-foreground text-background"
+                : "border-border hover:border-foreground"
+            }`}
+            onClick={() => onSelectPlan(null)}
+          >
+            {t("oneTimePurchase")}
+          </button>
+          <button
+            type="button"
+            className={`flex-1 border px-4 py-3 text-sm transition-colors ${
+              selectedPlanId !== null
+                ? "border-foreground bg-foreground text-background"
+                : "border-border hover:border-foreground"
+            }`}
+            onClick={() => onSelectPlan(allPlans[0]!.id)}
+          >
+            {t("subscription")}
+          </button>
+        </div>
+      )}
 
       {selectedPlanId !== null && allPlans.length > 1 && (
         <div className="space-y-2">
