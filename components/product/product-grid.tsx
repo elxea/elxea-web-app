@@ -7,7 +7,7 @@ export function ProductGrid({ products }: { products: Product[] }) {
 
   if (products.length === 0) {
     return (
-      <p className="text-muted text-[14px] py-12">
+      <p className="text-muted-foreground text-sm py-12">
         {t("noProducts")}
       </p>
     );

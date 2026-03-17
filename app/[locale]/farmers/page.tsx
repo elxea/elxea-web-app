@@ -27,7 +27,7 @@ async function FarmersList() {
 
     if (!farmers || farmers.length === 0) {
       return (
-        <p className="text-muted text-[14px]">
+        <p className="text-muted-foreground text-sm">
           {t("empty")}
         </p>
       );
@@ -49,7 +49,7 @@ async function FarmersList() {
               href={`/farmers/${farmer.slug.current}`}
               className="group block"
             >
-              <div className="aspect-square bg-surface mb-4 overflow-hidden">
+              <div className="aspect-square bg-muted mb-4 overflow-hidden">
                 {farmer.photo?.asset ? (
                   <Image
                     src={urlFor(farmer.photo).width(600).height(600).url()}
@@ -60,16 +60,16 @@ async function FarmersList() {
                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                   />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center text-light text-[13px]">
+                  <div className="w-full h-full flex items-center justify-center text-muted-foreground text-sm">
                     {farmer.name}
                   </div>
                 )}
               </div>
-              <h3 className="text-[14px] font-medium group-hover:underline">
+              <h3 className="text-sm font-medium group-hover:underline">
                 {farmer.name}
               </h3>
               {(farmer.region || farmer.country) && (
-                <p className="text-[13px] text-muted mt-1">
+                <p className="text-sm text-muted-foreground mt-1">
                   {[farmer.region, farmer.country].filter(Boolean).join(", ")}
                 </p>
               )}
@@ -80,7 +80,7 @@ async function FarmersList() {
     );
   } catch {
     return (
-      <p className="text-muted text-[14px]">
+      <p className="text-muted-foreground text-sm">
         {t("loadError")}
       </p>
     );

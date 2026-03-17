@@ -3,11 +3,14 @@ import Image from "next/image";
 import { notFound } from "next/navigation";
 import { getLocale, getTranslations } from "next-intl/server";
 import { getClient } from "@/sanity/lib/client";
-import { ARTICLE_BY_SLUG_QUERY } from "@/sanity/lib/queries";
+import { ARTICLE_BY_SLUG_QUERY, RELATED_ARTICLES_QUERY } from "@/sanity/lib/queries";
 import { urlFor } from "@/sanity/lib/image";
 import { PortableText } from "@/components/sanity/portable-text";
 import { isAuthenticated } from "@/lib/shopify/auth";
 import { MemberGate } from "@/components/ui/member-gate";
+import { AuthorProfile } from "@/components/journal/author-profile";
+import { RelatedArticles } from "@/components/journal/related-articles";
+import { Link } from "@/i18n/navigation";
 
 export async function generateMetadata({
   params,
@@ -20,13 +23,16 @@ export async function generateMetadata({
     const client = getClient();
     const article = await client.fetch(ARTICLE_BY_SLUG_QUERY, { slug, language: locale });
     if (!article) return {};
+    const seo = article.seo;
+    const title = seo?.title || article.title;
+    const description = seo?.description || article.excerpt?.slice(0, 160);
     const image = article.mainImage?.asset ? urlFor(article.mainImage).width(1200).url() : undefined;
     return {
-      title: article.title,
-      description: article.excerpt?.slice(0, 160),
+      title,
+      description,
       openGraph: {
-        title: article.title,
-        description: article.excerpt?.slice(0, 160),
+        title,
+        description,
         images: image ? [{ url: image }] : [],
       },
     };
@@ -55,7 +61,7 @@ export default async function ArticlePage({
   } catch {
     return (
       <div className="max-w-3xl mx-auto px-6 py-16">
-        <p className="text-muted">{t("loadError")}</p>
+        <p className="text-muted-foreground">{t("loadError")}</p>
       </div>
     );
   }
@@ -66,28 +72,61 @@ export default async function ArticlePage({
   const isMemberOnly = article.memberOnly === true;
   const loggedIn = isMemberOnly ? await isAuthenticated() : true;
 
+  // Fetch related articles (parallel with rendering setup)
+  let relatedArticles: unknown[] = [];
+  if (loggedIn && article.category?._id) {
+    try {
+      const client = getClient();
+      relatedArticles = await client.fetch(RELATED_ARTICLES_QUERY, {
+        language: locale,
+        currentId: article._id,
+        categoryId: article.category._id,
+        tagIds: article.tags?.map((t: { _id: string }) => t._id) ?? [],
+      });
+    } catch {
+      // silently fail — related articles are non-critical
+    }
+  }
+
   return (
     <article className="max-w-3xl mx-auto px-6 py-16">
       {/* Header */}
       <header className="mb-12">
         {article.category && (
-          <p className="text-[12px] text-light uppercase tracking-wider mb-4">
+          <Link
+            href={`/journal?category=${article.category.slug.current}`}
+            className="text-xs text-muted-foreground uppercase tracking-wider mb-4 block hover:text-foreground transition-colors"
+          >
             {article.category.title}
-          </p>
+          </Link>
         )}
         <h1 className="mb-4">{article.title}</h1>
         {article.excerpt && (
-          <p className="text-muted text-[14px] leading-relaxed">{article.excerpt}</p>
+          <p className="text-muted-foreground text-sm leading-relaxed">{article.excerpt}</p>
         )}
-        <div className="flex items-center gap-4 mt-6 text-[12px] text-light">
+        <div className="flex items-center gap-4 mt-6 text-xs text-muted-foreground">
           {article.author && <span>{article.author.name}</span>}
           {article.publishedAt && (
             <time>{new Date(article.publishedAt).toLocaleDateString(locale)}</time>
           )}
           {isMemberOnly && (
-            <span className="text-muted">[{tCommon("memberOnly")}]</span>
+            <span className="text-muted-foreground">[{tCommon("memberOnly")}]</span>
           )}
         </div>
+
+        {/* Tags */}
+        {article.tags && article.tags.length > 0 && (
+          <div className="flex flex-wrap gap-2 mt-4">
+            {article.tags.map((tag: { _id: string; title: string; slug: { current: string } }) => (
+              <span
+                key={tag._id}
+                className="text-xs text-muted-foreground border border-border px-2 py-0.5 rounded"
+              >
+                {tag.title}
+              </span>
+            ))}
+          </div>
+        )}
       </header>
 
       {/* Main image */}
@@ -107,11 +146,74 @@ export default async function ArticlePage({
 
       {/* Body — gated for member-only content */}
       {loggedIn ? (
-        article.body && (
-          <div className="prose-custom">
-            <PortableText value={article.body} />
-          </div>
-        )
+        <>
+          {article.body && (
+            <div className="prose-custom">
+              <PortableText value={article.body} />
+            </div>
+          )}
+
+          {/* Audio/Video */}
+          {article.audioVideoUrl && (
+            <div className="mt-8 border border-border rounded-lg p-4">
+              <p className="text-xs text-muted-foreground uppercase tracking-wider mb-2">
+                {t("media")}
+              </p>
+              <a
+                href={article.audioVideoUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm underline underline-offset-2 hover:text-muted-foreground transition-colors"
+              >
+                {article.audioVideoUrl}
+              </a>
+            </div>
+          )}
+
+          {/* Article-level CTA */}
+          {article.cta?.title && (
+            <div className="mt-12 border border-border rounded-lg overflow-hidden">
+              {article.cta.image?.asset && (
+                <Image
+                  src={urlFor(article.cta.image).width(800).height(400).url()}
+                  alt={article.cta.title}
+                  width={800}
+                  height={400}
+                  sizes="(max-width: 768px) 100vw, 768px"
+                  className="w-full object-cover"
+                />
+              )}
+              <div className="p-6">
+                <p className="text-sm font-medium mb-3">{article.cta.title}</p>
+                {article.cta.url && (
+                  <a
+                    href={article.cta.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-block text-xs font-medium border border-foreground px-4 py-2 hover:bg-foreground hover:text-background transition-colors"
+                  >
+                    {t("ctaButton")}
+                  </a>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Author profile */}
+          {article.author && (
+            <AuthorProfile
+              author={article.author}
+              writtenByLabel={t("writtenBy")}
+            />
+          )}
+
+          {/* Related articles */}
+          <RelatedArticles
+            articles={relatedArticles as Parameters<typeof RelatedArticles>[0]["articles"]}
+            heading={t("relatedArticles")}
+            locale={locale}
+          />
+        </>
       ) : (
         <MemberGate />
       )}

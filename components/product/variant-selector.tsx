@@ -2,6 +2,7 @@
 
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import type { ProductVariant } from "@/lib/shopify/types";
+import { Button } from "@/components/ui/button";
 
 export function VariantSelector({
   options,
@@ -51,28 +52,23 @@ export function VariantSelector({
     <div className="space-y-6">
       {options.map((option) => (
         <div key={option.id}>
-          <p className="text-[13px] font-medium mb-3">{option.name}</p>
+          <p className="text-sm font-medium mb-3">{option.name}</p>
           <div className="flex flex-wrap gap-2">
             {option.values.map((value) => {
               const selected = isSelected(option.name, value);
               const available = isAvailable(option.name, value);
               return (
-                <button
+                <Button
                   key={value}
+                  variant={selected ? "default" : "outline"}
+                  size="sm"
                   onClick={() => handleSelect(option.name, value)}
                   disabled={!available}
                   aria-pressed={selected}
                   aria-label={`${option.name}: ${value}`}
-                  className={`px-4 py-2.5 text-[13px] border transition-colors ${
-                    selected
-                      ? "border-charcoal bg-charcoal text-cream"
-                      : available
-                        ? "border-border text-charcoal hover:border-charcoal"
-                        : "border-border text-light cursor-not-allowed"
-                  }`}
                 >
                   {value}
-                </button>
+                </Button>
               );
             })}
           </div>

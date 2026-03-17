@@ -1,55 +1,46 @@
 @import "tailwindcss";
 
+/* Adobe Fonts (Typekit ID: fwg7gtf) */
+/* Headings: termina + ryo-gothic-plusn */
+/* Body: neue-haas-grotesk-text + kozuka-gothic-pro */
+
 @theme {
-  /* Brand Colors — warm neutrals inspired by Aesop's tone */
-  --color-cream: #FFFEF2;
-  --color-charcoal: #333333;
-  --color-muted: #666666;
-  --color-light: #707070;
-  --color-border: #E5E3D8;
-  --color-surface: #F5F4EE;
-  --color-error: #B80220;
+  --font-sans: neue-haas-grotesk-text, kozuka-gothic-pro, sans-serif;
+  --font-heading: termina, ryo-gothic-plusn, sans-serif;
+  --color-background: oklch(1 0 0);
+  --color-foreground: oklch(0.145 0 0);
 
-  /* Font Family */
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --color-card: oklch(1 0 0);
+  --color-card-foreground: oklch(0.145 0 0);
 
-  /* Spacing scale — generous whitespace */
-  --spacing-section: 6rem;
-  --spacing-block: 3rem;
+  --color-popover: oklch(1 0 0);
+  --color-popover-foreground: oklch(0.145 0 0);
+
+  --color-primary: oklch(0.205 0 0);
+  --color-primary-foreground: oklch(0.985 0 0);
+
+  --color-secondary: oklch(0.97 0 0);
+  --color-secondary-foreground: oklch(0.205 0 0);
+
+  --color-muted: oklch(0.97 0 0);
+  --color-muted-foreground: oklch(0.556 0 0);
+
+  --color-accent: oklch(0.97 0 0);
+  --color-accent-foreground: oklch(0.205 0 0);
+
+  --color-destructive: oklch(0.577 0.245 27.325);
+  --color-destructive-foreground: oklch(0.985 0 0);
+
+  --color-border: oklch(0.922 0 0);
+  --color-input: oklch(0.922 0 0);
+  --color-ring: oklch(0.708 0 0);
+
+  --radius-sm: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
 }
 
-/* Base styles */
-body {
-  background-color: var(--color-cream);
-  color: var(--color-charcoal);
-  font-family: var(--font-sans);
-  font-size: 14px;
-  line-height: 1.6;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-/* Typography — restrained, hierarchy through weight not size */
-h1 {
-  font-size: 1.875rem;
-  font-weight: 400;
-  line-height: 1.25;
-  letter-spacing: -0.01em;
-}
-
-h2 {
-  font-size: 1.25rem;
-  font-weight: 500;
-  line-height: 1.4;
-}
-
-h3 {
-  font-size: 1rem;
-  font-weight: 500;
-  line-height: 1.5;
-}
-
-/* No border-radius anywhere — clean, architectural */
-button, input, select, textarea, a {
-  border-radius: 0;
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
 }

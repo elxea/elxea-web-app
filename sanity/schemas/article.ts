@@ -19,10 +19,28 @@ export const article = defineType({
       validation: (rule) => rule.required(),
     }),
     defineField({
+      name: "orderNumber",
+      title: "記事番号",
+      type: "number",
+    }),
+    defineField({
       name: "excerpt",
       title: "抜粋",
       type: "text",
       rows: 3,
+    }),
+    defineField({
+      name: "thumbnail",
+      title: "サムネイル",
+      type: "image",
+      options: { hotspot: true },
+      fields: [
+        defineField({
+          name: "alt",
+          title: "代替テキスト",
+          type: "string",
+        }),
+      ],
     }),
     defineField({
       name: "mainImage",
@@ -49,6 +67,18 @@ export const article = defineType({
       to: [{ type: "category" }],
     }),
     defineField({
+      name: "tags",
+      title: "タグ",
+      type: "array",
+      of: [{ type: "reference", to: [{ type: "tag" }] }],
+    }),
+    defineField({
+      name: "featured",
+      title: "注目記事",
+      type: "boolean",
+      initialValue: false,
+    }),
+    defineField({
       name: "author",
       title: "執筆者",
       type: "reference",
@@ -59,6 +89,31 @@ export const article = defineType({
       title: "関連商品（Shopify ハンドル）",
       type: "array",
       of: [{ type: "string" }],
+    }),
+    defineField({
+      name: "audioVideoUrl",
+      title: "動画/音声リンク",
+      type: "url",
+    }),
+    defineField({
+      name: "audioUrl",
+      title: "オーディオURL",
+      type: "url",
+    }),
+    defineField({
+      name: "cta",
+      title: "CTA",
+      type: "object",
+      fields: [
+        defineField({ name: "title", title: "CTAタイトル", type: "string" }),
+        defineField({
+          name: "image",
+          title: "CTA画像",
+          type: "image",
+          options: { hotspot: true },
+        }),
+        defineField({ name: "url", title: "CTAリンク", type: "url" }),
+      ],
     }),
     defineField({
       name: "memberOnly",

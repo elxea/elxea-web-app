@@ -28,7 +28,7 @@ async function EventsList() {
 
     if (!events || events.length === 0) {
       return (
-        <p className="text-muted text-[14px]">
+        <p className="text-muted-foreground text-sm">
           {t("empty")}
         </p>
       );
@@ -52,7 +52,7 @@ async function EventsList() {
               "group grid grid-cols-1 md:grid-cols-[1fr_2fr] gap-6";
             const inner = (
               <>
-                <div className="aspect-[4/3] bg-surface overflow-hidden">
+                <div className="aspect-[4/3] bg-muted overflow-hidden">
                   {event.image?.asset ? (
                     <Image
                       src={urlFor(event.image).width(400).height(300).url()}
@@ -63,13 +63,13 @@ async function EventsList() {
                       className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                     />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center text-light text-[13px]">
+                    <div className="w-full h-full flex items-center justify-center text-muted-foreground text-sm">
                       {event.title}
                     </div>
                   )}
                 </div>
                 <div className="flex flex-col justify-center">
-                  <p className="text-[12px] text-light mb-2">
+                  <p className="text-xs text-muted-foreground mb-2">
                     {new Date(event.date).toLocaleDateString(locale, {
                       year: "numeric",
                       month: "long",
@@ -84,14 +84,14 @@ async function EventsList() {
                   </p>
                   <h3 className="text-lg font-medium group-hover:underline mb-2">
                     {event.memberOnly && (
-                      <span className="text-[12px] text-muted mr-1.5">
+                      <span className="text-xs text-muted-foreground mr-1.5">
                         [{tCommon("memberOnly")}]
                       </span>
                     )}
                     {event.title}
                   </h3>
                   {event.location && (
-                    <p className="text-[13px] text-muted">{event.location}</p>
+                    <p className="text-sm text-muted-foreground">{event.location}</p>
                   )}
                 </div>
               </>
@@ -126,7 +126,7 @@ async function EventsList() {
     );
   } catch {
     return (
-      <p className="text-muted text-[14px]">
+      <p className="text-muted-foreground text-sm">
         {t("loadError")}
       </p>
     );

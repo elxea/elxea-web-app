@@ -5,6 +5,10 @@ import { useTranslations } from "next-intl";
 import { useCart } from "./cart-context";
 import { formatPrice } from "@/lib/utils";
 import { Link } from "@/i18n/navigation";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+import { trackBeginCheckout, trackRemoveFromCart } from "@/lib/analytics";
+import { toast } from "sonner";
 
 export function CartContent() {
   const t = useTranslations("common");
@@ -13,13 +17,10 @@ export function CartContent() {
   if (!cart || cart.lines.length === 0) {
     return (
       <div className="text-center py-20">
-        <p className="text-muted text-[14px] mb-6">{t("emptyCart")}</p>
-        <Link
-          href="/products"
-          className="inline-block border border-charcoal px-8 py-3 text-[13px] font-medium hover:bg-charcoal hover:text-cream transition-colors"
-        >
-          {t("products")}
-        </Link>
+        <p className="text-muted-foreground text-sm mb-6">{t("emptyCart")}</p>
+        <Button variant="outline" asChild>
+          <Link href="/products">{t("products")}</Link>
+        </Button>
       </div>
     );
   }
@@ -32,7 +33,7 @@ export function CartContent() {
           <div key={item.id} className="py-6 flex gap-6">
             {/* Image */}
             {item.merchandise.product.featuredImage && (
-              <div className="w-20 h-20 bg-surface flex-shrink-0">
+              <div className="w-20 h-20 bg-muted flex-shrink-0">
                 <Image
                   src={item.merchandise.product.featuredImage.url}
                   alt={
@@ -41,6 +42,7 @@ export function CartContent() {
                   }
                   width={80}
                   height={80}
+                  sizes="80px"
                   className="w-full h-full object-cover"
                 />
               </div>
@@ -48,15 +50,20 @@ export function CartContent() {
 
             {/* Details */}
             <div className="flex-1 min-w-0">
-              <p className="text-[14px] font-medium truncate">
+              <p className="text-sm font-medium truncate">
                 {item.merchandise.product.title}
               </p>
               {item.merchandise.title !== "Default Title" && (
-                <p className="text-[13px] text-muted mt-0.5">
+                <p className="text-sm text-muted-foreground mt-0.5">
                   {item.merchandise.title}
                 </p>
               )}
-              <p className="text-[14px] mt-2">
+              {item.sellingPlanAllocation && (
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {item.sellingPlanAllocation.sellingPlan.name}
+                </p>
+              )}
+              <p className="text-sm mt-2">
                 {formatPrice(
                   item.merchandise.price.amount,
                   item.merchandise.price.currencyCode
@@ -64,8 +71,10 @@ export function CartContent() {
               </p>
 
               {/* Quantity */}
-              <div className="flex items-center gap-3 mt-3">
-                <button
+              <div className="flex items-center gap-1 mt-3">
+                <Button
+                  variant="outline"
+                  size="icon-xs"
                   onClick={() =>
                     updateQuantity(
                       item.id,
@@ -75,14 +84,15 @@ export function CartContent() {
                   }
                   disabled={isPending}
                   aria-label={`${t("quantity")} -1`}
-                  className="w-8 h-8 border border-border text-[13px] hover:border-charcoal transition-colors disabled:opacity-50"
                 >
                   -
-                </button>
-                <span className="text-[13px] w-6 text-center" aria-label={t("quantity")}>
+                </Button>
+                <span className="text-sm w-8 text-center" aria-label={t("quantity")}>
                   {item.quantity}
                 </span>
-                <button
+                <Button
+                  variant="outline"
+                  size="icon-xs"
                   onClick={() =>
                     updateQuantity(
                       item.id,
@@ -92,23 +102,34 @@ export function CartContent() {
                   }
                   disabled={isPending}
                   aria-label={`${t("quantity")} +1`}
-                  className="w-8 h-8 border border-border text-[13px] hover:border-charcoal transition-colors disabled:opacity-50"
                 >
                   +
-                </button>
+                </Button>
               </div>
             </div>
 
             {/* Remove + Line total */}
             <div className="flex flex-col items-end justify-between">
-              <button
-                onClick={() => removeFromCart(item.id)}
+              <Button
+                variant="link"
+                size="sm"
+                className="text-muted-foreground h-auto p-0"
+                onClick={async () => {
+                  trackRemoveFromCart({
+                    id: item.merchandise.id,
+                    name: item.merchandise.product.title,
+                    price: parseFloat(item.merchandise.price.amount),
+                    currency: item.merchandise.price.currencyCode,
+                    quantity: item.quantity,
+                  });
+                  await removeFromCart(item.id);
+                  toast(t("removedFromCart"));
+                }}
                 disabled={isPending}
-                className="text-[12px] text-muted hover:text-charcoal transition-colors disabled:opacity-50"
               >
                 {t("remove")}
-              </button>
-              <p className="text-[14px]">
+              </Button>
+              <p className="text-sm">
                 {formatPrice(
                   item.cost.totalAmount.amount,
                   item.cost.totalAmount.currencyCode
@@ -120,10 +141,11 @@ export function CartContent() {
       </div>
 
       {/* Summary */}
-      <div className="border-t border-border pt-6 mt-6">
+      <Separator className="mt-6" />
+      <div className="pt-6">
         <div className="flex justify-between mb-6">
-          <p className="text-[14px]">{t("subtotal")}</p>
-          <p className="text-[14px] font-medium">
+          <p className="text-sm">{t("subtotal")}</p>
+          <p className="text-sm font-medium">
             {formatPrice(
               cart.cost.subtotalAmount.amount,
               cart.cost.subtotalAmount.currencyCode
@@ -131,12 +153,27 @@ export function CartContent() {
           </p>
         </div>
 
-        <a
-          href={cart.checkoutUrl}
-          className="block w-full h-12 bg-charcoal text-cream text-[14px] font-medium flex items-center justify-center hover:bg-charcoal/90 transition-colors"
+        <Button
+          size="lg"
+          className="w-full h-12"
+          asChild
+          onClick={() => {
+            trackBeginCheckout(
+              cart.lines.map((item) => ({
+                id: item.merchandise.id,
+                name: item.merchandise.product.title,
+                price: parseFloat(item.merchandise.price.amount),
+                quantity: item.quantity,
+              })),
+              cart.cost.subtotalAmount.currencyCode,
+              parseFloat(cart.cost.subtotalAmount.amount)
+            );
+          }}
         >
-          {t("checkout")}
-        </a>
+          <a href={cart.checkoutUrl.replace("https://elxea.com/", "https://elxea.myshopify.com/")}>
+            {t("checkout")}
+          </a>
+        </Button>
       </div>
     </div>
   );

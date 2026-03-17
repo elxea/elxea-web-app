@@ -1,6 +1,11 @@
 import { getTranslations, getLocale } from "next-intl/server";
-import { getCustomerFromSession } from "@/lib/shopify/auth";
+import Image from "next/image";
+import { getCustomerFromSession, getSubscriptionsFromSession } from "@/lib/shopify/auth";
 import { Link } from "@/i18n/navigation";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+import type { SubscriptionContract } from "@/lib/shopify/customer";
+import { SubscriptionActions } from "@/components/account/subscription-actions";
 
 function formatPrice(amount: string, currency: string, locale: string) {
   return new Intl.NumberFormat(locale, {
@@ -33,13 +38,10 @@ export default async function AccountPage() {
     return (
       <div className="max-w-2xl mx-auto px-6 py-16 text-center">
         <h1 className="text-2xl mb-6">{tCommon("account")}</h1>
-        <p className="text-muted mb-8">{t("loginRequired")}</p>
-        <a
-          href={`/api/auth/login?locale=${locale}`}
-          className="inline-block border border-charcoal px-8 py-3 text-[13px] font-medium hover:bg-charcoal hover:text-cream transition-colors"
-        >
-          {tCommon("login")}
-        </a>
+        <p className="text-muted-foreground mb-8">{t("loginRequired")}</p>
+        <Button variant="outline" asChild>
+          <a href={`/api/auth/login?locale=${locale}`}>{tCommon("login")}</a>
+        </Button>
       </div>
     );
   }
@@ -50,23 +52,60 @@ export default async function AccountPage() {
   const email = customer.emailAddress?.emailAddress;
   const orders = customer.orders?.edges ?? [];
 
+  // Fetch subscriptions (graceful fallback if API doesn't support it)
+  let subscriptions: SubscriptionContract[] = [];
+  try {
+    subscriptions = await getSubscriptionsFromSession();
+  } catch {
+    // Subscription API may not be available
+  }
+
   return (
     <div className="max-w-3xl mx-auto px-6 py-16">
       {/* Customer info */}
       <div className="mb-12">
         <h1 className="text-2xl mb-2">{tCommon("account")}</h1>
         {displayName && (
-          <p className="text-[15px] text-charcoal">{displayName}</p>
+          <p className="text-sm text-foreground">{displayName}</p>
         )}
-        {email && <p className="text-[13px] text-muted">{email}</p>}
+        {email && <p className="text-sm text-muted-foreground">{email}</p>}
 
-        <a
-          href={`/api/auth/logout?locale=${locale}`}
-          className="inline-block mt-6 text-[13px] text-muted underline hover:text-charcoal transition-colors"
-        >
-          {tCommon("logout")}
-        </a>
+        <Button variant="link" className="mt-6 p-0 h-auto text-muted-foreground" asChild>
+          <a href={`/api/auth/logout?locale=${locale}`}>{tCommon("logout")}</a>
+        </Button>
       </div>
+
+      {/* Subscriptions */}
+      <section className="mb-12">
+        <h2 className="text-lg mb-6 pb-3 border-b border-border">
+          {t("subscriptions")}
+        </h2>
+
+        {subscriptions.length === 0 ? (
+          <div>
+            <p className="text-muted-foreground text-sm mb-4">
+              {t("noSubscriptions")}
+            </p>
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/products">{tCommon("products")}</Link>
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {subscriptions.map((sub) => (
+              <SubscriptionCard
+                key={sub.id}
+                subscription={sub}
+                locale={locale}
+                t={t}
+              />
+            ))}
+            <p className="text-xs text-muted-foreground">
+              {t("subscriptionNote")}
+            </p>
+          </div>
+        )}
+      </section>
 
       {/* Order history */}
       <section>
@@ -75,7 +114,7 @@ export default async function AccountPage() {
         </h2>
 
         {orders.length === 0 ? (
-          <p className="text-muted text-[14px]">{t("noOrders")}</p>
+          <p className="text-muted-foreground text-sm">{t("noOrders")}</p>
         ) : (
           <div className="space-y-4">
             {orders.map(({ node: order }) => (
@@ -84,13 +123,13 @@ export default async function AccountPage() {
                 className="flex items-center justify-between py-4 border-b border-border"
               >
                 <div>
-                  <p className="text-[14px] font-medium">{order.name}</p>
-                  <p className="text-[12px] text-light">
+                  <p className="text-sm font-medium">{order.name}</p>
+                  <p className="text-xs text-muted-foreground">
                     {formatDate(order.processedAt, locale)}
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-[14px]">
+                  <p className="text-sm">
                     {formatPrice(
                       order.totalPrice.amount,
                       order.totalPrice.currencyCode,
@@ -105,22 +144,116 @@ export default async function AccountPage() {
       </section>
 
       {/* Quick links */}
-      <section className="mt-12 pt-8 border-t border-border">
-        <div className="flex flex-wrap gap-6">
-          <Link
-            href="/products"
-            className="text-[13px] text-muted hover:text-charcoal underline transition-colors"
-          >
-            {tCommon("products")}
-          </Link>
-          <Link
-            href="/journal"
-            className="text-[13px] text-muted hover:text-charcoal underline transition-colors"
-          >
-            {tCommon("journal")}
-          </Link>
+      <Separator className="mt-12" />
+      <section className="pt-8">
+        <div className="flex flex-wrap gap-4">
+          <Button variant="link" className="p-0 h-auto text-muted-foreground" asChild>
+            <Link href="/products">{tCommon("products")}</Link>
+          </Button>
+          <Button variant="link" className="p-0 h-auto text-muted-foreground" asChild>
+            <Link href="/journal">{tCommon("journal")}</Link>
+          </Button>
         </div>
       </section>
+    </div>
+  );
+}
+
+function SubscriptionCard({
+  subscription,
+  locale,
+  t,
+}: {
+  subscription: SubscriptionContract;
+  locale: string;
+  t: (key: string, values?: Record<string, string | number>) => string;
+}) {
+  const statusMap: Record<string, string> = {
+    ACTIVE: t("subscriptionActive"),
+    PAUSED: t("subscriptionPaused"),
+    CANCELLED: t("subscriptionCancelled"),
+  };
+
+  const statusColorMap: Record<string, string> = {
+    ACTIVE: "text-green-700 bg-green-50",
+    PAUSED: "text-yellow-700 bg-yellow-50",
+    CANCELLED: "text-muted-foreground bg-muted",
+  };
+
+  const statusLabel = statusMap[subscription.status] ?? subscription.status;
+  const statusColor = statusColorMap[subscription.status] ?? "text-muted-foreground bg-muted";
+
+  const { interval, intervalCount } = subscription.deliveryPolicy;
+  const intervalKey =
+    interval === "MONTH"
+      ? "intervalMonth"
+      : interval === "WEEK"
+        ? "intervalWeek"
+        : "intervalDay";
+
+  const lines = subscription.lines?.edges ?? [];
+
+  return (
+    <div className="border border-border p-5">
+      {/* Status + next delivery */}
+      <div className="flex items-center justify-between mb-4">
+        <span className={`text-xs px-2 py-1 ${statusColor}`}>
+          {statusLabel}
+        </span>
+        {subscription.nextBillingDate && (
+          <p className="text-xs text-muted-foreground">
+            {t("nextDelivery")}: {formatDate(subscription.nextBillingDate, locale)}
+          </p>
+        )}
+      </div>
+
+      {/* Line items */}
+      <div className="space-y-3">
+        {lines.map(({ node: line }) => (
+          <div key={line.id} className="flex items-center gap-4">
+            {line.variantImage ? (
+              <Image
+                src={line.variantImage.url}
+                alt={line.variantImage.altText ?? line.title}
+                width={56}
+                height={56}
+                className="object-cover"
+              />
+            ) : (
+              <div className="w-14 h-14 bg-muted flex items-center justify-center text-xs text-muted-foreground">
+                —
+              </div>
+            )}
+            <div className="flex-1 min-w-0">
+              <p className="text-sm truncate">{line.title}</p>
+              {line.variantTitle && (
+                <p className="text-xs text-muted-foreground">{line.variantTitle}</p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                × {line.quantity}
+              </p>
+            </div>
+            <p className="text-sm">
+              {formatPrice(line.currentPrice.amount, line.currentPrice.currencyCode, locale)}
+            </p>
+          </div>
+        ))}
+      </div>
+
+      {/* Delivery interval */}
+      <div className="mt-4 pt-4 border-t border-border">
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-xs text-muted-foreground">
+            {t("deliveryInterval")}: {t(intervalKey, { count: intervalCount })}
+          </p>
+        </div>
+        {(subscription.status === "ACTIVE" || subscription.status === "PAUSED") && (
+          <SubscriptionActions
+            contractId={subscription.id}
+            status={subscription.status}
+          />
+        )}
+      </div>
     </div>
   );
 }

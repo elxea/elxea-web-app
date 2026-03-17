@@ -55,6 +55,40 @@ export const blockContent = defineType({
       },
     }),
     defineArrayMember({
+      type: "object",
+      name: "ctaBlock",
+      title: "CTAブロック",
+      fields: [
+        {
+          name: "title",
+          type: "string",
+          title: "タイトル",
+        },
+        {
+          name: "image",
+          type: "image",
+          title: "画像",
+          options: { hotspot: true },
+        },
+        {
+          name: "url",
+          type: "url",
+          title: "リンクURL",
+        },
+        {
+          name: "shopifyHandle",
+          type: "string",
+          title: "Shopify商品ハンドル",
+        },
+      ],
+      preview: {
+        select: { title: "title" },
+        prepare({ title }) {
+          return { title: `CTA: ${title || "未設定"}` };
+        },
+      },
+    }),
+    defineArrayMember({
       type: "image",
       options: { hotspot: true },
       fields: [

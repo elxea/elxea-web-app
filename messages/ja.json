@@ -16,6 +16,9 @@
     "viewAll": "すべて見る",
     "readMore": "続きを読む",
     "addToCart": "カートに追加",
+    "addedToCart": "カートに追加しました",
+    "viewCart": "カートを見る",
+    "removedFromCart": "カートから削除しました",
     "checkout": "購入手続きへ",
     "subtotal": "小計",
     "quantity": "数量",
@@ -31,16 +34,25 @@
     "backToHome": "ホームに戻る",
     "errorTitle": "エラーが発生しました",
     "errorDescription": "問題が発生しました。もう一度お試しください。",
-    "retry": "再試行"
+    "retry": "再試行",
+    "about": "elxeaについて",
+    "faq": "よくあるご質問",
+    "contact": "お問い合わせ",
+    "shipping": "送料について",
+    "teaMenu": "お茶メニュー",
+    "playlists": "プレイリスト"
   },
   "home": {
+    "tagline": "Specialty Coffee & Tea",
     "hero": "スペシャルティコーヒー & ティー",
     "featuredProducts": "おすすめ商品",
     "latestJournal": "最新の記事",
     "upcomingEvents": "近日開催のイベント",
     "journalPlaceholder": "まもなく記事を公開します。",
     "eventsPlaceholder": "まもなくイベント情報を公開します。",
-    "productsPlaceholder": "まもなく商品を公開します。"
+    "productsPlaceholder": "まもなく商品を公開します。",
+    "storyHeading": "日常の中にきらめきを感じる一杯をあなたにも。",
+    "approachHeading": "私たちのコミュニティと地球の未来のために。"
   },
   "product": {
     "price": "価格",
@@ -66,7 +78,47 @@
     "title": "ジャーナル",
     "description": "コーヒーとお茶にまつわるストーリー",
     "empty": "まだ記事がありません。",
-    "loadError": "記事を読み込めませんでした。"
+    "loadError": "記事を読み込めませんでした。",
+    "writtenBy": "執筆",
+    "relatedArticles": "関連する記事",
+    "media": "動画 / 音声",
+    "ctaButton": "詳しく見る"
+  },
+  "teaMenu": {
+    "title": "お茶メニュー",
+    "description": "elxeaが厳選したスペシャルティティーのラインナップ",
+    "empty": "お茶メニューはまだ登録されていません。",
+    "loadError": "お茶メニューを読み込めませんでした。",
+    "variety": "品種",
+    "origin": "産地",
+    "season": "収穫時期",
+    "netWeight": "内容量",
+    "brewingGuide": "淹れ方ガイド",
+    "temperature": "温度",
+    "water": "湯量",
+    "time": "抽出時間",
+    "buyNow": "購入する",
+    "relatedArticle": "関連記事"
+  },
+  "playlist": {
+    "title": "Sound from Nature",
+    "description": "自然の音を感じるプレイリスト",
+    "empty": "プレイリストはまだ登録されていません。",
+    "loadError": "プレイリストを読み込めませんでした。",
+    "recorded": "録音日"
+  },
+  "elxeaJournal": {
+    "title": "elxea Journal",
+    "description": "季節のお茶と暮らしを届けるニュースレター",
+    "empty": "ジャーナルはまだ登録されていません。",
+    "loadError": "ジャーナルを読み込めませんでした。",
+    "relatedTea": "関連するお茶",
+    "relatedPlaylist": "プレイリスト",
+    "relatedPost": "関連記事"
+  },
+  "people": {
+    "loadError": "プロフィールを読み込めませんでした。",
+    "articlesByAuthor": "この人の記事"
   },
   "farmer": {
     "empty": "農家プロフィールはまだ登録されていません。",
@@ -84,9 +136,114 @@
     "loginRequired": "マイページを表示するにはログインが必要です。",
     "orderHistory": "注文履歴",
     "noOrders": "注文履歴はまだありません。",
-    "memberOnlyDescription": "この内容は会員限定です。ログインしてすべてのコンテンツをお楽しみください。"
+    "memberOnlyDescription": "この内容は会員限定です。ログインしてすべてのコンテンツをお楽しみください。",
+    "subscriptions": "定期便",
+    "noSubscriptions": "ご契約中の定期便はありません。",
+    "subscriptionActive": "契約中",
+    "subscriptionPaused": "一時停止中",
+    "subscriptionCancelled": "解約済み",
+    "nextDelivery": "次回お届け日",
+    "deliveryInterval": "お届け頻度",
+    "intervalMonth": "{count}ヶ月ごと",
+    "intervalWeek": "{count}週間ごと",
+    "intervalDay": "{count}日ごと",
+    "manageSubscription": "定期便を管理する",
+    "subscriptionNote": "頻度変更・商品変更はShopifyのマイページから手続きいただけます。",
+    "skipNext": "次回スキップ",
+    "pauseSubscription": "一時停止",
+    "resumeSubscription": "再開",
+    "cancelSubscription": "解約",
+    "confirmCancel": "本当に解約する",
+    "actionError": "操作に失敗しました。もう一度お試しください。"
+  },
+  "legal": {
+    "tokushoho": "特定商取引法に基づく表記",
+    "privacy": "プライバシーポリシー",
+    "terms": "利用規約",
+    "returns": "返品・交換ポリシー"
+  },
+  "about": {
+    "title": "elxeaについて",
+    "subtitle": "農家と消費者をつなぐ、スペシャルティティーの新しい体験",
+    "mission": "私たちのミッション",
+    "missionText": "elxeaは、日本各地の茶農家が丹精込めて育てたスペシャルティティーを、直接お客様のもとへお届けするD2Cブランドです。生産者の顔が見える透明性のある取引を通じて、お茶の新しい価値と体験を創造します。",
+    "story": "ブランドストーリー",
+    "storyText": "日本のお茶文化は数百年の歴史を持ちますが、多くの素晴らしい茶農家の存在は消費者にはあまり知られていません。elxeaは、そうした農家と消費者を直接つなぎ、お茶を通じた豊かな体験を提供するために生まれました。\n\n私たちは農家を訪問し、その土地の気候や製法を深く理解した上で、最高品質の茶葉を厳選しています。定期便を通じて、季節ごとの旬のお茶をお届けし、日本茶の奥深い世界をご紹介します。",
+    "values": "大切にしていること",
+    "value1Title": "透明性",
+    "value1Text": "生産者、産地、製法をすべて開示します。お客様が安心して選べるお茶をお届けします。",
+    "value2Title": "持続可能性",
+    "value2Text": "茶農家の持続可能な経営を支援し、日本のお茶文化の未来に貢献します。",
+    "value3Title": "品質",
+    "value3Text": "スペシャルティグレードの茶葉のみを取り扱い、最高の状態でお届けします。"
+  },
+  "faq": {
+    "title": "よくあるご質問",
+    "subtitle": "ご不明な点がございましたらお気軽にお問い合わせください。",
+    "q1": "定期便とは何ですか？",
+    "a1": "定期便は、毎月または隔月で厳選したスペシャルティティーをお届けするサブスクリプションサービスです。季節に合わせた旬のお茶を、農家から直接お届けします。",
+    "q2": "定期便の解約はできますか？",
+    "a2": "はい、いつでも解約可能です。マイページの定期便管理から手続きいただけます。次回発送日の3日前までにお手続きください。",
+    "q3": "送料はいくらですか？",
+    "a3": "全国一律550円（税込）でお届けします。5,000円以上のご注文で送料無料です。定期便は常に送料無料でお届けします。",
+    "q4": "届くまでどのくらいかかりますか？",
+    "a4": "ご注文確定後、通常3〜5営業日以内に発送いたします。発送後は1〜3日でお届けします（地域により異なります）。",
+    "q5": "支払い方法は何がありますか？",
+    "a5": "クレジットカード（Visa、Mastercard、American Express、JCB）、Apple Pay、Google Pay、Shop Payがご利用いただけます。",
+    "q6": "返品・交換はできますか？",
+    "a6": "食品のため、お客様都合での返品はお受けしておりません。商品に不備があった場合は、到着後7日以内にお問い合わせください。交換または返金にて対応いたします。",
+    "q7": "ギフト包装はできますか？",
+    "a7": "現在準備中です。今後のアップデートをお待ちください。",
+    "q8": "定期便の届け先や頻度は変更できますか？",
+    "a8": "はい、マイページからお届け先の変更、お届け頻度の変更（毎月↔隔月）が可能です。次回発送日の3日前までにお手続きください。"
+  },
+  "contact": {
+    "title": "お問い合わせ",
+    "subtitle": "ご質問やご要望がございましたら、下記フォームよりお気軽にお問い合わせください。",
+    "name": "お名前",
+    "email": "メールアドレス",
+    "subject": "件名",
+    "message": "お問い合わせ内容",
+    "submit": "送信する",
+    "success": "お問い合わせを受け付けました。2営業日以内にご返信いたします。",
+    "error": "送信に失敗しました。もう一度お試しください。",
+    "emailDirect": "メールでのお問い合わせ",
+    "emailAddress": "support@elxea.com",
+    "responseTime": "通常2営業日以内にご返信いたします。"
+  },
+  "shippingInfo": {
+    "title": "送料について",
+    "subtitle": "配送料金とお届けに関するご案内",
+    "domestic": "国内配送",
+    "domesticRate": "全国一律 550円（税込）",
+    "freeShipping": "5,000円以上のご注文で送料無料",
+    "subscriptionFree": "定期便は常に送料無料",
+    "deliveryTime": "お届け日数",
+    "deliveryTimeText": "ご注文確定後、通常3〜5営業日以内に発送いたします。発送後のお届け目安は以下の通りです。",
+    "region1": "関東・中部・関西",
+    "region1Days": "発送後1〜2日",
+    "region2": "北海道・東北・中国・四国・九州",
+    "region2Days": "発送後2〜3日",
+    "region3": "沖縄・離島",
+    "region3Days": "発送後3〜5日",
+    "packaging": "梱包について",
+    "packagingText": "茶葉の品質を保つため、遮光性・密閉性の高いパッケージでお届けします。配送中の衝撃から守るため、緩衝材を使用しています。",
+    "note": "※天候や交通状況により、お届けが遅れる場合がございます。あらかじめご了承ください。"
+  },
+  "cookie": {
+    "message": "このサイトではCookieを使用して、お客様の閲覧体験の向上とサイトの分析を行っています。",
+    "accept": "同意する",
+    "decline": "必要なもののみ",
+    "learnMore": "詳しく見る"
+  },
+  "breadcrumb": {
+    "home": "ホーム"
   },
   "footer": {
+    "shop": "ショップ",
+    "content": "コンテンツ",
+    "legal": "法的情報",
+    "support": "サポート",
     "copyright": "© {year} elxea. All rights reserved."
   }
 }

@@ -1,7 +1,12 @@
+import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { searchProducts } from "@/lib/shopify";
 import { ProductGrid } from "@/components/product/product-grid";
 import { SearchForm } from "@/components/search-form";
+
+export const metadata: Metadata = {
+  title: "Search",
+};
 
 export default async function SearchPage({
   searchParams,
@@ -26,7 +31,7 @@ export default async function SearchPage({
 
       {q && results && (
         <div className="mt-12">
-          <p className="text-[13px] text-muted mb-8">
+          <p className="text-sm text-muted-foreground mb-8">
             {t("results", { count: results.totalCount })}
           </p>
           <ProductGrid products={results.products} />
@@ -34,7 +39,7 @@ export default async function SearchPage({
       )}
 
       {q && !results && (
-        <p className="text-muted text-[14px] mt-12">
+        <p className="text-muted-foreground text-sm mt-12">
           {t("loadError")}
         </p>
       )}

@@ -2,6 +2,7 @@ import Image from "next/image";
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { formatPrice } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
 import type { Product } from "@/lib/shopify/types";
 
 export function ProductCard({ product }: { product: Product }) {
@@ -12,7 +13,7 @@ export function ProductCard({ product }: { product: Product }) {
   return (
     <Link href={`/products/${product.handle}`} className="group block">
       {/* Image */}
-      <div className="aspect-square bg-surface mb-4 overflow-hidden">
+      <div className="aspect-square bg-muted mb-4 overflow-hidden rounded-md">
         {product.featuredImage ? (
           <Image
             src={product.featuredImage.url}
@@ -23,7 +24,7 @@ export function ProductCard({ product }: { product: Product }) {
             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-light text-[13px]">
+          <div className="w-full h-full flex items-center justify-center text-muted-foreground text-sm">
             {t("noImage")}
           </div>
         )}
@@ -32,23 +33,25 @@ export function ProductCard({ product }: { product: Product }) {
       {/* Info */}
       <div className="space-y-1.5">
         {product.vendor && (
-          <p className="text-[12px] text-light">{product.vendor}</p>
+          <p className="text-xs text-muted-foreground">{product.vendor}</p>
         )}
-        <h2 className="text-[14px] font-medium leading-snug group-hover:underline">
+        <h2 className="text-sm font-medium leading-snug group-hover:underline">
           {product.title}
         </h2>
         <div className="flex items-center gap-2">
-          <p className="text-[14px]">
+          <p className="text-sm">
             {formatPrice(price.amount, price.currencyCode)}
           </p>
           {comparePrice && parseFloat(comparePrice.amount) > parseFloat(price.amount) && (
-            <p className="text-[13px] text-light line-through">
+            <p className="text-sm text-muted-foreground line-through">
               {formatPrice(comparePrice.amount, comparePrice.currencyCode)}
             </p>
           )}
         </div>
         {!product.availableForSale && (
-          <p className="text-[12px] text-error">{t("soldOut")}</p>
+          <Badge variant="destructive" className="text-xs">
+            {t("soldOut")}
+          </Badge>
         )}
       </div>
     </Link>

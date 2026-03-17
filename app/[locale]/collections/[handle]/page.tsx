@@ -41,7 +41,7 @@ export default async function CollectionPage({
   } catch {
     return (
       <div className="max-w-7xl mx-auto px-6 py-16">
-        <p className="text-muted">{t("loadError")}</p>
+        <p className="text-muted-foreground">{t("loadError")}</p>
       </div>
     );
   }
@@ -52,7 +52,7 @@ export default async function CollectionPage({
     <div className="max-w-7xl mx-auto px-6 py-16">
       <h1 className="mb-4">{collection.title}</h1>
       {collection.description && (
-        <p className="text-muted text-[14px] mb-12 max-w-2xl">
+        <p className="text-muted-foreground text-sm mb-12 max-w-2xl">
           {collection.description}
         </p>
       )}

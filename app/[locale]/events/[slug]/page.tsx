@@ -8,6 +8,7 @@ import { urlFor } from "@/sanity/lib/image";
 import { PortableText } from "@/components/sanity/portable-text";
 import { isAuthenticated } from "@/lib/shopify/auth";
 import { MemberGate } from "@/components/ui/member-gate";
+import { Button } from "@/components/ui/button";
 
 export async function generateMetadata({
   params,
@@ -51,7 +52,7 @@ export default async function EventPage({
   } catch {
     return (
       <div className="max-w-3xl mx-auto px-6 py-16">
-        <p className="text-muted">{t("loadError")}</p>
+        <p className="text-muted-foreground">{t("loadError")}</p>
       </div>
     );
   }
@@ -65,7 +66,7 @@ export default async function EventPage({
   return (
     <div className="max-w-3xl mx-auto px-6 py-16">
       <header className="mb-12">
-        <p className="text-[12px] text-light mb-4">
+        <p className="text-xs text-muted-foreground mb-4">
           {new Date(event.date).toLocaleDateString(locale, {
             year: "numeric",
             month: "long",
@@ -80,10 +81,10 @@ export default async function EventPage({
         </p>
         <h1 className="mb-4">{event.title}</h1>
         {event.location && (
-          <p className="text-muted text-[14px]">{event.location}</p>
+          <p className="text-muted-foreground text-sm">{event.location}</p>
         )}
         {isMemberOnly && (
-          <p className="text-[12px] text-muted mt-4">[{tCommon("memberOnly")}]</p>
+          <p className="text-xs text-muted-foreground mt-4">[{tCommon("memberOnly")}]</p>
         )}
       </header>
 
@@ -107,14 +108,15 @@ export default async function EventPage({
 
           {event.externalUrl && (
             <div className="mt-12">
-              <a
-                href={event.externalUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-block border border-charcoal px-8 py-3 text-[13px] font-medium hover:bg-charcoal hover:text-cream transition-colors"
-              >
-                {t("detailsLink")}
-              </a>
+              <Button variant="outline" asChild>
+                <a
+                  href={event.externalUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {t("detailsLink")}
+                </a>
+              </Button>
             </div>
           )}
         </>

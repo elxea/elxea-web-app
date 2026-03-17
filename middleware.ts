@@ -4,8 +4,30 @@ import { routing } from "./i18n/routing";
 
 const intlMiddleware = createMiddleware(routing);
 
+const SITE_PASSWORD = process.env.SITE_PASSWORD;
+
+function checkSitePassword(request: NextRequest): NextResponse | null {
+  if (!SITE_PASSWORD) return null;
+
+  const authCookie = request.cookies.get("site_auth")?.value;
+  if (authCookie === SITE_PASSWORD) return null;
+
+  const { pathname } = request.nextUrl;
+
+  // Allow access to password page itself
+  if (pathname === "/password") return null;
+
+  // Redirect to password page
+  const passwordUrl = new URL("/password", request.url);
+  return NextResponse.redirect(passwordUrl);
+}
+
 export default function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // Site-wide password protection (staging/preview)
+  const passwordResponse = checkSitePassword(request);
+  if (passwordResponse) return passwordResponse;
 
   // Check if this is an /account route that needs auth
   const accountMatch = pathname.match(/^\/(ja|en)\/account/);
@@ -30,6 +52,6 @@ export const config = {
     // - /api routes
     // - /_next (Next.js internals)
     // - Static files
-    "/((?!studio|api|_next|.*\\..*).*)",
+    "/((?!studio|api|password|_next|.*\\..*).*)",
   ],
 };

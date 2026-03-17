@@ -21,7 +21,7 @@ async function CollectionsContent() {
     const collections = await getCollections();
     if (collections.length === 0) {
       const t = await getTranslations("collection");
-      return <p className="text-muted text-[14px]">{t("empty")}</p>;
+      return <p className="text-muted-foreground text-sm">{t("empty")}</p>;
     }
 
     return (
@@ -32,7 +32,7 @@ async function CollectionsContent() {
             href={`/collections/${collection.handle}`}
             className="group block"
           >
-            <div className="aspect-[4/3] bg-surface mb-4 overflow-hidden">
+            <div className="aspect-[4/3] bg-muted mb-4 overflow-hidden">
               {collection.image ? (
                 <Image
                   src={collection.image.url}
@@ -43,16 +43,16 @@ async function CollectionsContent() {
                   className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                 />
               ) : (
-                <div className="w-full h-full flex items-center justify-center text-light text-[13px]">
+                <div className="w-full h-full flex items-center justify-center text-muted-foreground text-sm">
                   {collection.title}
                 </div>
               )}
             </div>
-            <h2 className="text-[14px] font-medium group-hover:underline">
+            <h2 className="text-sm font-medium group-hover:underline">
               {collection.title}
             </h2>
             {collection.description && (
-              <p className="text-[13px] text-muted mt-1 line-clamp-2">
+              <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
                 {collection.description}
               </p>
             )}
@@ -63,7 +63,7 @@ async function CollectionsContent() {
   } catch {
     const t = await getTranslations("collection");
     return (
-      <p className="text-muted text-[14px]">
+      <p className="text-muted-foreground text-sm">
         {t("loadError")}
       </p>
     );

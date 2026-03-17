@@ -3,6 +3,7 @@
 import { useLocale } from "next-intl";
 import { usePathname, useRouter } from "@/i18n/navigation";
 import { locales, type Locale } from "@/i18n/config";
+import { Button } from "@/components/ui/button";
 
 const localeLabels: Record<Locale, string> = {
   ja: "日本語",
@@ -21,17 +22,19 @@ export function LanguageSwitcher() {
   return (
     <div className="flex gap-3">
       {locales.map((l) => (
-        <button
+        <Button
           key={l}
+          variant="ghost"
+          size="sm"
           onClick={() => handleChange(l)}
-          className={`text-[13px] transition-colors ${
+          className={
             locale === l
-              ? "text-charcoal font-medium"
-              : "text-muted hover:text-charcoal"
-          }`}
+              ? "text-foreground font-medium"
+              : "text-muted-foreground"
+          }
         >
           {localeLabels[l]}
-        </button>
+        </Button>
       ))}
     </div>
   );

@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
 import { NextIntlClientProvider, hasLocale } from "next-intl";
 import { getMessages } from "next-intl/server";
 import { notFound } from "next/navigation";
@@ -7,12 +6,9 @@ import { locales } from "@/i18n/config";
 import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
 import { CartProviderWrapper } from "@/components/cart/cart-provider-wrapper";
-
-const inter = Inter({
-  subsets: ["latin"],
-  display: "swap",
-  variable: "--font-sans",
-});
+import { CookieConsent } from "@/components/ui/cookie-consent";
+import { Toaster } from "@/components/ui/sonner";
+import { ScrollToTop } from "@/components/ui/scroll-to-top";
 
 export const metadata: Metadata = {
   title: {
@@ -20,6 +16,27 @@ export const metadata: Metadata = {
     template: "%s | elxea",
   },
   description: "elxea - specialty coffee & tea",
+  manifest: "/manifest.json",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "32x32" },
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180" }],
+  },
+  openGraph: {
+    type: "website",
+    siteName: "elxea",
+    images: [{ url: "/og-image.jpg", width: 1000, height: 628, alt: "elxea - Specialty Coffee & Tea" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    images: ["/og-image.jpg"],
+  },
+  other: {
+    "theme-color": "#333333",
+  },
 };
 
 export default async function LocaleLayout({
@@ -35,15 +52,27 @@ export default async function LocaleLayout({
   }
 
   const messages = await getMessages();
+  const alternateLocale = locale === "ja" ? "en" : "ja";
 
   return (
-    <html lang={locale} className={inter.variable}>
-      <body className="min-h-screen flex flex-col bg-cream text-charcoal">
+    <html lang={locale}>
+      <head>
+        <script async src="https://use.typekit.net/fwg7gtf.js" />
+        <script dangerouslySetInnerHTML={{ __html: "try{Typekit.load({async:true})}catch(e){}" }} />
+        <link rel="alternate" hrefLang={locale} href={`https://elxea.com/${locale}`} />
+        <link rel="alternate" hrefLang={alternateLocale} href={`https://elxea.com/${alternateLocale}`} />
+        <link rel="alternate" hrefLang="x-default" href="https://elxea.com/ja" />
+        <meta name="facebook-domain-verification" content="so8t14i6xbm14emy15c8f2zz3kap2c" />
+      </head>
+      <body className="min-h-screen flex flex-col bg-background text-foreground">
         <NextIntlClientProvider messages={messages}>
           <CartProviderWrapper>
             <Header />
             <main className="flex-1">{children}</main>
             <Footer />
+            <CookieConsent />
+            <Toaster />
+            <ScrollToTop />
           </CartProviderWrapper>
         </NextIntlClientProvider>
       </body>
