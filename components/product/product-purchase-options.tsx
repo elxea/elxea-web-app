@@ -48,7 +48,7 @@ export function ProductPurchaseOptions({
 
   return (
     <>
-      {displayPrice && displayCurrency && (
+      {displayPrice && displayCurrency && parseFloat(displayPrice) > 0 && (
         <p className="text-lg">
           {formatPrice(displayPrice, displayCurrency)}
         </p>

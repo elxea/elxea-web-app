@@ -26,7 +26,9 @@ export function SellingPlanSelector({
 
   return (
     <div className="space-y-4">
-      <p className="text-sm font-medium">{t("purchaseType")}</p>
+      {!subscriptionOnly && (
+        <p className="text-sm font-medium">{t("purchaseType")}</p>
+      )}
 
       {!subscriptionOnly && (
         <div className="flex gap-3">
@@ -77,7 +79,7 @@ export function SellingPlanSelector({
                   onClick={() => onSelectPlan(plan.id)}
                 >
                   <span>{plan.name}</span>
-                  {perDeliveryPrice && (
+                  {perDeliveryPrice && parseFloat(perDeliveryPrice.amount) > 0 && (
                     <span className="block text-xs opacity-80">
                       {formatPrice(perDeliveryPrice.amount, perDeliveryPrice.currencyCode)}
                     </span>
