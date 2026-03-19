@@ -94,7 +94,7 @@ export default async function ArticlePage({
       <header className="mb-12">
         {article.category && (
           <Link
-            href={`/journal?category=${article.category.slug.current}`}
+            href={`/journal/category/${article.category.slug.current}`}
             className="text-xs text-muted-foreground uppercase tracking-wider mb-4 block hover:text-foreground transition-colors"
           >
             {article.category.title}
@@ -105,7 +105,14 @@ export default async function ArticlePage({
           <p className="text-muted-foreground text-sm leading-relaxed">{article.excerpt}</p>
         )}
         <div className="flex items-center gap-4 mt-6 text-xs text-muted-foreground">
-          {article.author && <span>{article.author.name}</span>}
+          {article.author && (
+            <Link
+              href={`/journal/author/${article.author.slug?.current ?? ""}`}
+              className="hover:text-foreground transition-colors"
+            >
+              {article.author.name}
+            </Link>
+          )}
           {article.publishedAt && (
             <time>{new Date(article.publishedAt).toLocaleDateString(locale)}</time>
           )}
@@ -118,12 +125,13 @@ export default async function ArticlePage({
         {article.tags && article.tags.length > 0 && (
           <div className="flex flex-wrap gap-2 mt-4">
             {article.tags.map((tag: { _id: string; title: string; slug: { current: string } }) => (
-              <span
+              <Link
                 key={tag._id}
-                className="text-xs text-muted-foreground border border-border px-2 py-0.5 rounded"
+                href={`/journal/tag/${tag.slug.current}`}
+                className="text-xs text-muted-foreground border border-border px-2 py-0.5 rounded hover:text-foreground hover:border-foreground transition-colors"
               >
                 {tag.title}
-              </span>
+              </Link>
             ))}
           </div>
         )}

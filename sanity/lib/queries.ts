@@ -266,6 +266,31 @@ export const JOURNAL_BY_SLUG_QUERY = groq`
   }
 `;
 
+// Tags
+export const TAG_BY_SLUG_QUERY = groq`
+  *[_type == "tag" && slug.current == $tagSlug][0] {
+    _id,
+    title,
+    slug
+  }
+`;
+
+export const ARTICLES_BY_TAG_QUERY = groq`
+  *[_type == "article" && language == $language && $tagSlug in tags[]->slug.current] | order(publishedAt desc) [$start...$end] {
+    _id,
+    title,
+    slug,
+    excerpt,
+    thumbnail,
+    mainImage,
+    publishedAt,
+    memberOnly,
+    category->{title, slug},
+    tags[]->{_id, title, slug},
+    author->{name, slug, image}
+  }
+`;
+
 // People (Author detail)
 export const AUTHOR_BY_SLUG_QUERY = groq`
   *[_type == "author" && slug.current == $slug][0] {
@@ -280,7 +305,7 @@ export const AUTHOR_BY_SLUG_QUERY = groq`
 `;
 
 export const ARTICLES_BY_AUTHOR_QUERY = groq`
-  *[_type == "article" && language == $language && author->slug.current == $authorSlug] | order(publishedAt desc) [0...10] {
+  *[_type == "article" && language == $language && author->slug.current == $authorSlug] | order(publishedAt desc) [$start...$end] {
     _id,
     title,
     slug,
@@ -289,7 +314,9 @@ export const ARTICLES_BY_AUTHOR_QUERY = groq`
     mainImage,
     publishedAt,
     memberOnly,
-    category->{title, slug}
+    category->{title, slug},
+    tags[]->{_id, title, slug},
+    author->{name, slug, image}
   }
 `;
 
