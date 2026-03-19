@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "../dist/tokens.css";
+@import "../dist/tokens-cjk.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -9,7 +10,7 @@
 /* Design tokens generated from tokens/ via Style Dictionary (pnpm build:tokens) */
 
 h1, h2, h3, h4, h5, h6 {
-  font-family: var(--font-heading);
+  font-family: var(--typography-family-heading);
 }
 
 :root {

@@ -13,7 +13,11 @@
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
     "build:tokens": "node sd.config.mjs",
-    "chromatic": "chromatic --exit-zero-on-changes"
+    "validate:tokens": "npx tsx scripts/design-system/validate-tokens.ts",
+    "chromatic": "chromatic --exit-zero-on-changes",
+    "sync:figma-read": "npx tsx scripts/design-system/sync-figma-read.ts",
+    "audit:components": "npx tsx scripts/design-system/audit-components.ts",
+    "diff:tokens": "npx tsx scripts/design-system/diff-tokens.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.3.0",

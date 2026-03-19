@@ -1,117 +1,112 @@
-# Developer — 技術実装全般
+# elxea Web App — プロジェクト技術仕様
 
-elxea の技術実装全般を担当。EC サイト開発、フロントエンド・バックエンド実装、バグ修正、PoC 作成を行う。
+elxea EC サイト（Next.js ヘッドレスコマース）のプロジェクト固有ルール。
 
-## Contract
-
-- health_check_method: N/A（構築前）
-- health_check_target: N/A
-- normal: N/A
-- abnormal: N/A
-- stale_threshold_days: N/A
-- escalation: 本番デプロイは全件 Setaka 承認
-
-## 責務
-
-- EC サイト開発（Shopify テーマ・カスタマイズ）
-- フロントエンド実装（LP、Web アプリ）
-- バックエンド実装（API、データ処理）
-- バグ修正・技術的負債の解消
-- PoC・プロトタイプ作成
-- 他エージェントのリポの技術サポート（Boss 経由で依頼）
+エージェント定義（責務・権限・Devlog・制約）は `elxea-developer/CLAUDE.md` を参照。
 
 ## アーキテクチャ
 
-- Runtime: 未定（プロジェクトに応じて判断）
-- Deploy: 未定
-- Dependencies: 未定
+- Runtime: Next.js 15 + React 19 + TypeScript（App Router）
+- Styling: Tailwind CSS v4.2 + shadcn/ui（new-york）+ Radix UI + CVA
+- CMS: Sanity.io（コンテンツ）+ Notion（タスク・運用）
+- EC: Shopify Storefront API（ヘッドレス）
+- Auth/DB: Firebase（Firestore + Auth）
+- Deploy: Vercel
+- i18n: next-intl（日本語 primary）
+- Package Manager: pnpm
 
-## コマンド
+## デザインシステム方針
 
-N/A（構築前）
+### 原則: コードファースト
 
-## データフロー
+Figma は探索・スケッチ用。**コードがソース・オブ・トゥルース**。デザイントークン・コンポーネントの正規定義はすべてコード側に置き、Figma はそれを参照する構造にする。
 
-### Input
-- Setaka / Boss からの技術要件
-- Designer からの UI/UX デザイン
-- 各エージェントからの技術的な改善要望（Boss 経由）
+根拠: Shopify Polaris ですら Figma 起点のガバナンスで1年で14%のUIドリフトが発生（Builder.io 調査）。小規模チームでは Figma とコードの二重管理は維持不可能。
 
-### Output
-- 実装済みコード（各プロジェクトリポ）
-- 技術ドキュメント
-- PoC・プロトタイプ
+### Design Token アーキテクチャ
 
-## 他エージェントとの接点
+**Tailwind v4 `@theme`（`app/globals.css`）が唯一のトークン定義場所。**
 
-- **Designer**: Designer が UI/UX を設計、Developer が実装。デザインカンプ → コード化のフロー
-- **Broadcaster**: Broadcaster リポ（elxea-broadcaster）の技術的な改善・機能追加
-- **Boss**: タスクのルーティング経由で技術タスクを受ける。他エージェントのリポのコードを変更する場合は Boss が指示
+3層モデル（W3C Design Tokens 標準準拠）:
 
-## Notion DB
+| 層 | 例 | 定義場所 |
+|---|---|---|
+| Core（生の値） | `oklch(0.205 0 0)` | `@theme` 内の CSS 変数 |
+| Semantic（用途別） | `--color-primary`, `--color-muted` | `@theme` 内の CSS 変数 |
+| Component（適用値） | CVA variants 内の Tailwind クラス | 各 `components/ui/*.tsx` |
 
-| DB名 | ID | 読み/書き | 用途 |
-|---|---|---|---|
-| All Tasks | `50adc342...` | 読み | 自分にアサインされたタスクの確認 |
-| Proposal for Project List | `2bd0a535...` | 読み/書き | Devlog（開発プロセス記録）の作成 |
+ルール:
+- **生の値（HEX/OKLCH/px）をコンポーネント内に直書き禁止** → 必ず `@theme` トークン経由
+- **`bg-[#xxx]` 等の arbitrary value は原則禁止** → トークンが足りなければ `@theme` に追加してから使う
+- 色は OKLCH カラースペースで統一（知覚的均一性）
+- フォントは `--font-sans`（本文）/ `--font-heading`（見出し）の2系統。追加する場合は `@theme` に定義
 
-## Devlog ルール
+### コンポーネントシステム: shadcn/ui
 
-### なぜ Devlog を書くのか
+**shadcn/ui（new-york スタイル）を公式コンポーネント基盤とする。**
 
-エージェントのセッションはいつでも分断される（コンテキスト上限、タイムアウト、エラー等）。分断された次のセッションが文脈を追えるかどうかは、Devlog の有無で決まる。MEMORY.md はローカルな作業メモに過ぎず、Devlog こそがセッション間の文脈を橋渡しする唯一の永続記録である。
+構成:
+- プリミティブ: Radix UI（アクセシビリティ・振る舞い）
+- バリアント管理: CVA（class-variance-authority）
+- クラス結合: `cn()` = clsx + tailwind-merge（`lib/utils.ts`）
+- アイコン: Lucide React
+- 配置: `components/ui/` に shadcn/ui コンポーネントを格納
 
-したがって Devlog の作成は「ルールだから書く」のではなく、「セッション継続性を担保するために書く」。作業ログ・メモ・記録を求められたら、それは Devlog エントリの作成を意味する。
+コンポーネント追加手順:
+1. `npx shadcn@latest add <component>` で追加
+2. プロジェクト固有のカスタマイズは追加後にファイルを直接編集
+3. `data-slot` 属性を維持（デバッグ・テスト用）
 
-### 手順
+### Tailwind 規律
 
-1. セッション完了前に **Proposal for Project List** DB へ Devlog エントリを作成する（忘れた場合は次回セッション開始時に作成）
-2. MEMORY.md に作業メモを残す（Devlog 作成の素材として）
-3. Devlog の参照は必要時のみ（前回の経緯が不明なとき、他エージェントの作業を引き継ぐとき）
-4. 「メモしておいて」「作業ログを残して」「記録して」等の指示 → Devlog エントリの作成（タスクページへの書き込みではない）
+- ユーティリティクラスは **1要素あたり最大10-12個**。超える場合はコンポーネント抽出
+- `@apply` は非推奨 → 明示的な CSS プロパティまたはコンポーネント化で対応
+- 条件付きスタイリングは `cn()` + CVA variants で管理（インライン三項演算子の乱用禁止）
+- セマンティックなトークン名を使用: `text-primary`, `bg-muted`（`text-gray-500` 等の数値スケール直接指定より優先）
 
-### 必須プロパティ
-グローバル CLAUDE.md の「記録ルール」に準拠。以下はエージェント固有の補足：
-- **Name**: Type の値と同じ文字列を入れる（例: Type が Devlog なら Name も「Devlog」）。詳細は Note またはページ本文に記載
-- **Type**: `Devlog` / `Proposal` / `Research` / `Spec` / `Design` / `Review`（グローバル CLAUDE.md の判定基準に従う）
-- **Project**: 下記「Project の決定方法」に従う
-- **Assignee**: Developer（People List: `31c70c9d-064c-8154-bf27-f0e059e2b952`）
-- **Date**: `date` コマンドで JST 取得 → UTC 変換（JST-9h）→ `date:Data:start` に ISO-8601 datetime を分単位で設定、`is_datetime: 1`
+### LP・ページテンプレート戦略
 
-### Project の決定方法（優先順）
-1. **タスク起点の作業**: 作業対象タスク（All Tasks List）の Project リレーションをそのまま引き継ぐ
-2. **Boss からの指示**: 指示に含まれる Project 情報を使う
-3. **上記で特定できない場合**: All Projects DB（`collection://22263392-2e8d-4f63-912b-c74a4299e0be`）で Assignee に自分が含まれ、Status が「In progress」のプロジェクトを検索して使う
-4. **それでも複数該当する場合**: ユーザーに確認する
+新規 LP はゼロから作らない。**セクション単位のテンプレートを組み合わせて構成する。**
 
-### 記載禁止事項
-Devlog は社内チーム全員が閲覧できるため、以下の情報は絶対に記載しない：
-- API キー、トークン、パスワード、シークレット等の認証情報
-- 個人情報（顧客の氏名・住所・連絡先等）
-- 財務の具体的数値（売上・利益・口座情報等）
-- 管理者のみが保持するプライベートページの内容
-- その他セキュリティレベルの高い情報
+基本セクションテンプレート（順次整備）:
+1. **Hero** — メインビジュアル + キャッチコピー + CTA
+2. **Features** — 特徴・メリットのグリッド表示
+3. **Testimonials** — お客様の声・レビュー
+4. **CTA** — コンバージョン誘導ブロック
+5. **FAQ** — よくある質問のアコーディオン
 
-作業内容の記述では、具体的な値ではなく「API認証を更新した」「顧客データの処理を修正した」のように抽象化して記載する。
+各テンプレートは `@theme` トークン + shadcn/ui コンポーネントで構成し、プロパティ（テキスト・画像・色）を差し替えるだけで新 LP を生成できる構造にする。
 
-### 本文テンプレート
+### 導入済みツール
+
+| ツール | 目的 | 状態 |
+|--------|------|------|
+| Storybook | コンポーネントカタログ（59コンポーネント + トークン可視化） | ✅ 稼働中 |
+| Style Dictionary | tokens/base.json → CSS変数 自動生成 | ✅ 稼働中 |
+| Chromatic | Visual Regression 自動検知 | ✅ 設定済み |
+| Figma Variable Rebinder | Code → Figma トークン同期プラグイン | ✅ 作成済み |
+| Figma Variable Exporter | Figma → Code トークン書き出しプラグイン | ✅ 作成済み |
+
+### デザインシステム管理スキル
+
+| スキル | ファイル | 用途 |
+|--------|---------|------|
+| design-tokens | `.claude/skills/design-tokens.md` | トークンの編集・ビルド・検証ルール |
+| figma-sync | `.claude/skills/figma-sync.md` | Figma ↔ コード同期手順 |
+| component-catalog | `.claude/skills/component-catalog.md` | コンポーネント管理・追加手順 |
+| visual-qa | `.claude/skills/visual-qa.md` | ビジュアル品質管理チェックリスト |
+
+### デザインシステム管理コマンド
+
+```bash
+pnpm build:tokens        # トークンビルド（base.json → CSS変数）
+pnpm validate:tokens     # トークンの整合性チェック
+pnpm diff:tokens         # トークン変更の差分表示
+pnpm audit:components    # コンポーネント使用状況レポート
+pnpm sync:figma-read     # Figma API でファイル情報読み取り
+pnpm storybook           # Storybook dev server (port 6006)
+pnpm chromatic           # ビジュアルリグレッションテスト
 ```
-## Intent（意図）
-何を目的にこの作業をしたか
-
-## What was done（実装内容）
-具体的に何を実装・変更したか
-
-## Result（結果）
-Done / Partial / Blocked / Reverted とその補足
-
-## Learnings（学び）
-得られた知見、注意点、次回への申し送り
-```
-
-## 環境変数
-
-N/A（プロジェクトごとに設定）
 
 ## React / Next.js ベストプラクティス（Vercel Engineering 準拠）
 
@@ -219,41 +214,3 @@ N/A（プロジェクトごとに設定）
 
 ### 5. 完了報告時に検証結果を添える
 - 「修正しました」だけではなく、grep 結果（残存ゼロ）とビルド成功のエビデンスを必ず添える
-
-## 判断権限
-
-### Tier 0: 自律実行（報告不要）
-- ローカル開発・ビルド・テストの実行
-- コードの読み取り・調査・PoC 作成
-- Devlog / MEMORY.md の作成・更新
-- ブランチ作成・ローカルコミット
-- 技術調査レポートの作成
-
-### Tier 1: Boss 承認（Daily Reports で集約報告）
-- PR の作成（マージは Tier 2）
-- 他エージェントのリポへのコード変更（Boss 経由の依頼に基づく）
-- ステージング環境へのデプロイ
-- パッケージ・依存関係の追加・更新
-
-### Tier 2: Setaka 承認（明示的な承認待ち）
-- 本番環境へのデプロイ
-- PR のマージ（main/master ブランチへ）
-- 新しいクラウドサービスの追加
-- `--force` / `--no-verify` の使用
-- データベースマイグレーション
-
-### エスカレーション手順
-1. Tier 1/2 の判断が必要な場合、All Tasks DB にタスクを作成（Status: Review）
-2. タスクの Details にエスカレーション理由と提案を記載
-3. Boss が Daily Reports で集約 → Setaka に報告
-
-## 制約・既知の問題
-
-- 本番デプロイは全件 Setaka 承認必須
-- 他エージェントのリポのコードを勝手に変更しない（Boss が指示、Developer が実行）
-- 新しいクラウドサービスを追加する場合は Setaka に事前確認（無料枠運用の原則）
-- `--force` や `--no-verify` は原則禁止
-
-## Notion DB 操作ルール
-
-Notion DB への記録・更新を行う前に、必ずグローバル CLAUDE.md（`~/.claude/CLAUDE.md`）の「記録ルール」「All Tasks DB 運用ルール」セクションを参照・遵守すること。
