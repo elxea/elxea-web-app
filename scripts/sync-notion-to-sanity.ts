@@ -652,7 +652,7 @@ async function fetchPageRegistry(): Promise<PageRegistryEntry[]> {
       database_id: NOTION_PAGE_REGISTRY_DB_ID,
       filter: {
         property: "Status",
-        status: { equals: "Published" },
+        select: { equals: "Published" },
       },
       start_cursor: startCursor,
     });
@@ -822,7 +822,7 @@ async function syncPageContent(
         fieldType: c.fieldType,
       }));
 
-      const sanityId = `page-${page.slug}`;
+      const sanityId = `page-${page.slug === "/" ? "home" : page.slug.replace(/^\//, "").replace(/\//g, "-")}`;
       const doc = {
         _id: sanityId,
         _type: "page" as const,
