@@ -65,13 +65,11 @@ backup-before-cleanup/
 # vercel env pull
 .env.vercel
 .env.staging
+.env.preview
 
 # storybook
 storybook-static/
 build-storybook.log
-
-# firebase functions deps
-functions/node_modules/
 
 # sanity runtime
 .sanity/runtime/

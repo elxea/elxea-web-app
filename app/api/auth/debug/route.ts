@@ -4,6 +4,10 @@ import { decryptToken } from "@/lib/shopify/customer";
 import { getSession, getCustomerFromSession } from "@/lib/shopify/auth";
 
 export async function GET(request: NextRequest) {
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json({ error: "Not available" }, { status: 404 });
+  }
+
   // Test 1: Read cookies via request.cookies (Route Handler style)
   const reqCookies = {
     shop_at: !!request.cookies.get("shop_at")?.value,

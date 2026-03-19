@@ -7,7 +7,7 @@ const ACCOUNT_DOMAIN = "account.elxea.com";
 const AUTHORIZE_URL = `https://${ACCOUNT_DOMAIN}/authentication/oauth/authorize`;
 const TOKEN_URL = `https://${ACCOUNT_DOMAIN}/authentication/oauth/token`;
 const LOGOUT_URL = `https://${ACCOUNT_DOMAIN}/authentication/logout`;
-const CUSTOMER_API_URL = `https://shopify.com/53242265758/account/customer/api/2025-04/graphql`;
+const CUSTOMER_API_URL = `https://shopify.com/${process.env.SHOPIFY_SHOP_ID}/account/customer/api/2025-04/graphql`;
 
 export { LOGOUT_URL };
 
