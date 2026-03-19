@@ -3,43 +3,48 @@
     "$description": "All color tokens — semantic UI colors + brand palette",
     "semantic": {
       "$type": "color",
-      "$description": "UI semantic colors (shadcn/ui)",
-      "background": { "$value": "oklch(1 0 0)" },
-      "foreground": { "$value": "oklch(0.145 0 0)" },
-      "card": { "$value": "oklch(1 0 0)" },
-      "card-foreground": { "$value": "oklch(0.145 0 0)" },
+      "$description": "UI semantic colors — derived from elxea Webflow design",
+      "background": { "$value": "oklch(0.933 0.012 96.4)", "$description": "Warm cream (#ebe9e0)" },
+      "foreground": { "$value": "oklch(0.397 0.002 247.9)", "$description": "Dark gray (#464748)" },
+      "card": { "$value": "oklch(1 0 0)", "$description": "White card surface" },
+      "card-foreground": { "$value": "oklch(0.397 0.002 247.9)" },
       "popover": { "$value": "oklch(1 0 0)" },
-      "popover-foreground": { "$value": "oklch(0.145 0 0)" },
-      "primary": { "$value": "oklch(0.205 0 0)" },
-      "primary-foreground": { "$value": "oklch(0.985 0 0)" },
-      "secondary": { "$value": "oklch(0.97 0 0)" },
-      "secondary-foreground": { "$value": "oklch(0.205 0 0)" },
-      "muted": { "$value": "oklch(0.97 0 0)" },
-      "muted-foreground": { "$value": "oklch(0.556 0 0)" },
-      "accent": { "$value": "oklch(0.97 0 0)" },
-      "accent-foreground": { "$value": "oklch(0.205 0 0)" },
-      "destructive": { "$value": "oklch(0.577 0.245 27.325)" },
-      "destructive-foreground": { "$value": "oklch(0.985 0 0)" },
-      "border": { "$value": "oklch(0.922 0 0)" },
-      "input": { "$value": "oklch(0.922 0 0)" },
-      "ring": { "$value": "oklch(0.708 0 0)" },
-      "success": { "$value": "oklch(0.627 0.194 149.214)", "$description": "Success state" },
-      "success-foreground": { "$value": "oklch(0.985 0 0)" },
-      "warning": { "$value": "oklch(0.769 0.189 70.08)", "$description": "Warning state" },
-      "warning-foreground": { "$value": "oklch(0.205 0 0)" },
-      "info": { "$value": "oklch(0.623 0.214 259.815)", "$description": "Info state" },
-      "info-foreground": { "$value": "oklch(0.985 0 0)" }
+      "popover-foreground": { "$value": "oklch(0.397 0.002 247.9)" },
+      "primary": { "$value": "oklch(0.397 0.002 247.9)", "$description": "Dark gray (#464748)" },
+      "primary-foreground": { "$value": "oklch(1 0 0)" },
+      "secondary": { "$value": "oklch(0.863 0.026 102.0)", "$description": "Warm light gray (#d5d3c0)" },
+      "secondary-foreground": { "$value": "oklch(0.397 0.002 247.9)" },
+      "muted": { "$value": "oklch(0.863 0.026 102.0)", "$description": "Warm light gray (#d5d3c0)" },
+      "muted-foreground": { "$value": "oklch(0.615 0.006 106.6)", "$description": "Mid gray (#858581)" },
+      "accent": { "$value": "oklch(0.846 0.173 85.6)", "$description": "Gold (#ffc200)" },
+      "accent-foreground": { "$value": "oklch(0.397 0.002 247.9)" },
+      "destructive": { "$value": "oklch(0.572 0.133 16.4)", "$description": "Tea red (#b9525c)" },
+      "destructive-foreground": { "$value": "oklch(1 0 0)" },
+      "border": { "$value": "oklch(0.863 0.026 102.0)", "$description": "Warm light gray (#d5d3c0)" },
+      "input": { "$value": "oklch(0.863 0.026 102.0)" },
+      "ring": { "$value": "oklch(0.615 0.006 106.6)", "$description": "Mid gray (#858581)" },
+      "success": { "$value": "oklch(0.807 0.050 178.3)", "$description": "Tea green (#9ecbc0)" },
+      "success-foreground": { "$value": "oklch(0.397 0.002 247.9)" },
+      "warning": { "$value": "oklch(0.846 0.173 85.6)", "$description": "Gold (#ffc200)" },
+      "warning-foreground": { "$value": "oklch(0.397 0.002 247.9)" },
+      "info": { "$value": "oklch(0.623 0.214 259.815)", "$description": "Info blue" },
+      "info-foreground": { "$value": "oklch(1 0 0)" }
     },
     "brand": {
       "$type": "color",
-      "$description": "elxea brand palette (placeholder — adjust to brand guidelines)",
-      "black": { "$value": "oklch(0.145 0 0)", "$description": "Primary brand black" },
-      "white": { "$value": "oklch(1 0 0)", "$description": "Primary brand white" },
-      "cream": { "$value": "oklch(0.965 0.01 90)", "$description": "Warm background" },
-      "stone": { "$value": "oklch(0.75 0.01 70)", "$description": "Neutral mid-tone" },
-      "tea-green": { "$value": "oklch(0.75 0.12 145)", "$description": "Tea accent" },
-      "earth": { "$value": "oklch(0.55 0.08 55)", "$description": "Earthy warm tone" },
-      "deep-navy": { "$value": "oklch(0.25 0.05 260)", "$description": "Deep contrast" }
+      "$description": "elxea brand palette — from Webflow design system",
+      "black": { "$value": "oklch(0 0 0)", "$description": "#000000" },
+      "white": { "$value": "oklch(1 0 0)", "$description": "#ffffff" },
+      "cream": { "$value": "oklch(0.933 0.012 96.4)", "$description": "gray-20 (#ebe9e0) — primary background" },
+      "sand": { "$value": "oklch(0.863 0.026 102.0)", "$description": "gray-40 (#d5d3c0) — secondary / border" },
+      "stone": { "$value": "oklch(0.742 0.017 102.9)", "$description": "gray-60 (#adaca0) — subtle text" },
+      "ash": { "$value": "oklch(0.615 0.006 106.6)", "$description": "gray-80 (#858581) — muted text" },
+      "charcoal": { "$value": "oklch(0.482 0.005 271.3)", "$description": "gray-100 (#5d5e61) — body text" },
+      "graphite": { "$value": "oklch(0.397 0.002 247.9)", "$description": "gray-120 (#464748) — headings" },
+      "gold": { "$value": "oklch(0.846 0.173 85.6)", "$description": "secondary (#ffc200) — accent" },
+      "tea-green": { "$value": "oklch(0.807 0.050 178.3)", "$description": "#9ecbc0 — tea accent" },
+      "tea-red": { "$value": "oklch(0.572 0.133 16.4)", "$description": "#b9525c — tea warm accent" },
+      "tea-warm": { "$value": "oklch(0.821 0.061 41.5)", "$description": "#e8b8a6 — warm peach accent" }
     }
   },
   "typography": {
@@ -47,12 +52,20 @@
     "family": {
       "$type": "fontFamily",
       "sans": {
-        "$value": "neue-haas-grotesk-text, kozuka-gothic-pro, sans-serif",
-        "$description": "Body text"
+        "$value": "aktiv-grotesk, kozuka-gothic-pro, sans-serif",
+        "$description": "Body text (EN: aktiv-grotesk, JP: kozuka-gothic-pro)"
       },
       "heading": {
-        "$value": "termina, ryo-gothic-plusn, sans-serif",
-        "$description": "Headings"
+        "$value": "aktiv-grotesk-extended, dnp-shuei-gothic-gin-std, sans-serif",
+        "$description": "Headings (EN: aktiv-grotesk-extended, JP: dnp-shuei-gothic-gin-std)"
+      },
+      "secondary": {
+        "$value": "neue-haas-grotesk-text, ryo-gothic-plusn, sans-serif",
+        "$description": "Secondary / accent text"
+      },
+      "special": {
+        "$value": "dnp-shuei-ymincho-std, Georgia, serif",
+        "$description": "Special / editorial (JP mincho)"
       },
       "mono": {
         "$value": "SF Mono, Menlo, monospace",
@@ -93,9 +106,10 @@
       "tighter": { "$value": "-0.05em" },
       "tight": { "$value": "-0.025em" },
       "normal": { "$value": "0em" },
-      "wide": { "$value": "0.025em" },
-      "wider": { "$value": "0.05em" },
-      "widest": { "$value": "0.1em" }
+      "narrow": { "$value": "0.025em", "$description": "Webflow narrow" },
+      "wide": { "$value": "0.05em", "$description": "Webflow regular" },
+      "wider": { "$value": "0.1em" },
+      "widest": { "$value": "0.125em", "$description": "Webflow wide" }
     },
     "lineHeight": {
       "$type": "number",
@@ -110,52 +124,52 @@
       "$type": "typography",
       "$description": "Composite typography presets — heading hierarchy + body styles",
       "display": {
-        "$value": { "fontFamily": "termina, ryo-gothic-plusn, sans-serif", "fontSize": "4.5rem", "fontWeight": "700", "lineHeight": "1", "letterSpacing": "-0.025em" },
+        "$value": { "fontFamily": "aktiv-grotesk-extended, dnp-shuei-gothic-gin-std, sans-serif", "fontSize": "4.5rem", "fontWeight": "700", "lineHeight": "1", "letterSpacing": "-0.025em" },
         "$description": "Hero / display text"
       },
       "h1": {
-        "$value": { "fontFamily": "termina, ryo-gothic-plusn, sans-serif", "fontSize": "3rem", "fontWeight": "700", "lineHeight": "1.1", "letterSpacing": "-0.025em" },
-        "$description": "Page title"
+        "$value": { "fontFamily": "aktiv-grotesk-extended, dnp-shuei-gothic-gin-std, sans-serif", "fontSize": "3.25rem", "fontWeight": "700", "lineHeight": "1.25", "letterSpacing": "0.025em" },
+        "$description": "Page title (Webflow: 3.25rem)"
       },
       "h2": {
-        "$value": { "fontFamily": "termina, ryo-gothic-plusn, sans-serif", "fontSize": "2.25rem", "fontWeight": "600", "lineHeight": "1.2", "letterSpacing": "-0.025em" },
-        "$description": "Section heading"
+        "$value": { "fontFamily": "aktiv-grotesk-extended, dnp-shuei-gothic-gin-std, sans-serif", "fontSize": "2rem", "fontWeight": "600", "lineHeight": "1.25", "letterSpacing": "0.025em" },
+        "$description": "Section heading (Webflow: 2rem)"
       },
       "h3": {
-        "$value": { "fontFamily": "termina, ryo-gothic-plusn, sans-serif", "fontSize": "1.875rem", "fontWeight": "600", "lineHeight": "1.25", "letterSpacing": "0em" },
-        "$description": "Subsection heading"
+        "$value": { "fontFamily": "aktiv-grotesk-extended, dnp-shuei-gothic-gin-std, sans-serif", "fontSize": "1.5rem", "fontWeight": "600", "lineHeight": "1.25", "letterSpacing": "0.025em" },
+        "$description": "Subsection heading (Webflow: 1.5rem)"
       },
       "h4": {
-        "$value": { "fontFamily": "termina, ryo-gothic-plusn, sans-serif", "fontSize": "1.5rem", "fontWeight": "600", "lineHeight": "1.3", "letterSpacing": "0em" },
-        "$description": "Card / block heading"
+        "$value": { "fontFamily": "aktiv-grotesk-extended, dnp-shuei-gothic-gin-std, sans-serif", "fontSize": "1.25rem", "fontWeight": "600", "lineHeight": "1.5", "letterSpacing": "0.05em" },
+        "$description": "Card / block heading (Webflow: 1.25rem)"
       },
       "h5": {
-        "$value": { "fontFamily": "termina, ryo-gothic-plusn, sans-serif", "fontSize": "1.25rem", "fontWeight": "600", "lineHeight": "1.4", "letterSpacing": "0em" },
-        "$description": "Small heading"
+        "$value": { "fontFamily": "aktiv-grotesk-extended, dnp-shuei-gothic-gin-std, sans-serif", "fontSize": "1rem", "fontWeight": "600", "lineHeight": "1.5", "letterSpacing": "0.05em" },
+        "$description": "Small heading (Webflow: 1rem)"
       },
       "h6": {
-        "$value": { "fontFamily": "termina, ryo-gothic-plusn, sans-serif", "fontSize": "1.125rem", "fontWeight": "600", "lineHeight": "1.5", "letterSpacing": "0em" },
-        "$description": "Label heading"
+        "$value": { "fontFamily": "aktiv-grotesk-extended, dnp-shuei-gothic-gin-std, sans-serif", "fontSize": "0.875rem", "fontWeight": "600", "lineHeight": "1.5", "letterSpacing": "0.05em" },
+        "$description": "Label heading (Webflow: 0.875rem)"
       },
       "body-lg": {
-        "$value": { "fontFamily": "neue-haas-grotesk-text, kozuka-gothic-pro, sans-serif", "fontSize": "1.125rem", "fontWeight": "400", "lineHeight": "1.625", "letterSpacing": "0em" },
+        "$value": { "fontFamily": "aktiv-grotesk, kozuka-gothic-pro, sans-serif", "fontSize": "1.125rem", "fontWeight": "400", "lineHeight": "1.75", "letterSpacing": "0.05em" },
         "$description": "Large body text"
       },
       "body": {
-        "$value": { "fontFamily": "neue-haas-grotesk-text, kozuka-gothic-pro, sans-serif", "fontSize": "1rem", "fontWeight": "400", "lineHeight": "1.5", "letterSpacing": "0em" },
-        "$description": "Default body text"
+        "$value": { "fontFamily": "aktiv-grotesk, kozuka-gothic-pro, sans-serif", "fontSize": "1rem", "fontWeight": "400", "lineHeight": "1.75", "letterSpacing": "0.05em" },
+        "$description": "Default body text (Webflow: line-height wide=1.75)"
       },
       "body-sm": {
-        "$value": { "fontFamily": "neue-haas-grotesk-text, kozuka-gothic-pro, sans-serif", "fontSize": "0.875rem", "fontWeight": "400", "lineHeight": "1.5", "letterSpacing": "0em" },
+        "$value": { "fontFamily": "aktiv-grotesk, kozuka-gothic-pro, sans-serif", "fontSize": "0.875rem", "fontWeight": "400", "lineHeight": "1.5", "letterSpacing": "0.05em" },
         "$description": "Small body text"
       },
       "caption": {
-        "$value": { "fontFamily": "neue-haas-grotesk-text, kozuka-gothic-pro, sans-serif", "fontSize": "0.75rem", "fontWeight": "400", "lineHeight": "1.5", "letterSpacing": "0.025em" },
-        "$description": "Caption / helper text"
+        "$value": { "fontFamily": "aktiv-grotesk, kozuka-gothic-pro, sans-serif", "fontSize": "0.75rem", "fontWeight": "400", "lineHeight": "1.5", "letterSpacing": "0.05em" },
+        "$description": "Caption / helper text (Webflow: 0.75rem)"
       },
       "overline": {
-        "$value": { "fontFamily": "termina, ryo-gothic-plusn, sans-serif", "fontSize": "0.75rem", "fontWeight": "600", "lineHeight": "1.5", "letterSpacing": "0.1em" },
-        "$description": "Overline / label — uppercase style"
+        "$value": { "fontFamily": "aktiv-grotesk-extended, dnp-shuei-gothic-gin-std, sans-serif", "fontSize": "0.75rem", "fontWeight": "600", "lineHeight": "1.5", "letterSpacing": "0.125em" },
+        "$description": "Overline / label — uppercase style (Webflow: wide=0.125rem)"
       },
       "code": {
         "$value": { "fontFamily": "SF Mono, Menlo, monospace", "fontSize": "0.875rem", "fontWeight": "400", "lineHeight": "1.5", "letterSpacing": "0em" },
@@ -413,9 +427,9 @@
       },
       "ringColor": {
         "$type": "color",
-        "default": { "$value": "oklch(0.708 0 0)" },
-        "primary": { "$value": "oklch(0.205 0 0)" },
-        "destructive": { "$value": "oklch(0.577 0.245 27.325)" }
+        "default": { "$value": "oklch(0.615 0.006 106.6)" },
+        "primary": { "$value": "oklch(0.397 0.002 247.9)" },
+        "destructive": { "$value": "oklch(0.572 0.133 16.4)" }
       }
     }
   },
@@ -530,7 +544,7 @@
       "height": {
         "$type": "dimension",
         "mobile": { "$value": "3.5rem", "$description": "56px" },
-        "desktop": { "$value": "4rem", "$description": "64px" }
+        "desktop": { "$value": "6rem", "$description": "96px — Webflow header-height" }
       }
     },
     "sidebar": {
