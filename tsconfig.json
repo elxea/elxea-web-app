@@ -38,6 +38,11 @@
   "exclude": [
     "node_modules",
     "scripts",
-    "functions"
+    "functions",
+    "**/*.stories.ts",
+    "**/*.stories.tsx",
+    "stories",
+    ".storybook",
+    "e2e"
   ]
 }
