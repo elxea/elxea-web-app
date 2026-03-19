@@ -25,7 +25,7 @@ export function AddToCartButton({
     return (
       <button
         disabled
-        className="w-full h-12 bg-light text-cream text-[14px] font-medium cursor-not-allowed"
+        className="w-full h-12 bg-muted text-muted-foreground text-[14px] font-medium cursor-not-allowed"
       >
         {t("soldOut")}
       </button>
@@ -36,7 +36,7 @@ export function AddToCartButton({
     <button
       onClick={() => addToCart(merchandiseId, 1, sellingPlanId)}
       disabled={isPending}
-      className="w-full h-12 bg-charcoal text-cream text-[14px] font-medium hover:bg-charcoal/90 transition-colors disabled:opacity-50"
+      className="w-full h-12 border border-foreground bg-foreground text-background text-[14px] font-medium hover:bg-transparent hover:text-foreground transition-colors disabled:opacity-50"
     >
       {isPending ? "..." : t("addToCart")}
     </button>
