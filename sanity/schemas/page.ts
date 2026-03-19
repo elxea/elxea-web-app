@@ -29,6 +29,49 @@ export const page = defineType({
       type: "seo",
     }),
     defineField({
+      name: "contentFields",
+      title: "コンテンツフィールド",
+      type: "array",
+      readOnly: true,
+      of: [
+        {
+          type: "object",
+          fields: [
+            defineField({
+              name: "key",
+              title: "キー",
+              type: "string",
+            }),
+            defineField({
+              name: "ja",
+              title: "日本語",
+              type: "text",
+            }),
+            defineField({
+              name: "en",
+              title: "英語",
+              type: "text",
+            }),
+            defineField({
+              name: "fieldType",
+              title: "フィールドタイプ",
+              type: "string",
+              options: {
+                list: [
+                  { title: "text", value: "text" },
+                  { title: "image", value: "image" },
+                  { title: "url", value: "url" },
+                ],
+              },
+            }),
+          ],
+          preview: {
+            select: { title: "key", subtitle: "ja" },
+          },
+        },
+      ],
+    }),
+    defineField({
       name: "language",
       title: "言語",
       type: "string",
