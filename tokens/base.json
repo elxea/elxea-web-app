@@ -288,7 +288,8 @@
     "aspectRatio": {
       "$type": "number",
       "$description": "Standard aspect ratios (width/height)",
-      "square": { "$value": "1", "$description": "1:1 — Avatar, icon, thumbnail" },
+      "square": { "$value": "1", "$description": "1:1 — Avatar, icon, profile, playlist cover" },
+      "standard": { "$value": "1.5", "$description": "3:2 — Webflow primary ratio: article card, event, collection, content image" },
       "portrait": { "$value": "0.75", "$description": "3:4 — Product image, card" },
       "landscape": { "$value": "1.333", "$description": "4:3 — Gallery image" },
       "wide": { "$value": "1.778", "$description": "16:9 — Video, banner" },

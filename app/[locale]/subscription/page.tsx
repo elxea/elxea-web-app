@@ -117,7 +117,7 @@ export default async function SubscriptionLPPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
           {/* Image placeholder */}
-          <div className="aspect-[4/3] bg-muted" />
+          <div className="aspect-[3/2] bg-muted" />
 
           <Card>
             <CardHeader>
@@ -158,13 +158,13 @@ export default async function SubscriptionLPPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           <div>
-            <div className="aspect-[4/3] bg-muted mb-4" />
+            <div className="aspect-[3/2] bg-muted mb-4" />
             <p className="text-sm text-muted-foreground leading-relaxed">
               {t("teabagBody")}
             </p>
           </div>
           <div>
-            <div className="aspect-[4/3] bg-muted mb-4" />
+            <div className="aspect-[3/2] bg-muted mb-4" />
             <p className="text-sm text-muted-foreground leading-relaxed">
               {t("teabagBody")}
             </p>
