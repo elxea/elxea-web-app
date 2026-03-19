@@ -337,8 +337,41 @@ export const SITE_SETTINGS_QUERY = groq`
     title,
     description,
     ogImage,
-    navigation,
+    navigation[] {
+      label,
+      labelEn,
+      href,
+      order,
+      showInHeader,
+      showInFooter,
+      footerGroup
+    },
+    footerGroups[] {
+      key,
+      label,
+      labelEn,
+      order
+    },
     footerText,
     socialLinks
+  }
+`;
+
+export const PAGE_CONTENT_QUERY = groq`
+  *[_type == "page" && slug.current == $slug][0] {
+    _id,
+    title,
+    slug,
+    contentFields[] {
+      key,
+      ja,
+      en,
+      fieldType
+    },
+    seo {
+      metaTitle,
+      metaDescription,
+      ogImage
+    }
   }
 `;
