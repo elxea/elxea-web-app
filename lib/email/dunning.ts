@@ -1,8 +1,7 @@
-import nodemailer from "nodemailer";
+import { Resend } from "resend";
 
-const GMAIL_USER = process.env.GMAIL_USER;
-const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD;
-const FROM_EMAIL = process.env.CONTACT_FROM_EMAIL || GMAIL_USER || "info@elxea.com";
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
+const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "no-reply@elxea.com";
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://elxea.com";
 
 type DunningEmailData = {
@@ -182,9 +181,11 @@ function buildHtmlEmail(data: DunningEmailData): string {
 export async function sendDunningEmail(
   data: DunningEmailData
 ): Promise<{ success: boolean; error?: string }> {
-  if (!GMAIL_USER || !GMAIL_APP_PASSWORD) {
-    return { success: false, error: "Gmail SMTP credentials not configured" };
+  if (!RESEND_API_KEY) {
+    return { success: false, error: "RESEND_API_KEY not configured" };
   }
+
+  const resend = new Resend(RESEND_API_KEY);
 
   const text = buildTextEmail(data);
   const html = buildHtmlEmail(data);
@@ -194,26 +195,23 @@ export async function sendDunningEmail(
     : `【roji】定期便のお支払いについて（${data.attemptNumber}回目）`;
 
   try {
-    const transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: {
-        user: GMAIL_USER,
-        pass: GMAIL_APP_PASSWORD,
-      },
-    });
-
-    await transporter.sendMail({
-      from: `roji by elxea <${FROM_EMAIL}>`,
+    const { error } = await resend.emails.send({
+      from: `elxea <${FROM_EMAIL}>`,
       to: data.customerEmail,
       subject,
       text,
       html,
     });
 
+    if (error) {
+      console.error("[Dunning Email] Resend error:", error.message);
+      return { success: false, error: error.message };
+    }
+
     return { success: true };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error("[Dunning Email] SMTP error:", message);
+    console.error("[Dunning Email] Resend error:", message);
     return { success: false, error: message };
   }
 }
