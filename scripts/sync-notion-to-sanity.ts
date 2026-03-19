@@ -37,6 +37,8 @@ const NOTION_API_KEY = env.NOTION_API_KEY;
 const CONTENT_HUB_DB_ID = env.NOTION_CONTENT_HUB_DB_ID;
 const SANITY_PROJECT_ID = env.NEXT_PUBLIC_SANITY_PROJECT_ID;
 const SANITY_DATASET = env.NEXT_PUBLIC_SANITY_DATASET || "production";
+const NOTION_PAGE_REGISTRY_DB_ID = env.NOTION_PAGE_REGISTRY_DB_ID || "";
+const NOTION_PAGE_CONTENT_DB_ID = env.NOTION_PAGE_CONTENT_DB_ID || "";
 const DRY_RUN = process.argv.includes("--dry-run");
 
 if (!NOTION_API_KEY) {
@@ -79,6 +81,32 @@ const sanity = createClient({
 });
 
 // ─── Types ───────────────────────────────────────────────────
+
+interface PageRegistryEntry {
+  notionId: string;
+  name: string;
+  slug: string;
+  navLabelJa: string;
+  navLabelEn: string;
+  navOrder: number;
+  showInHeader: boolean;
+  showInFooter: boolean;
+  footerGroup: string;
+  seoTitleJa: string;
+  seoTitleEn: string;
+  seoDescJa: string;
+  seoDescEn: string;
+  ogImageUrl: string;
+  status: string;
+}
+
+interface PageContentEntry {
+  key: string;
+  pageNotionId: string;
+  ja: string;
+  en: string;
+  fieldType: string;
+}
 
 interface ContentHubEntry {
   notionId: string;
@@ -606,6 +634,272 @@ async function resolveOperationsHubProducts(
   return handles;
 }
 
+function getNumber(page: PageObjectResponse, name: string): number {
+  const prop = page.properties[name];
+  if (prop?.type === "number" && prop.number !== null) return prop.number;
+  return 0;
+}
+
+// ─── Page Registry Fetch ─────────────────────────────────────
+
+async function fetchPageRegistry(): Promise<PageRegistryEntry[]> {
+  const entries: PageRegistryEntry[] = [];
+  let hasMore = true;
+  let startCursor: string | undefined;
+
+  while (hasMore) {
+    const response = await notion.databases.query({
+      database_id: NOTION_PAGE_REGISTRY_DB_ID,
+      filter: {
+        property: "Status",
+        status: { equals: "Published" },
+      },
+      start_cursor: startCursor,
+    });
+
+    for (const page of response.results) {
+      if (!("properties" in page)) continue;
+      const p = page as PageObjectResponse;
+
+      entries.push({
+        notionId: p.id,
+        name: getTitle(p),
+        slug: getText(p, "Slug"),
+        navLabelJa: getText(p, "Nav Label (JA)"),
+        navLabelEn: getText(p, "Nav Label (EN)"),
+        navOrder: getNumber(p, "Nav Order"),
+        showInHeader: getCheckbox(p, "Show in Header"),
+        showInFooter: getCheckbox(p, "Show in Footer"),
+        footerGroup: getSelect(p, "Footer Group"),
+        seoTitleJa: getText(p, "SEO Title (JA)"),
+        seoTitleEn: getText(p, "SEO Title (EN)"),
+        seoDescJa: getText(p, "SEO Description (JA)"),
+        seoDescEn: getText(p, "SEO Description (EN)"),
+        ogImageUrl: getUrl(p, "OG Image URL"),
+        status: getStatus(p, "Status"),
+      });
+    }
+
+    hasMore = response.has_more;
+    startCursor = response.next_cursor ?? undefined;
+  }
+
+  return entries;
+}
+
+// ─── Page Content Fetch ──────────────────────────────────────
+
+async function fetchPageContent(): Promise<PageContentEntry[]> {
+  const entries: PageContentEntry[] = [];
+  let hasMore = true;
+  let startCursor: string | undefined;
+
+  while (hasMore) {
+    const response = await notion.databases.query({
+      database_id: NOTION_PAGE_CONTENT_DB_ID,
+      start_cursor: startCursor,
+    });
+
+    for (const page of response.results) {
+      if (!("properties" in page)) continue;
+      const p = page as PageObjectResponse;
+
+      const pageRelationIds = getRelationIds(p, "Page");
+
+      entries.push({
+        key: getTitle(p),
+        pageNotionId: pageRelationIds[0] || "",
+        ja: getText(p, "JA"),
+        en: getText(p, "EN"),
+        fieldType: getSelect(p, "Type"),
+      });
+    }
+
+    hasMore = response.has_more;
+    startCursor = response.next_cursor ?? undefined;
+  }
+
+  return entries;
+}
+
+// ─── Navigation Sync ─────────────────────────────────────────
+
+const FOOTER_GROUP_ORDER: Record<string, number> = {
+  Shop: 1,
+  Content: 2,
+  Support: 3,
+  Legal: 4,
+};
+
+async function syncNavigation(registry: PageRegistryEntry[]): Promise<void> {
+  const headerItems = registry
+    .filter((e) => e.showInHeader)
+    .sort((a, b) => a.navOrder - b.navOrder)
+    .map((e) => ({
+      _key: e.slug,
+      label: e.navLabelJa || e.name,
+      href: `/${e.slug}`,
+    }));
+
+  const footerGroupMap = new Map<string, typeof headerItems>();
+  for (const e of registry) {
+    if (!e.showInFooter || !e.footerGroup) continue;
+    if (!footerGroupMap.has(e.footerGroup)) footerGroupMap.set(e.footerGroup, []);
+    footerGroupMap.get(e.footerGroup)!.push({
+      _key: e.slug,
+      label: e.navLabelJa || e.name,
+      href: `/${e.slug}`,
+    });
+  }
+
+  const footerGroups = [...footerGroupMap.entries()]
+    .sort(
+      ([a], [b]) =>
+        (FOOTER_GROUP_ORDER[a] ?? 99) - (FOOTER_GROUP_ORDER[b] ?? 99)
+    )
+    .map(([group, links]) => ({
+      _key: slugify(group),
+      title: group,
+      links,
+    }));
+
+  if (DRY_RUN) {
+    console.log(
+      `  [dry-run] would patch siteSettings: headerNav (${headerItems.length} items), footerGroups (${footerGroups.length} groups)`
+    );
+    return;
+  }
+
+  const existing = await sanity.fetch<{ _id: string } | null>(
+    `*[_type == "siteSettings"][0]{ _id }`
+  );
+
+  if (existing) {
+    await sanity
+      .patch(existing._id)
+      .set({ headerNav: headerItems, footerGroups })
+      .commit();
+    console.log(`  -> patched siteSettings (${existing._id})`);
+  } else {
+    await sanity.create({
+      _type: "siteSettings",
+      headerNav: headerItems,
+      footerGroups,
+    });
+    console.log("  -> created siteSettings");
+  }
+}
+
+// ─── Page Content Sync ───────────────────────────────────────
+
+async function syncPageContent(
+  registry: PageRegistryEntry[],
+  content: PageContentEntry[]
+): Promise<{ synced: number; errors: number }> {
+  let synced = 0;
+  let errors = 0;
+  const failures: string[] = [];
+
+  // Group content by page Notion ID
+  const contentByPage = new Map<string, PageContentEntry[]>();
+  for (const entry of content) {
+    if (!entry.pageNotionId) continue;
+    const normalized = entry.pageNotionId.replace(/-/g, "");
+    if (!contentByPage.has(normalized)) contentByPage.set(normalized, []);
+    contentByPage.get(normalized)!.push(entry);
+  }
+
+  for (const page of registry) {
+    try {
+      const normalizedId = page.notionId.replace(/-/g, "");
+      const pageContent = contentByPage.get(normalizedId) || [];
+
+      const contentFields = pageContent.map((c) => ({
+        _key: c.key,
+        key: c.key,
+        ja: c.ja,
+        en: c.en,
+        fieldType: c.fieldType,
+      }));
+
+      const sanityId = `page-${page.slug}`;
+      const doc = {
+        _id: sanityId,
+        _type: "page" as const,
+        title: page.name,
+        slug: { _type: "slug" as const, current: page.slug },
+        contentFields,
+        seo: {
+          metaTitle: page.seoTitleJa,
+          metaDescription: page.seoDescJa,
+        },
+      };
+
+      if (DRY_RUN) {
+        console.log(
+          `  [dry-run] would createOrReplace page: ${sanityId} (${contentFields.length} fields)`
+        );
+      } else {
+        await sanity.createOrReplace(doc);
+        console.log(
+          `  -> synced page: ${sanityId} (${contentFields.length} fields)`
+        );
+      }
+
+      synced++;
+    } catch (err) {
+      errors++;
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`  ERROR (${page.slug}): ${message}`);
+      failures.push(page.slug);
+    }
+  }
+
+  if (failures.length > 0) {
+    console.log(`\n  Failed pages: ${failures.join(", ")}`);
+  }
+
+  return { synced, errors };
+}
+
+// ─── Pages Sync Orchestrator ─────────────────────────────────
+
+async function syncPages(): Promise<void> {
+  if (!NOTION_PAGE_REGISTRY_DB_ID) {
+    console.error("Missing NOTION_PAGE_REGISTRY_DB_ID in .env");
+    process.exit(1);
+  }
+  if (!NOTION_PAGE_CONTENT_DB_ID) {
+    console.error("Missing NOTION_PAGE_CONTENT_DB_ID in .env");
+    process.exit(1);
+  }
+
+  if (DRY_RUN) {
+    console.log("=== DRY RUN MODE (no writes to Sanity) ===\n");
+  }
+
+  console.log("Fetching Page Registry (Status=Published)...");
+  const registry = await fetchPageRegistry();
+  console.log(`  Found ${registry.length} pages\n`);
+
+  console.log("Fetching Page Content...");
+  const content = await fetchPageContent();
+  console.log(`  Found ${content.length} content entries\n`);
+
+  console.log("Syncing navigation...");
+  await syncNavigation(registry);
+  console.log();
+
+  console.log("Syncing page documents...");
+  const { synced, errors } = await syncPageContent(registry, content);
+  console.log();
+
+  console.log("---");
+  console.log(
+    `Pages sync ${DRY_RUN ? "(dry run) " : ""}complete: ${synced} synced, ${errors} errors`
+  );
+}
+
 // ─── Main Sync ───────────────────────────────────────────────
 
 async function sync() {
@@ -840,7 +1134,21 @@ async function sync() {
   );
 }
 
-sync().catch((err) => {
+const args = process.argv.slice(2);
+const SYNC_PAGES = args.includes("--pages");
+const SYNC_ALL = args.includes("--all");
+const SYNC_ARTICLES = !SYNC_PAGES || SYNC_ALL;
+
+(async () => {
+  if (SYNC_ARTICLES) {
+    console.log("Syncing articles...");
+    await sync();
+  }
+  if (SYNC_PAGES || SYNC_ALL) {
+    console.log("Syncing pages...");
+    await syncPages();
+  }
+})().catch((err) => {
   console.error("Sync failed:", err);
   process.exit(1);
 });
