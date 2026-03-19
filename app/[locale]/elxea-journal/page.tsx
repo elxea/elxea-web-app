@@ -7,9 +7,9 @@ import { JOURNALS_QUERY } from "@/sanity/lib/queries";
 import { urlFor } from "@/sanity/lib/image";
 
 const themeColors: Record<string, string> = {
-  akane: "#C53D43",
-  sui: "#66BAB7",
-  sohi: "#E0815E",
+  akane: "var(--color-brand-tea-red)",
+  sui: "var(--color-brand-tea-green)",
+  sohi: "var(--color-brand-tea-warm)",
 };
 
 export default function ElxeaJournalPage() {
@@ -73,7 +73,7 @@ async function JournalGrid() {
                   {/* Theme badge */}
                   <span
                     className="absolute top-3 left-3 text-[10px] font-medium text-white px-2 py-0.5 rounded-sm uppercase tracking-wider"
-                    style={{ backgroundColor: themeColors[j.theme] || "#737373" }}
+                    style={{ backgroundColor: themeColors[j.theme] || "var(--color-brand-ash)" }}
                   >
                     {j.theme}
                   </span>
