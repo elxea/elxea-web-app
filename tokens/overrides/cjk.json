@@ -1,0 +1,138 @@
+{
+  "$description": "CJK (Japanese) typography overrides — applied via :lang(ja). Overrides lineHeight and letterSpacing from base.json typography.style composites for improved Japanese text readability.",
+  "typography": {
+    "style": {
+      "$type": "typography",
+      "display": {
+        "$value": {
+          "fontFamily": "termina, ryo-gothic-plusn, sans-serif",
+          "fontSize": "4.5rem",
+          "fontWeight": "700",
+          "lineHeight": "1.3",
+          "letterSpacing": "0.02em"
+        },
+        "$description": "Hero / display text — CJK override"
+      },
+      "h1": {
+        "$value": {
+          "fontFamily": "termina, ryo-gothic-plusn, sans-serif",
+          "fontSize": "3rem",
+          "fontWeight": "700",
+          "lineHeight": "1.4",
+          "letterSpacing": "0.02em"
+        },
+        "$description": "Page title — CJK override"
+      },
+      "h2": {
+        "$value": {
+          "fontFamily": "termina, ryo-gothic-plusn, sans-serif",
+          "fontSize": "2.25rem",
+          "fontWeight": "600",
+          "lineHeight": "1.5",
+          "letterSpacing": "0.02em"
+        },
+        "$description": "Section heading — CJK override"
+      },
+      "h3": {
+        "$value": {
+          "fontFamily": "termina, ryo-gothic-plusn, sans-serif",
+          "fontSize": "1.875rem",
+          "fontWeight": "600",
+          "lineHeight": "1.55",
+          "letterSpacing": "0.04em"
+        },
+        "$description": "Subsection heading — CJK override"
+      },
+      "h4": {
+        "$value": {
+          "fontFamily": "termina, ryo-gothic-plusn, sans-serif",
+          "fontSize": "1.5rem",
+          "fontWeight": "600",
+          "lineHeight": "1.6",
+          "letterSpacing": "0.04em"
+        },
+        "$description": "Card / block heading — CJK override"
+      },
+      "h5": {
+        "$value": {
+          "fontFamily": "termina, ryo-gothic-plusn, sans-serif",
+          "fontSize": "1.25rem",
+          "fontWeight": "600",
+          "lineHeight": "1.7",
+          "letterSpacing": "0.04em"
+        },
+        "$description": "Small heading — CJK override"
+      },
+      "h6": {
+        "$value": {
+          "fontFamily": "termina, ryo-gothic-plusn, sans-serif",
+          "fontSize": "1.125rem",
+          "fontWeight": "600",
+          "lineHeight": "1.8",
+          "letterSpacing": "0.04em"
+        },
+        "$description": "Label heading — CJK override"
+      },
+      "body-lg": {
+        "$value": {
+          "fontFamily": "neue-haas-grotesk-text, kozuka-gothic-pro, sans-serif",
+          "fontSize": "1.125rem",
+          "fontWeight": "400",
+          "lineHeight": "1.9",
+          "letterSpacing": "0.04em"
+        },
+        "$description": "Large body text — CJK override"
+      },
+      "body": {
+        "$value": {
+          "fontFamily": "neue-haas-grotesk-text, kozuka-gothic-pro, sans-serif",
+          "fontSize": "1rem",
+          "fontWeight": "400",
+          "lineHeight": "1.8",
+          "letterSpacing": "0.04em"
+        },
+        "$description": "Default body text — CJK override"
+      },
+      "body-sm": {
+        "$value": {
+          "fontFamily": "neue-haas-grotesk-text, kozuka-gothic-pro, sans-serif",
+          "fontSize": "0.875rem",
+          "fontWeight": "400",
+          "lineHeight": "1.8",
+          "letterSpacing": "0.04em"
+        },
+        "$description": "Small body text — CJK override"
+      },
+      "caption": {
+        "$value": {
+          "fontFamily": "neue-haas-grotesk-text, kozuka-gothic-pro, sans-serif",
+          "fontSize": "0.75rem",
+          "fontWeight": "400",
+          "lineHeight": "1.75",
+          "letterSpacing": "0.05em"
+        },
+        "$description": "Caption / helper text — CJK override"
+      },
+      "overline": {
+        "$value": {
+          "fontFamily": "termina, ryo-gothic-plusn, sans-serif",
+          "fontSize": "0.75rem",
+          "fontWeight": "600",
+          "lineHeight": "1.75",
+          "letterSpacing": "0.15em"
+        },
+        "$description": "Overline / label — CJK override"
+      },
+      "code": {
+        "$value": {
+          "fontFamily": "SF Mono, Menlo, monospace",
+          "fontSize": "0.875rem",
+          "fontWeight": "400",
+          "lineHeight": "1.8",
+          "letterSpacing": "0em"
+        },
+        "$description": "Code / monospace text — CJK override"
+      }
+    }
+  }
+}
