@@ -209,6 +209,26 @@
     "error": "送信に失敗しました。もう一度お試しください。",
     "emailDirect": "メールでのお問い合わせ",
     "emailAddress": "support@elxea.com",
+    "responseTime": "通常2営業日以内にご返信いたします。",
+    "businessLink": "法人のお客様はこちら"
+  },
+  "contactBusiness": {
+    "title": "法人のお客様",
+    "subtitle": "卸売・PR・メディア掲載等のお問い合わせ",
+    "companyName": "会社名",
+    "name": "担当者名",
+    "email": "メールアドレス",
+    "inquiryType": "用件種別",
+    "inquiryTypePlaceholder": "選択してください",
+    "inquiryWholesale": "卸売について",
+    "inquiryPress": "PR・メディア掲載",
+    "inquiryOther": "その他",
+    "message": "お問い合わせ内容",
+    "submit": "送信する",
+    "success": "お問い合わせを受け付けました。2営業日以内にご返信いたします。",
+    "error": "送信に失敗しました。もう一度お試しください。",
+    "emailDirect": "メールでのお問い合わせ",
+    "emailAddress": "info@elxea.com",
     "responseTime": "通常2営業日以内にご返信いたします。"
   },
   "shippingInfo": {

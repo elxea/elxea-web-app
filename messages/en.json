@@ -209,6 +209,26 @@
     "error": "Failed to send. Please try again.",
     "emailDirect": "Email Us Directly",
     "emailAddress": "support@elxea.com",
+    "responseTime": "We typically respond within 2 business days.",
+    "businessLink": "For business inquiries"
+  },
+  "contactBusiness": {
+    "title": "For Business",
+    "subtitle": "Wholesale, PR, media inquiries",
+    "companyName": "Company Name",
+    "name": "Contact Person",
+    "email": "Email Address",
+    "inquiryType": "Inquiry Type",
+    "inquiryTypePlaceholder": "Select an option",
+    "inquiryWholesale": "Wholesale",
+    "inquiryPress": "PR / Media",
+    "inquiryOther": "Other",
+    "message": "Message",
+    "submit": "Send",
+    "success": "Your inquiry has been received. We will respond within 2 business days.",
+    "error": "Failed to send. Please try again.",
+    "emailDirect": "Email Us Directly",
+    "emailAddress": "info@elxea.com",
     "responseTime": "We typically respond within 2 business days."
   },
   "shippingInfo": {
