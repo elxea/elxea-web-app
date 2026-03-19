@@ -1,19 +1,8 @@
-import { Resend } from "resend";
+import nodemailer from "nodemailer";
 
-let _resend: Resend | null = null;
-
-function getResend(): Resend {
-  if (!_resend) {
-    const key = process.env.RESEND_API_KEY;
-    if (!key) {
-      throw new Error("RESEND_API_KEY is not configured");
-    }
-    _resend = new Resend(key);
-  }
-  return _resend;
-}
-
-const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "info@elxea.com";
+const GMAIL_USER = process.env.GMAIL_USER;
+const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD;
+const FROM_EMAIL = process.env.CONTACT_FROM_EMAIL || GMAIL_USER || "info@elxea.com";
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://elxea.com";
 
 type DunningEmailData = {
@@ -193,8 +182,8 @@ function buildHtmlEmail(data: DunningEmailData): string {
 export async function sendDunningEmail(
   data: DunningEmailData
 ): Promise<{ success: boolean; error?: string }> {
-  if (!process.env.RESEND_API_KEY) {
-    return { success: false, error: "RESEND_API_KEY not configured" };
+  if (!GMAIL_USER || !GMAIL_APP_PASSWORD) {
+    return { success: false, error: "Gmail SMTP credentials not configured" };
   }
 
   const text = buildTextEmail(data);
@@ -204,18 +193,27 @@ export async function sendDunningEmail(
     ? "【roji】定期便のお支払いについて（一時停止のお知らせ）"
     : `【roji】定期便のお支払いについて（${data.attemptNumber}回目）`;
 
-  const { error } = await getResend().emails.send({
-    from: `roji by elxea <${FROM_EMAIL}>`,
-    to: [data.customerEmail],
-    subject,
-    text,
-    html,
-  });
+  try {
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: GMAIL_USER,
+        pass: GMAIL_APP_PASSWORD,
+      },
+    });
 
-  if (error) {
-    console.error("[Dunning Email] Resend error:", error);
-    return { success: false, error: error.message };
+    await transporter.sendMail({
+      from: `roji by elxea <${FROM_EMAIL}>`,
+      to: data.customerEmail,
+      subject,
+      text,
+      html,
+    });
+
+    return { success: true };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("[Dunning Email] SMTP error:", message);
+    return { success: false, error: message };
   }
-
-  return { success: true };
 }
