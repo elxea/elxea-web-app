@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import nodemailer from "nodemailer";
+import { Resend } from "resend";
 
-const TO_EMAIL = process.env.CONTACT_TO_EMAIL || "info@elxea.com";
-const GMAIL_USER = process.env.GMAIL_USER;
-const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD;
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
+const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "no-reply@elxea.com";
+const TO_EMAIL =
+  process.env.CONTACT_TO_EMAIL ||
+  process.env.GMAIL_USER ||
+  "info@elxea.com";
 
 export async function POST(request: NextRequest) {
   try {
-    if (!GMAIL_USER || !GMAIL_APP_PASSWORD) {
+    if (!RESEND_API_KEY) {
       return NextResponse.json(
         { error: "Email service not configured" },
         { status: 503 }
@@ -32,16 +35,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: {
-        user: GMAIL_USER,
-        pass: GMAIL_APP_PASSWORD,
-      },
-    });
+    const resend = new Resend(RESEND_API_KEY);
 
-    await transporter.sendMail({
-      from: `elxea Contact <${GMAIL_USER}>`,
+    await resend.emails.send({
+      from: `elxea <${FROM_EMAIL}>`,
       to: TO_EMAIL,
       replyTo: email,
       subject: `[お問い合わせ] ${subject}`,
