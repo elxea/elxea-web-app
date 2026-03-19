@@ -73,7 +73,7 @@ export default async function ProductPage({
         {/* Info */}
         <div className="space-y-8">
           {product.vendor && (
-            <p className="text-[12px] text-light uppercase tracking-wider">
+            <p className="text-[12px] text-muted-foreground uppercase tracking-wider">
               {product.vendor}
             </p>
           )}
@@ -119,7 +119,7 @@ export default async function ProductPage({
 
           {product.description && (
             <div className="pt-8 border-t border-border">
-              <p className="text-[14px] text-muted leading-relaxed whitespace-pre-line">
+              <p className="text-[14px] text-muted-foreground leading-relaxed whitespace-pre-line">
                 {product.description}
               </p>
             </div>
