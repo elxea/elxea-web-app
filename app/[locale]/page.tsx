@@ -25,16 +25,16 @@ export default function HomePage() {
           sizes="100vw"
         />
         <div className="relative text-center max-w-xl px-6">
-          <p className="text-xs text-white/80 uppercase tracking-[0.2em] mb-6">
+          <p className="text-xs text-foreground/70 uppercase tracking-[0.2em] mb-6">
             {t("home.tagline")}
           </p>
-          <h1 className="text-4xl md:text-5xl font-light tracking-tight mb-6 text-white">
+          <h1 className="text-4xl md:text-5xl font-light tracking-tight mb-6 text-foreground">
             Tea for Creativity.
           </h1>
-          <p className="text-white/80 text-sm leading-relaxed mb-10">
+          <p className="text-foreground/70 text-sm leading-relaxed mb-10">
             {t("home.hero")}
           </p>
-          <Button variant="outline" className="border-white text-white hover:bg-white hover:text-foreground" asChild>
+          <Button variant="outline" asChild>
             <Link href="/products">{t("common.products")}</Link>
           </Button>
         </div>
@@ -63,13 +63,13 @@ export default function HomePage() {
           sizes="100vw"
         />
         <div className="relative text-center max-w-lg px-6">
-          <p className="text-xs text-white/70 uppercase tracking-[0.2em] mb-4">
+          <p className="text-xs text-foreground/70 uppercase tracking-[0.2em] mb-4">
             Our Story
           </p>
-          <h2 className="text-2xl md:text-3xl font-light text-white mb-6">
+          <h2 className="text-2xl md:text-3xl font-light text-foreground mb-6">
             {t("home.storyHeading")}
           </h2>
-          <Button variant="outline" className="border-white text-white hover:bg-white hover:text-foreground" asChild>
+          <Button variant="outline" asChild>
             <Link href="/about">{t("common.about")}</Link>
           </Button>
         </div>
@@ -111,13 +111,13 @@ export default function HomePage() {
           sizes="100vw"
         />
         <div className="relative text-center max-w-lg px-6">
-          <p className="text-xs text-white/70 uppercase tracking-[0.2em] mb-4">
+          <p className="text-xs text-foreground/70 uppercase tracking-[0.2em] mb-4">
             Our Approach
           </p>
-          <h2 className="text-2xl md:text-3xl font-light text-white mb-6">
+          <h2 className="text-2xl md:text-3xl font-light text-foreground mb-6">
             {t("home.approachHeading")}
           </h2>
-          <Button variant="outline" className="border-white text-white hover:bg-white hover:text-foreground" asChild>
+          <Button variant="outline" asChild>
             <Link href="/about">{t("common.about")}</Link>
           </Button>
         </div>
