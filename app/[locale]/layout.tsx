@@ -9,6 +9,8 @@ import { CartProviderWrapper } from "@/components/cart/cart-provider-wrapper";
 import { CookieConsent } from "@/components/ui/cookie-consent";
 import { Toaster } from "@/components/ui/sonner";
 import { ScrollToTop } from "@/components/ui/scroll-to-top";
+import { getClient } from "@/sanity/lib/client";
+import { SITE_SETTINGS_QUERY } from "@/sanity/lib/queries";
 
 export const metadata: Metadata = {
   title: {
@@ -54,6 +56,35 @@ export default async function LocaleLayout({
   const messages = await getMessages();
   const alternateLocale = locale === "ja" ? "en" : "ja";
 
+  let headerNavItems: { href: string; label: string }[] = [];
+  let footerGroups: { label: string; items: { href: string; label: string }[] }[] = [];
+
+  try {
+    const settings = await getClient().fetch(SITE_SETTINGS_QUERY);
+    if (settings?.navigation) {
+      headerNavItems = settings.navigation
+        .filter((item: any) => item.showInHeader)
+        .sort((a: any, b: any) => (a.order ?? 0) - (b.order ?? 0))
+        .map((item: any) => ({
+          href: item.href,
+          label: locale === "en" && item.labelEn ? item.labelEn : item.label,
+        }));
+
+      const groups = (settings.footerGroups || []).sort((a: any, b: any) => (a.order ?? 0) - (b.order ?? 0));
+      footerGroups = groups.map((group: any) => ({
+        label: locale === "en" && group.labelEn ? group.labelEn : group.label,
+        items: (settings.navigation || [])
+          .filter((item: any) => item.showInFooter && item.footerGroup === group.key)
+          .map((item: any) => ({
+            href: item.href,
+            label: locale === "en" && item.labelEn ? item.labelEn : item.label,
+          })),
+      }));
+    }
+  } catch (err) {
+    console.error("Failed to fetch site settings:", err);
+  }
+
   return (
     <html lang={locale}>
       <head>
@@ -66,9 +97,9 @@ export default async function LocaleLayout({
       <body className="min-h-screen flex flex-col bg-background text-foreground">
         <NextIntlClientProvider messages={messages}>
           <CartProviderWrapper>
-            <Header />
+            <Header navItems={headerNavItems} />
             <main className="flex-1">{children}</main>
-            <Footer />
+            <Footer groups={footerGroups} />
             <CookieConsent />
             <Toaster />
             <ScrollToTop />
