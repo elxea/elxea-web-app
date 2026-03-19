@@ -61,7 +61,7 @@ async function ArticlesList({ categorySlug }: { categorySlug: string | null }) {
 
   try {
     const client = getClient();
-    const [categories, articles] = await Promise.all([
+    const [rawCategories, articles] = await Promise.all([
       client.fetch(CATEGORIES_QUERY),
       categorySlug
         ? client.fetch(ARTICLES_BY_CATEGORY_QUERY, {
@@ -76,6 +76,17 @@ async function ArticlesList({ categorySlug }: { categorySlug: string | null }) {
             end: 30,
           }),
     ]);
+
+    // Deduplicate categories by title (Sanity may have ja/en variants with same title)
+    const seen = new Set<string>();
+    const categories = (rawCategories ?? []).filter(
+      (cat: { title: string }) => {
+        const key = cat.title;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      }
+    );
 
     return (
       <>

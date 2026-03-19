@@ -6,6 +6,8 @@ import { getClient } from "@/sanity/lib/client";
 import { TEA_MENU_BY_SLUG_QUERY } from "@/sanity/lib/queries";
 import { urlFor } from "@/sanity/lib/image";
 import { Link } from "@/i18n/navigation";
+import { PortableText } from "@/components/sanity/portable-text";
+import type { PortableTextBlock } from "@portabletext/types";
 
 export async function generateMetadata({
   params,
@@ -20,7 +22,7 @@ export async function generateMetadata({
     if (!tea) return {};
     const seo = tea.seo;
     const title = seo?.title || tea.displayName;
-    const description = seo?.description || tea.description?.slice(0, 160);
+    const description = seo?.description || (typeof tea.description === "string" ? tea.description?.slice(0, 160) : undefined);
     const image = tea.photo?.asset ? urlFor(tea.photo).width(800).url() : undefined;
     return {
       title,
@@ -88,9 +90,13 @@ export default async function TeaMenuDetailPage({
           <h1 className="mb-4">{tea.displayName}</h1>
 
           {tea.description && (
-            <p className="text-sm text-muted-foreground leading-relaxed mb-8">
-              {tea.description}
-            </p>
+            <div className="text-sm text-muted-foreground leading-relaxed mb-8">
+              {typeof tea.description === "string" ? (
+                <p>{tea.description}</p>
+              ) : (
+                <PortableText value={tea.description as PortableTextBlock[]} />
+              )}
+            </div>
           )}
 
           {/* Details table */}

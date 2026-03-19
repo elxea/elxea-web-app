@@ -6,6 +6,7 @@ import { getClient } from "@/sanity/lib/client";
 import { PLAYLIST_BY_SLUG_QUERY } from "@/sanity/lib/queries";
 import { urlFor } from "@/sanity/lib/image";
 import { PortableText } from "@/components/sanity/portable-text";
+import type { PortableTextBlock } from "@portabletext/types";
 
 export async function generateMetadata({
   params,
@@ -20,10 +21,10 @@ export async function generateMetadata({
     const image = pl.albumImage?.asset ? urlFor(pl.albumImage).width(800).url() : undefined;
     return {
       title: pl.title,
-      description: pl.description?.slice(0, 160),
+      description: typeof pl.description === "string" ? pl.description?.slice(0, 160) : undefined,
       openGraph: {
         title: pl.title,
-        description: pl.description?.slice(0, 160),
+        description: typeof pl.description === "string" ? pl.description?.slice(0, 160) : undefined,
         images: image ? [{ url: image }] : [],
       },
     };
@@ -99,9 +100,13 @@ export default async function PlaylistDetailPage({
           )}
 
           {pl.description && (
-            <p className="text-sm text-muted-foreground leading-relaxed mb-8">
-              {pl.description}
-            </p>
+            <div className="text-sm text-muted-foreground leading-relaxed mb-8">
+              {typeof pl.description === "string" ? (
+                <p>{pl.description}</p>
+              ) : (
+                <PortableText value={pl.description as PortableTextBlock[]} />
+              )}
+            </div>
           )}
 
           {/* Streaming links */}

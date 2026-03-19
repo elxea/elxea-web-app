@@ -1,5 +1,6 @@
 "use client";
 
+import { useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { usePathname } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,7 @@ export function CategoryFilter({ categories, activeSlug, allLabel }: CategoryFil
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const [isPending, startTransition] = useTransition();
 
   function handleFilter(slug: string | null) {
     const params = new URLSearchParams(searchParams.toString());
@@ -28,11 +30,13 @@ export function CategoryFilter({ categories, activeSlug, allLabel }: CategoryFil
     } else {
       params.delete("category");
     }
-    router.push(`${pathname}?${params.toString()}`, { scroll: false });
+    startTransition(() => {
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    });
   }
 
   return (
-    <div className="flex flex-wrap gap-2 mb-8">
+    <div className={`flex flex-wrap gap-2 mb-8 transition-opacity ${isPending ? "opacity-60" : ""}`}>
       <Button
         variant={activeSlug === null ? "default" : "ghost"}
         size="sm"

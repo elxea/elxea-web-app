@@ -4,6 +4,10 @@
 
 @custom-variant dark (&:is(.dark *));
 
+html {
+  scroll-behavior: smooth;
+}
+
 /* Adobe Fonts (Typekit ID: fwg7gtf) */
 /* Headings: aktiv-grotesk-extended + dnp-shuei-gothic-gin-std */
 /* Body: aktiv-grotesk + kozuka-gothic-pro */
