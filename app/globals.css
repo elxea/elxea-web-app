@@ -4,19 +4,31 @@
 
 @custom-variant dark (&:is(.dark *));
 
-html {
-  scroll-behavior: smooth;
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
 }
 
-/* Adobe Fonts (Typekit ID: fwg7gtf) */
+/* Adobe Fonts (Typekit ID: fwg7gtf) — loaded via CSS <link> in layout.tsx */
 /* Headings: aktiv-grotesk-extended + dnp-shuei-gothic-gin-std */
 /* Body: aktiv-grotesk + kozuka-gothic-pro */
 /* Secondary: neue-haas-grotesk-text + ryo-gothic-plusn */
 /* Special: dnp-shuei-ymincho-std */
 /* Design tokens generated from tokens/ via Style Dictionary (pnpm build:tokens) */
 
+body {
+  font-family: var(--typography-family-sans);
+  font-size: 1rem;
+  line-height: 1.75;
+  letter-spacing: 0.05em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--typography-family-heading);
+  letter-spacing: 0.025em;
 }
 
 :root {

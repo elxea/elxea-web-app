@@ -57,8 +57,7 @@ export default async function LocaleLayout({
   return (
     <html lang={locale}>
       <head>
-        <script async src="https://use.typekit.net/fwg7gtf.js" />
-        <script dangerouslySetInnerHTML={{ __html: "try{Typekit.load({async:true})}catch(e){}" }} />
+        <link rel="stylesheet" href="https://use.typekit.net/fwg7gtf.css" />
         <link rel="alternate" hrefLang={locale} href={`https://elxea.com/${locale}`} />
         <link rel="alternate" hrefLang={alternateLocale} href={`https://elxea.com/${alternateLocale}`} />
         <link rel="alternate" hrefLang="x-default" href="https://elxea.com/ja" />
