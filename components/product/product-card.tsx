@@ -13,13 +13,13 @@ export function ProductCard({ product }: { product: Product }) {
   return (
     <Link href={`/products/${product.handle}`} className="group block">
       {/* Image */}
-      <div className="aspect-square bg-muted mb-4 overflow-hidden rounded-md">
+      <div className="aspect-[3/2] bg-muted mb-4 overflow-hidden rounded-md">
         {product.featuredImage ? (
           <Image
             src={product.featuredImage.url}
             alt={product.featuredImage.altText || product.title}
             width={600}
-            height={600}
+            height={400}
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
           />

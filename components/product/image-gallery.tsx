@@ -19,7 +19,7 @@ export function ImageGallery({ images }: { images: ImageType[] }) {
 
   if (images.length === 0) {
     return (
-      <div className="aspect-square bg-muted flex items-center justify-center text-muted-foreground rounded-md">
+      <div className="aspect-[3/2] bg-muted flex items-center justify-center text-muted-foreground rounded-md">
         {t("noImage")}
       </div>
     );
@@ -30,7 +30,7 @@ export function ImageGallery({ images }: { images: ImageType[] }) {
       {/* Main image — click to zoom */}
       <button
         type="button"
-        className="aspect-square bg-muted mb-3 overflow-hidden rounded-md w-full cursor-zoom-in"
+        className="aspect-[3/2] bg-muted mb-3 overflow-hidden rounded-md w-full cursor-zoom-in"
         onClick={() => setZoomOpen(true)}
       >
         <Image

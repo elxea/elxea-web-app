@@ -64,19 +64,19 @@ export default async function FarmerPage({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16">
         {/* Photo */}
         {farmer.photo?.asset ? (
-          <div className="aspect-square bg-muted overflow-hidden">
+          <div className="aspect-[3/2] bg-muted overflow-hidden">
             <Image
-              src={urlFor(farmer.photo).width(800).height(800).url()}
+              src={urlFor(farmer.photo).width(800).height(533).url()}
               alt={farmer.photo.alt || farmer.name}
               width={800}
-              height={800}
+              height={533}
               sizes="(max-width: 1024px) 100vw, 50vw"
               className="w-full h-full object-cover"
               priority
             />
           </div>
         ) : (
-          <div className="aspect-square bg-muted" />
+          <div className="aspect-[3/2] bg-muted" />
         )}
 
         {/* Info */}

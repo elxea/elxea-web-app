@@ -48,15 +48,15 @@ async function PlaylistGrid() {
               className="group block"
             >
               <div
-                className="aspect-square bg-muted mb-4 overflow-hidden"
+                className="aspect-[3/2] bg-muted mb-4 overflow-hidden"
                 style={pl.colors?.color1 ? { backgroundColor: pl.colors.color1 } : undefined}
               >
                 {pl.albumImage?.asset ? (
                   <Image
-                    src={urlFor(pl.albumImage).width(600).height(600).url()}
+                    src={urlFor(pl.albumImage).width(600).height(400).url()}
                     alt={pl.albumImage.alt || pl.title}
                     width={600}
-                    height={600}
+                    height={400}
                     sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                   />

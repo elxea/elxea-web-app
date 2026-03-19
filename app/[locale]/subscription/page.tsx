@@ -77,7 +77,7 @@ export default async function SubscriptionLPPage() {
         {/* Image grid (placeholder) */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="aspect-square bg-muted" />
+            <div key={i} className="aspect-[3/2] bg-muted" />
           ))}
         </div>
       </section>
@@ -103,7 +103,7 @@ export default async function SubscriptionLPPage() {
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6">
           {TEA_LINEUP.map((name) => (
             <div key={name}>
-              <div className="aspect-square bg-muted mb-4" />
+              <div className="aspect-[3/2] bg-muted mb-4" />
               <p className="text-xs text-muted-foreground mb-1">Single</p>
               <p className="text-sm">{name}</p>
             </div>
@@ -300,7 +300,7 @@ function FeatureCard({
     <Card>
       <CardHeader>
         {/* Illustration placeholder */}
-        <div className="aspect-square bg-muted -mx-6 -mt-6 rounded-t-xl" />
+        <div className="aspect-[3/2] bg-muted -mx-6 -mt-6 rounded-t-xl" />
       </CardHeader>
       <CardContent className="space-y-3">
         <p className="text-xs text-muted-foreground">{number}</p>
