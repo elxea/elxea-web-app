@@ -24,7 +24,6 @@ export default function HomePage() {
           className="object-cover"
           sizes="100vw"
         />
-        <div className="absolute inset-0 bg-black/30" />
         <div className="relative text-center max-w-xl px-6">
           <p className="text-xs text-white/80 uppercase tracking-[0.2em] mb-6">
             {t("home.tagline")}
@@ -63,7 +62,6 @@ export default function HomePage() {
           className="object-cover"
           sizes="100vw"
         />
-        <div className="absolute inset-0 bg-black/40" />
         <div className="relative text-center max-w-lg px-6">
           <p className="text-xs text-white/70 uppercase tracking-[0.2em] mb-4">
             Our Story
@@ -112,7 +110,6 @@ export default function HomePage() {
           className="object-cover"
           sizes="100vw"
         />
-        <div className="absolute inset-0 bg-black/40" />
         <div className="relative text-center max-w-lg px-6">
           <p className="text-xs text-white/70 uppercase tracking-[0.2em] mb-4">
             Our Approach
