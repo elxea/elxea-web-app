@@ -13,28 +13,41 @@ type ShopifyResponse<T> = {
 export async function shopifyFetch<T>({
   query,
   variables,
-  cache = "force-cache",
+  cache,
+  revalidate = 60,
   tags,
 }: {
   query: string;
   variables?: Record<string, unknown>;
   cache?: RequestCache;
+  revalidate?: number | false;
   tags?: string[];
 }): Promise<T> {
   if (!SHOPIFY_STORE_DOMAIN || !SHOPIFY_STOREFRONT_ACCESS_TOKEN) {
     throw new Error("Shopify API credentials not configured.");
   }
 
-  const res = await fetch(endpoint, {
+  // cache: "no-store" takes precedence (cart, search, mutations)
+  // Otherwise use ISR with next.revalidate + tags
+  const fetchOptions: RequestInit & { next?: { revalidate?: number; tags?: string[] } } = {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "X-Shopify-Storefront-Access-Token": SHOPIFY_STOREFRONT_ACCESS_TOKEN,
     },
     body: JSON.stringify({ query, variables }),
-    cache,
-    next: tags ? { tags } : undefined,
-  });
+  };
+
+  if (cache === "no-store") {
+    fetchOptions.cache = "no-store";
+  } else {
+    fetchOptions.next = {
+      ...(revalidate !== false ? { revalidate } : {}),
+      ...(tags ? { tags } : {}),
+    };
+  }
+
+  const res = await fetch(endpoint, fetchOptions);
 
   if (!res.ok) {
     throw new Error(`Shopify API error: ${res.status} ${res.statusText}`);
