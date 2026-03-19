@@ -175,8 +175,8 @@ function SubscriptionCard({
   };
 
   const statusColorMap: Record<string, string> = {
-    ACTIVE: "text-green-700 bg-green-50",
-    PAUSED: "text-yellow-700 bg-yellow-50",
+    ACTIVE: "text-success-foreground bg-success/20",
+    PAUSED: "text-warning-foreground bg-warning/20",
     CANCELLED: "text-muted-foreground bg-muted",
   };
 

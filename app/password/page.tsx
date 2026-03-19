@@ -27,29 +27,15 @@ export default function PasswordPage() {
   }
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontFamily: "system-ui, sans-serif",
-        background: "#FFFEF2",
-      }}
-    >
+    <div className="min-h-screen flex items-center justify-center font-sans bg-background">
       <form
         onSubmit={handleSubmit}
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: "16px",
-          width: "320px",
-        }}
+        className="flex flex-col gap-4 w-80"
       >
-        <h1 style={{ fontSize: "18px", fontWeight: 400, color: "#333", textAlign: "center" }}>
+        <h1 className="text-lg font-normal text-foreground text-center">
           elxea
         </h1>
-        <p style={{ fontSize: "13px", color: "#666", textAlign: "center" }}>
+        <p className="text-[13px] text-muted-foreground text-center">
           This site is password protected.
         </p>
         <input
@@ -58,29 +44,16 @@ export default function PasswordPage() {
           onChange={(e) => setPassword(e.target.value)}
           placeholder="Password"
           autoFocus
-          style={{
-            padding: "10px 12px",
-            border: "1px solid #E5E3D8",
-            background: "#fff",
-            fontSize: "14px",
-            outline: "none",
-          }}
+          className="px-3 py-2.5 border border-border bg-popover text-sm outline-none"
         />
         {error && (
-          <p style={{ fontSize: "13px", color: "#c00", margin: 0 }}>
+          <p className="text-[13px] text-destructive m-0">
             Incorrect password.
           </p>
         )}
         <button
           type="submit"
-          style={{
-            padding: "10px",
-            background: "#333",
-            color: "#fff",
-            border: "none",
-            fontSize: "14px",
-            cursor: "pointer",
-          }}
+          className="py-2.5 bg-primary text-primary-foreground border-none text-sm cursor-pointer"
         >
           Enter
         </button>
