@@ -49,13 +49,13 @@ async function FarmersList() {
               href={`/farmers/${farmer.slug.current}`}
               className="group block"
             >
-              <div className="aspect-square bg-muted mb-4 overflow-hidden">
+              <div className="aspect-[3/2] bg-muted mb-4 overflow-hidden">
                 {farmer.photo?.asset ? (
                   <Image
-                    src={urlFor(farmer.photo).width(600).height(600).url()}
+                    src={urlFor(farmer.photo).width(600).height(400).url()}
                     alt={farmer.photo.alt || farmer.name}
                     width={600}
-                    height={600}
+                    height={400}
                     sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                   />

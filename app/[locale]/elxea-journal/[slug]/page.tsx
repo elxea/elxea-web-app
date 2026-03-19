@@ -109,12 +109,12 @@ export default async function ElxeaJournalDetailPage({
                   className="group block"
                 >
                   {tea.photo?.asset && (
-                    <div className="aspect-square bg-muted mb-2 overflow-hidden">
+                    <div className="aspect-[3/2] bg-muted mb-2 overflow-hidden">
                       <Image
-                        src={urlFor(tea.photo).width(200).height(200).url()}
+                        src={urlFor(tea.photo).width(200).height(133).url()}
                         alt={tea.photo.alt || tea.displayName}
                         width={200}
-                        height={200}
+                        height={133}
                         sizes="(max-width: 640px) 50vw, 33vw"
                         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                       />

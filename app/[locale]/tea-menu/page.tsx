@@ -49,15 +49,15 @@ async function TeaMenuList() {
               className="group block"
             >
               <div
-                className="aspect-square bg-muted mb-4 overflow-hidden"
+                className="aspect-[3/2] bg-muted mb-4 overflow-hidden"
                 style={item.color ? { backgroundColor: item.color } : undefined}
               >
                 {item.photo?.asset ? (
                   <Image
-                    src={urlFor(item.photo).width(600).height(600).url()}
+                    src={urlFor(item.photo).width(600).height(400).url()}
                     alt={item.photo.alt || item.displayName}
                     width={600}
-                    height={600}
+                    height={400}
                     sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                   />
