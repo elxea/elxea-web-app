@@ -52,13 +52,13 @@ async function EventsList() {
               "group grid grid-cols-1 md:grid-cols-[1fr_2fr] gap-6";
             const inner = (
               <>
-                <div className="aspect-[4/3] bg-muted overflow-hidden">
+                <div className="aspect-[3/2] bg-muted overflow-hidden">
                   {event.image?.asset ? (
                     <Image
-                      src={urlFor(event.image).width(400).height(300).url()}
+                      src={urlFor(event.image).width(600).height(400).url()}
                       alt={event.title}
-                      width={400}
-                      height={300}
+                      width={600}
+                      height={400}
                       sizes="(max-width: 768px) 100vw, 33vw"
                       className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                     />

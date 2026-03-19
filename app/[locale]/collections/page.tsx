@@ -32,13 +32,13 @@ async function CollectionsContent() {
             href={`/collections/${collection.handle}`}
             className="group block"
           >
-            <div className="aspect-[4/3] bg-muted mb-4 overflow-hidden">
+            <div className="aspect-[3/2] bg-muted mb-4 overflow-hidden">
               {collection.image ? (
                 <Image
                   src={collection.image.url}
                   alt={collection.image.altText || collection.title}
                   width={600}
-                  height={450}
+                  height={400}
                   sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                   className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                 />
