@@ -17,7 +17,10 @@ import { Separator } from "@/components/ui/separator";
 import { useCart } from "@/components/cart/cart-context";
 import { Menu } from "lucide-react";
 
-export function Header() {
+type NavItem = { href: string; label: string };
+type HeaderProps = { navItems?: NavItem[] };
+
+export function Header({ navItems: externalNavItems }: HeaderProps) {
   const t = useTranslations("common");
   const pathname = usePathname();
   const locale = useLocale();
@@ -30,15 +33,18 @@ export function Header() {
     setIsLoggedIn(document.cookie.includes("shop_auth=1"));
   }, [pathname]);
 
-  const navItems = [
-    { href: "/products", label: t("products") },
-    { href: "/subscription", label: t("subscription") },
-    { href: "/journal", label: t("journal") },
-    { href: "/tea-menu", label: t("teaMenu") },
-    { href: "/playlists", label: t("playlists") },
-    { href: "/farmers", label: t("farmers") },
-    { href: "/events", label: t("events") },
-  ];
+  const navItems =
+    externalNavItems && externalNavItems.length > 0
+      ? externalNavItems
+      : [
+          { href: "/products", label: t("products") },
+          { href: "/subscription", label: t("subscription") },
+          { href: "/journal", label: t("journal") },
+          { href: "/tea-menu", label: t("teaMenu") },
+          { href: "/playlists", label: t("playlists") },
+          { href: "/farmers", label: t("farmers") },
+          { href: "/events", label: t("events") },
+        ];
 
   return (
     <header className="border-b border-border bg-background sticky top-0 z-50">
