@@ -29,6 +29,14 @@ export default function middleware(request: NextRequest) {
   const passwordResponse = checkSitePassword(request);
   if (passwordResponse) return passwordResponse;
 
+  // Redirect /en/* to /ja/* (English content not ready yet)
+  if (pathname.startsWith("/en")) {
+    const jaPath = pathname.replace(/^\/en/, "/ja") || "/ja";
+    const redirectUrl = new URL(jaPath, request.url);
+    redirectUrl.search = request.nextUrl.search;
+    return NextResponse.redirect(redirectUrl, 301);
+  }
+
   // Check if this is an /account route that needs auth
   const accountMatch = pathname.match(/^\/(ja|en)\/account/);
   if (accountMatch) {

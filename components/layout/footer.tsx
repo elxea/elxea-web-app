@@ -144,11 +144,12 @@ export function Footer() {
             </ul>
           </div>
 
-          {/* Language */}
+          {/* Language — hidden until English content is ready
           <div>
             <p className="text-sm font-medium mb-5">{t("common.language")}</p>
             <LanguageSwitcher />
           </div>
+          */}
         </div>
 
         {/* Legal links + Copyright */}
