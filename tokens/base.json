@@ -1,0 +1,109 @@
+{
+  "color": {
+    "$description": "elxea brand and semantic colors (Webflow extracted values)",
+    "brand": {
+      "gray-20": { "$value": "#ebe9e0", "$type": "color" },
+      "gray-40": { "$value": "#d5d3c0", "$type": "color" },
+      "gray-60": { "$value": "#adaca0", "$type": "color" },
+      "gray-80": { "$value": "#858581", "$type": "color" },
+      "gray-100": { "$value": "#5d5e61", "$type": "color" },
+      "gray-120": { "$value": "#464748", "$type": "color" },
+      "white": { "$value": "#ffffff", "$type": "color" },
+      "black": { "$value": "#000000", "$type": "color" },
+      "gold": { "$value": "#ffc200", "$type": "color" },
+      "tea-green": { "$value": "#9ecbc0", "$type": "color" },
+      "tea-red": { "$value": "#b9525c", "$type": "color" },
+      "tea-warm": { "$value": "#e8b8a6", "$type": "color" }
+    },
+    "semantic": {
+      "background": { "$value": "{color.brand.gray-40}", "$type": "color" },
+      "foreground": { "$value": "{color.brand.gray-100}", "$type": "color" },
+      "card": { "$value": "{color.brand.gray-40}", "$type": "color" },
+      "card-foreground": { "$value": "{color.brand.gray-100}", "$type": "color" },
+      "popover": { "$value": "{color.brand.gray-20}", "$type": "color" },
+      "popover-foreground": { "$value": "{color.brand.gray-100}", "$type": "color" },
+      "primary": { "$value": "{color.brand.gray-120}", "$type": "color" },
+      "primary-foreground": { "$value": "{color.brand.white}", "$type": "color" },
+      "secondary": { "$value": "{color.brand.gold}", "$type": "color" },
+      "secondary-foreground": { "$value": "{color.brand.gray-120}", "$type": "color" },
+      "muted": { "$value": "{color.brand.gray-20}", "$type": "color" },
+      "muted-foreground": { "$value": "{color.brand.gray-80}", "$type": "color" },
+      "accent": { "$value": "{color.brand.gold}", "$type": "color" },
+      "accent-foreground": { "$value": "{color.brand.gray-120}", "$type": "color" },
+      "destructive": { "$value": "{color.brand.tea-red}", "$type": "color" },
+      "destructive-foreground": { "$value": "{color.brand.white}", "$type": "color" },
+      "border": { "$value": "{color.brand.gray-80}", "$type": "color" },
+      "input": { "$value": "{color.brand.gray-20}", "$type": "color" },
+      "ring": { "$value": "{color.brand.gray-80}", "$type": "color" },
+      "success": { "$value": "{color.brand.tea-green}", "$type": "color" },
+      "success-foreground": { "$value": "{color.brand.gray-120}", "$type": "color" },
+      "warning": { "$value": "{color.brand.gold}", "$type": "color" },
+      "warning-foreground": { "$value": "{color.brand.gray-120}", "$type": "color" },
+      "info": { "$value": "#5b8fb9", "$type": "color" },
+      "info-foreground": { "$value": "{color.brand.white}", "$type": "color" }
+    }
+  },
+  "typography": {
+    "$description": "elxea typography tokens (Webflow extracted values)",
+    "family": {
+      "sans": { "$value": "aktiv-grotesk, kozuka-gothic-pro, sans-serif", "$type": "fontFamily" },
+      "heading": { "$value": "aktiv-grotesk-extended, dnp-shuei-gothic-gin-std, sans-serif", "$type": "fontFamily" },
+      "secondary": { "$value": "neue-haas-grotesk-text, ryo-gothic-plusn, sans-serif", "$type": "fontFamily" },
+      "special": { "$value": "dnp-shuei-ymincho-std, Georgia, serif", "$type": "fontFamily" },
+      "mono": { "$value": "'SF Mono', Menlo, monospace", "$type": "fontFamily" }
+    },
+    "size": {
+      "h1": { "$value": "3.25rem", "$type": "dimension" },
+      "h2": { "$value": "2rem", "$type": "dimension" },
+      "h2-alt": { "$value": "1.75rem", "$type": "dimension" },
+      "h3": { "$value": "1.5rem", "$type": "dimension" },
+      "h4": { "$value": "1.25rem", "$type": "dimension" },
+      "h5": { "$value": "1rem", "$type": "dimension" },
+      "h6": { "$value": "0.875rem", "$type": "dimension" },
+      "body-01": { "$value": "1rem", "$type": "dimension" },
+      "body-02": { "$value": "0.875rem", "$type": "dimension" },
+      "caption": { "$value": "0.75rem", "$type": "dimension" }
+    },
+    "weight": {
+      "thin": { "$value": 200, "$type": "fontWeight" },
+      "light": { "$value": 400, "$type": "fontWeight" },
+      "regular": { "$value": 500, "$type": "fontWeight" },
+      "bold": { "$value": 600, "$type": "fontWeight" }
+    },
+    "lineHeight": {
+      "narrow": { "$value": 1.25, "$type": "number" },
+      "regular": { "$value": 1.5, "$type": "number" },
+      "wide": { "$value": 1.75, "$type": "number" }
+    },
+    "letterSpacing": {
+      "narrow": { "$value": "0.025rem", "$type": "dimension" },
+      "regular": { "$value": "0.05rem", "$type": "dimension" },
+      "wide": { "$value": "0.125rem", "$type": "dimension" }
+    }
+  },
+  "spacing": {
+    "$description": "Webflow spacing scale",
+    "0": { "$value": "0rem", "$type": "dimension" },
+    "2-5": { "$value": "0.25rem", "$type": "dimension" },
+    "5": { "$value": "0.5rem", "$type": "dimension" },
+    "10": { "$value": "1rem", "$type": "dimension" },
+    "15": { "$value": "1.5rem", "$type": "dimension" },
+    "20": { "$value": "2rem", "$type": "dimension" },
+    "40": { "$value": "4rem", "$type": "dimension" },
+    "60": { "$value": "6rem", "$type": "dimension" },
+    "80": { "$value": "8rem", "$type": "dimension" }
+  },
+  "shape": {
+    "$description": "Border radius tokens",
+    "radius-round": { "$value": "0.25rem", "$type": "dimension" },
+    "radius-pill": { "$value": "1rem", "$type": "dimension" },
+    "radius-circle": { "$value": "99rem", "$type": "dimension" }
+  },
+  "layout": {
+    "$description": "Layout constraint tokens",
+    "max-width": { "$value": "1280px", "$type": "dimension" },
+    "max-width-container": { "$value": "1200px", "$type": "dimension" },
+    "max-width-post": { "$value": "720px", "$type": "dimension" },
+    "height-header": { "$value": "6rem", "$type": "dimension" }
+  }
+}

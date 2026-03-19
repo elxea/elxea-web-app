@@ -8,6 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "test:e2e": "playwright test",
+    "build:tokens": "style-dictionary build --config tokens/config.mjs",
+    "validate:tokens": "style-dictionary build --config tokens/config.mjs --verbose",
     "sync:notion": "tsx scripts/sync-notion-to-sanity.ts",
     "sync:notion:dry": "tsx scripts/sync-notion-to-sanity.ts --dry-run"
   },

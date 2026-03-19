@@ -1,46 +1,65 @@
 @import "tailwindcss";
+@import "../dist/tokens.css";
+@import "../dist/tokens-cjk.css";
 
-/* Adobe Fonts (Typekit ID: fwg7gtf) */
-/* Headings: termina + ryo-gothic-plusn */
-/* Body: neue-haas-grotesk-text + kozuka-gothic-pro */
+/* --- Base styles --- */
 
-@theme {
-  --font-sans: neue-haas-grotesk-text, kozuka-gothic-pro, sans-serif;
-  --font-heading: termina, ryo-gothic-plusn, sans-serif;
-  --color-background: oklch(1 0 0);
-  --color-foreground: oklch(0.145 0 0);
-
-  --color-card: oklch(1 0 0);
-  --color-card-foreground: oklch(0.145 0 0);
-
-  --color-popover: oklch(1 0 0);
-  --color-popover-foreground: oklch(0.145 0 0);
-
-  --color-primary: oklch(0.205 0 0);
-  --color-primary-foreground: oklch(0.985 0 0);
-
-  --color-secondary: oklch(0.97 0 0);
-  --color-secondary-foreground: oklch(0.205 0 0);
-
-  --color-muted: oklch(0.97 0 0);
-  --color-muted-foreground: oklch(0.556 0 0);
-
-  --color-accent: oklch(0.97 0 0);
-  --color-accent-foreground: oklch(0.205 0 0);
-
-  --color-destructive: oklch(0.577 0.245 27.325);
-  --color-destructive-foreground: oklch(0.985 0 0);
-
-  --color-border: oklch(0.922 0 0);
-  --color-input: oklch(0.922 0 0);
-  --color-ring: oklch(0.708 0 0);
-
-  --radius-sm: 0.25rem;
-  --radius-md: 0.375rem;
-  --radius-lg: 0.5rem;
-  --radius-xl: 0.75rem;
+html {
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+/* --- Body typography --- */
+
+body {
+  font-family: var(--typography-family-sans);
+  font-size: var(--typography-size-body-01);
+  font-weight: var(--typography-weight-regular);
+  line-height: var(--typography-lineHeight-wide);
+  letter-spacing: var(--typography-letterSpacing-regular);
+}
+
+/* --- Heading typography --- */
+
 h1, h2, h3, h4, h5, h6 {
-  font-family: var(--font-heading);
+  font-family: var(--typography-family-heading);
+  font-weight: var(--typography-weight-bold);
+  letter-spacing: var(--typography-letterSpacing-narrow);
+}
+
+h1 {
+  font-size: var(--typography-size-h1);
+  line-height: var(--typography-lineHeight-narrow);
+}
+
+h2 {
+  font-size: var(--typography-size-h2);
+  line-height: var(--typography-lineHeight-narrow);
+}
+
+h3 {
+  font-size: var(--typography-size-h3);
+  line-height: var(--typography-lineHeight-narrow);
+}
+
+h4 {
+  font-size: var(--typography-size-h4);
+  line-height: var(--typography-lineHeight-regular);
+}
+
+h5 {
+  font-size: var(--typography-size-h5);
+  line-height: var(--typography-lineHeight-regular);
+}
+
+h6 {
+  font-size: var(--typography-size-h6);
+  line-height: var(--typography-lineHeight-regular);
 }
