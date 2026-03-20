@@ -9,6 +9,7 @@ import { CartProviderWrapper } from "@/components/cart/cart-provider-wrapper";
 import { CookieConsent } from "@/components/ui/cookie-consent";
 import { Toaster } from "@/components/ui/sonner";
 import { ScrollToTop } from "@/components/ui/scroll-to-top";
+import { LenisProvider } from "@/components/providers/lenis-provider";
 import { getClient } from "@/sanity/lib/client";
 import { SITE_SETTINGS_QUERY } from "@/sanity/lib/queries";
 
@@ -97,12 +98,14 @@ export default async function LocaleLayout({
       <body className="min-h-screen flex flex-col bg-background text-foreground">
         <NextIntlClientProvider messages={messages}>
           <CartProviderWrapper>
-            <Header navItems={headerNavItems} />
-            <main className="flex-1">{children}</main>
-            <Footer groups={footerGroups} />
-            <CookieConsent />
-            <Toaster />
-            <ScrollToTop />
+            <LenisProvider>
+              <Header navItems={headerNavItems} />
+              <main className="flex-1">{children}</main>
+              <Footer groups={footerGroups} />
+              <CookieConsent />
+              <Toaster />
+              <ScrollToTop />
+            </LenisProvider>
           </CartProviderWrapper>
         </NextIntlClientProvider>
       </body>
