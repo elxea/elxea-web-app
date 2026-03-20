@@ -6,9 +6,9 @@ import Image from "next/image";
  * Displays the elxea logo at low opacity on a muted background.
  * Used across all image containers when no image is available.
  */
-export function ImagePlaceholder() {
+export function ImagePlaceholder({ className }: { className?: string }) {
   return (
-    <div className="w-full h-full flex items-center justify-center bg-muted">
+    <div className={`w-full h-full flex items-center justify-center bg-muted ${className ?? ""}`}>
       <Image
         src="/logo.png"
         alt=""

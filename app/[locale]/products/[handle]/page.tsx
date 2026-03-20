@@ -65,16 +65,6 @@ export default async function ProductPage({
       )
     ) || product.variants[0];
 
-  const { metafields } = product;
-  const hasFeatures = metafields.features.length > 0;
-  const hasTeaDetails =
-    metafields.teaCategory ||
-    metafields.variety ||
-    metafields.season ||
-    metafields.taste ||
-    metafields.aroma;
-  const hasEnrichment = hasFeatures || hasTeaDetails || metafields.howToEnjoy;
-
   return (
     <div className="max-w-7xl mx-auto px-6 py-16">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16">
@@ -139,9 +129,9 @@ export default async function ProductPage({
       </div>
 
       {/* Featured content from Operations Hub */}
-      {hasEnrichment && (
-        <ProductFeatures metafields={metafields} />
-      )}
+      <Suspense fallback={null}>
+        <ProductFeatures metafields={product.metafields} />
+      </Suspense>
     </div>
   );
 }

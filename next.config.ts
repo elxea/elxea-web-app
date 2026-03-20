@@ -14,6 +14,10 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: "https",
+        hostname: "*.shopify.com",
+      },
+      {
+        protocol: "https",
         hostname: "cdn.sanity.io",
       },
     ],

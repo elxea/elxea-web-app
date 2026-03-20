@@ -8,27 +8,34 @@ interface ProductFeaturesProps {
 }
 
 export async function ProductFeatures({ metafields }: ProductFeaturesProps) {
-  const t = await getTranslations("product");
-
+  const hasFeatures = metafields.features.length > 0;
   const hasTeaDetails =
     metafields.teaCategory ||
     metafields.variety ||
     metafields.season ||
     metafields.taste ||
-    metafields.aroma;
+    metafields.aroma ||
+    metafields.menuNumber;
+  const hasEnrichment = hasFeatures || hasTeaDetails || metafields.howToEnjoy;
+
+  if (!hasEnrichment) return null;
+
+  const t = await getTranslations("product");
 
   return (
     <div className="mt-20 space-y-20">
       {/* Feature sections */}
       {metafields.features.map((feature, index) => (
         <section
-          key={index}
-          className={`grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center ${
-            index % 2 === 1 ? "lg:[direction:rtl]" : ""
-          }`}
+          key={`feature_${index + 1}`}
+          className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center"
         >
           {feature.imageUrl && (
-            <div className={`aspect-[4/3] relative overflow-hidden bg-muted rounded-md ${index % 2 === 1 ? "lg:[direction:ltr]" : ""}`}>
+            <div
+              className={`aspect-[4/3] relative overflow-hidden bg-muted rounded-md ${
+                index % 2 === 1 ? "lg:order-last" : ""
+              }`}
+            >
               <Image
                 src={feature.imageUrl}
                 alt={feature.title}
@@ -38,7 +45,13 @@ export async function ProductFeatures({ metafields }: ProductFeaturesProps) {
               />
             </div>
           )}
-          <div className={`space-y-4 ${index % 2 === 1 ? "lg:[direction:ltr]" : ""} ${!feature.imageUrl ? "lg:col-span-2 max-w-2xl" : ""}`}>
+          <div
+            className={`space-y-4 ${
+              !feature.imageUrl ? "lg:col-span-2 max-w-2xl" : ""
+            } ${
+              index % 2 === 1 && feature.imageUrl ? "lg:order-first" : ""
+            }`}
+          >
             {feature.title && (
               <h2 className="text-xl font-medium leading-relaxed">
                 {feature.title}
