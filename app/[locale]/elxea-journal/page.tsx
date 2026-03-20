@@ -5,6 +5,7 @@ import { Link } from "@/i18n/navigation";
 import { getClient } from "@/sanity/lib/client";
 import { JOURNALS_QUERY } from "@/sanity/lib/queries";
 import { urlFor } from "@/sanity/lib/image";
+import { ImagePlaceholder } from "@/components/ui/image-placeholder";
 
 const themeLabels: Record<string, string> = {
   akane: "茜(あかね)",
@@ -72,9 +73,7 @@ async function JournalGrid() {
                       className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                     />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center text-muted-foreground text-sm">
-                      {j.title}
-                    </div>
+                    <ImagePlaceholder />
                   )}
                   {/* Theme badge */}
                   <span

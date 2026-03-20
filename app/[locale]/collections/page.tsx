@@ -2,6 +2,7 @@ import Image from "next/image";
 import { getTranslations } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import { getCollections } from "@/lib/shopify";
+import { ImagePlaceholder } from "@/components/ui/image-placeholder";
 
 export default async function CollectionsPage() {
   const t = await getTranslations("common");
@@ -43,9 +44,7 @@ async function CollectionsContent() {
                   className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                 />
               ) : (
-                <div className="w-full h-full flex items-center justify-center text-muted-foreground text-sm">
-                  {collection.title}
-                </div>
+                <ImagePlaceholder />
               )}
             </div>
             <h2 className="text-sm font-medium group-hover:underline">

@@ -7,6 +7,7 @@ import { TEA_MENU_BY_SLUG_QUERY } from "@/sanity/lib/queries";
 import { urlFor } from "@/sanity/lib/image";
 import { Link } from "@/i18n/navigation";
 import { PortableText } from "@/components/sanity/portable-text";
+import { ImagePlaceholder } from "@/components/ui/image-placeholder";
 import type { PortableTextBlock } from "@portabletext/types";
 
 export async function generateMetadata({
@@ -76,9 +77,7 @@ export default async function TeaMenuDetailPage({
               priority
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-              {tea.displayName}
-            </div>
+            <ImagePlaceholder />
           )}
         </div>
 

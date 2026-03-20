@@ -6,6 +6,7 @@ import { getClient } from "@/sanity/lib/client";
 import { FARMER_BY_SLUG_QUERY } from "@/sanity/lib/queries";
 import { urlFor } from "@/sanity/lib/image";
 import { PortableText } from "@/components/sanity/portable-text";
+import { ImagePlaceholder } from "@/components/ui/image-placeholder";
 
 export async function generateMetadata({
   params,
@@ -76,7 +77,9 @@ export default async function FarmerPage({
             />
           </div>
         ) : (
-          <div className="aspect-[3/2] bg-muted" />
+          <div className="aspect-[3/2] rounded-md overflow-hidden">
+            <ImagePlaceholder />
+          </div>
         )}
 
         {/* Info */}

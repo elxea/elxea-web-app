@@ -10,6 +10,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ImagePlaceholder } from "@/components/ui/image-placeholder";
 import type { Image as ImageType } from "@/lib/shopify/types";
 
 export function ImageGallery({ images }: { images: ImageType[] }) {
@@ -19,8 +20,8 @@ export function ImageGallery({ images }: { images: ImageType[] }) {
 
   if (images.length === 0) {
     return (
-      <div className="aspect-[3/2] bg-muted flex items-center justify-center text-muted-foreground rounded-md">
-        {t("noImage")}
+      <div className="aspect-[3/2] rounded-md overflow-hidden">
+        <ImagePlaceholder />
       </div>
     );
   }

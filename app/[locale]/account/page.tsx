@@ -3,6 +3,7 @@ import Image from "next/image";
 import { getCustomerFromSession, getSubscriptionsFromSession } from "@/lib/shopify/auth";
 import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
+import { ImagePlaceholder } from "@/components/ui/image-placeholder";
 import { Separator } from "@/components/ui/separator";
 import type { SubscriptionContract } from "@/lib/shopify/customer";
 import { SubscriptionActions } from "@/components/account/subscription-actions";
@@ -220,8 +221,8 @@ function SubscriptionCard({
                 className="object-cover"
               />
             ) : (
-              <div className="w-14 h-14 bg-muted flex items-center justify-center text-xs text-muted-foreground">
-                —
+              <div className="w-14 h-14 rounded-md overflow-hidden">
+                <ImagePlaceholder />
               </div>
             )}
             <div className="flex-1 min-w-0">

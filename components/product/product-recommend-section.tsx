@@ -14,6 +14,7 @@
 import Image from "next/image";
 import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
+import { ImagePlaceholder } from "@/components/ui/image-placeholder";
 import { getProducts } from "@/lib/shopify";
 import { formatPrice } from "@/lib/utils";
 import {
@@ -154,7 +155,7 @@ export async function ProductRecommendSection() {
                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                   />
                 ) : (
-                  <div className="w-full h-full bg-muted" />
+                  <ImagePlaceholder />
                 )}
               </div>
               <p className="text-sm font-medium leading-snug group-hover:underline line-clamp-2">

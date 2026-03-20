@@ -1,6 +1,7 @@
 import Image from "next/image";
 import { Link } from "@/i18n/navigation";
 import { urlFor } from "@/sanity/lib/image";
+import { ImagePlaceholder } from "@/components/ui/image-placeholder";
 
 type ArticleCardProps = {
   article: {
@@ -40,9 +41,7 @@ export function ArticleCard({ article, locale, memberOnlyLabel }: ArticleCardPro
               className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center text-muted-foreground text-sm">
-              {article.title}
-            </div>
+            <ImagePlaceholder />
           )}
         </div>
       </Link>

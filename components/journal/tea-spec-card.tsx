@@ -2,6 +2,7 @@ import Image from "next/image";
 import { useTranslations } from "next-intl";
 import { urlFor } from "@/sanity/lib/image";
 import { Link } from "@/i18n/navigation";
+import { ImagePlaceholder } from "@/components/ui/image-placeholder";
 
 interface TeaSpecCardProps {
   tea: {
@@ -35,9 +36,7 @@ export function TeaSpecCard({ tea }: TeaSpecCardProps) {
             className="w-full h-full object-cover"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-muted-foreground text-sm">
-            {tea.displayName}
-          </div>
+          <ImagePlaceholder />
         )}
       </div>
 

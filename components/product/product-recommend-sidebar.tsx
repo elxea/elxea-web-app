@@ -12,6 +12,7 @@
 
 import Image from "next/image";
 import { Link } from "@/i18n/navigation";
+import { ImagePlaceholder } from "@/components/ui/image-placeholder";
 import { getProducts } from "@/lib/shopify";
 import { formatPrice } from "@/lib/utils";
 import { getRecommendedProducts } from "@/lib/recommendations/product-engine";
@@ -102,7 +103,7 @@ export async function ProductRecommendSidebar({
                       className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                     />
                   ) : (
-                    <div className="w-full h-full bg-muted" />
+                    <ImagePlaceholder />
                   )}
                 </div>
 

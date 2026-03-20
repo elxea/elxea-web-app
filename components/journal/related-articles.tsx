@@ -1,6 +1,7 @@
 import Image from "next/image";
 import { Link } from "@/i18n/navigation";
 import { urlFor } from "@/sanity/lib/image";
+import { ImagePlaceholder } from "@/components/ui/image-placeholder";
 
 type RelatedArticle = {
   _id: string;
@@ -46,9 +47,7 @@ export function RelatedArticles({ articles, heading, locale }: RelatedArticlesPr
                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                   />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">
-                    {article.title}
-                  </div>
+                  <ImagePlaceholder />
                 )}
               </div>
               <div className="space-y-1">
