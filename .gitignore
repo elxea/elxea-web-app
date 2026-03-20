@@ -34,7 +34,8 @@ yarn-error.log*
 
 # env files
 .env
-.env*.local
+.env*
+!.env.example
 
 # vercel
 .vercel
@@ -62,10 +63,7 @@ shopify-app-settings.md
 # backups
 backup-before-cleanup/
 
-# vercel env pull
-.env.vercel
-.env.staging
-.env.preview
+# vercel env pull (covered by .env* above)
 
 # storybook
 storybook-static/
