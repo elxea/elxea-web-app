@@ -12,8 +12,8 @@ export function LenisProvider({ children }: { children: React.ReactNode }) {
     if (prefersReducedMotion) return;
 
     const lenis = new Lenis({
-      lerp: 0.1,
-      wheelMultiplier: 0.8,
+      lerp: 0.13,
+      wheelMultiplier: 0.9,
       gestureOrientation: "vertical",
       touchMultiplier: 0,
     });
