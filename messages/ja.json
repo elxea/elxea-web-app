@@ -112,9 +112,18 @@
     "description": "季節のお茶と暮らしを届けるニュースレター",
     "empty": "ジャーナルはまだ登録されていません。",
     "loadError": "ジャーナルを読み込めませんでした。",
+    "teaSection": "お届けのお茶について",
+    "teaDetailLink": "詳しくみる",
     "relatedTea": "関連するお茶",
     "relatedPlaylist": "プレイリスト",
-    "relatedPost": "関連記事"
+    "relatedPost": "コラム",
+    "no": "No.",
+    "category": "Category",
+    "name": "Name",
+    "variety": "Variety",
+    "season": "Season",
+    "origin": "Origin",
+    "netWeight": "Net Wt."
   },
   "people": {
     "loadError": "プロフィールを読み込めませんでした。",

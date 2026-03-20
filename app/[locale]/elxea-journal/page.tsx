@@ -6,6 +6,12 @@ import { getClient } from "@/sanity/lib/client";
 import { JOURNALS_QUERY } from "@/sanity/lib/queries";
 import { urlFor } from "@/sanity/lib/image";
 
+const themeLabels: Record<string, string> = {
+  akane: "茜(あかね)",
+  sui: "翠(すい)",
+  sohi: "そひ",
+};
+
 const themeColors: Record<string, string> = {
   akane: "var(--color-brand-tea-red)",
   sui: "var(--color-brand-tea-green)",
@@ -75,7 +81,7 @@ async function JournalGrid() {
                     className="absolute top-3 left-3 text-[10px] font-medium text-white px-2 py-0.5 rounded-sm uppercase tracking-wider"
                     style={{ backgroundColor: themeColors[j.theme] || "var(--color-brand-ash)" }}
                   >
-                    {j.theme}
+                    {themeLabels[j.theme] || j.theme}
                   </span>
                 </div>
                 <div className="space-y-1.5">

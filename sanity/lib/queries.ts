@@ -259,7 +259,10 @@ export const JOURNAL_BY_SLUG_QUERY = groq`
     thumbnail,
     relatedPost->{title, slug},
     playlist->{title, slug, albumImage, spotifyUrl},
-    teaMenus[]->{_id, title, slug, displayName, photo},
+    teaMenus[]->{
+      _id, title, slug, displayName, productNumber,
+      category, variety, season, origin, netWeight, photo
+    },
     featured,
     seo,
     language

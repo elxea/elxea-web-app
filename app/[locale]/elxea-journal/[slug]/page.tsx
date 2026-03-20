@@ -6,7 +6,20 @@ import { getClient } from "@/sanity/lib/client";
 import { JOURNAL_BY_SLUG_QUERY } from "@/sanity/lib/queries";
 import { urlFor } from "@/sanity/lib/image";
 import { PortableText } from "@/components/sanity/portable-text";
+import { TeaSpecCard } from "@/components/journal/tea-spec-card";
 import { Link } from "@/i18n/navigation";
+
+const themeLabels: Record<string, string> = {
+  akane: "茜(あかね)",
+  sui: "翠(すい)",
+  sohi: "そひ",
+};
+
+const themeColors: Record<string, string> = {
+  akane: "var(--color-brand-tea-red)",
+  sui: "var(--color-brand-tea-green)",
+  sohi: "var(--color-brand-tea-warm)",
+};
 
 export async function generateMetadata({
   params,
@@ -56,109 +69,109 @@ export default async function ElxeaJournalDetailPage({
 
   if (!journal) notFound();
 
-  return (
-    <article className="max-w-3xl mx-auto px-6 py-16">
-      {/* Header */}
-      <header className="mb-12">
-        <span className="text-xs text-muted-foreground uppercase tracking-wider">
-          {journal.theme}
-        </span>
-        <h1 className="mt-2 mb-4">{journal.title}</h1>
-        {journal.summary && (
-          <p className="text-muted-foreground text-sm leading-relaxed">{journal.summary}</p>
-        )}
-      </header>
+  const themeLabel = themeLabels[journal.theme] || journal.theme;
+  const themeColor = themeColors[journal.theme] || "var(--color-brand-ash)";
 
-      {/* Main image */}
+  return (
+    <article>
+      {/* ① Hero image — full width */}
       {journal.mainImage?.asset && (
-        <div className="mb-12">
+        <div className="w-full aspect-[2/1] sm:aspect-[5/2] bg-muted overflow-hidden">
           <Image
-            src={urlFor(journal.mainImage).width(1200).url()}
+            src={urlFor(journal.mainImage).width(1600).height(640).url()}
             alt={journal.mainImage.alt || journal.title}
-            width={1200}
-            height={675}
-            sizes="(max-width: 768px) 100vw, 768px"
-            className="w-full"
+            width={1600}
+            height={640}
+            sizes="100vw"
+            className="w-full h-full object-cover"
             priority
           />
         </div>
       )}
 
-      {/* Body */}
+      {/* ② Theme badge + Title + Summary */}
+      <header className="max-w-4xl mx-auto px-6 pt-10 pb-8">
+        <span
+          className="inline-block text-[10px] font-medium text-white px-2.5 py-1 uppercase tracking-wider mb-4"
+          style={{ backgroundColor: themeColor }}
+        >
+          {themeLabel}
+        </span>
+        <h1 className="mb-4">{journal.title}</h1>
+        {journal.summary && (
+          <p className="text-muted-foreground text-sm leading-relaxed max-w-2xl">
+            {journal.summary}
+          </p>
+        )}
+      </header>
+
+      {/* ③ Body (Portable Text) */}
       {journal.body && (
-        <div className="prose-custom">
-          <PortableText value={journal.body} />
+        <div className="max-w-3xl mx-auto px-6 pb-12">
+          <div className="prose-custom">
+            <PortableText value={journal.body} />
+          </div>
         </div>
       )}
 
-      {/* Related tea menus */}
+      {/* ④ お届けのお茶について */}
       {journal.teaMenus && journal.teaMenus.length > 0 && (
-        <section className="border-t border-border pt-8 mt-12">
-          <h2 className="text-sm font-medium mb-4">{t("relatedTea")}</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+        <section className="max-w-5xl mx-auto px-6 py-12">
+          <h2 className="text-base font-medium mb-8">{t("teaSection")}</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {journal.teaMenus.map(
               (tea: {
                 _id: string;
                 slug: { current: string };
                 displayName: string;
+                productNumber: string;
+                category: string;
+                variety: string;
+                season: string;
+                origin: string;
+                netWeight: number;
                 photo?: { asset: object; alt?: string };
               }) => (
-                <Link
-                  key={tea._id}
-                  href={`/tea-menu/${tea.slug.current}`}
-                  className="group block"
-                >
-                  {tea.photo?.asset && (
-                    <div className="aspect-[3/2] bg-muted mb-2 overflow-hidden">
-                      <Image
-                        src={urlFor(tea.photo).width(200).height(133).url()}
-                        alt={tea.photo.alt || tea.displayName}
-                        width={200}
-                        height={133}
-                        sizes="(max-width: 640px) 50vw, 33vw"
-                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                      />
-                    </div>
-                  )}
-                  <p className="text-xs font-medium group-hover:underline">{tea.displayName}</p>
-                </Link>
+                <TeaSpecCard key={tea._id} tea={tea} />
               )
             )}
           </div>
         </section>
       )}
 
-      {/* Playlist link */}
+      {/* ⑤ Playlist */}
       {journal.playlist && (
-        <section className="border-t border-border pt-8 mt-8">
-          <h2 className="text-sm font-medium mb-4">{t("relatedPlaylist")}</h2>
+        <section className="max-w-4xl mx-auto px-6 py-8 border-t border-border">
+          <h2 className="text-base font-medium mb-6">{t("relatedPlaylist")}</h2>
           <Link
             href={`/playlists/${journal.playlist.slug.current}`}
-            className="flex items-center gap-4 group"
+            className="flex items-center gap-5 group"
           >
             {journal.playlist.albumImage?.asset && (
               <Image
-                src={urlFor(journal.playlist.albumImage).width(80).height(80).url()}
+                src={urlFor(journal.playlist.albumImage).width(120).height(120).url()}
                 alt={journal.playlist.title}
-                width={80}
-                height={80}
-                className="size-16 object-cover rounded"
+                width={120}
+                height={120}
+                className="size-20 object-cover"
               />
             )}
             <div>
-              <p className="text-sm font-medium group-hover:underline">{journal.playlist.title}</p>
+              <p className="text-sm font-medium group-hover:underline">
+                {journal.playlist.title}
+              </p>
               {journal.playlist.spotifyUrl && (
-                <p className="text-xs text-muted-foreground mt-0.5">Spotify</p>
+                <p className="text-xs text-muted-foreground mt-1">Spotify</p>
               )}
             </div>
           </Link>
         </section>
       )}
 
-      {/* Related article */}
+      {/* ⑥ Related article (コラム) */}
       {journal.relatedPost && (
-        <section className="border-t border-border pt-8 mt-8">
-          <h2 className="text-sm font-medium mb-4">{t("relatedPost")}</h2>
+        <section className="max-w-4xl mx-auto px-6 py-8 border-t border-border">
+          <h2 className="text-base font-medium mb-4">{t("relatedPost")}</h2>
           <Link
             href={`/journal/${journal.relatedPost.slug.current}`}
             className="text-sm underline underline-offset-2 hover:text-muted-foreground transition-colors"
@@ -167,6 +180,9 @@ export default async function ElxeaJournalDetailPage({
           </Link>
         </section>
       )}
+
+      {/* Bottom spacing */}
+      <div className="pb-16" />
     </article>
   );
 }

@@ -112,9 +112,18 @@
     "description": "A newsletter about seasonal tea and everyday life",
     "empty": "No journals yet.",
     "loadError": "Could not load journals.",
+    "teaSection": "About the Tea in This Issue",
+    "teaDetailLink": "Learn more",
     "relatedTea": "Related Tea",
     "relatedPlaylist": "Playlist",
-    "relatedPost": "Related Article"
+    "relatedPost": "Column",
+    "no": "No.",
+    "category": "Category",
+    "name": "Name",
+    "variety": "Variety",
+    "season": "Season",
+    "origin": "Origin",
+    "netWeight": "Net Wt."
   },
   "people": {
     "loadError": "Could not load profile.",
