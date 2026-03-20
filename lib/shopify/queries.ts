@@ -50,6 +50,32 @@ export const GET_PRODUCT_BY_HANDLE_QUERY = /* GraphQL */ `
           }
         }
       }
+      metafields(identifiers: [
+        { namespace: "custom", key: "feature_01_title" }
+        { namespace: "custom", key: "feature_01_text_body" }
+        { namespace: "custom", key: "feature_01_image_url" }
+        { namespace: "custom", key: "feature_02_title" }
+        { namespace: "custom", key: "feature_02_text_body" }
+        { namespace: "custom", key: "feature_02_image_url" }
+        { namespace: "custom", key: "feature_03_title" }
+        { namespace: "custom", key: "feature_03_text_body" }
+        { namespace: "custom", key: "feature_03_image_url" }
+        { namespace: "custom", key: "feature_04_title" }
+        { namespace: "custom", key: "feature_04_text_body" }
+        { namespace: "custom", key: "feature_04_image_url" }
+        { namespace: "my_fields", key: "_how-to-enjoy" }
+        { namespace: "custom", key: "menu_number" }
+        { namespace: "custom", key: "_type-of-tea" }
+        { namespace: "custom", key: "variety" }
+        { namespace: "custom", key: "season" }
+        { namespace: "custom", key: "taste" }
+        { namespace: "custom", key: "aroma" }
+      ]) {
+        namespace
+        key
+        value
+        type
+      }
     }
   }
   ${IMAGE_FRAGMENT}

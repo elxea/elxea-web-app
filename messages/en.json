@@ -64,7 +64,15 @@
     "oneTimePurchase": "One-time purchase",
     "subscription": "Subscribe",
     "deliveryFrequency": "Delivery frequency",
-    "subscriptionPrice": "{price} (Regular price {compareAtPrice})"
+    "subscriptionPrice": "{price} (Regular price {compareAtPrice})",
+    "teaDetails": "Tea Details",
+    "teaCategory": "Category",
+    "teaVariety": "Variety",
+    "teaSeason": "Season",
+    "teaTaste": "Taste",
+    "teaAroma": "Aroma",
+    "menuNumber": "Menu Number",
+    "howToEnjoy": "How to Enjoy"
   },
   "collection": {
     "empty": "No collections available",

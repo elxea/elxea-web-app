@@ -16,6 +16,8 @@ import {
 import type {
   Product,
   ProductVariant,
+  ProductFeature,
+  ProductMetafields,
   Collection,
   Cart,
   CartItem,
@@ -31,6 +33,40 @@ function flattenConnection<T>(connection: ShopifyConnection<T>): T[] {
   return connection.edges.map((edge) => edge.node);
 }
 
+// Parse metafields array into structured ProductMetafields
+type RawMetafield = { namespace: string; key: string; value: string; type: string } | null;
+
+function parseProductMetafields(raw: RawMetafield[]): ProductMetafields {
+  const map = new Map<string, string>();
+  for (const mf of raw) {
+    if (mf) map.set(`${mf.namespace}.${mf.key}`, mf.value);
+  }
+
+  const features: ProductFeature[] = [];
+  for (let i = 1; i <= 4; i++) {
+    const title = map.get(`custom.feature_0${i}_title`);
+    const body = map.get(`custom.feature_0${i}_text_body`);
+    if (title || body) {
+      features.push({
+        title: title || "",
+        body: body || "",
+        imageUrl: map.get(`custom.feature_0${i}_image_url`) || null,
+      });
+    }
+  }
+
+  return {
+    features,
+    howToEnjoy: map.get("my_fields._how-to-enjoy") || null,
+    menuNumber: map.get("custom.menu_number") || null,
+    teaCategory: map.get("custom._type-of-tea") || null,
+    variety: map.get("custom.variety") || null,
+    season: map.get("custom.season") || null,
+    taste: map.get("custom.taste") || null,
+    aroma: map.get("custom.aroma") || null,
+  };
+}
+
 // Reshape product from GraphQL response
 function reshapeProduct(raw: Record<string, unknown>): Product {
   const product = raw as Product & {
@@ -41,6 +77,7 @@ function reshapeProduct(raw: Record<string, unknown>): Product {
     sellingPlanGroups: ShopifyConnection<Omit<SellingPlanGroup, "sellingPlans"> & {
       sellingPlans: ShopifyConnection<SellingPlan>;
     }>;
+    metafields?: RawMetafield[];
   };
 
   return {
@@ -68,6 +105,7 @@ function reshapeProduct(raw: Record<string, unknown>): Product {
           sellingPlans: flattenConnection(g.sellingPlans as unknown as ShopifyConnection<SellingPlan>),
         }))
       : [],
+    metafields: parseProductMetafields(product.metafields || []),
   };
 }
 

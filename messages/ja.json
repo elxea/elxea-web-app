@@ -64,7 +64,15 @@
     "oneTimePurchase": "通常購入",
     "subscription": "定期購入",
     "deliveryFrequency": "お届け頻度",
-    "subscriptionPrice": "{price}（通常価格 {compareAtPrice}）"
+    "subscriptionPrice": "{price}（通常価格 {compareAtPrice}）",
+    "teaDetails": "お茶の詳細",
+    "teaCategory": "カテゴリー",
+    "teaVariety": "品種",
+    "teaSeason": "収穫時期",
+    "teaTaste": "味わい",
+    "teaAroma": "香り",
+    "menuNumber": "メニュー番号",
+    "howToEnjoy": "美味しい楽しみ方"
   },
   "collection": {
     "empty": "コレクションがありません",

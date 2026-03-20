@@ -8,6 +8,7 @@ import { ImageGallery } from "@/components/product/image-gallery";
 import { VariantSelector } from "@/components/product/variant-selector";
 import { AddToCartButton } from "@/components/product/add-to-cart-button";
 import { ProductPurchaseOptions } from "@/components/product/product-purchase-options";
+import { ProductFeatures } from "@/components/product/product-features";
 
 export async function generateMetadata({
   params,
@@ -63,6 +64,16 @@ export default async function ProductPage({
         (opt) => currentSearchParams[opt.name] === opt.value
       )
     ) || product.variants[0];
+
+  const { metafields } = product;
+  const hasFeatures = metafields.features.length > 0;
+  const hasTeaDetails =
+    metafields.teaCategory ||
+    metafields.variety ||
+    metafields.season ||
+    metafields.taste ||
+    metafields.aroma;
+  const hasEnrichment = hasFeatures || hasTeaDetails || metafields.howToEnjoy;
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-16">
@@ -126,6 +137,11 @@ export default async function ProductPage({
           )}
         </div>
       </div>
+
+      {/* Featured content from Operations Hub */}
+      {hasEnrichment && (
+        <ProductFeatures metafields={metafields} />
+      )}
     </div>
   );
 }

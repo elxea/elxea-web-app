@@ -59,6 +59,23 @@ export type ProductVariant = {
   sellingPlanAllocations: SellingPlanAllocation[];
 };
 
+export type ProductFeature = {
+  title: string;
+  body: string;
+  imageUrl: string | null;
+};
+
+export type ProductMetafields = {
+  features: ProductFeature[];
+  howToEnjoy: string | null;
+  menuNumber: string | null;
+  teaCategory: string | null;
+  variety: string | null;
+  season: string | null;
+  taste: string | null;
+  aroma: string | null;
+};
+
 export type Product = {
   id: string;
   handle: string;
@@ -81,6 +98,7 @@ export type Product = {
   createdAt: string;
   updatedAt: string;
   sellingPlanGroups: SellingPlanGroup[];
+  metafields: ProductMetafields;
 };
 
 export type Collection = {
