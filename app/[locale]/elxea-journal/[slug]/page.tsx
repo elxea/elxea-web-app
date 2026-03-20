@@ -76,7 +76,7 @@ export default async function ElxeaJournalDetailPage({
     <article>
       {/* ① Hero image — full width */}
       {journal.mainImage?.asset && (
-        <div className="w-full aspect-[2/1] sm:aspect-[5/2] bg-muted overflow-hidden">
+        <div className="w-full aspect-[2/1] sm:aspect-[5/2] bg-muted overflow-hidden rounded-md">
           <Image
             src={urlFor(journal.mainImage).width(1600).height(640).url()}
             alt={journal.mainImage.alt || journal.title}

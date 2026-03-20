@@ -46,7 +46,7 @@ export default async function AboutPage() {
           </section>
 
           {/* Image break */}
-          <div className="relative aspect-[16/7] w-full overflow-hidden">
+          <div className="relative aspect-[16/7] w-full overflow-hidden rounded-md">
             <Image
               src="/hero-day.jpg"
               alt="elxea tea"

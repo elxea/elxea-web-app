@@ -66,7 +66,7 @@ const components: PortableTextComponents = {
             width={1200}
             height={800}
             sizes="(max-width: 768px) 100vw, 768px"
-            className="w-full"
+            className="w-full rounded-md"
           />
           {value.caption && (
             <figcaption className="text-xs text-muted-foreground mt-2">

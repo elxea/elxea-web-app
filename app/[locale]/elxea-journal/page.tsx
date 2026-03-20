@@ -61,7 +61,7 @@ async function JournalGrid() {
                 href={`/elxea-journal/${j.slug.current}`}
                 className="group block"
               >
-                <div className="aspect-[3/2] bg-muted mb-4 overflow-hidden relative">
+                <div className="aspect-[3/2] bg-muted mb-4 overflow-hidden rounded-md relative">
                   {image?.asset ? (
                     <Image
                       src={urlFor(image).width(600).height(400).url()}

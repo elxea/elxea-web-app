@@ -66,7 +66,7 @@ export default async function PlaylistDetailPage({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16">
         {/* Album image */}
         <div
-          className="aspect-[3/2] bg-muted overflow-hidden"
+          className="aspect-[3/2] bg-muted overflow-hidden rounded-md"
           style={gradientStyle}
         >
           {pl.albumImage?.asset ? (

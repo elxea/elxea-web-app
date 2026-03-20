@@ -32,7 +32,7 @@ async function CollectionsContent() {
             href={`/collections/${collection.handle}`}
             className="group block"
           >
-            <div className="aspect-[3/2] bg-muted mb-4 overflow-hidden">
+            <div className="aspect-[3/2] bg-muted mb-4 overflow-hidden rounded-md">
               {collection.image ? (
                 <Image
                   src={collection.image.url}

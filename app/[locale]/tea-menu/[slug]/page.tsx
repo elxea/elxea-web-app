@@ -62,7 +62,7 @@ export default async function TeaMenuDetailPage({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16">
         {/* Photo */}
         <div
-          className="aspect-[3/2] bg-muted overflow-hidden"
+          className="aspect-[3/2] bg-muted overflow-hidden rounded-md"
           style={tea.color ? { backgroundColor: tea.color } : undefined}
         >
           {tea.photo?.asset ? (

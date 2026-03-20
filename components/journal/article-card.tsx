@@ -29,7 +29,7 @@ export function ArticleCard({ article, locale, memberOnlyLabel }: ArticleCardPro
         href={`/journal/${article.slug.current}`}
         className="block"
       >
-        <div className="aspect-[3/2] bg-muted mb-4 overflow-hidden">
+        <div className="aspect-[3/2] bg-muted mb-4 overflow-hidden rounded-md">
           {image?.asset ? (
             <Image
               src={urlFor(image).width(600).height(400).url()}

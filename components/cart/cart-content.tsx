@@ -33,7 +33,7 @@ export function CartContent() {
           <div key={item.id} className="py-6 flex gap-6">
             {/* Image */}
             {item.merchandise.product.featuredImage && (
-              <div className="w-20 h-20 bg-muted flex-shrink-0">
+              <div className="w-20 h-20 bg-muted flex-shrink-0 rounded-md overflow-hidden">
                 <Image
                   src={item.merchandise.product.featuredImage.url}
                   alt={

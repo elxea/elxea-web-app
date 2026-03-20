@@ -92,7 +92,7 @@ export async function ProductRecommendSidebar({
                 className="group flex gap-3 items-start"
               >
                 {/* Thumbnail */}
-                <div className="w-16 h-16 shrink-0 bg-muted overflow-hidden rounded-sm">
+                <div className="w-16 h-16 shrink-0 bg-muted overflow-hidden rounded-md">
                   {product.featuredImage ? (
                     <Image
                       src={product.featuredImage.url}

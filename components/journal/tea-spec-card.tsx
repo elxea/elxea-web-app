@@ -22,7 +22,7 @@ export function TeaSpecCard({ tea }: TeaSpecCardProps) {
   const t = useTranslations("elxeaJournal");
 
   return (
-    <div className="border border-border bg-background">
+    <div className="border border-border bg-background rounded-md overflow-hidden">
       {/* Photo */}
       <div className="aspect-square bg-muted overflow-hidden">
         {tea.photo?.asset ? (

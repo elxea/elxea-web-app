@@ -35,7 +35,7 @@ export function RelatedArticles({ articles, heading, locale }: RelatedArticlesPr
               href={`/journal/${article.slug.current}`}
               className="group block"
             >
-              <div className="aspect-[3/2] bg-muted mb-3 overflow-hidden">
+              <div className="aspect-[3/2] bg-muted mb-3 overflow-hidden rounded-md">
                 {image?.asset ? (
                   <Image
                     src={urlFor(image).width(400).height(267).url()}

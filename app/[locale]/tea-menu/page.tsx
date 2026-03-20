@@ -49,7 +49,7 @@ async function TeaMenuList() {
               className="group block"
             >
               <div
-                className="aspect-[3/2] bg-muted mb-4 overflow-hidden"
+                className="aspect-[3/2] bg-muted mb-4 overflow-hidden rounded-md"
                 style={item.color ? { backgroundColor: item.color } : undefined}
               >
                 {item.photo?.asset ? (

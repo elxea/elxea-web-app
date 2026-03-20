@@ -48,7 +48,7 @@ async function PlaylistGrid() {
               className="group block"
             >
               <div
-                className="aspect-[3/2] bg-muted mb-4 overflow-hidden"
+                className="aspect-[3/2] bg-muted mb-4 overflow-hidden rounded-md"
                 style={pl.colors?.color1 ? { backgroundColor: pl.colors.color1 } : undefined}
               >
                 {pl.albumImage?.asset ? (

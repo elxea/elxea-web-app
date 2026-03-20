@@ -52,7 +52,7 @@ async function EventsList() {
               "group grid grid-cols-1 md:grid-cols-[1fr_2fr] gap-6";
             const inner = (
               <>
-                <div className="aspect-[3/2] bg-muted overflow-hidden">
+                <div className="aspect-[3/2] bg-muted overflow-hidden rounded-md">
                   {event.image?.asset ? (
                     <Image
                       src={urlFor(event.image).width(600).height(400).url()}

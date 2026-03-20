@@ -143,7 +143,7 @@ export async function ProductRecommendSection() {
               href={`/products/${product.handle}`}
               className="group block"
             >
-              <div className="aspect-[3/2] bg-muted mb-4 overflow-hidden rounded-sm">
+              <div className="aspect-[3/2] bg-muted mb-4 overflow-hidden rounded-md">
                 {product.featuredImage ? (
                   <Image
                     src={product.featuredImage.url}

@@ -49,7 +49,7 @@ async function FarmersList() {
               href={`/farmers/${farmer.slug.current}`}
               className="group block"
             >
-              <div className="aspect-[3/2] bg-muted mb-4 overflow-hidden">
+              <div className="aspect-[3/2] bg-muted mb-4 overflow-hidden rounded-md">
                 {farmer.photo?.asset ? (
                   <Image
                     src={urlFor(farmer.photo).width(600).height(400).url()}

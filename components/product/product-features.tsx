@@ -28,7 +28,7 @@ export async function ProductFeatures({ metafields }: ProductFeaturesProps) {
           }`}
         >
           {feature.imageUrl && (
-            <div className={`aspect-[4/3] relative overflow-hidden bg-muted ${index % 2 === 1 ? "lg:[direction:ltr]" : ""}`}>
+            <div className={`aspect-[4/3] relative overflow-hidden bg-muted rounded-md ${index % 2 === 1 ? "lg:[direction:ltr]" : ""}`}>
               <Image
                 src={feature.imageUrl}
                 alt={feature.title}

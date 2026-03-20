@@ -64,7 +64,7 @@ export default async function FarmerPage({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16">
         {/* Photo */}
         {farmer.photo?.asset ? (
-          <div className="aspect-[3/2] bg-muted overflow-hidden">
+          <div className="aspect-[3/2] bg-muted overflow-hidden rounded-md">
             <Image
               src={urlFor(farmer.photo).width(800).height(533).url()}
               alt={farmer.photo.alt || farmer.name}
