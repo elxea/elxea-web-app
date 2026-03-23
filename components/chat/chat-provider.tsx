@@ -15,8 +15,8 @@ import {
   type ChatStatus,
   type ChatTransport,
   type UIMessageChunk,
-  DefaultChatTransport,
 } from "ai";
+import { ElxeaChatTransport } from "./elxea-chat-transport";
 import { usePathname } from "next/navigation";
 
 // ---------------------------------------------------------------------------
@@ -53,8 +53,11 @@ const SESSION_KEY = "elxea-chat-session-id";
 function getOrCreateSessionId(): string {
   if (typeof window === "undefined") return "";
   const existing = localStorage.getItem(SESSION_KEY);
-  if (existing) return existing;
-  const id = `sess_${crypto.randomUUID()}`;
+  // UUID v4 形式のみ有効（旧 sess_ プレフィックス付きは再生成）
+  if (existing && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(existing)) {
+    return existing;
+  }
+  const id = crypto.randomUUID();
   localStorage.setItem(SESSION_KEY, id);
   return id;
 }
@@ -133,9 +136,9 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
   const transport = useMemo(() => {
     if (IS_MOCK) return new MockChatTransport();
-    return new DefaultChatTransport({
+    return new ElxeaChatTransport({
       api: CHAT_API_URL,
-      body: { session_id: sessionId },
+      sessionId,
     });
   }, [sessionId]);
 
