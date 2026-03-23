@@ -134,7 +134,7 @@ export function ChatBar() {
     <div
       ref={panelRef}
       data-slot="chat-bar"
-      className="sticky bottom-0 z-40 w-full"
+      className="fixed bottom-0 left-0 right-0 z-40"
     >
       {/* ---- Expanded chat panel ---- */}
       {isOpen && messages.length > 0 && (
@@ -186,14 +186,7 @@ export function ChatBar() {
       {/* ---- Input bar (always visible) ---- */}
       <div
         data-slot="chat-input-bar"
-        className={cn(
-          "mx-auto w-full max-w-2xl",
-          "px-4 py-3",
-          "bg-background/80 backdrop-blur-xl",
-          isOpen && messages.length > 0
-            ? "border-x border-b border-border/40 rounded-b-2xl"
-            : "border border-border/40 rounded-2xl shadow-lg",
-        )}
+        className="mx-auto w-full max-w-2xl px-4 py-3"
       >
         <form
           onSubmit={onSubmit}
@@ -212,19 +205,19 @@ export function ChatBar() {
             placeholder={placeholder}
             aria-label="Chat message input"
             className={cn(
-              "flex-1 h-10 rounded-full border border-border/60 bg-muted/40 px-4 text-sm",
-              "placeholder:text-muted-foreground/70",
+              "flex-1 h-10 rounded-full border border-border/30 bg-background px-4 text-sm shadow-sm",
+              "placeholder:text-muted-foreground/50",
               "outline-none transition-colors",
-              "focus-visible:border-primary/40 focus-visible:ring-2 focus-visible:ring-primary/20",
+              "focus-visible:border-primary/40 focus-visible:ring-1 focus-visible:ring-primary/20",
             )}
           />
           <Button
             type="submit"
             size="icon"
-            variant="default"
+            variant="ghost"
             disabled={!input.trim() || isStreaming}
             aria-label="Send message"
-            className="shrink-0 rounded-full"
+            className="shrink-0 rounded-full text-muted-foreground hover:text-foreground"
           >
             <SendHorizontal className="size-4" />
           </Button>

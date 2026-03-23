@@ -104,8 +104,8 @@ export default async function LocaleLayout({
               <LenisProvider>
                 <Header navItems={headerNavItems} />
                 <main className="flex-1">{children}</main>
-                <ChatBar />
                 <Footer groups={footerGroups} />
+                <ChatBar />
                 <CookieConsent />
                 <Toaster />
                 <ScrollToTop />
