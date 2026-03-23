@@ -425,11 +425,18 @@ function MobileChatDrawer() {
       {/* Fullscreen drawer — repositionInputs={false} prevents vaul from
           fighting with iOS keyboard repositioning which causes the drawer
           to jump up/down erratically (vaul#216, vaul#619). We handle
-          keyboard offset ourselves via the visualViewport API above. */}
+          keyboard offset ourselves via the visualViewport API above.
+
+          handleOnly — restricts drag-to-dismiss to the handle bar only.
+          Without this, iOS keyboard open/close causes viewport resize
+          events that vaul misinterprets as a downward swipe gesture,
+          dismissing the drawer when the user taps the input (vaul#619).
+          The explicit close button remains functional via DrawerClose. */}
       <Drawer
         open={isOpen}
         onOpenChange={setIsOpen}
         repositionInputs={false}
+        handleOnly={true}
       >
         <DrawerContent
           className={cn(
