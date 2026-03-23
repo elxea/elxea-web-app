@@ -391,7 +391,10 @@ function MobileChatDrawer() {
         <div
           data-slot="chat-panel-mobile"
           className={cn(
-            "fixed inset-0 z-50 bg-background flex flex-col",
+            // Use -bottom-96 to extend the background well below the viewport.
+            // When iOS keyboard pushes the viewport up, the extended background
+            // prevents the underlying page from showing through.
+            "fixed inset-x-0 top-0 -bottom-96 z-50 bg-background flex flex-col",
             "animate-in slide-in-from-bottom duration-300",
           )}
         >
