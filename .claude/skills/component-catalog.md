@@ -21,7 +21,7 @@ app/ 配下で import されている:
 | Sonner (Toaster) | `@/components/ui/sonner` | layout（通知） |
 
 ### 未使用（49個）
-accordion, alert, alert-dialog, aspect-ratio, avatar, breadcrumb, button-group, calendar, carousel, chart, checkbox, collapsible, combobox, command, context-menu, cookie-consent, direction, drawer, dropdown-menu, empty, field, form, hover-card, input-group, input-otp, item, kbd, member-gate, menubar, native-select, navigation-menu, pagination, popover, progress, radio-group, resizable, scroll-area, scroll-to-top, select, sidebar, slider, spinner, switch, table, tabs, textarea, toggle, toggle-group, tooltip
+accordion, alert, alert-dialog, aspect-ratio, avatar, breadcrumb, button-group, calendar, carousel, chart, checkbox, collapsible, combobox, command, context-menu, cookie-consent, direction, drawer, dropdown-menu, empty, field, form, hover-card, input-group, input-otp, item, kbd, member-gate, menubar, native-select, navigation-menu, pagination, popover, progress, radio-group, resizable, scroll-area, select, sidebar, slider, spinner, switch, table, tabs, textarea, toggle, toggle-group, tooltip
 
 ## Storybook 構成
 

@@ -8,7 +8,6 @@ import { Footer } from "@/components/layout/footer";
 import { CartProviderWrapper } from "@/components/cart/cart-provider-wrapper";
 import { CookieConsent } from "@/components/ui/cookie-consent";
 import { Toaster } from "@/components/ui/sonner";
-import { ScrollToTop } from "@/components/ui/scroll-to-top";
 import { LenisProvider } from "@/components/providers/lenis-provider";
 import { ChatProvider } from "@/components/chat/chat-provider";
 import { ChatBar } from "@/components/chat/chat-bar";
@@ -108,7 +107,6 @@ export default async function LocaleLayout({
                 <ChatBar />
                 <CookieConsent />
                 <Toaster />
-                <ScrollToTop />
               </LenisProvider>
             </ChatProvider>
           </CartProviderWrapper>
