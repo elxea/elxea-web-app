@@ -95,8 +95,11 @@ function ChatInputForm({
         onFocus={onFocus}
         placeholder={placeholder}
         aria-label="Chat message input"
+        autoComplete="off"
         className={cn(
-          "flex-1 h-10 rounded-full border border-border/30 bg-background px-4 text-sm shadow-sm",
+          // text-base (16px) on mobile prevents iOS Safari auto-zoom on focus;
+          // md:text-sm restores 14px on desktop where zoom is not an issue.
+          "flex-1 h-10 rounded-full border border-border/30 bg-background px-4 text-base md:text-sm shadow-sm",
           "placeholder:text-muted-foreground/50",
           "outline-none transition-colors",
           "focus-visible:border-primary/40 focus-visible:ring-1 focus-visible:ring-primary/20",
@@ -327,6 +330,7 @@ function MobileChatDrawer() {
     useChatContext();
 
   const [input, setInput] = useState("");
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -345,8 +349,46 @@ function MobileChatDrawer() {
         inputRef.current?.focus();
       }, 300);
       return () => clearTimeout(timer);
+    } else {
+      // Reset keyboard height when drawer closes
+      setKeyboardHeight(0);
     }
   }, [isOpen]);
+
+  // ---------------------------------------------------------------------------
+  // iOS keyboard handling via visualViewport API
+  // When the on-screen keyboard opens on iOS Safari, the visual viewport
+  // shrinks but the layout viewport stays the same. Fixed-position elements
+  // (like our input bar inside the drawer) get hidden behind the keyboard.
+  // We track the keyboard height and apply it as bottom padding so the input
+  // bar stays visible above the keyboard.
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const vv = window.visualViewport;
+    if (!vv) return;
+
+    function handleResize() {
+      if (!vv) return;
+      // The difference between the window inner height and the visual viewport
+      // height gives us the keyboard height (approximately).
+      const kbHeight = window.innerHeight - vv.height;
+      // Only apply if keyboard is actually showing (> 100px threshold to avoid
+      // false positives from URL bar changes).
+      setKeyboardHeight(kbHeight > 100 ? kbHeight : 0);
+    }
+
+    vv.addEventListener("resize", handleResize);
+    return () => vv.removeEventListener("resize", handleResize);
+  }, [isOpen]);
+
+  // Scroll to bottom when keyboard opens
+  useEffect(() => {
+    if (keyboardHeight > 0) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [keyboardHeight]);
 
   const onSubmit = useCallback(
     (e: React.FormEvent) => {
@@ -380,8 +422,15 @@ function MobileChatDrawer() {
         hasMessages={messages.length > 0}
       />
 
-      {/* Fullscreen drawer */}
-      <Drawer open={isOpen} onOpenChange={setIsOpen}>
+      {/* Fullscreen drawer — repositionInputs={false} prevents vaul from
+          fighting with iOS keyboard repositioning which causes the drawer
+          to jump up/down erratically (vaul#216, vaul#619). We handle
+          keyboard offset ourselves via the visualViewport API above. */}
+      <Drawer
+        open={isOpen}
+        onOpenChange={setIsOpen}
+        repositionInputs={false}
+      >
         <DrawerContent
           className={cn(
             "inset-x-0 bottom-0 mt-0 max-h-[100dvh] rounded-t-2xl",
@@ -412,10 +461,15 @@ function MobileChatDrawer() {
             className="flex-1 min-h-0"
           />
 
-          {/* Input bar (fixed at bottom of drawer) */}
+          {/* Input bar — sits above the keyboard via dynamic bottom padding */}
           <div
             data-slot="chat-input-bar-mobile"
-            className="border-t border-border/40 px-4 py-3"
+            className="border-t border-border/40 px-4 py-3 transition-[padding] duration-150"
+            style={
+              keyboardHeight > 0
+                ? { paddingBottom: `calc(0.75rem + ${keyboardHeight}px)` }
+                : undefined
+            }
           >
             <ChatInputForm
               input={input}
