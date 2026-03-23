@@ -198,9 +198,13 @@ function DesktopChatBar() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages.length]);
 
-  // Close panel on outside click
+  // Close panel on outside click (desktop only — skip on mobile to avoid
+  // interfering with MobileChatDrawer which shares the same isOpen state)
   useEffect(() => {
     if (!isOpen) return;
+
+    // Only register on desktop (md breakpoint = 768px)
+    if (typeof window !== "undefined" && window.innerWidth < 768) return;
 
     function handleClick(e: MouseEvent) {
       if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
@@ -334,15 +338,9 @@ function MobileChatDrawer() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, status]);
 
-  // Focus input when panel opens
-  useEffect(() => {
-    if (isOpen) {
-      const timer = setTimeout(() => {
-        inputRef.current?.focus();
-      }, 300);
-      return () => clearTimeout(timer);
-    }
-  }, [isOpen]);
+  // Do NOT auto-focus on mobile — let the user tap the input manually.
+  // Auto-focus triggers the iOS keyboard immediately, which can cause
+  // viewport issues before the panel animation completes.
 
   // Lock body scroll when panel is open
   useEffect(() => {
