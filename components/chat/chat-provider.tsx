@@ -50,6 +50,8 @@ interface ChatContextValue {
   quickReplies: QuickReplyItem[];
   /** Clear quick replies after user selects one */
   clearQuickReplies: () => void;
+  /** Whether the user is authenticated via Shopify */
+  isAuthenticated: boolean;
 }
 
 const ChatContext = createContext<ChatContextValue | null>(null);
@@ -130,10 +132,28 @@ const CHAT_API_URL =
   process.env.NEXT_PUBLIC_CHAT_API_URL ?? "http://localhost:8787/api/chat";
 const IS_MOCK = process.env.NEXT_PUBLIC_CHAT_MOCK === "true";
 
+/**
+ * Fetch the Shopify Customer ID from the server-side session.
+ * Returns null if not authenticated or on error.
+ */
+async function fetchShopifyCustomerId(): Promise<string | null> {
+  try {
+    const res = await fetch("/api/auth/customer-id");
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.customer_id ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export function ChatProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const [sessionId, setSessionId] = useState("");
+  const [shopifyCustomerId, setShopifyCustomerId] = useState<string | null>(
+    null,
+  );
   const [productCards, setProductCards] = useState<ProductCardItem[]>([]);
   const [quickReplies, setQuickReplies] = useState<QuickReplyItem[]>([]);
   const initialisedRef = useRef(false);
@@ -146,15 +166,34 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // sessionId を ref に保持（transport が最新値を参照できるよう）
+  // Fetch Shopify Customer ID if shop_auth cookie exists (non-httpOnly flag).
+  // Re-check when pathname changes (user might log in/out during navigation).
+  useEffect(() => {
+    const hasAuthFlag =
+      typeof document !== "undefined" &&
+      document.cookie.includes("shop_auth=1");
+
+    if (hasAuthFlag && !shopifyCustomerId) {
+      fetchShopifyCustomerId().then(setShopifyCustomerId);
+    } else if (!hasAuthFlag && shopifyCustomerId) {
+      // User logged out
+      setShopifyCustomerId(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
+
+  // sessionId / shopifyCustomerId を ref に保持（transport が最新値を参照できるよう）
   const sessionIdRef = useRef(sessionId);
   sessionIdRef.current = sessionId;
+  const shopifyCustomerIdRef = useRef(shopifyCustomerId);
+  shopifyCustomerIdRef.current = shopifyCustomerId;
 
   const transport = useMemo(() => {
     if (IS_MOCK) return new MockChatTransport();
     return new ElxeaChatTransport({
       api: CHAT_API_URL,
       getSessionId: () => sessionIdRef.current,
+      getShopifyCustomerId: () => shopifyCustomerIdRef.current,
       callbacks: {
         onProductCards: (products) => setProductCards(products),
         onQuickReplies: (items) => setQuickReplies(items),
@@ -182,6 +221,8 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     setQuickReplies([]);
   }, []);
 
+  const isAuthenticated = shopifyCustomerId !== null;
+
   const value = useMemo<ChatContextValue>(
     () => ({
       messages,
@@ -195,8 +236,9 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       productCards,
       quickReplies,
       clearQuickReplies,
+      isAuthenticated,
     }),
-    [messages, status, isOpen, pathname, sessionId, sendMessage, error, productCards, quickReplies, clearQuickReplies],
+    [messages, status, isOpen, pathname, sessionId, sendMessage, error, productCards, quickReplies, clearQuickReplies, isAuthenticated],
   );
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;

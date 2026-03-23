@@ -38,6 +38,8 @@ interface ElxeaChatTransportOptions {
   api: string;
   /** セッション ID を返す関数（遅延評価で最新値を取得） */
   getSessionId: () => string;
+  /** Shopify Customer ID を返す関数（null = 未ログイン） */
+  getShopifyCustomerId?: () => string | null;
   /** SSE イベントコールバック */
   callbacks?: ChatEventCallbacks;
 }
@@ -45,11 +47,13 @@ interface ElxeaChatTransportOptions {
 export class ElxeaChatTransport implements ChatTransport<UIMessage> {
   private api: string;
   private getSessionId: () => string;
+  private getShopifyCustomerId: () => string | null;
   private callbacks: ChatEventCallbacks;
 
   constructor(options: ElxeaChatTransportOptions) {
     this.api = options.api;
     this.getSessionId = options.getSessionId;
+    this.getShopifyCustomerId = options.getShopifyCustomerId ?? (() => null);
     this.callbacks = options.callbacks ?? {};
   }
 
@@ -76,13 +80,21 @@ export class ElxeaChatTransport implements ChatTransport<UIMessage> {
     }
 
     // Workers API にリクエスト
+    // ログイン済みユーザーは shopify_customer_id を送信して
+    // cx-agent 側で identity resolution を行う
+    const shopifyCustomerId = this.getShopifyCustomerId();
+    const requestBody: Record<string, string> = {
+      message: messageText,
+      session_id: sessionId,
+    };
+    if (shopifyCustomerId) {
+      requestBody.shopify_customer_id = shopifyCustomerId;
+    }
+
     const response = await fetch(this.api, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        message: messageText,
-        session_id: sessionId,
-      }),
+      body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {
