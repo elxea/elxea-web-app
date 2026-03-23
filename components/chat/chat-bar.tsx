@@ -306,7 +306,7 @@ function DesktopChatBar() {
       {/* Input bar (always visible on desktop) */}
       <div
         data-slot="chat-input-bar"
-        className="mx-auto w-full max-w-2xl px-4 pb-10 pt-3"
+        className="mx-auto w-full max-w-2xl px-4 pb-14 pt-3"
       >
         <ChatInputForm
           input={input}
@@ -398,13 +398,13 @@ function MobileChatDrawer() {
         <div
           data-slot="chat-panel-mobile"
           className={cn(
-            // Use -bottom-96 to extend the background well below the viewport.
-            // When iOS keyboard pushes the viewport up, the extended background
-            // prevents the underlying page from showing through.
-            "fixed inset-x-0 top-0 -bottom-96 z-50 bg-background flex flex-col",
+            "fixed inset-0 z-50 bg-background flex flex-col",
             "animate-in slide-in-from-bottom duration-300",
           )}
         >
+          {/* Extended background below viewport for iOS keyboard —
+              a separate div so it doesn't affect flex layout */}
+          <div className="fixed inset-x-0 bottom-0 h-96 translate-y-full bg-background z-50 pointer-events-none" />
           {/* Header */}
           <div className="flex items-center justify-between border-b border-border/40 px-4 py-3">
             <span className="text-sm font-medium text-muted-foreground tracking-wide">
