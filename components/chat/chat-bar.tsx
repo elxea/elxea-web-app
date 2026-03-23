@@ -241,7 +241,8 @@ function DesktopChatBar() {
 
   const onKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
-      if (e.key === "Enter" && !e.shiftKey) {
+      // e.nativeEvent.isComposing: IME 変換中（日本語入力の確定 Enter）は送信しない
+      if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
         e.preventDefault();
         if (!input.trim() || isStreaming) return;
         sendMessage(input);
@@ -268,9 +269,14 @@ function DesktopChatBar() {
             "border border-border/40 rounded-t-2xl",
             "bg-background/80 backdrop-blur-xl",
             "shadow-lg",
-            "overflow-hidden",
             "transition-all duration-300",
           )}
+          onWheel={(e) => {
+            // Prevent scroll from propagating to the page body when
+            // hovering over the chat panel — scroll stays inside the
+            // messages list.
+            e.stopPropagation();
+          }}
         >
           {/* Panel header */}
           <div className="flex items-center justify-between border-b border-border/40 px-4 py-2">
@@ -300,7 +306,7 @@ function DesktopChatBar() {
       {/* Input bar (always visible on desktop) */}
       <div
         data-slot="chat-input-bar"
-        className="mx-auto w-full max-w-2xl px-4 pb-6 pt-3"
+        className="mx-auto w-full max-w-2xl px-4 pb-10 pt-3"
       >
         <ChatInputForm
           input={input}
@@ -364,7 +370,8 @@ function MobileChatDrawer() {
 
   const onKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
-      if (e.key === "Enter" && !e.shiftKey) {
+      // e.nativeEvent.isComposing: IME 変換中（日本語入力の確定 Enter）は送信しない
+      if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
         e.preventDefault();
         if (!input.trim() || isStreaming) return;
         sendMessage(input);

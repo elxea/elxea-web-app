@@ -22,7 +22,7 @@ export function ChatLauncher({ onClick, hasMessages }: ChatLauncherProps) {
       onClick={onClick}
       aria-label="Open chat"
       className={cn(
-        "fixed bottom-6 right-6 z-40 size-12 rounded-full shadow-lg",
+        "fixed bottom-10 right-6 z-40 size-12 rounded-full shadow-lg",
         "md:hidden",
         "transition-transform duration-200",
         "hover:scale-105 active:scale-95",
