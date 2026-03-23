@@ -3,13 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SendHorizontal, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Drawer,
-  DrawerContent,
-  DrawerHeader,
-  DrawerTitle,
-  DrawerClose,
-} from "@/components/ui/drawer";
+// vaul Drawer removed — replaced with a plain fixed panel for iOS keyboard compatibility
 import { cn } from "@/lib/utils";
 import { useChatContext } from "./chat-provider";
 import { ChatMessage } from "./chat-message";
@@ -330,7 +324,6 @@ function MobileChatDrawer() {
     useChatContext();
 
   const [input, setInput] = useState("");
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -341,54 +334,25 @@ function MobileChatDrawer() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, status]);
 
-  // Focus input when drawer opens
+  // Focus input when panel opens
   useEffect(() => {
     if (isOpen) {
-      // Small delay to wait for drawer animation
       const timer = setTimeout(() => {
         inputRef.current?.focus();
       }, 300);
       return () => clearTimeout(timer);
-    } else {
-      // Reset keyboard height when drawer closes
-      setKeyboardHeight(0);
     }
   }, [isOpen]);
 
-  // ---------------------------------------------------------------------------
-  // iOS keyboard handling via visualViewport API
-  // When the on-screen keyboard opens on iOS Safari, the visual viewport
-  // shrinks but the layout viewport stays the same. Fixed-position elements
-  // (like our input bar inside the drawer) get hidden behind the keyboard.
-  // We track the keyboard height and apply it as bottom padding so the input
-  // bar stays visible above the keyboard.
-  // ---------------------------------------------------------------------------
+  // Lock body scroll when panel is open
   useEffect(() => {
-    if (!isOpen) return;
-
-    const vv = window.visualViewport;
-    if (!vv) return;
-
-    function handleResize() {
-      if (!vv) return;
-      // The difference between the window inner height and the visual viewport
-      // height gives us the keyboard height (approximately).
-      const kbHeight = window.innerHeight - vv.height;
-      // Only apply if keyboard is actually showing (> 100px threshold to avoid
-      // false positives from URL bar changes).
-      setKeyboardHeight(kbHeight > 100 ? kbHeight : 0);
+    if (isOpen) {
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = "";
+      };
     }
-
-    vv.addEventListener("resize", handleResize);
-    return () => vv.removeEventListener("resize", handleResize);
   }, [isOpen]);
-
-  // Scroll to bottom when keyboard opens
-  useEffect(() => {
-    if (keyboardHeight > 0) {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [keyboardHeight]);
 
   const onSubmit = useCallback(
     (e: React.FormEvent) => {
@@ -422,43 +386,31 @@ function MobileChatDrawer() {
         hasMessages={messages.length > 0}
       />
 
-      {/* Fullscreen drawer — repositionInputs={false} prevents vaul from
-          fighting with iOS keyboard repositioning which causes the drawer
-          to jump up/down erratically (vaul#216, vaul#619). We handle
-          keyboard offset ourselves via the visualViewport API above.
-
-          handleOnly — restricts drag-to-dismiss to the handle bar only.
-          Without this, iOS keyboard open/close causes viewport resize
-          events that vaul misinterprets as a downward swipe gesture,
-          dismissing the drawer when the user taps the input (vaul#619).
-          The explicit close button remains functional via DrawerClose. */}
-      <Drawer
-        open={isOpen}
-        onOpenChange={setIsOpen}
-        repositionInputs={false}
-        handleOnly={true}
-      >
-        <DrawerContent
+      {/* Fullscreen fixed panel — no vaul, no gesture detection, no viewport
+          resize side-effects. Pure CSS positioning that iOS keyboards cannot
+          displace. The panel slides up from the bottom via CSS transition. */}
+      {isOpen && (
+        <div
+          data-slot="chat-panel-mobile"
           className={cn(
-            "inset-x-0 bottom-0 mt-0 max-h-[100dvh] rounded-t-2xl",
-            "flex flex-col",
+            "fixed inset-0 z-50 bg-background flex flex-col",
+            "animate-in slide-in-from-bottom duration-300",
           )}
         >
           {/* Header */}
-          <DrawerHeader className="flex flex-row items-center justify-between border-b border-border/40 px-4 py-3">
-            <DrawerTitle className="text-sm font-medium text-muted-foreground tracking-wide">
+          <div className="flex items-center justify-between border-b border-border/40 px-4 py-3">
+            <span className="text-sm font-medium text-muted-foreground tracking-wide">
               elxea assistant
-            </DrawerTitle>
-            <DrawerClose asChild>
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                aria-label="Close chat"
-              >
-                <X className="size-4" />
-              </Button>
-            </DrawerClose>
-          </DrawerHeader>
+            </span>
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              onClick={() => setIsOpen(false)}
+              aria-label="Close chat"
+            >
+              <X className="size-4" />
+            </Button>
+          </div>
 
           {/* Messages area */}
           <MessagesList
@@ -468,15 +420,13 @@ function MobileChatDrawer() {
             className="flex-1 min-h-0"
           />
 
-          {/* Input bar — sits above the keyboard via dynamic bottom padding */}
+          {/* Input bar — pb-safe accounts for iPhone home indicator.
+              No dynamic keyboard-height tracking needed: with a normal
+              fixed panel (not vaul), iOS Safari natively pushes the
+              viewport up when the keyboard opens. */}
           <div
             data-slot="chat-input-bar-mobile"
-            className="border-t border-border/40 px-4 py-3 transition-[padding] duration-150"
-            style={
-              keyboardHeight > 0
-                ? { paddingBottom: `calc(0.75rem + ${keyboardHeight}px)` }
-                : undefined
-            }
+            className="border-t border-border/40 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
           >
             <ChatInputForm
               input={input}
@@ -488,8 +438,8 @@ function MobileChatDrawer() {
               inputRef={inputRef}
             />
           </div>
-        </DrawerContent>
-      </Drawer>
+        </div>
+      )}
     </div>
   );
 }
