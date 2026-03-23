@@ -20,6 +20,7 @@ const AudioContext = createContext<AudioContextValue>({
 });
 
 const STORAGE_KEY = "elxea-bgm-playing";
+const POSITION_KEY = "elxea-bgm-position";
 
 export function AudioProvider({ children }: { children: React.ReactNode }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -30,9 +31,37 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     audio.loop = true;
     audio.volume = 0.3;
     audio.preload = "none";
+
+    // 前回の再生位置を復元
+    try {
+      const savedPosition = localStorage.getItem(POSITION_KEY);
+      if (savedPosition) {
+        const pos = parseFloat(savedPosition);
+        if (!isNaN(pos) && pos > 0) {
+          audio.currentTime = pos;
+        }
+      }
+    } catch {}
+
     audioRef.current = audio;
 
+    // 再生位置を5秒ごとに保存
+    const saveInterval = setInterval(() => {
+      if (audio && !audio.paused && isFinite(audio.currentTime)) {
+        try {
+          localStorage.setItem(POSITION_KEY, String(audio.currentTime));
+        } catch {}
+      }
+    }, 5000);
+
     return () => {
+      // 離脱時に最終位置を保存
+      if (audio && isFinite(audio.currentTime)) {
+        try {
+          localStorage.setItem(POSITION_KEY, String(audio.currentTime));
+        } catch {}
+      }
+      clearInterval(saveInterval);
       audio.pause();
       audio.src = "";
       audioRef.current = null;
@@ -57,6 +86,7 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
       setIsPlaying(false);
       try {
         localStorage.setItem(STORAGE_KEY, "false");
+        localStorage.setItem(POSITION_KEY, String(audio.currentTime));
       } catch {}
     }
   }, []);
