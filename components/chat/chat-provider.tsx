@@ -16,7 +16,11 @@ import {
   type ChatTransport,
   type UIMessageChunk,
 } from "ai";
-import { ElxeaChatTransport } from "./elxea-chat-transport";
+import {
+  ElxeaChatTransport,
+  type ProductCardItem,
+  type QuickReplyItem,
+} from "./elxea-chat-transport";
 import { usePathname } from "next/navigation";
 
 // ---------------------------------------------------------------------------
@@ -40,6 +44,12 @@ interface ChatContextValue {
   sendMessage: (text: string) => void;
   /** Error state */
   error: Error | undefined;
+  /** Product cards received from the agent (H-4) */
+  productCards: ProductCardItem[];
+  /** Quick reply suggestions received from the agent (H-4) */
+  quickReplies: QuickReplyItem[];
+  /** Clear quick replies after user selects one */
+  clearQuickReplies: () => void;
 }
 
 const ChatContext = createContext<ChatContextValue | null>(null);
@@ -124,6 +134,8 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const [sessionId, setSessionId] = useState("");
+  const [productCards, setProductCards] = useState<ProductCardItem[]>([]);
+  const [quickReplies, setQuickReplies] = useState<QuickReplyItem[]>([]);
   const initialisedRef = useRef(false);
 
   // Hydrate session ID on mount (client only)
@@ -143,6 +155,10 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     return new ElxeaChatTransport({
       api: CHAT_API_URL,
       getSessionId: () => sessionIdRef.current,
+      callbacks: {
+        onProductCards: (products) => setProductCards(products),
+        onQuickReplies: (items) => setQuickReplies(items),
+      },
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -150,15 +166,21 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   const { messages, sendMessage: rawSendMessage, status, error } =
     useChat({ transport });
 
-  // Wrap sendMessage to auto-open panel (block if session not ready)
+  // 新しいメッセージ送信時にプロダクトカードとクイックリプライをクリア
   const sendMessage = useCallback(
     (text: string) => {
       if (!text.trim() || !sessionId) return;
       setIsOpen(true);
+      setProductCards([]);
+      setQuickReplies([]);
       rawSendMessage({ text });
     },
     [rawSendMessage, sessionId],
   );
+
+  const clearQuickReplies = useCallback(() => {
+    setQuickReplies([]);
+  }, []);
 
   const value = useMemo<ChatContextValue>(
     () => ({
@@ -170,8 +192,11 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       sessionId,
       sendMessage,
       error,
+      productCards,
+      quickReplies,
+      clearQuickReplies,
     }),
-    [messages, status, isOpen, pathname, sessionId, sendMessage, error],
+    [messages, status, isOpen, pathname, sessionId, sendMessage, error, productCards, quickReplies, clearQuickReplies],
   );
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;

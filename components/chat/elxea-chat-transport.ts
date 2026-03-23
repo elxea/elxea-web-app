@@ -6,20 +6,51 @@
  */
 import type { ChatTransport, UIMessage, UIMessageChunk } from "ai";
 
+// ---------------------------------------------------------------------------
+// Types (H-4: product_card / quick_replies イベント)
+// ---------------------------------------------------------------------------
+
+export type ProductCardItem = {
+  name: string;
+  price: string;
+  url: string;
+  image: string | null;
+  description: string;
+};
+
+export type QuickReplyItem = {
+  label: string;
+  text: string;
+};
+
+/** SSE イベントのコールバック（UI ステート管理に使用） */
+export interface ChatEventCallbacks {
+  onProductCards?: (products: ProductCardItem[]) => void;
+  onQuickReplies?: (items: QuickReplyItem[]) => void;
+}
+
+// ---------------------------------------------------------------------------
+// Transport
+// ---------------------------------------------------------------------------
+
 interface ElxeaChatTransportOptions {
   /** Workers API の URL（例: https://elxea-agent.setaka.workers.dev/api/chat） */
   api: string;
   /** セッション ID を返す関数（遅延評価で最新値を取得） */
   getSessionId: () => string;
+  /** SSE イベントコールバック */
+  callbacks?: ChatEventCallbacks;
 }
 
 export class ElxeaChatTransport implements ChatTransport<UIMessage> {
   private api: string;
   private getSessionId: () => string;
+  private callbacks: ChatEventCallbacks;
 
   constructor(options: ElxeaChatTransportOptions) {
     this.api = options.api;
     this.getSessionId = options.getSessionId;
+    this.callbacks = options.callbacks ?? {};
   }
 
   async sendMessages({
@@ -65,6 +96,8 @@ export class ElxeaChatTransport implements ChatTransport<UIMessage> {
     // Workers の SSE レスポンスを Vercel AI SDK の UIMessageChunk に変換
     const partId = crypto.randomUUID();
     let textStarted = false;
+    let textEnded = false;
+    const callbacks = this.callbacks;
 
     return new ReadableStream<UIMessageChunk>({
       async start(controller) {
@@ -104,12 +137,23 @@ export class ElxeaChatTransport implements ChatTransport<UIMessage> {
                   } as UIMessageChunk);
                 }
 
+                // H-4: product_card イベントをコールバック経由で UI に伝達
+                if (event.type === "product_card" && event.products) {
+                  callbacks.onProductCards?.(event.products as ProductCardItem[]);
+                }
+
+                // H-4: quick_replies イベントをコールバック経由で UI に伝達
+                if (event.type === "quick_replies" && event.items) {
+                  callbacks.onQuickReplies?.(event.items as QuickReplyItem[]);
+                }
+
                 if (event.type === "done") {
-                  if (textStarted) {
+                  if (textStarted && !textEnded) {
                     controller.enqueue({
                       type: "text-end",
                       id: partId,
                     } as UIMessageChunk);
+                    textEnded = true;
                   }
                 }
               } catch {
@@ -117,14 +161,16 @@ export class ElxeaChatTransport implements ChatTransport<UIMessage> {
               }
             }
           }
-
-          // ストリーム終了時に text-end が未送信なら送る
-          if (textStarted) {
-            // done イベントで既に送信済みの場合があるが、重複は SDK 側で吸収される
-          }
         } catch (err) {
           console.error("SSE parse error:", err);
         } finally {
+          // H-5: text-end 送信保証 — ストリーム終了時に未送信なら必ず送る
+          if (textStarted && !textEnded) {
+            controller.enqueue({
+              type: "text-end",
+              id: partId,
+            } as UIMessageChunk);
+          }
           controller.close();
         }
       },
