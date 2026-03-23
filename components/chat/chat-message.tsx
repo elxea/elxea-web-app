@@ -2,6 +2,7 @@
 
 import { type UIMessage } from "ai";
 import { cn } from "@/lib/utils";
+import type { ChatMessageMeta } from "./chat-provider";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -66,6 +67,8 @@ interface ChatMessageProps {
 export function ChatMessage({ message }: ChatMessageProps) {
   const isUser = message.role === "user";
   const text = getTextFromMessage(message);
+  const meta = message.metadata as ChatMessageMeta | undefined;
+  const isLine = meta?.channel === "line";
 
   if (!text) return null;
 
@@ -73,10 +76,16 @@ export function ChatMessage({ message }: ChatMessageProps) {
     <div
       data-slot="chat-message"
       className={cn(
-        "flex w-full",
-        isUser ? "justify-end" : "justify-start",
+        "flex w-full flex-col",
+        isUser ? "items-end" : "items-start",
       )}
     >
+      {/* WC3: Cross-channel label for LINE messages */}
+      {isLine && (
+        <span className="mb-0.5 px-1 text-xs text-muted-foreground">
+          LINE で送信
+        </span>
+      )}
       <div
         className={cn(
           "max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap",

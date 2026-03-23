@@ -130,7 +130,65 @@ class MockChatTransport implements ChatTransport<UIMessage> {
 
 const CHAT_API_URL =
   process.env.NEXT_PUBLIC_CHAT_API_URL ?? "http://localhost:8787/api/chat";
+const CHAT_API_BASE = CHAT_API_URL.replace(/\/api\/chat$/, "");
 const IS_MOCK = process.env.NEXT_PUBLIC_CHAT_MOCK === "true";
+
+// ---------------------------------------------------------------------------
+// History API types
+// ---------------------------------------------------------------------------
+
+/** Metadata attached to UIMessage for cross-channel display */
+export interface ChatMessageMeta {
+  channel?: "line" | "web";
+}
+
+interface HistoryApiMessage {
+  role: "user" | "assistant";
+  content: string;
+  channel: "line" | "web";
+  created_at: string;
+  product_cards?: ProductCardItem[];
+}
+
+interface HistoryApiResponse {
+  messages: HistoryApiMessage[];
+  is_linked: boolean;
+}
+
+/**
+ * Fetch conversation history from the cx-agent API.
+ * Returns null on error so the chat can degrade gracefully.
+ */
+async function fetchChatHistory(
+  sessionId: string,
+  shopifyCustomerId: string | null,
+): Promise<HistoryApiResponse | null> {
+  try {
+    const params = new URLSearchParams({ session_id: sessionId });
+    if (shopifyCustomerId) {
+      params.set("shopify_customer_id", shopifyCustomerId);
+    }
+    const res = await fetch(
+      `${CHAT_API_BASE}/api/chat/history?${params.toString()}`,
+    );
+    if (!res.ok) return null;
+    return (await res.json()) as HistoryApiResponse;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Convert history API messages to Vercel AI SDK UIMessage format.
+ */
+function historyToUIMessages(msgs: HistoryApiMessage[]): UIMessage[] {
+  return msgs.map((m) => ({
+    id: crypto.randomUUID(),
+    role: m.role,
+    parts: [{ type: "text" as const, text: m.content }],
+    metadata: { channel: m.channel } satisfies ChatMessageMeta,
+  }));
+}
 
 /**
  * Fetch the Shopify Customer ID from the server-side session.
@@ -202,8 +260,23 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const { messages, sendMessage: rawSendMessage, status, error } =
+  const { messages, sendMessage: rawSendMessage, status, error, setMessages } =
     useChat({ transport });
+
+  // WC3: 初回マウント時にクロスチャネル会話履歴をロード
+  const historyLoadedRef = useRef(false);
+  useEffect(() => {
+    if (historyLoadedRef.current || !sessionId || IS_MOCK) return;
+    historyLoadedRef.current = true;
+
+    fetchChatHistory(sessionId, shopifyCustomerId).then((data) => {
+      if (!data || data.messages.length === 0) return;
+      setMessages(historyToUIMessages(data.messages));
+    });
+    // 初回のみ実行。shopifyCustomerId の変化で再取得はしない
+    // （認証後のリロードは別フローで対応）
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId]);
 
   // 新しいメッセージ送信時にプロダクトカードとクイックリプライをクリア
   const sendMessage = useCallback(
