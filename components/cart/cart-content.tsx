@@ -170,7 +170,7 @@ export function CartContent() {
             );
           }}
         >
-          <a href={cart.checkoutUrl.replace("https://elxea.com/", "https://elxea.myshopify.com/")}>
+          <a href={cart.checkoutUrl}>
             {t("checkout")}
           </a>
         </Button>
