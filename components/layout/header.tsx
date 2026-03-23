@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
 import { useCart } from "@/components/cart/cart-context";
+import { AudioToggle } from "@/components/audio/audio-toggle";
 import { Menu } from "lucide-react";
 
 type NavItem = { href: string; label: string };
@@ -90,6 +91,10 @@ export function Header({ navItems: externalNavItems }: HeaderProps) {
                   </Button>
                 ))}
                 <Separator className="my-2" />
+                <div className="px-4 py-2 sm:hidden">
+                  <AudioToggle className="items-start" />
+                </div>
+                <Separator className="my-2 sm:hidden" />
                 <Button
                   variant="ghost"
                   className="justify-start text-muted-foreground sm:hidden"
@@ -149,6 +154,7 @@ export function Header({ navItems: externalNavItems }: HeaderProps) {
 
           {/* Right actions */}
           <div className="flex items-center gap-1 ml-auto">
+            <AudioToggle className="hidden sm:flex mr-2" />
             <Button
               variant="ghost"
               size="sm"

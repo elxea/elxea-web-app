@@ -11,6 +11,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { LenisProvider } from "@/components/providers/lenis-provider";
 import { ChatProvider } from "@/components/chat/chat-provider";
 import { ChatBar } from "@/components/chat/chat-bar";
+import { AudioProvider } from "@/components/audio/audio-provider";
 import { getClient } from "@/sanity/lib/client";
 import { SITE_SETTINGS_QUERY } from "@/sanity/lib/queries";
 
@@ -98,6 +99,7 @@ export default async function LocaleLayout({
       </head>
       <body className="min-h-screen flex flex-col bg-background text-foreground">
         <NextIntlClientProvider messages={messages}>
+          <AudioProvider>
           <CartProviderWrapper>
             <ChatProvider>
               <LenisProvider>
@@ -110,6 +112,7 @@ export default async function LocaleLayout({
               </LenisProvider>
             </ChatProvider>
           </CartProviderWrapper>
+          </AudioProvider>
         </NextIntlClientProvider>
       </body>
     </html>
