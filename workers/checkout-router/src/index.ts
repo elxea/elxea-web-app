@@ -1,34 +1,29 @@
 /**
  * elxea Checkout Router — Cloudflare Worker
  *
- * Architecture: Cloudflare O2O (Orange-to-Orange) with Shopify
- *
- * DNS points elxea.com A record to 23.227.38.65 (Shopify) with Cloudflare proxy.
- * Shopify is the default origin and handles /checkouts/* natively.
- * This Worker intercepts all other requests and forwards them to Vercel.
+ * Architecture: DNS points to Vercel (76.76.21.21, proxied via Cloudflare).
+ * Vercel serves the Next.js app as the default origin.
+ * This Worker intercepts Shopify-specific paths and proxies them to Shopify.
  *
  * Routing rules:
- *   Shopify (passthrough — do NOT fetch, just return):
+ *   Shopify (proxy to Shopify origin):
  *     /checkouts/*
- *     /cart/* (Shopify cart API, distinct from the Next.js /cart page)
+ *     /cart/add, /cart/update, /cart/change, /cart/clear, /cart.js, /cart.json
  *     /services/*
  *     /.well-known/shopify/*
  *     /payments/*
  *     /wallets/*
+ *     /admin/*
  *
- *   Vercel (rewrite origin):
+ *   Vercel (passthrough — let Cloudflare route to origin normally):
  *     Everything else — the Next.js app
- *
- * Note on O2O: In Cloudflare O2O mode with Shopify, Workers may be disabled
- * on /checkout paths by Shopify's Cloudflare for SaaS configuration. This is
- * acceptable — Shopify handles checkout natively on the custom domain.
  */
 
 export interface Env {
-  VERCEL_ORIGIN: string;
+  SHOPIFY_ORIGIN: string;
 }
 
-/** Paths that Shopify must handle — do not intercept */
+/** Paths that Shopify must handle — proxy to Shopify origin */
 const SHOPIFY_PATH_PREFIXES = [
   '/checkouts/',
   '/checkouts',
@@ -43,22 +38,13 @@ const SHOPIFY_PATH_PREFIXES = [
   '/payments/',
   '/wallets/',
   '/admin/',
-];
-
-/** Paths that must always pass through to the origin (Shopify or ACME) */
-const PASSTHROUGH_PREFIXES = [
-  '/.well-known/acme-challenge/',
+  // Shopify CDN paths (served from Shopify's CDN when checkout pages reference them)
+  '/cdn/',
 ];
 
 function isShopifyPath(pathname: string): boolean {
   return SHOPIFY_PATH_PREFIXES.some(
     (prefix) => pathname === prefix || pathname.startsWith(prefix)
-  );
-}
-
-function isPassthroughPath(pathname: string): boolean {
-  return PASSTHROUGH_PREFIXES.some(
-    (prefix) => pathname.startsWith(prefix)
   );
 }
 
@@ -71,42 +57,32 @@ export default {
     const url = new URL(request.url);
     const { pathname } = url;
 
-    // 1. ACME challenges must pass through for SSL certificate renewal
-    if (isPassthroughPath(pathname)) {
-      return fetch(request);
-    }
-
-    // 2. Shopify paths — let O2O handle natively (passthrough to Shopify origin)
+    // Shopify paths — proxy to Shopify origin
     if (isShopifyPath(pathname)) {
-      return fetch(request);
+      const shopifyUrl = new URL(pathname + url.search, env.SHOPIFY_ORIGIN);
+
+      const shopifyRequest = new Request(shopifyUrl.toString(), {
+        method: request.method,
+        headers: request.headers,
+        body: request.body,
+        redirect: 'manual',
+      });
+
+      // Set Host header to the custom domain (Shopify recognizes it)
+      shopifyRequest.headers.set('Host', url.host);
+      shopifyRequest.headers.set('X-Forwarded-Host', url.host);
+      shopifyRequest.headers.set('X-Forwarded-Proto', 'https');
+
+      const response = await fetch(shopifyRequest);
+      const newResponse = new Response(response.body, response);
+      newResponse.headers.set('x-elxea-router', 'shopify-proxy');
+      return newResponse;
     }
 
-    // 3. Everything else — rewrite to Vercel origin
-    const vercelUrl = new URL(pathname + url.search, env.VERCEL_ORIGIN);
-
-    const vercelRequest = new Request(vercelUrl.toString(), {
-      method: request.method,
-      headers: request.headers,
-      body: request.body,
-      redirect: 'manual',
-    });
-
-    // Set Host header to the Vercel deployment
-    vercelRequest.headers.set('Host', new URL(env.VERCEL_ORIGIN).host);
-
-    // Preserve the original host for the app to use (e.g., for canonical URLs)
-    vercelRequest.headers.set('X-Forwarded-Host', url.host);
-    vercelRequest.headers.set('X-Forwarded-Proto', 'https');
-
-    const response = await fetch(vercelRequest);
-
-    // Clone response to allow header modification
+    // Everything else — passthrough to Vercel origin (default DNS target)
+    const response = await fetch(request);
     const newResponse = new Response(response.body, response);
-
-    // Remove any Vercel-specific headers that could leak origin info
-    // but keep x-vercel-id for debugging
-    newResponse.headers.delete('x-vercel-deployment-url');
-
+    newResponse.headers.set('x-elxea-router', 'vercel-passthrough');
     return newResponse;
   },
 };
