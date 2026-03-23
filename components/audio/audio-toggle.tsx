@@ -23,8 +23,16 @@ export function AudioToggle({ className }: AudioToggleProps) {
       <span className="text-xs font-medium tracking-widest uppercase underline underline-offset-2 decoration-foreground/40 hover:decoration-foreground">
         {isPlaying ? "pause" : "play"}
       </span>
+      <span
+        className={cn(
+          "text-xs tracking-wide text-muted-foreground inline-block",
+          isPlaying && "animate-spin-slow"
+        )}
+      >
+        ✿
+      </span>
       <span className="text-xs tracking-wide text-muted-foreground">
-        ✿ tea time mix
+        sound from nature
       </span>
     </button>
   );
