@@ -348,12 +348,25 @@ function MobileChatDrawer() {
   // Auto-focus triggers the iOS keyboard immediately, which can cause
   // viewport issues before the panel animation completes.
 
-  // Lock body scroll when panel is open
+  // Lock body scroll and set html background when panel is open.
+  // On iOS Safari, the keyboard creates a gap below fixed elements
+  // that reveals the page content. By setting the html background
+  // to the same color as the chat panel, this gap shows the correct
+  // color instead of the underlying page.
   useEffect(() => {
     if (isOpen) {
+      const html = document.documentElement;
+      const prevBg = html.style.backgroundColor;
+      const prevOverflow = document.body.style.overflow;
+
+      // Use the computed background color from the body (which uses bg-background)
+      // to ensure the gap behind iOS keyboard matches the chat panel color.
+      html.style.backgroundColor = getComputedStyle(document.body).backgroundColor;
       document.body.style.overflow = "hidden";
+
       return () => {
-        document.body.style.overflow = "";
+        html.style.backgroundColor = prevBg;
+        document.body.style.overflow = prevOverflow;
       };
     }
   }, [isOpen]);
@@ -431,7 +444,7 @@ function MobileChatDrawer() {
               viewport up when the keyboard opens. */}
           <div
             data-slot="chat-input-bar-mobile"
-            className="border-t border-border/40 px-4 pt-3 pb-[max(50vh,env(safe-area-inset-bottom))] bg-background"
+            className="border-t border-border/40 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
           >
             <ChatInputForm
               input={input}
