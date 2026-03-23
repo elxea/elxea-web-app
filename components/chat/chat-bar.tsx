@@ -402,10 +402,6 @@ function MobileChatDrawer() {
             "animate-in slide-in-from-bottom duration-300",
           )}
         >
-          {/* Extended background below viewport for iOS keyboard —
-              covers the gap between input bar and keyboard where the
-              underlying page would otherwise show through */}
-          <div className="fixed inset-x-0 -bottom-[100vh] h-[100vh] bg-background z-50 pointer-events-none" />
           {/* Header */}
           <div className="flex items-center justify-between border-b border-border/40 px-4 py-3">
             <span className="text-sm font-medium text-muted-foreground tracking-wide">
@@ -435,7 +431,7 @@ function MobileChatDrawer() {
               viewport up when the keyboard opens. */}
           <div
             data-slot="chat-input-bar-mobile"
-            className="border-t border-border/40 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+            className="border-t border-border/40 px-4 pt-3 pb-[max(50vh,env(safe-area-inset-bottom))] bg-background"
           >
             <ChatInputForm
               input={input}
