@@ -10,6 +10,8 @@ import { CookieConsent } from "@/components/ui/cookie-consent";
 import { Toaster } from "@/components/ui/sonner";
 import { ScrollToTop } from "@/components/ui/scroll-to-top";
 import { LenisProvider } from "@/components/providers/lenis-provider";
+import { ChatProvider } from "@/components/chat/chat-provider";
+import { ChatBar } from "@/components/chat/chat-bar";
 import { getClient } from "@/sanity/lib/client";
 import { SITE_SETTINGS_QUERY } from "@/sanity/lib/queries";
 
@@ -98,14 +100,17 @@ export default async function LocaleLayout({
       <body className="min-h-screen flex flex-col bg-background text-foreground">
         <NextIntlClientProvider messages={messages}>
           <CartProviderWrapper>
-            <LenisProvider>
-              <Header navItems={headerNavItems} />
-              <main className="flex-1">{children}</main>
-              <Footer groups={footerGroups} />
-              <CookieConsent />
-              <Toaster />
-              <ScrollToTop />
-            </LenisProvider>
+            <ChatProvider>
+              <LenisProvider>
+                <Header navItems={headerNavItems} />
+                <main className="flex-1">{children}</main>
+                <ChatBar />
+                <Footer groups={footerGroups} />
+                <CookieConsent />
+                <Toaster />
+                <ScrollToTop />
+              </LenisProvider>
+            </ChatProvider>
           </CartProviderWrapper>
         </NextIntlClientProvider>
       </body>
