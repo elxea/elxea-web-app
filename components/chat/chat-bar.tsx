@@ -403,8 +403,9 @@ function MobileChatDrawer() {
           )}
         >
           {/* Extended background below viewport for iOS keyboard —
-              a separate div so it doesn't affect flex layout */}
-          <div className="fixed inset-x-0 bottom-0 h-96 translate-y-full bg-background z-50 pointer-events-none" />
+              covers the gap between input bar and keyboard where the
+              underlying page would otherwise show through */}
+          <div className="fixed inset-x-0 -bottom-[100vh] h-[100vh] bg-background z-50 pointer-events-none" />
           {/* Header */}
           <div className="flex items-center justify-between border-b border-border/40 px-4 py-3">
             <span className="text-sm font-medium text-muted-foreground tracking-wide">
