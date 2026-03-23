@@ -134,13 +134,18 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // sessionId を ref に保持（transport が最新値を参照できるよう）
+  const sessionIdRef = useRef(sessionId);
+  sessionIdRef.current = sessionId;
+
   const transport = useMemo(() => {
     if (IS_MOCK) return new MockChatTransport();
     return new ElxeaChatTransport({
       api: CHAT_API_URL,
-      sessionId,
+      getSessionId: () => sessionIdRef.current,
     });
-  }, [sessionId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const { messages, sendMessage: rawSendMessage, status, error } =
     useChat({ transport });

@@ -9,17 +9,17 @@ import type { ChatTransport, UIMessage, UIMessageChunk } from "ai";
 interface ElxeaChatTransportOptions {
   /** Workers API の URL（例: https://elxea-agent.setaka.workers.dev/api/chat） */
   api: string;
-  /** セッション ID（UUID v4） */
-  sessionId: string;
+  /** セッション ID を返す関数（遅延評価で最新値を取得） */
+  getSessionId: () => string;
 }
 
 export class ElxeaChatTransport implements ChatTransport<UIMessage> {
   private api: string;
-  private sessionId: string;
+  private getSessionId: () => string;
 
   constructor(options: ElxeaChatTransportOptions) {
     this.api = options.api;
-    this.sessionId = options.sessionId;
+    this.getSessionId = options.getSessionId;
   }
 
   async sendMessages({
@@ -35,7 +35,8 @@ export class ElxeaChatTransport implements ChatTransport<UIMessage> {
         .map((p) => p.text)
         .join("") ?? "";
 
-    if (!messageText || !this.sessionId) {
+    const sessionId = this.getSessionId();
+    if (!messageText || !sessionId) {
       return new ReadableStream({
         start(controller) {
           controller.close();
@@ -49,7 +50,7 @@ export class ElxeaChatTransport implements ChatTransport<UIMessage> {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         message: messageText,
-        session_id: this.sessionId,
+        session_id: sessionId,
       }),
     });
 
