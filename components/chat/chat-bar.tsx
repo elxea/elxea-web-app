@@ -186,7 +186,7 @@ export function ChatBar() {
       {/* ---- Input bar (always visible) ---- */}
       <div
         data-slot="chat-input-bar"
-        className="mx-auto w-full max-w-2xl px-4 py-3"
+        className="mx-auto w-full max-w-2xl px-4 pb-6 pt-3"
       >
         <form
           onSubmit={onSubmit}
