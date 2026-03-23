@@ -10,6 +10,7 @@ import { ChatMessage } from "./chat-message";
 import { ChatLauncher } from "./chat-launcher";
 import { ProductCards } from "./product-card";
 import { QuickReplies } from "./quick-replies";
+import { LineCta } from "./line-cta";
 
 // ---------------------------------------------------------------------------
 // Placeholder logic
@@ -165,6 +166,8 @@ function MessagesList({
           disabled={isStreaming}
         />
       )}
+      {/* WC3-3: LINE friend add CTA */}
+      <LineCta />
       <div ref={messagesEndRef} />
     </div>
   );
