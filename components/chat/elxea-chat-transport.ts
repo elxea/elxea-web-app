@@ -35,7 +35,7 @@ export class ElxeaChatTransport implements ChatTransport<UIMessage> {
         .map((p) => p.text)
         .join("") ?? "";
 
-    if (!messageText) {
+    if (!messageText || !this.sessionId) {
       return new ReadableStream({
         start(controller) {
           controller.close();

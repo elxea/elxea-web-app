@@ -145,14 +145,14 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   const { messages, sendMessage: rawSendMessage, status, error } =
     useChat({ transport });
 
-  // Wrap sendMessage to auto-open panel
+  // Wrap sendMessage to auto-open panel (block if session not ready)
   const sendMessage = useCallback(
     (text: string) => {
-      if (!text.trim()) return;
+      if (!text.trim() || !sessionId) return;
       setIsOpen(true);
       rawSendMessage({ text });
     },
-    [rawSendMessage],
+    [rawSendMessage, sessionId],
   );
 
   const value = useMemo<ChatContextValue>(
