@@ -15,16 +15,16 @@ export function AudioToggle({ className }: AudioToggleProps) {
       type="button"
       onClick={toggle}
       className={cn(
-        "flex flex-col items-end gap-0 text-muted-foreground hover:text-foreground transition-colors duration-200",
+        "flex items-center gap-2 text-foreground transition-colors duration-200 cursor-pointer",
         className
       )}
       aria-label={isPlaying ? "Pause background music" : "Play background music"}
     >
-      <span className="text-xs tracking-widest uppercase leading-none">
+      <span className="text-xs font-medium tracking-widest uppercase underline underline-offset-2 decoration-foreground/40 hover:decoration-foreground">
         {isPlaying ? "pause" : "play"}
       </span>
-      <span className="text-xs tracking-wide leading-none mt-0.5 text-muted-foreground/70">
-        elxea tea time mix
+      <span className="text-xs tracking-wide text-muted-foreground">
+        ✿ tea time mix
       </span>
     </button>
   );
