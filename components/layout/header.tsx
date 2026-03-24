@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import Image from "next/image";
 import { useTranslations } from "next-intl";
 import { Link, usePathname } from "@/i18n/navigation";
-import { useLocale } from "next-intl";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -24,7 +23,6 @@ type HeaderProps = { navItems?: NavItem[] };
 export function Header({ navItems: externalNavItems }: HeaderProps) {
   const t = useTranslations("common");
   const pathname = usePathname();
-  const locale = useLocale();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const { cart } = useCart();
@@ -126,12 +124,12 @@ export function Header({ navItems: externalNavItems }: HeaderProps) {
                     className="justify-start text-muted-foreground sm:hidden"
                     asChild
                   >
-                    <a
-                      href={`/api/auth/login?locale=${locale}`}
+                    <Link
+                      href="/login"
                       onClick={() => setMobileOpen(false)}
                     >
                       {t("login")}
-                    </a>
+                    </Link>
                   </Button>
                 )}
               </nav>
@@ -179,7 +177,7 @@ export function Header({ navItems: externalNavItems }: HeaderProps) {
                 className="text-muted-foreground hidden sm:inline-flex"
                 asChild
               >
-                <a href={`/api/auth/login?locale=${locale}`}>{t("login")}</a>
+                <Link href="/login">{t("login")}</Link>
               </Button>
             )}
             <Button

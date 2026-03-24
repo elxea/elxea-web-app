@@ -180,7 +180,8 @@
     "lineButton": "Sign in with LINE",
     "or": "or",
     "shopifyButton": "Sign in with Email",
-    "terms": "By signing in, you agree to our Terms of Service and Privacy Policy."
+    "terms": "By signing in, you agree to our Terms of Service and Privacy Policy.",
+    "linkedSuccess": "Your LINE account has been linked"
   },
   "legal": {
     "tokushoho": "Specified Commercial Transactions Act",

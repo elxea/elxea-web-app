@@ -3,12 +3,21 @@
  *
  * LINE Login is the primary CTA. Shopify OAuth is retained
  * for users who already have a Shopify account.
+ *
+ * Session integration flow:
+ * 1. LineLoginButton saves chat session_id to cookie (client-side)
+ * 2. Auth.js signIn callback reads the cookie and sends it to cx-agent
+ * 3. cx-agent merges anonymous session conversations to the identified user
+ * 4. After redirect, LinkSuccessBanner shows confirmation
  */
+import { Suspense } from "react";
 import { getTranslations, getLocale } from "next-intl/server";
 import { signIn } from "@/auth";
 import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { LineLoginButton } from "./line-login-button";
+import { LinkSuccessBanner } from "./link-success-banner";
 
 export async function generateMetadata() {
   const t = await getTranslations("login");
@@ -24,6 +33,11 @@ export default async function LoginPage() {
   return (
     <div className="flex min-h-[60vh] items-center justify-center px-4 py-16">
       <div className="w-full max-w-sm space-y-8">
+        {/* Success banner after LINE Login */}
+        <Suspense fallback={null}>
+          <LinkSuccessBanner />
+        </Suspense>
+
         {/* Heading */}
         <div className="text-center space-y-2">
           <h1 className="font-heading text-2xl tracking-tight">
@@ -35,21 +49,15 @@ export default async function LoginPage() {
         </div>
 
         {/* LINE Login — primary action */}
-        <form
-          action={async () => {
+        <LineLoginButton
+          signInAction={async () => {
             "use server";
-            await signIn("line", { redirectTo: `/${locale}/account` });
+            await signIn("line", { redirectTo: `/${locale}/login?linked=true` });
           }}
         >
-          <Button
-            type="submit"
-            size="lg"
-            className="w-full bg-[#06C755] text-white hover:bg-[#06C755]/90 active:bg-[#06C755]/80"
-          >
-            <LineIcon />
-            {t("lineButton")}
-          </Button>
-        </form>
+          <LineIcon />
+          {t("lineButton")}
+        </LineLoginButton>
 
         {/* Divider */}
         <div className="flex items-center gap-4">
