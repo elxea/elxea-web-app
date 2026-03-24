@@ -54,6 +54,8 @@ interface ChatContextValue {
   isAuthenticated: boolean;
   /** LINE User ID from Auth.js session (null if not linked) */
   lineUserId: string | null;
+  /** Get ISO timestamp for a message (from metadata or runtime map) */
+  getMessageTimestamp: (messageId: string) => string | undefined;
 }
 
 const ChatContext = createContext<ChatContextValue | null>(null);
@@ -144,6 +146,7 @@ const IS_MOCK = process.env.NEXT_PUBLIC_CHAT_MOCK === "true";
 /** Metadata attached to UIMessage for cross-channel display */
 export interface ChatMessageMeta {
   channel?: "line" | "web";
+  timestamp?: string; // ISO 8601
 }
 
 interface HistoryApiMessage {
@@ -190,7 +193,10 @@ function historyToUIMessages(msgs: HistoryApiMessage[]): UIMessage[] {
     id: crypto.randomUUID(),
     role: m.role,
     parts: [{ type: "text" as const, text: m.content }],
-    metadata: { channel: m.channel } satisfies ChatMessageMeta,
+    metadata: {
+      channel: m.channel,
+      timestamp: m.created_at,
+    } satisfies ChatMessageMeta,
   }));
 }
 
@@ -329,7 +335,10 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       setIsOpen(true);
       setProductCards([]);
       setQuickReplies([]);
-      rawSendMessage({ text });
+      rawSendMessage({
+        text,
+        metadata: { timestamp: new Date().toISOString() } satisfies ChatMessageMeta,
+      });
     },
     [rawSendMessage, sessionId],
   );
@@ -337,6 +346,26 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   const clearQuickReplies = useCallback(() => {
     setQuickReplies([]);
   }, []);
+
+  // Runtime timestamp map: records when each message first appears (for
+  // assistant messages created by the AI SDK which don't carry metadata.timestamp)
+  const runtimeTimestampMapRef = useRef<Map<string, string>>(new Map());
+  useEffect(() => {
+    const map = runtimeTimestampMapRef.current;
+    for (const msg of messages) {
+      if (!map.has(msg.id)) {
+        const meta = msg.metadata as ChatMessageMeta | undefined;
+        map.set(msg.id, meta?.timestamp ?? new Date().toISOString());
+      }
+    }
+  }, [messages]);
+
+  const getMessageTimestamp = useCallback(
+    (messageId: string): string | undefined => {
+      return runtimeTimestampMapRef.current.get(messageId);
+    },
+    [],
+  );
 
   const isAuthenticated = shopifyCustomerId !== null || lineUserId !== null;
 
@@ -355,8 +384,9 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       clearQuickReplies,
       isAuthenticated,
       lineUserId,
+      getMessageTimestamp,
     }),
-    [messages, status, isOpen, pathname, sessionId, sendMessage, error, productCards, quickReplies, clearQuickReplies, isAuthenticated, lineUserId],
+    [messages, status, isOpen, pathname, sessionId, sendMessage, error, productCards, quickReplies, clearQuickReplies, isAuthenticated, lineUserId, getMessageTimestamp],
   );
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;

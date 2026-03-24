@@ -1,12 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SendHorizontal, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 // vaul Drawer removed — replaced with a plain fixed panel for iOS keyboard compatibility
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useChatContext } from "./chat-provider";
+import type { ChatMessageMeta } from "./chat-provider";
 import { ChatMessage } from "./chat-message";
 import { ChatLauncher } from "./chat-launcher";
 import { ProductCards } from "./product-card";
@@ -46,6 +47,49 @@ function TypingIndicator() {
       <span className="size-1.5 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:0ms]" />
       <span className="size-1.5 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:150ms]" />
       <span className="size-1.5 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:300ms]" />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Date separator
+// ---------------------------------------------------------------------------
+
+const DAY_NAMES = ["\u65E5", "\u6708", "\u706B", "\u6C34", "\u6728", "\u91D1", "\u571F"] as const;
+
+/**
+ * Build a human-readable date label:
+ *  - "today" -> "\u4ECA\u65E5"
+ *  - "yesterday" -> "\u6628\u65E5"
+ *  - otherwise -> "3\u670824\u65E5\uFF08\u6708\uFF09"
+ */
+function getDateLabel(date: Date): string {
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
+  const dateStr = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+
+  if (todayStr === dateStr) return "\u4ECA\u65E5";
+
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayStr = `${yesterday.getFullYear()}-${yesterday.getMonth()}-${yesterday.getDate()}`;
+  if (yesterdayStr === dateStr) return "\u6628\u65E5";
+
+  const month = date.getMonth() + 1;
+  const day = date.getDate();
+  const dayName = DAY_NAMES[date.getDay()];
+  return `${month}\u6708${day}\u65E5\uFF08${dayName}\uFF09`;
+}
+
+function DateSeparator({ label }: { label: string }) {
+  return (
+    <div
+      data-slot="date-separator"
+      className="flex items-center gap-3 py-2"
+    >
+      <div className="flex-1 border-t border-border" />
+      <span className="text-xs text-muted-foreground shrink-0">{label}</span>
+      <div className="flex-1 border-t border-border" />
     </div>
   );
 }
@@ -133,7 +177,7 @@ function MessagesList({
   messagesEndRef,
   className,
 }: MessagesListProps) {
-  const { productCards, quickReplies, sendMessage, clearQuickReplies } =
+  const { productCards, quickReplies, sendMessage, clearQuickReplies, getMessageTimestamp } =
     useChatContext();
 
   const handleQuickReply = useCallback(
@@ -144,6 +188,30 @@ function MessagesList({
     [clearQuickReplies, sendMessage],
   );
 
+  // Build a list of elements with date separators inserted at date boundaries
+  const messagesWithSeparators = useMemo(() => {
+    const elements: React.ReactNode[] = [];
+    let prevDateStr: string | null = null;
+
+    for (const msg of messages) {
+      const meta = msg.metadata as ChatMessageMeta | undefined;
+      const ts = meta?.timestamp ?? getMessageTimestamp(msg.id);
+      const msgDate = ts ? new Date(ts) : new Date();
+      const dateStr = `${msgDate.getFullYear()}-${msgDate.getMonth()}-${msgDate.getDate()}`;
+
+      if (dateStr !== prevDateStr) {
+        elements.push(
+          <DateSeparator key={`sep-${dateStr}`} label={getDateLabel(msgDate)} />,
+        );
+        prevDateStr = dateStr;
+      }
+
+      elements.push(<ChatMessage key={msg.id} message={msg} />);
+    }
+
+    return elements;
+  }, [messages, getMessageTimestamp]);
+
   return (
     <div
       data-slot="chat-messages"
@@ -152,9 +220,7 @@ function MessagesList({
         className,
       )}
     >
-      {messages.map((msg) => (
-        <ChatMessage key={msg.id} message={msg} />
-      ))}
+      {messagesWithSeparators}
       {isStreaming &&
         messages.length > 0 &&
         messages[messages.length - 1]?.role === "user" && <TypingIndicator />}

@@ -243,6 +243,19 @@ function FeedbackButtons({
 }
 
 // ---------------------------------------------------------------------------
+// Timestamp formatter
+// ---------------------------------------------------------------------------
+
+/**
+ * Format an ISO timestamp to HH:MM (24-hour) in the user's local timezone.
+ */
+function formatTime(iso: string): string {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  return d.toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit", hour12: false });
+}
+
+// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
@@ -251,10 +264,14 @@ interface ChatMessageProps {
 }
 
 export function ChatMessage({ message }: ChatMessageProps) {
+  const { getMessageTimestamp } = useChatContext();
   const isUser = message.role === "user";
   const text = getTextFromMessage(message);
   const meta = message.metadata as ChatMessageMeta | undefined;
   const isLine = meta?.channel === "line";
+
+  const timestamp = meta?.timestamp ?? getMessageTimestamp(message.id);
+  const timeLabel = timestamp ? formatTime(timestamp) : "";
 
   if (!text) return null;
 
@@ -266,21 +283,44 @@ export function ChatMessage({ message }: ChatMessageProps) {
         isUser ? "items-end" : "items-start",
       )}
     >
-      {/* WC3: Cross-channel label for LINE messages */}
-      {isLine && (
-        <span className="mb-0.5 px-1 text-xs text-muted-foreground">
-          LINE で送信
-        </span>
+      {/* WC3: Cross-channel label + timestamp row for LINE messages (user side) */}
+      {isLine && isUser && (
+        <div className="mb-0.5 flex items-center gap-1.5 px-1">
+          <span className="text-xs text-muted-foreground">LINE</span>
+        </div>
       )}
+      {/* Bubble + timestamp row */}
       <div
         className={cn(
-          "max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap",
-          isUser
-            ? "bg-primary text-primary-foreground"
-            : "bg-muted text-foreground",
+          "flex items-end gap-1.5",
+          isUser ? "flex-row-reverse" : "flex-row",
         )}
       >
-        {isUser ? text : renderContent(text)}
+        <div
+          className={cn(
+            "max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap",
+            isUser
+              ? "bg-primary text-primary-foreground"
+              : "bg-muted text-foreground",
+          )}
+        >
+          {isUser ? text : renderContent(text)}
+        </div>
+        {/* Timestamp + channel label */}
+        <div className={cn(
+          "flex shrink-0 items-end gap-1 pb-0.5",
+          isUser ? "flex-row-reverse" : "flex-row",
+        )}>
+          {/* LINE label for assistant messages */}
+          {isLine && !isUser && (
+            <span className="text-[10px] text-muted-foreground">LINE</span>
+          )}
+          {timeLabel && (
+            <span className="text-[10px] text-muted-foreground leading-none">
+              {timeLabel}
+            </span>
+          )}
+        </div>
       </div>
       {/* Feedback buttons for assistant messages */}
       {!isUser && (
