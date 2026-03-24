@@ -28,12 +28,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       clientId: process.env.AUTH_LINE_ID,
       clientSecret: process.env.AUTH_LINE_SECRET,
       authorization: {
+        url: "https://access.line.me/oauth2/v2.1/authorize",
         params: {
           bot_prompt: "aggressive",
           scope: "profile openid email",
-          // Do NOT set prompt — omitting it allows LINE's Universal Links
-          // to open the LINE app directly on mobile. Setting prompt=consent
-          // or prompt=login forces the browser-based flow.
+          initial_amr_display: "lineqr",
+          // initial_amr_display=lineqr: モバイルでは LINE アプリ起動、
+          // PC では QR コード表示を優先する。
+          // これにより email/password 入力画面をスキップ。
         },
       },
     }),
