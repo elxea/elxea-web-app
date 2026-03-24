@@ -6,9 +6,11 @@ import { getClient } from "@/sanity/lib/client";
 import { EVENT_BY_SLUG_QUERY } from "@/sanity/lib/queries";
 import { urlFor } from "@/sanity/lib/image";
 import { PortableText } from "@/components/sanity/portable-text";
-import { isAuthenticated } from "@/lib/shopify/auth";
+import { getMembershipTier } from "@/lib/shopify/auth";
+import type { MembershipTier } from "@/lib/shopify/customer";
 import { MemberGate } from "@/components/ui/member-gate";
 import { Button } from "@/components/ui/button";
+import { EventRegisterButton } from "@/components/events/event-register-button";
 
 export async function generateMetadata({
   params,
@@ -59,9 +61,12 @@ export default async function EventPage({
 
   if (!event) notFound();
 
-  // Member-only content gating
-  const isMemberOnly = event.memberOnly === true;
-  const loggedIn = isMemberOnly ? await isAuthenticated() : true;
+  // Membership tier gating
+  const requiredTier: MembershipTier = event.requiredTier ?? (event.memberOnly ? "standard" : "none");
+  const isGated = requiredTier !== "none";
+  const userTier = isGated ? await getMembershipTier() : "none" as MembershipTier;
+  const tierRank: Record<MembershipTier, number> = { none: 0, standard: 1, premium: 2 };
+  const hasAccess = !isGated || tierRank[userTier] >= tierRank[requiredTier];
 
   return (
     <div className="section-narrow">
@@ -83,7 +88,7 @@ export default async function EventPage({
         {event.location && (
           <p className="text-muted-foreground text-sm">{event.location}</p>
         )}
-        {isMemberOnly && (
+        {isGated && (
           <p className="text-xs text-muted-foreground mt-4">[{tCommon("memberOnly")}]</p>
         )}
       </header>
@@ -102,8 +107,28 @@ export default async function EventPage({
         </div>
       )}
 
-      {loggedIn ? (
+      {hasAccess ? (
         <>
+          {/* One-tap event registration */}
+          <div className="mb-8">
+            <EventRegisterButton
+              eventSlug={slug}
+              eventTitle={event.title}
+              eventDate={event.date ?? null}
+              eventImageUrl={
+                event.image?.asset
+                  ? urlFor(event.image).width(600).url()
+                  : null
+              }
+              registerLabel={t("register")}
+              cancelLabel={t("cancelRegistration")}
+              registeredMessage={t("registeredMessage")}
+              cancelledMessage={t("cancelledMessage")}
+              errorMessage={tCommon("error")}
+              loginRequiredMessage={tCommon("loginRequired")}
+            />
+          </div>
+
           {event.description && <PortableText value={event.description} />}
 
           {event.externalUrl && (
@@ -121,7 +146,7 @@ export default async function EventPage({
           )}
         </>
       ) : (
-        <MemberGate />
+        <MemberGate requiredTier={requiredTier} />
       )}
     </div>
   );

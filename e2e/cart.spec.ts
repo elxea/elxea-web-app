@@ -80,7 +80,7 @@ test.describe("Cart", () => {
       .catch(() => true);
 
     if (cartHasItem) {
-      test.skip("Cart add failed — Shopify API may be unavailable");
+      test.skip(true, "Cart add failed — Shopify API may be unavailable");
       return;
     }
 
@@ -125,7 +125,7 @@ test.describe("Cart", () => {
       .catch(() => false);
 
     if (cartIsEmpty) {
-      test.skip("Cart add failed — Shopify API may be unavailable");
+      test.skip(true, "Cart add failed — Shopify API may be unavailable");
       return;
     }
 
@@ -178,7 +178,7 @@ test.describe("Cart", () => {
       .catch(() => false);
 
     if (cartIsEmpty) {
-      test.skip("Cart add failed — Shopify API may be unavailable");
+      test.skip(true, "Cart add failed — Shopify API may be unavailable");
       return;
     }
 
@@ -227,7 +227,7 @@ test.describe("Cart", () => {
       .catch(() => false);
 
     if (cartIsEmpty) {
-      test.skip("Cart add failed — Shopify API may be unavailable");
+      test.skip(true, "Cart add failed — Shopify API may be unavailable");
       return;
     }
 

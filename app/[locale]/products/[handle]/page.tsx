@@ -9,6 +9,8 @@ import { VariantSelector } from "@/components/product/variant-selector";
 import { AddToCartButton } from "@/components/product/add-to-cart-button";
 import { ProductPurchaseOptions } from "@/components/product/product-purchase-options";
 import { ProductFeatures } from "@/components/product/product-features";
+import { FavoriteButton } from "@/components/product/favorite-button";
+import { Breadcrumb } from "@/components/seo/breadcrumb";
 
 export async function generateMetadata({
   params,
@@ -79,7 +81,21 @@ export default async function ProductPage({
             </p>
           )}
 
-          <h1>{product.title}</h1>
+          <div className="flex items-start justify-between gap-4">
+            <h1>{product.title}</h1>
+            <FavoriteButton
+              productHandle={product.handle}
+              productTitle={product.title}
+              productImageUrl={product.featuredImage?.url ?? null}
+              addLabel={t("addToFavorites")}
+              removeLabel={t("removeFromFavorites")}
+              addedMessage={t("addedToFavorites")}
+              removedMessage={t("removedFromFavorites")}
+              errorMessage={t("favoriteError")}
+              loginRequiredMessage={t("loginRequiredForFavorite")}
+              className="shrink-0 mt-1"
+            />
+          </div>
 
           {product.sellingPlanGroups.length === 0 && (
             <p className="text-lg">

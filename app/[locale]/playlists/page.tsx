@@ -40,7 +40,7 @@ async function PlaylistGrid() {
             albumImage?: { asset: object; alt?: string };
             description?: string;
             artist?: { name: string };
-            colors?: { color1?: string };
+            colors?: { color1?: string; primary?: string };
           }) => (
             <Link
               key={pl._id}
@@ -51,7 +51,7 @@ async function PlaylistGrid() {
                 image={pl.albumImage?.asset ? urlFor(pl.albumImage).width(600).height(400).url() : undefined}
                 alt={pl.albumImage?.alt || pl.title}
                 className="mb-4"
-                style={pl.colors?.color1 ? { backgroundColor: pl.colors.color1 } : undefined}
+                style={(pl.colors?.color1 || pl.colors?.primary) ? { backgroundColor: pl.colors?.color1 || pl.colors?.primary } : undefined}
                 hover
               />
               <div className="space-y-1">

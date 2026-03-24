@@ -7,10 +7,6 @@ service cloud.firestore {
     // Helper functions
     // -----------------------------------------------------------------------
 
-    // Check if the request comes from Firebase Admin SDK (server-side).
-    // Admin SDK bypasses all rules, so this is mainly documentation.
-    // Client requests are the ones governed by these rules.
-
     // Check if user is authenticated
     function isAuthenticated() {
       return request.auth != null;
@@ -22,6 +18,16 @@ service cloud.firestore {
     function isOwner(customerId) {
       return isAuthenticated()
         && request.auth.token.shopifyCustomerId == customerId;
+    }
+
+    // Validate string field: non-empty, within max length
+    function isValidString(field, maxLen) {
+      return field is string && field.size() > 0 && field.size() <= maxLen;
+    }
+
+    // Validate that a timestamp field is a server timestamp
+    function isServerTimestamp(field) {
+      return field == request.time;
     }
 
     // -----------------------------------------------------------------------
@@ -42,8 +48,11 @@ service cloud.firestore {
       match /favorites/{docId} {
         allow read: if isOwner(customerId);
         allow create: if isOwner(customerId)
-          && request.resource.data.keys().hasAll(['type', 'targetId', 'title'])
-          && request.resource.data.type in ['product', 'article'];
+          && isValidString(request.resource.data.type, 20)
+          && request.resource.data.type in ['product', 'article']
+          && isValidString(request.resource.data.targetId, 255)
+          && isValidString(request.resource.data.title, 500)
+          && isServerTimestamp(request.resource.data.createdAt);
         allow delete: if isOwner(customerId);
         allow update: if false;
       }
@@ -52,7 +61,9 @@ service cloud.firestore {
       match /follows/{docId} {
         allow read: if isOwner(customerId);
         allow create: if isOwner(customerId)
-          && request.resource.data.keys().hasAll(['farmerSlug', 'farmerName']);
+          && isValidString(request.resource.data.farmerSlug, 255)
+          && isValidString(request.resource.data.farmerName, 255)
+          && isServerTimestamp(request.resource.data.createdAt);
         allow delete: if isOwner(customerId);
         allow update: if false;
       }
@@ -61,7 +72,9 @@ service cloud.firestore {
       match /eventRegistrations/{docId} {
         allow read: if isOwner(customerId);
         allow create: if isOwner(customerId)
-          && request.resource.data.keys().hasAll(['eventSlug', 'eventTitle']);
+          && isValidString(request.resource.data.eventSlug, 255)
+          && isValidString(request.resource.data.eventTitle, 500)
+          && isServerTimestamp(request.resource.data.registeredAt);
         allow delete: if isOwner(customerId);
         allow update: if false;
       }
@@ -89,18 +102,18 @@ service cloud.firestore {
     // comments — top-level collection
     // -----------------------------------------------------------------------
     match /comments/{commentId} {
-      // Anyone authenticated can read approved comments
-      allow read: if isAuthenticated()
-        && resource.data.status == 'approved';
+      // Anyone can read approved comments; author can read their own
+      allow read: if resource.data.status == 'approved' || isOwner(resource.data.authorId);
 
       // Authenticated users can create comments
       allow create: if isAuthenticated()
-        && request.resource.data.keys().hasAll(['targetType', 'targetId', 'authorId', 'authorName', 'body', 'status'])
+        && request.resource.data.authorId == request.auth.token.shopifyCustomerId
         && request.resource.data.targetType in ['article', 'farmer']
-        && request.resource.data.body.size() <= 500
-        && request.resource.data.body.size() > 0
+        && isValidString(request.resource.data.targetId, 255)
+        && isValidString(request.resource.data.authorName, 255)
+        && isValidString(request.resource.data.body, 500)
         && request.resource.data.status == 'approved'
-        && request.resource.data.authorId == request.auth.token.shopifyCustomerId;
+        && isServerTimestamp(request.resource.data.createdAt);
 
       // Only the author can delete their own comment
       allow delete: if isAuthenticated()

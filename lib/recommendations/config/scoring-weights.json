@@ -1,0 +1,29 @@
+{
+  "_doc": "Scoring weights for the content recommendation engine. These weights determine how strongly each signal influences article ranking.",
+  "weights": {
+    "personaMatch": {
+      "value": 3,
+      "rationale": "Persona is the strongest signal because it reflects cumulative user behavior across multiple sessions. A persona match means the article's topic fundamentally aligns with the user's demonstrated interest pattern."
+    },
+    "targetLayerMatch": {
+      "value": 2,
+      "rationale": "Target layer (tea_lover / wellbeing / gourmet) represents the user's lifestyle segment. It is the second-strongest signal because it captures 'why' the user engages with tea content, complementing the persona 'what'."
+    },
+    "depthMatch": {
+      "value": 1,
+      "rationale": "Depth level (entry / explore / deep) indicates content complexity fit. It receives the lowest weight because a slightly mismatched depth is less disruptive than a wrong persona or layer — users can still benefit from adjacent depth levels."
+    },
+    "contextTimeMatch": {
+      "value": 1,
+      "rationale": "Time-of-day context provides a subtle relevance boost. Morning tea content is more relevant in the morning. Low weight because it is a 'nice to have' rather than a core signal."
+    },
+    "contextSeasonMatch": {
+      "value": 1,
+      "rationale": "Seasonal context provides a subtle relevance boost. Summer iced tea content is more relevant in summer. Low weight for the same reason as time context."
+    },
+    "readPenalty": {
+      "value": -1,
+      "rationale": "Small penalty for already-read articles to promote content discovery without completely hiding revisitable content."
+    }
+  }
+}

@@ -5,4 +5,5 @@ export default defineCliConfig({
     projectId: "5s8ahx87",
     dataset: "production",
   },
+  studioHost: "elxea",
 });

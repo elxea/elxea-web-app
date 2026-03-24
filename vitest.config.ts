@@ -20,7 +20,9 @@ export default defineConfig({
         test: {
           name: 'unit',
           include: ['__tests__/**/*.test.ts'],
+          exclude: ['e2e/**', 'node_modules/**'],
           environment: 'node',
+          globals: true,
         },
         resolve: {
           alias: {

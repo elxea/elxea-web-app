@@ -10,6 +10,8 @@ import {
 import { ArticleCard } from "@/components/journal/article-card";
 import { CategoryFilter } from "@/components/journal/category-filter";
 import { ImageCard } from "@/components/ui/image-card";
+import { requireAuth } from "@/lib/firebase/auth-guard";
+import { getRecommendedArticles } from "@/lib/recommendations/content-engine";
 
 export default async function JournalPage({
   searchParams,
@@ -55,6 +57,23 @@ function ArticlesListSkeleton() {
   );
 }
 
+type ArticleItem = {
+  _id: string;
+  slug: { current: string };
+  title: string;
+  excerpt?: string;
+  thumbnail?: { asset: object; alt?: string };
+  mainImage?: { asset: object; alt?: string };
+  publishedAt?: string;
+  memberOnly?: boolean;
+  category?: { title: string; slug: { current: string } };
+  tags?: { _id: string; title: string; slug: { current: string } }[];
+  author?: { name: string; image?: { asset: object } };
+  contentPersona?: string | string[] | null;
+  depthLevel?: string | null;
+  targetLayer?: string | null;
+};
+
 async function ArticlesList({ categorySlug }: { categorySlug: string | null }) {
   const locale = await getLocale();
   const t = await getTranslations("journal");
@@ -62,7 +81,7 @@ async function ArticlesList({ categorySlug }: { categorySlug: string | null }) {
 
   try {
     const client = getClient();
-    const [rawCategories, articles] = await Promise.all([
+    const [rawCategories, rawArticles] = await Promise.all([
       client.fetch(CATEGORIES_QUERY),
       categorySlug
         ? client.fetch(ARTICLES_BY_CATEGORY_QUERY, {
@@ -89,6 +108,23 @@ async function ArticlesList({ categorySlug }: { categorySlug: string | null }) {
       }
     );
 
+    // Resolve the authenticated user (gracefully — no error thrown for guests)
+    let customerId: string | null = null;
+    try {
+      const auth = await requireAuth();
+      if (auth.authenticated) {
+        customerId = auth.customerId;
+      }
+    } catch {
+      // Unauthenticated — fall through with customerId = null
+    }
+
+    // Apply personalization scoring
+    const articles = await getRecommendedArticles({
+      customerId,
+      rawArticles: rawArticles as ArticleItem[],
+    });
+
     return (
       <>
         {categories && categories.length > 0 && (
@@ -102,28 +138,14 @@ async function ArticlesList({ categorySlug }: { categorySlug: string | null }) {
           <p className="text-muted-foreground text-sm">{t("empty")}</p>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-10">
-            {articles.map(
-              (article: {
-                _id: string;
-                slug: { current: string };
-                title: string;
-                excerpt?: string;
-                thumbnail?: { asset: object; alt?: string };
-                mainImage?: { asset: object; alt?: string };
-                publishedAt?: string;
-                memberOnly?: boolean;
-                category?: { title: string; slug: { current: string } };
-                tags?: { _id: string; title: string; slug: { current: string } }[];
-                author?: { name: string; image?: { asset: object } };
-              }) => (
-                <ArticleCard
-                  key={article._id}
-                  article={article}
-                  locale={locale}
-                  memberOnlyLabel={tCommon("memberOnly")}
-                />
-              )
-            )}
+            {articles.map((article) => (
+              <ArticleCard
+                key={article._id}
+                article={article}
+                locale={locale}
+                memberOnlyLabel={tCommon("memberOnly")}
+              />
+            ))}
           </div>
         )}
       </>

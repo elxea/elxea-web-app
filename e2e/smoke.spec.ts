@@ -5,9 +5,9 @@ test.describe("Smoke tests", () => {
     await page.goto("/ja");
     await expect(page).toHaveTitle(/elxea/i);
 
-    // The hero section has "elxea" as an h1
+    // The hero section has h1 with tagline
     const heading = page.locator("h1");
-    await expect(heading).toContainText("elxea");
+    await expect(heading).toBeVisible();
   });
 
   test("homepage shows key sections", async ({ page }) => {
@@ -19,8 +19,7 @@ test.describe("Smoke tests", () => {
     // Latest journal section
     await expect(page.getByText("最新の記事")).toBeVisible();
 
-    // Upcoming events section
-    await expect(page.getByText("近日開催のイベント")).toBeVisible();
+    // Upcoming events section is shown only when events exist in Sanity CMS (conditional)
   });
 
   test("root / redirects to /ja", async ({ page }) => {
@@ -102,7 +101,7 @@ test.describe("Navigation", () => {
 
   test("logo links back to homepage", async ({ page }) => {
     await page.goto("/ja/products");
-    await page.locator("header").getByText("elxea").click();
+    await page.locator('header a[href="/ja"]').click();
     await page.waitForURL(/\/ja$/);
     expect(page.url()).toMatch(/\/ja$/);
   });

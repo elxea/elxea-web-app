@@ -6,10 +6,14 @@ import { getClient } from "@/sanity/lib/client";
 import { ARTICLE_BY_SLUG_QUERY, RELATED_ARTICLES_QUERY } from "@/sanity/lib/queries";
 import { urlFor } from "@/sanity/lib/image";
 import { PortableText } from "@/components/sanity/portable-text";
-import { isAuthenticated } from "@/lib/shopify/auth";
+import { getMembershipTier } from "@/lib/shopify/auth";
+import type { MembershipTier } from "@/lib/shopify/customer";
 import { MemberGate } from "@/components/ui/member-gate";
 import { AuthorProfile } from "@/components/journal/author-profile";
+import { BookmarkButton } from "@/components/journal/bookmark-button";
 import { RelatedArticles } from "@/components/journal/related-articles";
+import { CommentSection } from "@/components/community/comment-section";
+import { ArticleReadTracker } from "@/components/journal/article-read-tracker";
 import { Link } from "@/i18n/navigation";
 
 export async function generateMetadata({
@@ -50,6 +54,7 @@ export default async function ArticlePage({
   const locale = await getLocale();
   const t = await getTranslations("journal");
   const tCommon = await getTranslations("common");
+  const tComment = await getTranslations("comment");
 
   let article;
   try {
@@ -68,13 +73,16 @@ export default async function ArticlePage({
 
   if (!article) notFound();
 
-  // Member-only content gating
-  const isMemberOnly = article.memberOnly === true;
-  const loggedIn = isMemberOnly ? await isAuthenticated() : true;
+  // Membership tier gating
+  const requiredTier: MembershipTier = article.requiredTier ?? (article.memberOnly ? "standard" : "none");
+  const isGated = requiredTier !== "none";
+  const userTier = isGated ? await getMembershipTier() : "none" as MembershipTier;
+  const tierRank: Record<MembershipTier, number> = { none: 0, standard: 1, premium: 2 };
+  const hasAccess = !isGated || tierRank[userTier] >= tierRank[requiredTier];
 
   // Fetch related articles (parallel with rendering setup)
   let relatedArticles: unknown[] = [];
-  if (loggedIn && article.category?._id) {
+  if (hasAccess && article.category?._id) {
     try {
       const client = getClient();
       relatedArticles = await client.fetch(RELATED_ARTICLES_QUERY, {
@@ -90,6 +98,12 @@ export default async function ArticlePage({
 
   return (
     <article className="section-narrow">
+      {/* Behavior tracking — fires page_view on mount, article_read on 30s or 80% scroll */}
+      <ArticleReadTracker
+        articleSlug={slug}
+        category={article.category?.slug?.current}
+      />
+
       {/* Header */}
       <header className="mb-12">
         {article.category && (
@@ -100,7 +114,25 @@ export default async function ArticlePage({
             {article.category.title}
           </Link>
         )}
-        <h1 className="mb-4">{article.title}</h1>
+        <div className="flex items-start justify-between gap-4 mb-4">
+          <h1>{article.title}</h1>
+          <BookmarkButton
+            articleSlug={slug}
+            articleTitle={article.title}
+            articleImageUrl={
+              article.mainImage?.asset
+                ? urlFor(article.mainImage).width(200).url()
+                : null
+            }
+            addLabel={t("addToBookmarks")}
+            removeLabel={t("removeFromBookmarks")}
+            addedMessage={t("addedToBookmarks")}
+            removedMessage={t("removedFromBookmarks")}
+            errorMessage={t("bookmarkError")}
+            loginRequiredMessage={t("loginRequiredForBookmark")}
+            className="shrink-0 mt-1"
+          />
+        </div>
         {article.excerpt && (
           <p className="text-muted-foreground text-sm leading-relaxed">{article.excerpt}</p>
         )}
@@ -116,7 +148,7 @@ export default async function ArticlePage({
           {article.publishedAt && (
             <time>{new Date(article.publishedAt).toLocaleDateString(locale)}</time>
           )}
-          {isMemberOnly && (
+          {isGated && (
             <span className="text-muted-foreground">[{tCommon("memberOnly")}]</span>
           )}
         </div>
@@ -152,8 +184,8 @@ export default async function ArticlePage({
         </div>
       )}
 
-      {/* Body — gated for member-only content */}
-      {loggedIn ? (
+      {/* Body — gated by membership tier */}
+      {hasAccess ? (
         <>
           {article.body && (
             <div className="prose-custom">
@@ -221,9 +253,31 @@ export default async function ArticlePage({
             heading={t("relatedArticles")}
             locale={locale}
           />
+
+          {/* Comment section */}
+          <CommentSection
+            targetType="article"
+            targetId={slug}
+            locale={locale}
+            i18n={{
+              title: tComment("title"),
+              placeholder: tComment("placeholder"),
+              submit: tComment("submit"),
+              submitting: tComment("submitting"),
+              loginRequired: tComment("loginRequired"),
+              postedMessage: tComment("postedMessage"),
+              deletedMessage: tComment("deletedMessage"),
+              errorPosting: tComment("errorPosting"),
+              errorDeleting: tComment("errorDeleting"),
+              noComments: tComment("noComments"),
+              delete: tComment("delete"),
+              characterCount: tComment("characterCount"),
+              moderation: tComment("moderation"),
+            }}
+          />
         </>
       ) : (
-        <MemberGate />
+        <MemberGate requiredTier={requiredTier} />
       )}
     </article>
   );

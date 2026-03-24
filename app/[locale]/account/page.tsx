@@ -1,12 +1,14 @@
 import { getTranslations, getLocale } from "next-intl/server";
-import Image from "next/image";
 import { getCustomerFromSession, getSubscriptionsFromSession } from "@/lib/shopify/auth";
 import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
 import { ImagePlaceholder } from "@/components/ui/image-placeholder";
 import { Separator } from "@/components/ui/separator";
-import type { SubscriptionContract } from "@/lib/shopify/customer";
-import { SubscriptionActions } from "@/components/account/subscription-actions";
+import type { MembershipTier } from "@/lib/shopify/customer";
+import { DashboardSummary } from "@/components/account/dashboard-summary";
+import { FavoritesSection } from "@/components/account/favorites-section";
+import { FollowsSection } from "@/components/account/follows-section";
+import { EventsSection } from "@/components/account/events-section";
 
 function formatPrice(amount: string, currency: string, locale: string) {
   return new Intl.NumberFormat(locale, {
@@ -53,13 +55,30 @@ export default async function AccountPage() {
   const email = customer.emailAddress?.emailAddress;
   const orders = customer.orders?.edges ?? [];
 
-  // Fetch subscriptions (graceful fallback if API doesn't support it)
-  let subscriptions: SubscriptionContract[] = [];
+  // Fetch subscriptions for summary count (graceful fallback if API doesn't support it)
+  let subscriptionCount = 0;
   try {
-    subscriptions = await getSubscriptionsFromSession();
+    const subscriptions = await getSubscriptionsFromSession();
+    subscriptionCount = subscriptions.length;
   } catch {
     // Subscription API may not be available
   }
+
+  // Compute membership tier from already-fetched data (avoid extra API calls)
+  let membershipTier: MembershipTier = "none";
+  if (customer.tags) {
+    if (customer.tags.includes("member-premium")) membershipTier = "premium";
+    else if (customer.tags.includes("member-standard") || customer.tags.includes("member")) membershipTier = "standard";
+  }
+  if (membershipTier === "none" && subscriptionCount > 0) {
+    membershipTier = "standard";
+  }
+
+  const tierLabels: Record<MembershipTier, string> = {
+    none: t("tierNone"),
+    standard: t("tierStandard").replace(/限定$/, "").replace(/ Only$/, ""),
+    premium: t("tierPremium").replace(/限定$/, "").replace(/ Only$/, ""),
+  };
 
   return (
     <div className="section-narrow">
@@ -76,13 +95,46 @@ export default async function AccountPage() {
         </Button>
       </div>
 
-      {/* Subscriptions */}
+      {/* Dashboard summary — subscriptions card is clickable */}
+      <DashboardSummary
+        orderCount={orders.length}
+        subscriptionCount={subscriptionCount}
+        labels={{
+          favorites: t("dashboardFavorites"),
+          follows: t("dashboardFollows"),
+          events: t("dashboardEvents"),
+          orders: t("dashboardOrders"),
+          subscriptions: t("dashboardSubscriptions"),
+        }}
+        links={{
+          subscriptions: "/account/subscriptions",
+        }}
+      />
+
+      {/* Membership status */}
       <section className="mb-12">
-        <h2 className="mb-6 pb-3 border-b border-border">
+        <h2 className="text-lg mb-6 pb-3 border-b border-border">
+          {t("membershipStatus")}
+        </h2>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs text-muted-foreground mb-1">{t("currentTier")}</p>
+            <p className="text-sm">{tierLabels[membershipTier]}</p>
+          </div>
+          {membershipTier !== "premium" && (
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/membership">{t("viewPlans")}</Link>
+            </Button>
+          )}
+        </div>
+      </section>
+
+      {/* Subscriptions summary — link to dedicated page */}
+      <section className="mb-12">
+        <h2 className="text-lg mb-6 pb-3 border-b border-border">
           {t("subscriptions")}
         </h2>
-
-        {subscriptions.length === 0 ? (
+        {subscriptionCount === 0 ? (
           <div>
             <p className="text-muted-foreground text-sm mb-4">
               {t("noSubscriptions")}
@@ -92,23 +144,60 @@ export default async function AccountPage() {
             </Button>
           </div>
         ) : (
-          <div className="space-y-6">
-            {subscriptions.map((sub) => (
-              <SubscriptionCard
-                key={sub.id}
-                subscription={sub}
-                locale={locale}
-                t={t}
-              />
-            ))}
-            <p className="text-xs text-muted-foreground">
-              {t("subscriptionNote")}
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">
+              {subscriptionCount}件のご契約
             </p>
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/account/subscriptions">{t("viewSubscriptions")}</Link>
+            </Button>
           </div>
         )}
       </section>
 
-      {/* Order history */}
+      {/* Favorite products */}
+      <FavoritesSection
+        type="product"
+        title={t("favoriteProducts")}
+        emptyMessage={t("noFavoriteProducts")}
+        errorMessage={t("actionError")}
+        removedMessage={t("removedFromFavorites")}
+        locale={locale}
+        productBaseUrl="/products"
+        articleBaseUrl="/journal"
+      />
+
+      {/* Favorite articles */}
+      <FavoritesSection
+        type="article"
+        title={t("favoriteArticles")}
+        emptyMessage={t("noFavoriteArticles")}
+        errorMessage={t("actionError")}
+        removedMessage={t("removedFromFavorites")}
+        locale={locale}
+        productBaseUrl="/products"
+        articleBaseUrl="/journal"
+      />
+
+      {/* Following farmers */}
+      <FollowsSection
+        title={t("followingFarmers")}
+        emptyMessage={t("noFollows")}
+        errorMessage={t("actionError")}
+        removedMessage={t("unfollowed")}
+        locale={locale}
+      />
+
+      {/* Registered events */}
+      <EventsSection
+        title={t("registeredEvents")}
+        emptyMessage={t("noEventRegistrations")}
+        errorMessage={t("actionError")}
+        cancelledMessage={t("eventCancelled")}
+        locale={locale}
+      />
+
+      {/* Order history summary */}
       <section>
         <h2 className="mb-6 pb-3 border-b border-border">
           {t("orderHistory")}
@@ -118,7 +207,7 @@ export default async function AccountPage() {
           <p className="text-muted-foreground text-sm">{t("noOrders")}</p>
         ) : (
           <div className="space-y-4">
-            {orders.map(({ node: order }) => (
+            {orders.slice(0, 3).map(({ node: order }) => (
               <div
                 key={order.id}
                 className="flex items-center justify-between py-4 border-b border-border"
@@ -156,105 +245,6 @@ export default async function AccountPage() {
           </Button>
         </div>
       </section>
-    </div>
-  );
-}
-
-function SubscriptionCard({
-  subscription,
-  locale,
-  t,
-}: {
-  subscription: SubscriptionContract;
-  locale: string;
-  t: (key: string, values?: Record<string, string | number>) => string;
-}) {
-  const statusMap: Record<string, string> = {
-    ACTIVE: t("subscriptionActive"),
-    PAUSED: t("subscriptionPaused"),
-    CANCELLED: t("subscriptionCancelled"),
-  };
-
-  const statusColorMap: Record<string, string> = {
-    ACTIVE: "text-success-foreground bg-success/20",
-    PAUSED: "text-warning-foreground bg-warning/20",
-    CANCELLED: "text-muted-foreground bg-muted",
-  };
-
-  const statusLabel = statusMap[subscription.status] ?? subscription.status;
-  const statusColor = statusColorMap[subscription.status] ?? "text-muted-foreground bg-muted";
-
-  const { interval, intervalCount } = subscription.deliveryPolicy;
-  const intervalKey =
-    interval === "MONTH"
-      ? "intervalMonth"
-      : interval === "WEEK"
-        ? "intervalWeek"
-        : "intervalDay";
-
-  const lines = subscription.lines?.edges ?? [];
-
-  return (
-    <div className="border border-border p-5">
-      {/* Status + next delivery */}
-      <div className="flex items-center justify-between mb-4">
-        <span className={`text-xs px-2 py-1 ${statusColor}`}>
-          {statusLabel}
-        </span>
-        {subscription.nextBillingDate && (
-          <p className="text-xs text-muted-foreground">
-            {t("nextDelivery")}: {formatDate(subscription.nextBillingDate, locale)}
-          </p>
-        )}
-      </div>
-
-      {/* Line items */}
-      <div className="space-y-3">
-        {lines.map(({ node: line }) => (
-          <div key={line.id} className="flex items-center gap-4">
-            {line.variantImage ? (
-              <Image
-                src={line.variantImage.url}
-                alt={line.variantImage.altText ?? line.title}
-                width={56}
-                height={56}
-                className="object-cover rounded-md"
-              />
-            ) : (
-              <div className="w-14 h-14 rounded-md overflow-hidden">
-                <ImagePlaceholder />
-              </div>
-            )}
-            <div className="flex-1 min-w-0">
-              <p className="text-sm truncate">{line.title}</p>
-              {line.variantTitle && (
-                <p className="text-xs text-muted-foreground">{line.variantTitle}</p>
-              )}
-              <p className="text-xs text-muted-foreground">
-                × {line.quantity}
-              </p>
-            </div>
-            <p className="text-sm">
-              {formatPrice(line.currentPrice.amount, line.currentPrice.currencyCode, locale)}
-            </p>
-          </div>
-        ))}
-      </div>
-
-      {/* Delivery interval */}
-      <div className="mt-4 pt-4 border-t border-border">
-        <div className="flex items-center justify-between mb-3">
-          <p className="text-xs text-muted-foreground">
-            {t("deliveryInterval")}: {t(intervalKey, { count: intervalCount })}
-          </p>
-        </div>
-        {(subscription.status === "ACTIVE" || subscription.status === "PAUSED") && (
-          <SubscriptionActions
-            contractId={subscription.id}
-            status={subscription.status}
-          />
-        )}
-      </div>
     </div>
   );
 }

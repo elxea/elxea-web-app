@@ -129,12 +129,15 @@ export async function refreshAccessToken(refreshToken: string): Promise<TokenRes
 
 // --- Customer Account API queries ---
 
+export type MembershipTier = "none" | "standard" | "premium";
+
 export type Customer = {
   id: string;
   firstName: string | null;
   lastName: string | null;
   emailAddress: { emailAddress: string } | null;
   phoneNumber: { phoneNumber: string } | null;
+  tags: string[];
   orders: {
     edges: {
       node: {
@@ -155,7 +158,7 @@ export type SubscriptionContract = {
   nextBillingDate: string | null;
   deliveryPolicy: {
     interval: string;
-    intervalCount: number;
+    intervalCount: { count: number };
   };
   lines: {
     edges: {
@@ -165,7 +168,6 @@ export type SubscriptionContract = {
         variantTitle: string | null;
         quantity: number;
         currentPrice: { amount: string; currencyCode: string };
-        productId: string;
         variantImage: { url: string; altText: string | null } | null;
       };
     }[];
@@ -180,6 +182,7 @@ const CUSTOMER_QUERY = /* GraphQL */ `
       lastName
       emailAddress { emailAddress }
       phoneNumber { phoneNumber }
+      tags
       orders(first: 10, sortKey: PROCESSED_AT, reverse: true) {
         edges {
           node {
@@ -207,7 +210,9 @@ const SUBSCRIPTION_CONTRACTS_QUERY = /* GraphQL */ `
             nextBillingDate
             deliveryPolicy {
               interval
-              intervalCount
+              intervalCount {
+                count
+              }
             }
             lines(first: 10) {
               edges {
@@ -217,7 +222,6 @@ const SUBSCRIPTION_CONTRACTS_QUERY = /* GraphQL */ `
                   variantTitle
                   quantity
                   currentPrice { amount currencyCode }
-                  productId
                   variantImage { url altText }
                 }
               }
@@ -461,6 +465,40 @@ export function decryptToken(encrypted: string): string | null {
     let decrypted = decipher.update(data, "base64", "utf8");
     decrypted += decipher.final("utf8");
     return decrypted;
+  } catch {
+    return null;
+  }
+}
+
+// --- id_token helpers ---
+
+/**
+ * Extract the numeric Shopify Customer ID from a Shopify Customer Account API id_token.
+ *
+ * The id_token is a JWT. Its payload contains:
+ *   sub: "gid://shopify/Customer/12345"  (Customer GID)
+ *
+ * We decode the JWT payload without verifying the signature (the access_token
+ * already proves the session is valid). This avoids an extra API round-trip on
+ * every authenticated request.
+ *
+ * Returns the numeric portion (e.g. "12345") or null if decoding fails.
+ */
+export function extractCustomerIdFromIdToken(idToken: string): string | null {
+  try {
+    const parts = idToken.split(".");
+    if (parts.length < 2) return null;
+
+    // Base64url → Base64 → JSON
+    const payload = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const json = JSON.parse(Buffer.from(payload, "base64").toString("utf8"));
+
+    const sub: string | undefined = json.sub;
+    if (!sub) return null;
+
+    // sub is a GID: "gid://shopify/Customer/12345"
+    const match = sub.match(/(\d+)$/);
+    return match ? match[1] : null;
   } catch {
     return null;
   }

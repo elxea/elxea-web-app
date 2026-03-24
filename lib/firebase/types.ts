@@ -173,6 +173,12 @@ export type BehaviorEventMetadata = {
   productId?: string;
   query?: string;
   buttonLabel?: string;
+  /** Reading duration in seconds (set by behavior-tracker for view_content) */
+  durationSeconds?: number;
+  /** Product tags from Shopify (set by order webhook for purchase events) */
+  productTags?: string[];
+  /** Product category from Shopify (set by order webhook for purchase events) */
+  productCategory?: string;
 };
 
 export type BehaviorEvent = {

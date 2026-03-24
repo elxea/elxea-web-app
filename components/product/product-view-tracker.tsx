@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { trackViewItem } from "@/lib/analytics";
+import { trackProductView } from "@/lib/firebase/behavior-tracker";
 
 export function ProductViewTracker({
   id,
@@ -21,7 +22,10 @@ export function ProductViewTracker({
   variant?: string;
 }) {
   useEffect(() => {
+    // GTM analytics tracking
     trackViewItem({ id, name, price, currency, brand, category, variant });
+    // Firestore behavior event tracking
+    trackProductView({ productId: id, title: name, category });
   }, [id, name, price, currency, brand, category, variant]);
 
   return null;

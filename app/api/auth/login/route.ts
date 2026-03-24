@@ -8,7 +8,8 @@ import {
 } from "@/lib/shopify/customer";
 
 export async function GET(request: NextRequest) {
-  const origin = request.nextUrl.origin;
+  // NEXT_PUBLIC_APP_URL allows overriding the redirect URI base (e.g. for tunnels in local dev)
+  const origin = process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin;
   const redirectUri = `${origin}/api/auth/callback`;
 
   const codeVerifier = generateCodeVerifier();

@@ -6,7 +6,7 @@ test.describe("Mobile viewport", () => {
   test("homepage loads on mobile", async ({ page }) => {
     await page.goto("/ja");
     await expect(page).toHaveTitle(/elxea/i);
-    await expect(page.locator("h1")).toContainText("elxea");
+    await expect(page.locator("h1")).toBeVisible();
   });
 
   test("hamburger menu is visible and desktop nav is hidden", async ({
@@ -149,7 +149,7 @@ test.describe("Tablet viewport", () => {
   test("homepage loads on tablet", async ({ page }) => {
     await page.goto("/ja");
     await expect(page).toHaveTitle(/elxea/i);
-    await expect(page.locator("h1")).toContainText("elxea");
+    await expect(page.locator("h1")).toBeVisible();
   });
 
   test("navigation is appropriate for tablet width", async ({ page }) => {

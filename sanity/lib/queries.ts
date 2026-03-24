@@ -11,8 +11,14 @@ export const ARTICLES_QUERY = groq`
     mainImage,
     publishedAt,
     memberOnly,
+    requiredTier,
     featured,
     orderNumber,
+    contentPersona,
+    depthLevel,
+    targetLayer,
+    contextTime,
+    contextSeason,
     category->{title, slug},
     tags[]->{_id, title, slug},
     author->{name, slug, image}
@@ -29,8 +35,14 @@ export const ARTICLES_BY_CATEGORY_QUERY = groq`
     mainImage,
     publishedAt,
     memberOnly,
+    requiredTier,
     featured,
     orderNumber,
+    contentPersona,
+    depthLevel,
+    targetLayer,
+    contextTime,
+    contextSeason,
     category->{title, slug},
     tags[]->{_id, title, slug},
     author->{name, slug, image}
@@ -47,6 +59,7 @@ export const FEATURED_ARTICLES_QUERY = groq`
     mainImage,
     publishedAt,
     memberOnly,
+    requiredTier,
     category->{title, slug},
     author->{name, slug, image}
   }
@@ -63,6 +76,7 @@ export const ARTICLE_BY_SLUG_QUERY = groq`
     body,
     publishedAt,
     memberOnly,
+    requiredTier,
     featured,
     orderNumber,
     relatedProducts,
@@ -89,6 +103,7 @@ export const RELATED_ARTICLES_QUERY = groq`
     mainImage,
     publishedAt,
     memberOnly,
+    requiredTier,
     category->{title, slug}
   }
 `;
@@ -139,6 +154,7 @@ export const EVENTS_QUERY = groq`
     endDate,
     location,
     memberOnly,
+    requiredTier,
     externalUrl
   }
 `;
@@ -154,6 +170,7 @@ export const EVENT_BY_SLUG_QUERY = groq`
     endDate,
     location,
     memberOnly,
+    requiredTier,
     externalUrl,
     seo
   }
@@ -317,6 +334,7 @@ export const ARTICLES_BY_AUTHOR_QUERY = groq`
     mainImage,
     publishedAt,
     memberOnly,
+    requiredTier,
     category->{title, slug},
     tags[]->{_id, title, slug},
     author->{name, slug, image}

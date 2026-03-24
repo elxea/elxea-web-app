@@ -7,6 +7,7 @@ import {
   getSubscriptionContracts,
   type Customer,
   type SubscriptionContract,
+  type MembershipTier,
 } from "./customer";
 
 const ACCESS_TOKEN_COOKIE = "shop_at";
@@ -81,6 +82,39 @@ export async function getSubscriptionsFromSession(): Promise<SubscriptionContrac
   }
 }
 
+/**
+ * Determine membership tier from customer tags or active subscription contracts.
+ * Priority: tags (explicit) > subscription status (implicit).
+ * Tags: "member-premium" → premium, "member-standard" or "member" → standard.
+ * Fallback: any active subscription contract → standard.
+ */
+export async function getMembershipTier(): Promise<MembershipTier> {
+  try {
+    const session = await getSession();
+    if (!session) return "none";
+
+    const [customer, contracts] = await Promise.all([
+      getCustomer(session.accessToken),
+      getSubscriptionContracts(session.accessToken),
+    ]);
+
+    // Check tags first (set by Shopify Flow)
+    if (customer?.tags) {
+      if (customer.tags.includes("member-premium")) return "premium";
+      if (customer.tags.includes("member-standard") || customer.tags.includes("member")) return "standard";
+    }
+
+    // Fallback: check active subscription contracts
+    const hasActiveContract = contracts.some((c) => c.status === "ACTIVE");
+    if (hasActiveContract) return "standard";
+
+    return "none";
+  } catch (e) {
+    console.error("getMembershipTier error:", e);
+    return "none";
+  }
+}
+
 export async function setSessionCookies(
   accessToken: string,
   refreshToken: string,
@@ -123,6 +157,7 @@ export async function clearSession(): Promise<void> {
   cookieStore.delete(REFRESH_TOKEN_COOKIE);
   cookieStore.delete(EXPIRES_AT_COOKIE);
   cookieStore.delete(AUTH_FLAG_COOKIE);
+  cookieStore.delete("shop_cid"); // cached customer ID from id_token
 }
 
 /**

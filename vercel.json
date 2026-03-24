@@ -3,6 +3,14 @@
     {
       "path": "/api/cron/billing",
       "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/subscription-reminder",
+      "schedule": "0 22 * * *"
+    },
+    {
+      "path": "/api/cron/farmer-notification",
+      "schedule": "0 1 * * *"
     }
   ]
 }
