@@ -13,7 +13,7 @@
  *     /.well-known/shopify/*
  *     /payments/*
  *     /wallets/*
- *     /admin/*
+ *     /cdn/shopifycloud/*, /cdn/s/*
  *
  *   Vercel (passthrough — let Cloudflare route to origin normally):
  *     Everything else — the Next.js app
@@ -37,9 +37,9 @@ const SHOPIFY_PATH_PREFIXES = [
   '/.well-known/shopify/',
   '/payments/',
   '/wallets/',
-  '/admin/',
-  // Shopify CDN paths (served from Shopify's CDN when checkout pages reference them)
-  '/cdn/',
+  // Shopify CDN paths — only allow specific subdirectories needed by checkout
+  '/cdn/shopifycloud/',
+  '/cdn/s/',
 ];
 
 function isShopifyPath(pathname: string): boolean {
@@ -59,24 +59,32 @@ export default {
 
     // Shopify paths — proxy to Shopify origin
     if (isShopifyPath(pathname)) {
-      const shopifyUrl = new URL(pathname + url.search, env.SHOPIFY_ORIGIN);
+      try {
+        const shopifyUrl = new URL(pathname + url.search, env.SHOPIFY_ORIGIN);
 
-      const shopifyRequest = new Request(shopifyUrl.toString(), {
-        method: request.method,
-        headers: request.headers,
-        body: request.body,
-        redirect: 'manual',
-      });
+        const shopifyRequest = new Request(shopifyUrl.toString(), {
+          method: request.method,
+          headers: request.headers,
+          body: request.body,
+          redirect: 'manual',
+        });
 
-      // Set Host header to the custom domain (Shopify recognizes it)
-      shopifyRequest.headers.set('Host', url.host);
-      shopifyRequest.headers.set('X-Forwarded-Host', url.host);
-      shopifyRequest.headers.set('X-Forwarded-Proto', 'https');
+        // Set Host header to the custom domain (Shopify recognizes it)
+        shopifyRequest.headers.set('Host', url.host);
+        shopifyRequest.headers.set('X-Forwarded-Host', url.host);
+        shopifyRequest.headers.set('X-Forwarded-Proto', 'https');
 
-      const response = await fetch(shopifyRequest);
-      const newResponse = new Response(response.body, response);
-      newResponse.headers.set('x-elxea-router', 'shopify-proxy');
-      return newResponse;
+        const response = await fetch(shopifyRequest);
+        const newResponse = new Response(response.body, response);
+        newResponse.headers.set('x-elxea-router', 'shopify-proxy');
+        return newResponse;
+      } catch (err) {
+        console.error('[checkout-router] Shopify proxy error:', err);
+        return new Response('Bad Gateway', {
+          status: 502,
+          headers: { 'x-elxea-router': 'shopify-proxy-error' },
+        });
+      }
     }
 
     // Everything else — passthrough to Vercel origin (default DNS target)
