@@ -68,9 +68,9 @@ export default async function LoginPage() {
 
         {/* Shopify OAuth — secondary option */}
         <Button variant="outline" size="lg" className="w-full" asChild>
-          <Link href={`/api/auth/login?locale=${locale}`}>
+          <a href={`/api/auth/login?locale=${locale}`}>
             {t("shopifyButton")}
-          </Link>
+          </a>
         </Button>
 
         {/* Footer note */}
