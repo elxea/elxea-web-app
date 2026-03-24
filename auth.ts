@@ -31,6 +31,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         params: {
           bot_prompt: "aggressive",
           scope: "profile openid email",
+          // Do NOT set prompt — omitting it allows LINE's Universal Links
+          // to open the LINE app directly on mobile. Setting prompt=consent
+          // or prompt=login forces the browser-based flow.
         },
       },
     }),
@@ -105,6 +108,19 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           token.lineUserId;
       }
       return session;
+    },
+    async redirect({ url, baseUrl }) {
+      // After LINE Login, redirect to the completion page instead of
+      // back to the login page. The signIn action sets redirectTo with
+      // a query param ?linked=true which we detect here.
+      if (url.includes("/login") && url.includes("linked=true")) {
+        // Replace /login?linked=true with /login/complete
+        return url.replace(/\/login\?linked=true/, "/login/complete");
+      }
+      // Default: allow relative URLs, block external redirects
+      if (url.startsWith("/")) return `${baseUrl}${url}`;
+      if (url.startsWith(baseUrl)) return url;
+      return baseUrl;
     },
   },
   pages: {

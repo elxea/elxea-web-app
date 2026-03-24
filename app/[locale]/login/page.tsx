@@ -52,7 +52,7 @@ export default async function LoginPage() {
         <LineLoginButton
           signInAction={async () => {
             "use server";
-            await signIn("line", { redirectTo: `/${locale}/login?linked=true` });
+            await signIn("line", { redirectTo: `/${locale}/login/complete` });
           }}
         >
           <LineIcon />
