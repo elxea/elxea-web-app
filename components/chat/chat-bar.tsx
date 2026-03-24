@@ -12,6 +12,7 @@ import { ChatLauncher } from "./chat-launcher";
 import { ProductCards } from "./product-card";
 import { QuickReplies } from "./quick-replies";
 import { LineCta } from "./line-cta";
+import { TastingNoteCta } from "./tasting-note-cta";
 
 // ---------------------------------------------------------------------------
 // Placeholder logic
@@ -167,6 +168,8 @@ function MessagesList({
           disabled={isStreaming}
         />
       )}
+      {/* Tasting note survey CTA (after 5+ turns, once per session) */}
+      <TastingNoteCta />
       {/* WC3-3: LINE friend add CTA */}
       <LineCta />
       <div ref={messagesEndRef} />
