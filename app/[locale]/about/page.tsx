@@ -23,7 +23,7 @@ export default async function AboutPage() {
           alt=""
           fill
           priority
-          className="object-cover"
+          className="object-cover rounded-md"
           sizes="100vw"
         />
         <div className="absolute inset-0 bg-black/40" />
@@ -51,7 +51,7 @@ export default async function AboutPage() {
               src="/hero-day.jpg"
               alt="elxea tea"
               fill
-              className="object-cover"
+              className="object-cover rounded-md"
               sizes="(max-width: 768px) 100vw, 768px"
             />
           </div>
@@ -82,7 +82,7 @@ export default async function AboutPage() {
           src="/hero-approach.jpg"
           alt=""
           fill
-          className="object-cover"
+          className="object-cover rounded-md"
           sizes="100vw"
         />
         <div className="absolute inset-0 bg-black/30" />

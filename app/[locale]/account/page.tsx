@@ -218,7 +218,7 @@ function SubscriptionCard({
                 alt={line.variantImage.altText ?? line.title}
                 width={56}
                 height={56}
-                className="object-cover"
+                className="object-cover rounded-md"
               />
             ) : (
               <div className="w-14 h-14 rounded-md overflow-hidden">

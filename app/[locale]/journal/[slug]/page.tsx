@@ -146,7 +146,7 @@ export default async function ArticlePage({
             width={1200}
             height={675}
             sizes="(max-width: 768px) 100vw, 768px"
-            className="w-full"
+            className="w-full rounded-md"
             priority
           />
         </div>
@@ -188,7 +188,7 @@ export default async function ArticlePage({
                   width={800}
                   height={400}
                   sizes="(max-width: 768px) 100vw, 768px"
-                  className="w-full object-cover"
+                  className="w-full object-cover rounded-md"
                 />
               )}
               <div className="p-6">
