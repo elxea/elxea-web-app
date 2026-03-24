@@ -43,6 +43,7 @@
     "**/*.stories.tsx",
     "stories",
     ".storybook",
-    "e2e"
+    "e2e",
+    "workers"
   ]
 }
