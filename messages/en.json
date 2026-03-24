@@ -367,6 +367,17 @@
     "support": "Support",
     "copyright": "© {year} elxea. All rights reserved."
   },
+  "chat": {
+    "lineCta": {
+      "unauthenticated": "Sign in to continue this conversation on LINE",
+      "authenticated": "Continue the conversation on LINE.",
+      "addFriend": "Add Friend"
+    },
+    "feedback": {
+      "thanks": "Thanks!",
+      "thankYou": "Thank you"
+    }
+  },
   "tastingNote": {
     "title": "Tasting Note",
     "subtitle": "Record your experience",
@@ -404,6 +415,7 @@
     "completeMessage": "Your feedback helps make elxea better.",
     "completeBack": "Back to elxea",
     "errorMessage": "An error occurred. Please try again.",
-    "stepOf": "{current} / {total}"
+    "stepOf": "{current} / {total}",
+    "chatCta": "Record your experience →"
   }
 }

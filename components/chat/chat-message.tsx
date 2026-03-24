@@ -3,6 +3,7 @@
 import { type UIMessage } from "ai";
 import { cn } from "@/lib/utils";
 import { useCallback, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import { useChatContext } from "./chat-provider";
 import type { ChatMessageMeta } from "./chat-provider";
 
@@ -133,6 +134,7 @@ function FeedbackButtons({
   messageId: string;
   messageContent: string;
 }) {
+  const t = useTranslations("chat");
   const { sessionId } = useChatContext();
   const [selectedRating, setSelectedRating] = useState<number | null>(
     () => getExistingFeedback(messageId),
@@ -203,7 +205,7 @@ function FeedbackButtons({
         </button>
         {selectedRating !== null && !showComment && (
           <span className="text-xs text-muted-foreground/60 ml-1">
-            {selectedRating === 1 ? "Thanks!" : "Thank you"}
+            {selectedRating === 1 ? t("feedback.thanks") : t("feedback.thankYou")}
           </span>
         )}
       </div>

@@ -46,6 +46,12 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     };
     audio.addEventListener("loadedmetadata", handleLoadedMetadata);
 
+    // Sync isPlaying state with actual audio element events
+    const onPlay = () => setIsPlaying(true);
+    const onPause = () => setIsPlaying(false);
+    audio.addEventListener("play", onPlay);
+    audio.addEventListener("pause", onPause);
+
     audioRef.current = audio;
 
     // 再生位置を5秒ごとに保存
@@ -58,6 +64,8 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     }, 5000);
 
     return () => {
+      audio.removeEventListener("play", onPlay);
+      audio.removeEventListener("pause", onPause);
       audio.removeEventListener("loadedmetadata", handleLoadedMetadata);
       // 離脱時に最終位置を保存
       if (audio && isFinite(audio.currentTime)) {

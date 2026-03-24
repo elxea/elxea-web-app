@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { useChatContext } from "./chat-provider";
 import { Link } from "@/i18n/navigation";
 
@@ -48,17 +50,21 @@ function countTurns(messages: { role: string }[]): number {
 }
 
 export function TastingNoteCta() {
+  const t = useTranslations("tastingNote");
   const { messages } = useChatContext();
+  const [visible, setVisible] = useState(false);
 
-  // Already shown this session
-  if (wasCTAShown()) return null;
-
-  // Not enough turns yet
   const turns = countTurns(messages);
-  if (turns < MIN_TURNS) return null;
+  const shouldShow = !wasCTAShown() && turns >= MIN_TURNS;
 
-  // Mark as shown so it only appears once per session
-  markCTAShown();
+  useEffect(() => {
+    if (shouldShow) {
+      markCTAShown();
+      setVisible(true);
+    }
+  }, [shouldShow]);
+
+  if (!visible) return null;
 
   return (
     <div
@@ -69,7 +75,7 @@ export function TastingNoteCta() {
         href="/tasting-note"
         className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground transition-colors"
       >
-        体験を記録する →
+        {t("chatCta")}
       </Link>
     </div>
   );

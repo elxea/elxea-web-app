@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import { useChatContext } from "./chat-provider";
 
@@ -31,6 +32,7 @@ function LineIcon({ className }: { className?: string }) {
 }
 
 export function LineCta() {
+  const t = useTranslations("chat");
   const { isAuthenticated, messages } = useChatContext();
 
   // Only show after at least 1 exchange (not on empty chat)
@@ -52,7 +54,7 @@ export function LineCta() {
       >
         <LineIcon className="size-4 shrink-0 text-brand-line" />
         <span>
-          ログインすると、LINE でもこの会話を続けられます
+          {t("lineCta.unauthenticated")}
         </span>
       </div>
     );
@@ -77,9 +79,9 @@ export function LineCta() {
     >
       <LineIcon className="size-4 shrink-0 text-brand-line" />
       <span>
-        LINE でも会話を続けられます。
+        {t("lineCta.authenticated")}
         <span className="font-medium text-foreground ml-0.5">
-          友だち追加
+          {t("lineCta.addFriend")}
         </span>
       </span>
     </a>

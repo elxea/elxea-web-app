@@ -80,3 +80,4 @@ build-storybook.log
 
 # cloudflare workers
 workers/*/.wrangler/
+.next-backup/

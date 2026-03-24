@@ -42,19 +42,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   callbacks: {
     async signIn({ user, account, profile }) {
       if (account?.provider === "line") {
-        // Debug logging for LINE profile investigation
-        console.log("[auth] LINE signIn -- profile.sub:", profile?.sub);
-        console.log(
-          "[auth] LINE signIn -- account.providerAccountId:",
-          account.providerAccountId,
-        );
-        console.log("[auth] LINE signIn -- user.id:", user.id);
-        console.log("[auth] LINE signIn -- user.email:", user.email);
-        console.log(
-          "[auth] LINE signIn -- profile keys:",
-          profile ? Object.keys(profile) : "null",
-        );
-
         // profile.sub is the LINE userId from the OIDC id_token.
         // account.providerAccountId should be the same value.
         // Use profile.sub as primary, fall back to providerAccountId.
@@ -64,11 +51,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           // Read session_id from cookie (set by login page before redirect)
           const cookieStore = await cookies();
           const chatSessionId = cookieStore.get("chat_session_id")?.value;
-
-          console.log(
-            "[auth] LINE signIn -- chat_session_id from cookie:",
-            chatSessionId ?? "not set",
-          );
 
           try {
             await fetch(`${CHAT_API_BASE}/api/identity/link-line`, {
@@ -118,6 +100,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
   },
   pages: {
-    signIn: "/ja/login",
+    signIn: "/login",
   },
 });

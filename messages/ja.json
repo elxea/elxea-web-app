@@ -367,6 +367,17 @@
     "support": "サポート",
     "copyright": "© {year} elxea. All rights reserved."
   },
+  "chat": {
+    "lineCta": {
+      "unauthenticated": "ログインすると、LINE でもこの会話を続けられます",
+      "authenticated": "LINE でも会話を続けられます。",
+      "addFriend": "友だち追加"
+    },
+    "feedback": {
+      "thanks": "ありがとうございます！",
+      "thankYou": "ありがとうございます"
+    }
+  },
   "tastingNote": {
     "title": "テイスティングノート",
     "subtitle": "あなたの体験を記録する",
@@ -404,6 +415,7 @@
     "completeMessage": "あなたの声が elxea をより良くします。",
     "completeBack": "elxea トップページへ",
     "errorMessage": "送信中にエラーが発生しました。もう一度お試しください。",
-    "stepOf": "{current} / {total}"
+    "stepOf": "{current} / {total}",
+    "chatCta": "体験を記録する →"
   }
 }
