@@ -51,7 +51,7 @@ export default async function EventPage({
     event = await client.fetch(EVENT_BY_SLUG_QUERY, { slug, language: locale });
   } catch {
     return (
-      <div className="max-w-3xl mx-auto px-6 py-16">
+      <div className="section-narrow">
         <p className="text-muted-foreground">{t("loadError")}</p>
       </div>
     );
@@ -64,7 +64,7 @@ export default async function EventPage({
   const loggedIn = isMemberOnly ? await isAuthenticated() : true;
 
   return (
-    <div className="max-w-3xl mx-auto px-6 py-16">
+    <div className="section-narrow">
       <header className="mb-12">
         <p className="text-xs text-muted-foreground mb-4">
           {new Date(event.date).toLocaleDateString(locale, {

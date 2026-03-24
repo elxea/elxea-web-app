@@ -54,7 +54,7 @@ export default async function PeoplePage({
     }
   } catch {
     return (
-      <div className="max-w-3xl mx-auto px-6 py-16">
+      <div className="section-narrow">
         <p className="text-muted-foreground">{t("loadError")}</p>
       </div>
     );
@@ -101,7 +101,7 @@ export default async function PeoplePage({
       {articles && articles.length > 0 && (
         <section>
           <h2 className="text-lg font-medium mb-8">{t("articlesByAuthor")}</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-12">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-10">
             {(articles as Parameters<typeof ArticleCard>[0]["article"][]).map(
               (article) => (
                 <ArticleCard

@@ -19,6 +19,7 @@ export default function HomePage() {
         <Image
           src="/hero-day.jpg"
           alt=""
+          aria-hidden="true"
           fill
           priority
           className="object-cover"
@@ -28,7 +29,7 @@ export default function HomePage() {
           <p className="text-xs text-foreground/70 uppercase tracking-[0.2em] mb-6">
             {t("home.tagline")}
           </p>
-          <h1 className="text-4xl md:text-5xl font-light tracking-tight mb-6 text-foreground">
+          <h1 className="mb-6 text-foreground">
             Tea for Creativity.
           </h1>
           <p className="text-foreground/70 text-sm leading-relaxed mb-10">
@@ -41,7 +42,7 @@ export default function HomePage() {
       </section>
 
       {/* Featured Products */}
-      <section className="max-w-7xl mx-auto px-6 py-20">
+      <section className="section-wide">
         <div className="flex items-end justify-between mb-10">
           <h2>{t("home.featuredProducts")}</h2>
           <Button variant="link" className="p-0 h-auto text-muted-foreground" asChild>
@@ -58,6 +59,7 @@ export default function HomePage() {
         <Image
           src="/hero-night.jpg"
           alt=""
+          aria-hidden="true"
           fill
           className="object-cover"
           sizes="100vw"
@@ -66,7 +68,7 @@ export default function HomePage() {
           <p className="text-xs text-foreground/70 uppercase tracking-[0.2em] mb-4">
             Our Story
           </p>
-          <h2 className="text-2xl md:text-3xl font-light text-foreground mb-6">
+          <h2 className="text-foreground mb-6">
             {t("home.storyHeading")}
           </h2>
           <Button variant="outline" asChild>
@@ -76,7 +78,7 @@ export default function HomePage() {
       </section>
 
       {/* Journal */}
-      <section className="max-w-7xl mx-auto px-6 py-20">
+      <section className="section-wide">
         <div className="flex items-end justify-between mb-10">
           <h2>{t("home.latestJournal")}</h2>
           <Button variant="link" className="p-0 h-auto text-muted-foreground" asChild>
@@ -89,7 +91,7 @@ export default function HomePage() {
       </section>
 
       {/* Events */}
-      <section className="max-w-7xl mx-auto px-6 py-20">
+      <section className="section-wide">
         <div className="flex items-end justify-between mb-10">
           <h2>{t("home.upcomingEvents")}</h2>
           <Button variant="link" className="p-0 h-auto text-muted-foreground" asChild>
@@ -106,6 +108,7 @@ export default function HomePage() {
         <Image
           src="/hero-approach.jpg"
           alt=""
+          aria-hidden="true"
           fill
           className="object-cover"
           sizes="100vw"
@@ -114,7 +117,7 @@ export default function HomePage() {
           <p className="text-xs text-foreground/70 uppercase tracking-[0.2em] mb-4">
             Our Approach
           </p>
-          <h2 className="text-2xl md:text-3xl font-light text-foreground mb-6">
+          <h2 className="text-foreground mb-6">
             {t("home.approachHeading")}
           </h2>
           <Button variant="outline" asChild>
@@ -197,7 +200,7 @@ async function FeaturedArticles() {
     }
 
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-10">
         {articles.map(
           (article: {
             _id: string;

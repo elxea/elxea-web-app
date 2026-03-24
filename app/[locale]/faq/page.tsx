@@ -27,7 +27,7 @@ export default async function FAQPage() {
   ];
 
   return (
-    <div className="max-w-3xl mx-auto px-6 py-16">
+    <div className="section-narrow">
       <FAQJsonLd questions={questions} />
       <Breadcrumb
         items={[

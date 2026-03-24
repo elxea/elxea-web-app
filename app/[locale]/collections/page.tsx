@@ -1,14 +1,13 @@
-import Image from "next/image";
 import { getTranslations } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import { getCollections } from "@/lib/shopify";
-import { ImagePlaceholder } from "@/components/ui/image-placeholder";
+import { ImageCard } from "@/components/ui/image-card";
 
 export default async function CollectionsPage() {
   const t = await getTranslations("common");
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-16">
+    <div className="section-wide">
       <h1 className="mb-12">{t("collections")}</h1>
       <CollectionsContent />
     </div>
@@ -33,20 +32,12 @@ async function CollectionsContent() {
             href={`/collections/${collection.handle}`}
             className="group block"
           >
-            <div className="aspect-[3/2] bg-muted mb-4 overflow-hidden rounded-md">
-              {collection.image ? (
-                <Image
-                  src={collection.image.url}
-                  alt={collection.image.altText || collection.title}
-                  width={600}
-                  height={400}
-                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                />
-              ) : (
-                <ImagePlaceholder />
-              )}
-            </div>
+            <ImageCard
+              image={collection.image?.url}
+              alt={collection.image?.altText || collection.title}
+              className="mb-4"
+              hover
+            />
             <h2 className="text-sm font-medium group-hover:underline">
               {collection.title}
             </h2>

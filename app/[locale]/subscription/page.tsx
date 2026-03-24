@@ -9,6 +9,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Breadcrumb } from "@/components/seo/breadcrumb";
+import { ImageCard } from "@/components/ui/image-card";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("subscriptionLp");
@@ -52,7 +53,7 @@ export default async function SubscriptionLPPage() {
         <div className="absolute inset-0 bg-muted" />
         {/* TODO: hero image */}
         <div className="relative text-center max-w-xl px-6">
-          <h1 className="text-3xl md:text-4xl font-light tracking-tight mb-6 whitespace-pre-line">
+          <h1 className="mb-6 whitespace-pre-line">
             {t("heroHeading")}
           </h1>
           <Button asChild>
@@ -62,7 +63,7 @@ export default async function SubscriptionLPPage() {
       </section>
 
       {/* ─── 2. Brand Introduction ─── */}
-      <section className="max-w-3xl mx-auto px-6 py-20">
+      <section className="section-narrow">
         <Breadcrumb
           items={[
             { label: bt("home"), href: "/" },
@@ -77,13 +78,13 @@ export default async function SubscriptionLPPage() {
         {/* Image grid (placeholder) */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="aspect-[3/2] bg-muted" />
+            <ImageCard key={i} />
           ))}
         </div>
       </section>
 
       {/* ─── 3. Single Origin Appeal ─── */}
-      <section className="max-w-3xl mx-auto px-6 py-20">
+      <section className="section-narrow">
         <h2 className="mb-6">{t("originHeading")}</h2>
 
         {/* Image placeholder */}
@@ -97,13 +98,13 @@ export default async function SubscriptionLPPage() {
       </section>
 
       {/* ─── 4. Product Lineup (placeholder) ─── */}
-      <section className="max-w-7xl mx-auto px-6 py-20">
+      <section className="section-wide">
         <h2 className="mb-10">{t("lineupHeading")}</h2>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6">
           {TEA_LINEUP.map((name) => (
             <div key={name}>
-              <div className="aspect-[3/2] bg-muted mb-4" />
+              <ImageCard className="mb-4" />
               <p className="text-xs text-muted-foreground mb-1">Single</p>
               <p className="text-sm">{name}</p>
             </div>
@@ -112,12 +113,12 @@ export default async function SubscriptionLPPage() {
       </section>
 
       {/* ─── 5. Subscription Plan Details ─── */}
-      <section className="max-w-7xl mx-auto px-6 py-20">
+      <section className="section-wide">
         <h2 className="mb-10">{t("planHeading")}</h2>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
           {/* Image placeholder */}
-          <div className="aspect-[3/2] bg-muted" />
+          <ImageCard />
 
           <Card>
             <CardHeader>
@@ -153,18 +154,18 @@ export default async function SubscriptionLPPage() {
       </section>
 
       {/* ─── 6. Tea Bag Material ─── */}
-      <section className="max-w-7xl mx-auto px-6 py-20">
+      <section className="section-wide">
         <h2 className="mb-10">{t("teabagHeading")}</h2>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           <div>
-            <div className="aspect-[3/2] bg-muted mb-4" />
+            <ImageCard className="mb-4" />
             <p className="text-sm text-muted-foreground leading-relaxed">
               {t("teabagBody")}
             </p>
           </div>
           <div>
-            <div className="aspect-[3/2] bg-muted mb-4" />
+            <ImageCard className="mb-4" />
             <p className="text-sm text-muted-foreground leading-relaxed">
               {t("teabagBody")}
             </p>
@@ -176,7 +177,7 @@ export default async function SubscriptionLPPage() {
       </section>
 
       {/* ─── 7. Three Features ─── */}
-      <section className="max-w-7xl mx-auto px-6 py-20">
+      <section className="section-wide">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <FeatureCard
             number="01"
@@ -199,13 +200,13 @@ export default async function SubscriptionLPPage() {
       </section>
 
       {/* ─── 8. Subscriber-Only Perks ─── */}
-      <section className="max-w-7xl mx-auto px-6 py-20">
+      <section className="section-wide">
         <h2 className="mb-10">{t("perksHeading")}</h2>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
           <Card>
             <CardHeader>
-              <div className="aspect-[3/2] bg-muted -mx-6 -mt-6 rounded-t-xl" />
+              <ImageCard className="-mx-6 -mt-6 rounded-t-xl rounded-b-none" />
             </CardHeader>
             <CardContent className="space-y-3">
               <CardTitle>{t("perk1Title")}</CardTitle>
@@ -220,7 +221,7 @@ export default async function SubscriptionLPPage() {
 
           <Card>
             <CardHeader>
-              <div className="aspect-[3/2] bg-muted -mx-6 -mt-6 rounded-t-xl" />
+              <ImageCard className="-mx-6 -mt-6 rounded-t-xl rounded-b-none" />
             </CardHeader>
             <CardContent className="space-y-3">
               <CardTitle>{t("perk2Title")}</CardTitle>
@@ -241,7 +242,7 @@ export default async function SubscriptionLPPage() {
       </section>
 
       {/* ─── 9. CTA ─── */}
-      <section className="max-w-3xl mx-auto px-6 py-20 text-center">
+      <section className="section-narrow text-center">
         <h2 className="mb-8">{t("ctaHeading")}</h2>
         <Button asChild>
           <a href="#">{t("heroCta")}</a>
@@ -249,7 +250,7 @@ export default async function SubscriptionLPPage() {
       </section>
 
       {/* ─── 10. FAQ ─── */}
-      <section className="max-w-3xl mx-auto px-6 py-20">
+      <section className="section-narrow">
         <h2 className="mb-10">{t("faqHeading")}</h2>
 
         <div className="divide-y divide-border">
@@ -275,7 +276,7 @@ export default async function SubscriptionLPPage() {
       </section>
 
       {/* ─── 11. Final CTA ─── */}
-      <section className="max-w-3xl mx-auto px-6 py-20 text-center">
+      <section className="section-narrow text-center">
         <h2 className="mb-8">{t("ctaHeading")}</h2>
         <Button asChild>
           <a href="#">{t("heroCta")}</a>
@@ -300,7 +301,7 @@ function FeatureCard({
     <Card>
       <CardHeader>
         {/* Illustration placeholder */}
-        <div className="aspect-[3/2] bg-muted -mx-6 -mt-6 rounded-t-xl" />
+        <ImageCard className="-mx-6 -mt-6 rounded-t-xl rounded-b-none" />
       </CardHeader>
       <CardContent className="space-y-3">
         <p className="text-xs text-muted-foreground">{number}</p>

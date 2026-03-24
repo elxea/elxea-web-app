@@ -9,6 +9,7 @@ import {
 } from "@/sanity/lib/queries";
 import { ArticleCard } from "@/components/journal/article-card";
 import { CategoryFilter } from "@/components/journal/category-filter";
+import { ImageCard } from "@/components/ui/image-card";
 
 export default async function JournalPage({
   searchParams,
@@ -18,7 +19,7 @@ export default async function JournalPage({
   const { category } = await searchParams;
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-16">
+    <div className="section-wide">
       <JournalHeader />
       <Suspense fallback={<ArticlesListSkeleton />}>
         <ArticlesList categorySlug={category ?? null} />
@@ -39,10 +40,10 @@ function JournalHeader() {
 
 function ArticlesListSkeleton() {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-12">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-10">
       {Array.from({ length: 6 }).map((_, i) => (
         <div key={i} className="animate-pulse">
-          <div className="aspect-[3/2] bg-muted mb-4" />
+          <ImageCard className="mb-4" />
           <div className="space-y-2">
             <div className="h-3 bg-muted w-16" />
             <div className="h-4 bg-muted w-3/4" />
@@ -100,7 +101,7 @@ async function ArticlesList({ categorySlug }: { categorySlug: string | null }) {
         {!articles || articles.length === 0 ? (
           <p className="text-muted-foreground text-sm">{t("empty")}</p>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-12">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-10">
             {articles.map(
               (article: {
                 _id: string;

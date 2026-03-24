@@ -37,7 +37,7 @@ export default async function GenericPage({
     page = await client.fetch(PAGE_BY_SLUG_QUERY, { slug, language: locale });
   } catch {
     return (
-      <div className="max-w-3xl mx-auto px-6 py-16">
+      <div className="section-narrow">
         <p className="text-muted-foreground">{t("loadError")}</p>
       </div>
     );
@@ -46,7 +46,7 @@ export default async function GenericPage({
   if (!page) notFound();
 
   return (
-    <div className="max-w-3xl mx-auto px-6 py-16">
+    <div className="section-narrow">
       <h1 className="mb-12">{page.title}</h1>
       {page.body && <PortableText value={page.body} />}
     </div>

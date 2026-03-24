@@ -5,7 +5,7 @@ export default function CartPage() {
   const t = useTranslations("common");
 
   return (
-    <div className="max-w-3xl mx-auto px-6 py-16">
+    <div className="section-narrow">
       <h1 className="mb-12">{t("cart")}</h1>
       <CartContent />
     </div>

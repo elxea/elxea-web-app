@@ -38,7 +38,7 @@ export default async function AccountPage() {
   if (!customer) {
     return (
       <div className="max-w-2xl mx-auto px-6 py-16 text-center">
-        <h1 className="text-2xl mb-6">{tCommon("account")}</h1>
+        <h1 className="mb-6">{tCommon("account")}</h1>
         <p className="text-muted-foreground mb-8">{t("loginRequired")}</p>
         <Button variant="outline" asChild>
           <a href={`/api/auth/login?locale=${locale}`}>{tCommon("login")}</a>
@@ -62,10 +62,10 @@ export default async function AccountPage() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-6 py-16">
+    <div className="section-narrow">
       {/* Customer info */}
       <div className="mb-12">
-        <h1 className="text-2xl mb-2">{tCommon("account")}</h1>
+        <h1 className="mb-2">{tCommon("account")}</h1>
         {displayName && (
           <p className="text-sm text-foreground">{displayName}</p>
         )}
@@ -78,7 +78,7 @@ export default async function AccountPage() {
 
       {/* Subscriptions */}
       <section className="mb-12">
-        <h2 className="text-lg mb-6 pb-3 border-b border-border">
+        <h2 className="mb-6 pb-3 border-b border-border">
           {t("subscriptions")}
         </h2>
 
@@ -110,7 +110,7 @@ export default async function AccountPage() {
 
       {/* Order history */}
       <section>
-        <h2 className="text-lg mb-6 pb-3 border-b border-border">
+        <h2 className="mb-6 pb-3 border-b border-border">
           {t("orderHistory")}
         </h2>
 

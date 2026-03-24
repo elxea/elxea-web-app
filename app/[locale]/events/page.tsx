@@ -1,9 +1,8 @@
-import Image from "next/image";
 import { useTranslations } from "next-intl";
 import { getLocale, getTranslations } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import { getClient } from "@/sanity/lib/client";
-import { ImagePlaceholder } from "@/components/ui/image-placeholder";
+import { ImageCard } from "@/components/ui/image-card";
 import { EVENTS_QUERY } from "@/sanity/lib/queries";
 import { urlFor } from "@/sanity/lib/image";
 
@@ -11,7 +10,7 @@ export default function EventsPage() {
   const t = useTranslations("common");
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-16">
+    <div className="section-wide">
       <h1 className="mb-12">{t("events")}</h1>
       <EventsList />
     </div>
@@ -53,20 +52,12 @@ async function EventsList() {
               "group grid grid-cols-1 md:grid-cols-[1fr_2fr] gap-6";
             const inner = (
               <>
-                <div className="aspect-[3/2] bg-muted overflow-hidden rounded-md">
-                  {event.image?.asset ? (
-                    <Image
-                      src={urlFor(event.image).width(600).height(400).url()}
-                      alt={event.title}
-                      width={600}
-                      height={400}
-                      sizes="(max-width: 768px) 100vw, 33vw"
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                    />
-                  ) : (
-                    <ImagePlaceholder />
-                  )}
-                </div>
+                <ImageCard
+                  image={event.image?.asset ? urlFor(event.image).width(600).height(400).url() : undefined}
+                  alt={event.title}
+                  sizes="(max-width: 768px) 100vw, 33vw"
+                  hover
+                />
                 <div className="flex flex-col justify-center">
                   <p className="text-xs text-muted-foreground mb-2">
                     {new Date(event.date).toLocaleDateString(locale, {

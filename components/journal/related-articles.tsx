@@ -1,7 +1,6 @@
-import Image from "next/image";
 import { Link } from "@/i18n/navigation";
 import { urlFor } from "@/sanity/lib/image";
-import { ImagePlaceholder } from "@/components/ui/image-placeholder";
+import { ImageCard } from "@/components/ui/image-card";
 
 type RelatedArticle = {
   _id: string;
@@ -26,8 +25,8 @@ export function RelatedArticles({ articles, heading, locale }: RelatedArticlesPr
 
   return (
     <section className="border-t border-border pt-12 mt-16">
-      <h2 className="text-lg font-medium mb-8">{heading}</h2>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-8">
+      <h2 className="mb-8">{heading}</h2>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-10">
         {articles.map((article) => {
           const image = article.thumbnail ?? article.mainImage;
           return (
@@ -36,20 +35,15 @@ export function RelatedArticles({ articles, heading, locale }: RelatedArticlesPr
               href={`/journal/${article.slug.current}`}
               className="group block"
             >
-              <div className="aspect-[3/2] bg-muted mb-3 overflow-hidden rounded-md">
-                {image?.asset ? (
-                  <Image
-                    src={urlFor(image).width(400).height(267).url()}
-                    alt={image.alt || article.title}
-                    width={400}
-                    height={267}
-                    sizes="(max-width: 640px) 100vw, 50vw"
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                  />
-                ) : (
-                  <ImagePlaceholder />
-                )}
-              </div>
+              <ImageCard
+                image={image?.asset ? urlFor(image).width(400).height(267).url() : undefined}
+                alt={image?.alt || article.title}
+                className="mb-3"
+                width={400}
+                height={267}
+                sizes="(max-width: 640px) 100vw, 50vw"
+                hover
+              />
               <div className="space-y-1">
                 {article.category && (
                   <p className="text-xs text-muted-foreground uppercase tracking-wider">

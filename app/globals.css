@@ -45,6 +45,13 @@ h1, h2, h3, h4, h5, h6 {
   letter-spacing: 0.025em;
 }
 
+h1 { font: var(--typography-style-h1); }
+h2 { font: var(--typography-style-h2); }
+h3 { font: var(--typography-style-h3); }
+h4 { font: var(--typography-style-h4); }
+h5 { font: var(--typography-style-h5); }
+h6 { font: var(--typography-style-h6); }
+
 :root {
   /* Third-party brand colors */
   --brand-line: #06C755;
@@ -88,6 +95,11 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 @layer base {
+  /* Section layout utilities */
+  .section-narrow { @apply max-w-3xl mx-auto px-6 py-16; }
+  .section-wide   { @apply max-w-7xl mx-auto px-6 py-16; }
+  .section-full   { @apply w-full py-16; }
+
   /* Tap feedback for all interactive elements */
   button,
   [role="button"] {

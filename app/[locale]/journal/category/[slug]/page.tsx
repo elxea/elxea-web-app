@@ -58,7 +58,7 @@ export default async function CategoryPage({
   if (!category) notFound();
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-16">
+    <div className="section-wide">
       <Link
         href="/journal"
         className="text-xs text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors"
@@ -70,7 +70,7 @@ export default async function CategoryPage({
       {!articles || articles.length === 0 ? (
         <p className="text-muted-foreground text-sm">{t("empty")}</p>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-12">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-10">
           {articles.map(
             (article: {
               _id: string;

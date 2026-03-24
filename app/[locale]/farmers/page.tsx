@@ -1,9 +1,8 @@
-import Image from "next/image";
 import { useTranslations } from "next-intl";
 import { getLocale, getTranslations } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import { getClient } from "@/sanity/lib/client";
-import { ImagePlaceholder } from "@/components/ui/image-placeholder";
+import { ImageCard } from "@/components/ui/image-card";
 import { FARMERS_QUERY } from "@/sanity/lib/queries";
 import { urlFor } from "@/sanity/lib/image";
 
@@ -11,7 +10,7 @@ export default function FarmersPage() {
   const t = useTranslations("common");
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-16">
+    <div className="section-wide">
       <h1 className="mb-12">{t("farmers")}</h1>
       <FarmersList />
     </div>
@@ -35,7 +34,7 @@ async function FarmersList() {
     }
 
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-12">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-10">
         {farmers.map(
           (farmer: {
             _id: string;
@@ -50,20 +49,12 @@ async function FarmersList() {
               href={`/farmers/${farmer.slug.current}`}
               className="group block"
             >
-              <div className="aspect-[3/2] bg-muted mb-4 overflow-hidden rounded-md">
-                {farmer.photo?.asset ? (
-                  <Image
-                    src={urlFor(farmer.photo).width(600).height(400).url()}
-                    alt={farmer.photo.alt || farmer.name}
-                    width={600}
-                    height={400}
-                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                  />
-                ) : (
-                  <ImagePlaceholder />
-                )}
-              </div>
+              <ImageCard
+                image={farmer.photo?.asset ? urlFor(farmer.photo).width(600).height(400).url() : undefined}
+                alt={farmer.photo?.alt || farmer.name}
+                className="mb-4"
+                hover
+              />
               <h3 className="text-sm font-medium group-hover:underline">
                 {farmer.name}
               </h3>

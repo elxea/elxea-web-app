@@ -40,7 +40,7 @@ export default async function CollectionPage({
     collection = await getCollectionByHandle(handle);
   } catch {
     return (
-      <div className="max-w-7xl mx-auto px-6 py-16">
+      <div className="section-wide">
         <p className="text-muted-foreground">{t("loadError")}</p>
       </div>
     );
@@ -49,7 +49,7 @@ export default async function CollectionPage({
   if (!collection) notFound();
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-16">
+    <div className="section-wide">
       <h1 className="mb-4">{collection.title}</h1>
       {collection.description && (
         <p className="text-muted-foreground text-sm mb-12 max-w-2xl">

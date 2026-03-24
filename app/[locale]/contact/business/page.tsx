@@ -17,7 +17,7 @@ export default async function BusinessContactPage() {
   const ct = await getTranslations("contact");
 
   return (
-    <div className="max-w-3xl mx-auto px-6 py-16">
+    <div className="section-narrow">
       <Breadcrumb
         items={[
           { label: bt("home"), href: "/" },

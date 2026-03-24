@@ -21,6 +21,7 @@ export default async function AboutPage() {
         <Image
           src="/hero-night.jpg"
           alt=""
+          aria-hidden="true"
           fill
           priority
           className="object-cover rounded-md"
@@ -28,14 +29,14 @@ export default async function AboutPage() {
         />
         <div className="absolute inset-0 bg-black/40" />
         <div className="relative text-center max-w-xl px-6">
-          <h1 className="text-3xl md:text-4xl font-light text-white mb-4">
+          <h1 className="text-white mb-4">
             {t("title")}
           </h1>
           <p className="text-white/80 text-sm">{t("subtitle")}</p>
         </div>
       </section>
 
-      <div className="max-w-3xl mx-auto px-6 py-20">
+      <div className="section-narrow">
         <div className="space-y-20">
           {/* Mission */}
           <section>
@@ -81,6 +82,7 @@ export default async function AboutPage() {
         <Image
           src="/hero-approach.jpg"
           alt=""
+          aria-hidden="true"
           fill
           className="object-cover rounded-md"
           sizes="100vw"

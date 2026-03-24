@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import { notFound } from "next/navigation";
 import { getLocale, getTranslations } from "next-intl/server";
 import { getClient } from "@/sanity/lib/client";
@@ -7,7 +6,7 @@ import { TEA_MENU_BY_SLUG_QUERY } from "@/sanity/lib/queries";
 import { urlFor } from "@/sanity/lib/image";
 import { Link } from "@/i18n/navigation";
 import { PortableText } from "@/components/sanity/portable-text";
-import { ImagePlaceholder } from "@/components/ui/image-placeholder";
+import { ImageCard } from "@/components/ui/image-card";
 import type { PortableTextBlock } from "@portabletext/types";
 
 export async function generateMetadata({
@@ -50,7 +49,7 @@ export default async function TeaMenuDetailPage({
     tea = await client.fetch(TEA_MENU_BY_SLUG_QUERY, { slug, language: locale });
   } catch {
     return (
-      <div className="max-w-3xl mx-auto px-6 py-16">
+      <div className="section-narrow">
         <p className="text-muted-foreground">{t("loadError")}</p>
       </div>
     );
@@ -62,24 +61,15 @@ export default async function TeaMenuDetailPage({
     <div className="max-w-5xl mx-auto px-6 py-16">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16">
         {/* Photo */}
-        <div
-          className="aspect-[3/2] bg-muted overflow-hidden rounded-md"
+        <ImageCard
+          image={tea.photo?.asset ? urlFor(tea.photo).width(800).height(533).url() : undefined}
+          alt={tea.photo?.alt || tea.displayName}
+          width={800}
+          height={533}
+          sizes="(max-width: 1024px) 100vw, 50vw"
           style={tea.color ? { backgroundColor: tea.color } : undefined}
-        >
-          {tea.photo?.asset ? (
-            <Image
-              src={urlFor(tea.photo).width(800).height(533).url()}
-              alt={tea.photo.alt || tea.displayName}
-              width={800}
-              height={533}
-              sizes="(max-width: 1024px) 100vw, 50vw"
-              className="w-full h-full object-cover"
-              priority
-            />
-          ) : (
-            <ImagePlaceholder />
-          )}
-        </div>
+          priority
+        />
 
         {/* Info */}
         <div>

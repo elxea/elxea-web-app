@@ -20,7 +20,7 @@ export default function Error({
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] px-6 text-center">
-      <h1 className="text-2xl mb-4">{t("errorTitle")}</h1>
+      <h1 className="mb-4">{t("errorTitle")}</h1>
       <p className="text-muted-foreground text-sm mb-10 max-w-md">
         {t("errorDescription")}
       </p>

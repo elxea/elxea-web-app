@@ -17,7 +17,7 @@ export function Footer({ groups: externalGroups }: FooterProps) {
 
   return (
     <footer className="border-t border-border mt-auto bg-background">
-      <div className="max-w-7xl mx-auto px-6 py-16">
+      <div className="section-wide">
         <div className="grid grid-cols-1 md:grid-cols-5 gap-12">
           {/* Brand — always rendered */}
           <div>

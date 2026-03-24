@@ -1,7 +1,6 @@
-import Image from "next/image";
 import { Link } from "@/i18n/navigation";
 import { urlFor } from "@/sanity/lib/image";
-import { ImagePlaceholder } from "@/components/ui/image-placeholder";
+import { ImageCard } from "@/components/ui/image-card";
 
 type ArticleCardProps = {
   article: {
@@ -30,20 +29,12 @@ export function ArticleCard({ article, locale, memberOnlyLabel }: ArticleCardPro
         href={`/journal/${article.slug.current}`}
         className="block"
       >
-        <div className="aspect-[3/2] bg-muted mb-4 overflow-hidden rounded-md">
-          {image?.asset ? (
-            <Image
-              src={urlFor(image).width(600).height(400).url()}
-              alt={image.alt || article.title}
-              width={600}
-              height={400}
-              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-            />
-          ) : (
-            <ImagePlaceholder />
-          )}
-        </div>
+        <ImageCard
+          image={image?.asset ? urlFor(image).width(600).height(400).url() : undefined}
+          alt={image?.alt || article.title}
+          className="mb-4"
+          hover
+        />
       </Link>
       <div className="space-y-1.5">
         {article.category && (

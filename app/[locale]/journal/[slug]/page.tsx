@@ -60,7 +60,7 @@ export default async function ArticlePage({
     });
   } catch {
     return (
-      <div className="max-w-3xl mx-auto px-6 py-16">
+      <div className="section-narrow">
         <p className="text-muted-foreground">{t("loadError")}</p>
       </div>
     );
@@ -89,7 +89,7 @@ export default async function ArticlePage({
   }
 
   return (
-    <article className="max-w-3xl mx-auto px-6 py-16">
+    <article className="section-narrow">
       {/* Header */}
       <header className="mb-12">
         {article.category && (

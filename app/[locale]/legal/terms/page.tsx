@@ -12,7 +12,7 @@ export default async function TermsPage() {
   const bt = await getTranslations("breadcrumb");
 
   return (
-    <div className="max-w-3xl mx-auto px-6 py-16">
+    <div className="section-narrow">
       <Breadcrumb
         items={[
           { label: bt("home"), href: "/" },

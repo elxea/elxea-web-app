@@ -1,11 +1,10 @@
-import Image from "next/image";
 import { useTranslations } from "next-intl";
 import { getLocale, getTranslations } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import { getClient } from "@/sanity/lib/client";
 import { JOURNALS_QUERY } from "@/sanity/lib/queries";
 import { urlFor } from "@/sanity/lib/image";
-import { ImagePlaceholder } from "@/components/ui/image-placeholder";
+import { ImageCard } from "@/components/ui/image-card";
 
 const themeLabels: Record<string, string> = {
   akane: "茜(あかね)",
@@ -23,7 +22,7 @@ export default function ElxeaJournalPage() {
   const t = useTranslations("elxeaJournal");
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-16">
+    <div className="section-wide">
       <h1 className="mb-2">{t("title")}</h1>
       <p className="text-muted-foreground text-sm mb-12">{t("description")}</p>
       <JournalGrid />
@@ -44,7 +43,7 @@ async function JournalGrid() {
     }
 
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-12">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-10">
         {journals.map(
           (j: {
             _id: string;
@@ -62,22 +61,15 @@ async function JournalGrid() {
                 href={`/elxea-journal/${j.slug.current}`}
                 className="group block"
               >
-                <div className="aspect-[3/2] bg-muted mb-4 overflow-hidden rounded-md relative">
-                  {image?.asset ? (
-                    <Image
-                      src={urlFor(image).width(600).height(400).url()}
-                      alt={image.alt || j.title}
-                      width={600}
-                      height={400}
-                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                    />
-                  ) : (
-                    <ImagePlaceholder />
-                  )}
+                <div className="relative mb-4">
+                  <ImageCard
+                    image={image?.asset ? urlFor(image).width(600).height(400).url() : undefined}
+                    alt={image?.alt || j.title}
+                    hover
+                  />
                   {/* Theme badge */}
                   <span
-                    className="absolute top-3 left-3 text-[10px] font-medium text-white px-2 py-0.5 rounded-sm uppercase tracking-wider"
+                    className="absolute top-3 left-3 text-[10px] font-medium text-white px-2 py-0.5 rounded-sm uppercase tracking-wider z-10"
                     style={{ backgroundColor: themeColors[j.theme] || "var(--color-brand-ash)" }}
                   >
                     {themeLabels[j.theme] || j.theme}

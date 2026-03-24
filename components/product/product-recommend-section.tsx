@@ -11,10 +11,9 @@
  *   </Suspense>
  */
 
-import Image from "next/image";
 import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
-import { ImagePlaceholder } from "@/components/ui/image-placeholder";
+import { ImageCard } from "@/components/ui/image-card";
 import { getProducts } from "@/lib/shopify";
 import { formatPrice } from "@/lib/utils";
 import {
@@ -121,7 +120,7 @@ export async function ProductRecommendSection() {
     : "あなたへのおすすめ";
 
   return (
-    <section className="max-w-7xl mx-auto px-6 py-20">
+    <section className="section-wide">
       <div className="flex items-end justify-between mb-10">
         <div>
           <h2>あなたへのおすすめ</h2>
@@ -144,20 +143,15 @@ export async function ProductRecommendSection() {
               href={`/products/${product.handle}`}
               className="group block"
             >
-              <div className="aspect-[3/2] bg-muted mb-4 overflow-hidden rounded-md">
-                {product.featuredImage ? (
-                  <Image
-                    src={product.featuredImage.url}
-                    alt={product.featuredImage.altText || product.title}
-                    width={400}
-                    height={267}
-                    sizes="(max-width: 640px) 50vw, 25vw"
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                  />
-                ) : (
-                  <ImagePlaceholder />
-                )}
-              </div>
+              <ImageCard
+                image={product.featuredImage?.url}
+                alt={product.featuredImage?.altText || product.title}
+                className="mb-4"
+                width={400}
+                height={267}
+                sizes="(max-width: 640px) 50vw, 25vw"
+                hover
+              />
               <p className="text-sm font-medium leading-snug group-hover:underline line-clamp-2">
                 {product.title}
               </p>

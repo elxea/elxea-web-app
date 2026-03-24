@@ -1,12 +1,11 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { getClient } from "@/sanity/lib/client";
 import { PLAYLIST_BY_SLUG_QUERY } from "@/sanity/lib/queries";
 import { urlFor } from "@/sanity/lib/image";
 import { PortableText } from "@/components/sanity/portable-text";
-import { ImagePlaceholder } from "@/components/ui/image-placeholder";
+import { ImageCard } from "@/components/ui/image-card";
 import type { PortableTextBlock } from "@portabletext/types";
 
 export async function generateMetadata({
@@ -48,7 +47,7 @@ export default async function PlaylistDetailPage({
     pl = await client.fetch(PLAYLIST_BY_SLUG_QUERY, { slug });
   } catch {
     return (
-      <div className="max-w-3xl mx-auto px-6 py-16">
+      <div className="section-narrow">
         <p className="text-muted-foreground">{t("loadError")}</p>
       </div>
     );
@@ -66,24 +65,15 @@ export default async function PlaylistDetailPage({
     <div className="max-w-5xl mx-auto px-6 py-16">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16">
         {/* Album image */}
-        <div
-          className="aspect-[3/2] bg-muted overflow-hidden rounded-md"
+        <ImageCard
+          image={pl.albumImage?.asset ? urlFor(pl.albumImage).width(800).height(533).url() : undefined}
+          alt={pl.albumImage?.alt || pl.title}
+          width={800}
+          height={533}
+          sizes="(max-width: 1024px) 100vw, 50vw"
           style={gradientStyle}
-        >
-          {pl.albumImage?.asset ? (
-            <Image
-              src={urlFor(pl.albumImage).width(800).height(533).url()}
-              alt={pl.albumImage.alt || pl.title}
-              width={800}
-              height={533}
-              sizes="(max-width: 1024px) 100vw, 50vw"
-              className="w-full h-full object-cover"
-              priority
-            />
-          ) : (
-            <ImagePlaceholder />
-          )}
-        </div>
+          priority
+        />
 
         {/* Info */}
         <div>

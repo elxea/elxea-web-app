@@ -26,7 +26,7 @@ export default async function SearchPage({
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-16">
+    <div className="section-wide">
       <SearchForm initialQuery={q || ""} />
 
       {q && results && (

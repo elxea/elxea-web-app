@@ -10,7 +10,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { ImagePlaceholder } from "@/components/ui/image-placeholder";
+import { ImageCard } from "@/components/ui/image-card";
 import type { Image as ImageType } from "@/lib/shopify/types";
 
 export function ImageGallery({ images }: { images: ImageType[] }) {
@@ -19,11 +19,7 @@ export function ImageGallery({ images }: { images: ImageType[] }) {
   const t = useTranslations("common");
 
   if (images.length === 0) {
-    return (
-      <div className="aspect-[3/2] rounded-md overflow-hidden">
-        <ImagePlaceholder />
-      </div>
-    );
+    return <ImageCard />;
   }
 
   return (
