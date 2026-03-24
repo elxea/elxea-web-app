@@ -2,12 +2,18 @@
  * Content Recommendation Engine
  *
  * Scores and re-orders Sanity articles based on the user's Firestore persona
- * and behavioral history.
+ * and behavioral history. Persona data is computed by elxea-cx-agent
+ * (Single Source of Truth) and stored in Firestore.
  *
- * Scoring logic:
- *   +3 — persona × contentPersona match (primary signal)
- *   +2 — targetLayer match with user's depthLevel
- *   +1 — depthLevel of article matches user's reading depth history
+ * Scoring axes (2-axis model: persona x depth):
+ *   +3 — persona x contentPersona match (primary signal)
+ *   +2 — depthLevel of article matches user's depth level
+ *   +1 — content strategy bonus (persona x depth matrix alignment)
+ *
+ * Removed in this revision:
+ *   - targetLayer comparison (was buggy: compared tea_lover/wellbeing/gourmet
+ *     against entry/explore/deep — type mismatch, never matched)
+ *   - contextTime / contextSeason (premature — insufficient content volume)
  *
  * Fallback: returns the original order (publishedAt desc) for unauthenticated users
  * or when Firestore data is unavailable.
@@ -29,7 +35,8 @@ export type ArticleWithPersona = {
   _id: string;
   contentPersona?: string | string[] | null;
   depthLevel?: string | null;
-  targetLayer?: string | null;
+  /** @deprecated targetLayer is retained for backward compat but not used in scoring */
+  targetLayer?: string | string[] | null;
   [key: string]: unknown;
 };
 
@@ -40,9 +47,102 @@ export type ScoredArticle<T extends ArticleWithPersona = ArticleWithPersona> =
 // Scoring constants
 // --------------------------------------------------------------------------
 
-const SCORE_PERSONA_MATCH = 3;
-const SCORE_TARGET_LAYER_MATCH = 2;
-const SCORE_DEPTH_MATCH = 1;
+/** persona x contentPersona match */
+export const SCORE_PERSONA_MATCH = 3;
+/** depthLevel match */
+export const SCORE_DEPTH_MATCH = 2;
+/** Content strategy matrix bonus */
+export const SCORE_STRATEGY_BONUS = 1;
+/** Penalty for already-read articles */
+export const SCORE_READ_PENALTY = -1;
+
+// --------------------------------------------------------------------------
+// Content Strategy Matrix (persona x depth = 9 cells)
+//
+// Defines the content themes that resonate with each persona at each depth.
+// Used for strategy-level bonus scoring and as a reference for editorial.
+// --------------------------------------------------------------------------
+
+export type ContentStrategyCell = {
+  persona: PersonaType;
+  depth: DepthLevel;
+  /** Content themes / keywords that signal a good match for this cell */
+  themes: string[];
+  /** Human-readable description for editorial reference */
+  description: string;
+};
+
+export const CONTENT_STRATEGY_MATRIX: ContentStrategyCell[] = [
+  // Serenity
+  {
+    persona: "serenity",
+    depth: "entry",
+    themes: ["hojicha", "herbal", "relax", "evening", "beginner"],
+    description: "Introductory calming content: hojicha, herbal tea, relaxation rituals",
+  },
+  {
+    persona: "serenity",
+    depth: "explore",
+    themes: ["origin-story", "single-origin", "ritual", "meditation"],
+    description: "Origin stories with calming narratives, single-origin discoveries",
+  },
+  {
+    persona: "serenity",
+    depth: "deep",
+    themes: ["farm-visit", "tea-master", "interview", "limited-edition"],
+    description: "Farm visits, tea master interviews, limited edition deep-dives",
+  },
+  // Explorer
+  {
+    persona: "explorer",
+    depth: "entry",
+    themes: ["tea-types", "guide", "introduction", "variety"],
+    description: "Tea variety encyclopedia, brewing method introductions",
+  },
+  {
+    persona: "explorer",
+    depth: "explore",
+    themes: ["comparison", "processing", "region", "terroir"],
+    description: "Origin comparisons, processing method details, regional guides",
+  },
+  {
+    persona: "explorer",
+    depth: "deep",
+    themes: ["rare-cultivar", "terroir", "seasonal", "research"],
+    description: "Rare cultivars, terroir deep-dives, seasonal limited editions",
+  },
+  // Sensory
+  {
+    persona: "sensory",
+    depth: "entry",
+    themes: ["flavor-guide", "pairing", "taste", "beginner"],
+    description: "Flavor guides, food pairing introductions, tasting basics",
+  },
+  {
+    persona: "sensory",
+    depth: "explore",
+    themes: ["flavor-note", "brewing-comparison", "temperature", "extraction"],
+    description: "Flavor note analysis, brewing parameter comparisons",
+  },
+  {
+    persona: "sensory",
+    depth: "deep",
+    themes: ["tasting-note", "blend-proposal", "expert", "cupping"],
+    description: "Professional tasting notes, blend proposals, cupping sessions",
+  },
+];
+
+/**
+ * Look up the content strategy cell for a given persona + depth combination.
+ */
+export function getStrategyCell(
+  persona: PersonaType,
+  depth: DepthLevel
+): ContentStrategyCell | undefined {
+  return CONTENT_STRATEGY_MATRIX.find(
+    (cell) => cell.persona === persona && cell.depth === depth
+  );
+}
 
 // --------------------------------------------------------------------------
 // Main scoring function
@@ -50,6 +150,11 @@ const SCORE_DEPTH_MATCH = 1;
 
 /**
  * Score a single article against the user's persona and depth level.
+ *
+ * Fixed bug (P3): targetLayer was previously compared against depthLevel,
+ * but targetLayer values (tea_lover/wellbeing/gourmet) and depthLevel values
+ * (entry/explore/deep) are different types and never matched. Now we use
+ * only contentPersona for persona matching and depthLevel for depth matching.
  */
 export function scoreArticle(
   article: ArticleWithPersona,
@@ -58,7 +163,7 @@ export function scoreArticle(
 ): number {
   let score = 0;
 
-  // (1) persona × contentPersona match → +3
+  // (1) persona x contentPersona match -> +3
   if (userPersona && article.contentPersona) {
     const personas = Array.isArray(article.contentPersona)
       ? article.contentPersona
@@ -68,18 +173,45 @@ export function scoreArticle(
     }
   }
 
-  // (2) targetLayer × depthLevel match → +2
-  // targetLayer indicates the experience level the article is written for
-  if (userDepth && article.targetLayer) {
-    if (article.targetLayer === userDepth) {
-      score += SCORE_TARGET_LAYER_MATCH;
-    }
-  }
-
-  // (3) depthLevel of article matches user's reading depth history → +1
+  // (2) depthLevel match -> +2
   if (userDepth && article.depthLevel) {
     if (article.depthLevel === userDepth) {
       score += SCORE_DEPTH_MATCH;
+    }
+  }
+
+  // (3) Content strategy bonus -> +1
+  // When both persona and depth match AND the article's contentPersona aligns
+  // with the strategy matrix, give a bonus for being in the "sweet spot"
+  if (
+    userPersona &&
+    userDepth &&
+    article.contentPersona &&
+    article.depthLevel
+  ) {
+    const validPersonas: PersonaType[] = ["serenity", "explorer", "sensory"];
+    const validDepths: DepthLevel[] = ["entry", "explore", "deep"];
+
+    if (
+      validPersonas.includes(userPersona as PersonaType) &&
+      validDepths.includes(userDepth as DepthLevel)
+    ) {
+      const cell = getStrategyCell(
+        userPersona as PersonaType,
+        userDepth as DepthLevel
+      );
+      if (cell) {
+        const articlePersonas = Array.isArray(article.contentPersona)
+          ? article.contentPersona
+          : [article.contentPersona];
+        // Bonus if article persona matches AND article depth matches user depth
+        if (
+          articlePersonas.includes(userPersona) &&
+          article.depthLevel === userDepth
+        ) {
+          score += SCORE_STRATEGY_BONUS;
+        }
+      }
     }
   }
 
@@ -92,6 +224,9 @@ export function scoreArticle(
 
 /**
  * Retrieve the user's persona and depth level from Firestore.
+ * These values are computed by elxea-cx-agent's preference-pipeline
+ * and stored in users/{shopifyCustomerId}.
+ *
  * Returns null values when the document doesn't exist or fields are missing.
  */
 async function getUserPersonaData(
@@ -164,7 +299,7 @@ export async function getRecommendedArticles<T extends ArticleWithPersona>(
 ): Promise<(T & { _recommendScore: number })[]> {
   const { customerId, rawArticles, penalizeRead = true } = options;
 
-  // No user → return original order with score = 0
+  // No user -> return original order with score = 0
   if (!customerId) {
     return rawArticles.map((a) => ({ ...a, _recommendScore: 0 }));
   }
@@ -175,7 +310,7 @@ export async function getRecommendedArticles<T extends ArticleWithPersona>(
     penalizeRead ? getReadArticleSlugs(customerId) : Promise.resolve(new Set<string>()),
   ]);
 
-  // No persona data yet → return original order
+  // No persona data yet -> return original order
   if (!persona && !depthLevel) {
     return rawArticles.map((a) => ({ ...a, _recommendScore: 0 }));
   }
@@ -187,7 +322,7 @@ export async function getRecommendedArticles<T extends ArticleWithPersona>(
     const slug = article.slug as { current: string } | string | undefined;
     const slugStr = typeof slug === "object" && slug !== null ? slug.current : String(slug ?? "");
     if (penalizeRead && slugStr && readSlugs.has(slugStr)) {
-      score -= 1;
+      score += SCORE_READ_PENALTY;
     }
 
     return { ...article, _recommendScore: score };

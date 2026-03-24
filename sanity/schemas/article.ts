@@ -211,34 +211,9 @@ export const article = defineType({
       },
     }),
 
-    defineField({
-      name: "contextTime",
-      title: "コンテキスト：時間帯",
-      description: "この記事が特に合う時間帯（任意）。",
-      type: "string",
-      options: {
-        list: [
-          { title: "朝 (morning)", value: "morning" },
-          { title: "午後 (afternoon)", value: "afternoon" },
-          { title: "夜 (evening)", value: "evening" },
-        ],
-      },
-    }),
-
-    defineField({
-      name: "contextSeason",
-      title: "コンテキスト：季節",
-      description: "この記事が特に合う季節（任意）。",
-      type: "string",
-      options: {
-        list: [
-          { title: "春 (spring)", value: "spring" },
-          { title: "夏 (summer)", value: "summer" },
-          { title: "秋 (autumn)", value: "autumn" },
-          { title: "冬 (winter)", value: "winter" },
-        ],
-      },
-    }),
+    // contextTime and contextSeason removed in Phase 1.
+    // Insufficient content volume for time/season filtering.
+    // Will be reintroduced in Phase 2 when content library grows.
   ],
   preview: {
     select: {

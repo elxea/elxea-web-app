@@ -17,8 +17,6 @@ export const ARTICLES_QUERY = groq`
     contentPersona,
     depthLevel,
     targetLayer,
-    contextTime,
-    contextSeason,
     category->{title, slug},
     tags[]->{_id, title, slug},
     author->{name, slug, image}
@@ -41,8 +39,6 @@ export const ARTICLES_BY_CATEGORY_QUERY = groq`
     contentPersona,
     depthLevel,
     targetLayer,
-    contextTime,
-    contextSeason,
     category->{title, slug},
     tags[]->{_id, title, slug},
     author->{name, slug, image}
