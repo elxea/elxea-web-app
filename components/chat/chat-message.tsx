@@ -283,12 +283,6 @@ export function ChatMessage({ message }: ChatMessageProps) {
         isUser ? "items-end" : "items-start",
       )}
     >
-      {/* WC3: Cross-channel label + timestamp row for LINE messages (user side) */}
-      {isLine && isUser && (
-        <div className="mb-0.5 flex items-center gap-1.5 px-1">
-          <span className="text-xs text-muted-foreground">LINE</span>
-        </div>
-      )}
       {/* Bubble + timestamp row */}
       <div
         className={cn(
@@ -311,10 +305,6 @@ export function ChatMessage({ message }: ChatMessageProps) {
           "flex shrink-0 items-end gap-1 pb-0.5",
           isUser ? "flex-row-reverse" : "flex-row",
         )}>
-          {/* LINE label for assistant messages */}
-          {isLine && !isUser && (
-            <span className="text-[10px] text-muted-foreground">LINE</span>
-          )}
           {timeLabel && (
             <span className="text-[10px] text-muted-foreground leading-none">
               {timeLabel}
