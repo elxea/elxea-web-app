@@ -76,11 +76,13 @@ export function trackPageView(params: TrackPageViewParams): void {
 
 /**
  * Track article read completion (reached end of article or spent significant time).
+ * Includes durationSeconds for engagement depth scoring in persona calculation.
  */
 export function trackArticleRead(params: TrackArticleReadParams): void {
   sendEvent("view_content", {
     contentId: params.contentId,
     ...(params.category ? { query: `read:${params.category}` } : {}),
+    ...(params.durationSeconds ? { durationSeconds: params.durationSeconds } : {}),
   }).catch(() => {});
 }
 
