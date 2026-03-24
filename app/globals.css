@@ -86,3 +86,32 @@ h1, h2, h3, h4, h5, h6 {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
+
+@layer base {
+  /* Tap feedback for all interactive elements */
+  button,
+  [role="button"] {
+    @apply active:scale-[0.98] transition-transform;
+    cursor: pointer;
+  }
+
+  /* Disable active effect when disabled */
+  button:disabled,
+  [role="button"][aria-disabled="true"] {
+    @apply active:scale-100;
+  }
+
+  /* Link interaction */
+  a {
+    @apply transition-colors;
+  }
+
+  /* Enhanced feedback for shadcn/ui Button */
+  [data-slot="button"] {
+    @apply active:scale-[0.98] active:brightness-95;
+  }
+
+  [data-slot="button"]:disabled {
+    @apply active:scale-100 active:brightness-100;
+  }
+}
