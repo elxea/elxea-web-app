@@ -124,32 +124,32 @@
       "$type": "typography",
       "$description": "Composite typography presets — heading hierarchy + body styles",
       "display": {
-        "$value": { "fontFamily": "aktiv-grotesk-extended, dnp-shuei-gothic-gin-std, sans-serif", "fontSize": "4.5rem", "fontWeight": "700", "lineHeight": "1", "letterSpacing": "-0.025em" },
-        "$description": "Hero / display text"
+        "$value": { "fontFamily": "aktiv-grotesk-extended, dnp-shuei-gothic-gin-std, sans-serif", "fontSize": "2.75rem", "fontWeight": "300", "lineHeight": "1.2", "letterSpacing": "-0.01em" },
+        "$description": "Hero / display text — refined, understated scale"
       },
       "h1": {
-        "$value": { "fontFamily": "aktiv-grotesk-extended, dnp-shuei-gothic-gin-std, sans-serif", "fontSize": "3.25rem", "fontWeight": "700", "lineHeight": "1.25", "letterSpacing": "0.025em" },
-        "$description": "Page title (Webflow: 3.25rem)"
+        "$value": { "fontFamily": "aktiv-grotesk-extended, dnp-shuei-gothic-gin-std, sans-serif", "fontSize": "2rem", "fontWeight": "300", "lineHeight": "1.3", "letterSpacing": "0em" },
+        "$description": "Page title — light weight, moderate size"
       },
       "h2": {
-        "$value": { "fontFamily": "aktiv-grotesk-extended, dnp-shuei-gothic-gin-std, sans-serif", "fontSize": "2rem", "fontWeight": "600", "lineHeight": "1.25", "letterSpacing": "0.025em" },
-        "$description": "Section heading (Webflow: 2rem)"
+        "$value": { "fontFamily": "aktiv-grotesk-extended, dnp-shuei-gothic-gin-std, sans-serif", "fontSize": "1.5rem", "fontWeight": "400", "lineHeight": "1.3", "letterSpacing": "0em" },
+        "$description": "Section heading"
       },
       "h3": {
-        "$value": { "fontFamily": "aktiv-grotesk-extended, dnp-shuei-gothic-gin-std, sans-serif", "fontSize": "1.5rem", "fontWeight": "600", "lineHeight": "1.25", "letterSpacing": "0.025em" },
-        "$description": "Subsection heading (Webflow: 1.5rem)"
+        "$value": { "fontFamily": "aktiv-grotesk-extended, dnp-shuei-gothic-gin-std, sans-serif", "fontSize": "1.25rem", "fontWeight": "400", "lineHeight": "1.35", "letterSpacing": "0.01em" },
+        "$description": "Subsection heading"
       },
       "h4": {
-        "$value": { "fontFamily": "aktiv-grotesk-extended, dnp-shuei-gothic-gin-std, sans-serif", "fontSize": "1.25rem", "fontWeight": "600", "lineHeight": "1.5", "letterSpacing": "0.05em" },
-        "$description": "Card / block heading (Webflow: 1.25rem)"
+        "$value": { "fontFamily": "aktiv-grotesk-extended, dnp-shuei-gothic-gin-std, sans-serif", "fontSize": "1rem", "fontWeight": "500", "lineHeight": "1.5", "letterSpacing": "0.02em" },
+        "$description": "Card / block heading"
       },
       "h5": {
-        "$value": { "fontFamily": "aktiv-grotesk-extended, dnp-shuei-gothic-gin-std, sans-serif", "fontSize": "1rem", "fontWeight": "600", "lineHeight": "1.5", "letterSpacing": "0.05em" },
-        "$description": "Small heading (Webflow: 1rem)"
+        "$value": { "fontFamily": "aktiv-grotesk-extended, dnp-shuei-gothic-gin-std, sans-serif", "fontSize": "0.875rem", "fontWeight": "500", "lineHeight": "1.5", "letterSpacing": "0.02em" },
+        "$description": "Small heading"
       },
       "h6": {
-        "$value": { "fontFamily": "aktiv-grotesk-extended, dnp-shuei-gothic-gin-std, sans-serif", "fontSize": "0.875rem", "fontWeight": "600", "lineHeight": "1.5", "letterSpacing": "0.05em" },
-        "$description": "Label heading (Webflow: 0.875rem)"
+        "$value": { "fontFamily": "aktiv-grotesk-extended, dnp-shuei-gothic-gin-std, sans-serif", "fontSize": "0.8125rem", "fontWeight": "500", "lineHeight": "1.5", "letterSpacing": "0.02em" },
+        "$description": "Label heading"
       },
       "body-lg": {
         "$value": { "fontFamily": "aktiv-grotesk, kozuka-gothic-pro, sans-serif", "fontSize": "1.125rem", "fontWeight": "400", "lineHeight": "1.75", "letterSpacing": "0.05em" },
