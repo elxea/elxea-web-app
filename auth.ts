@@ -11,10 +11,73 @@
  * belong to the same LINE provider. If they differ, verify that
  * the LINE Login channel and Messaging API channel share the
  * same provider in LINE Developer Console.
+ *
+ * IMPORTANT: Explicit endpoint URLs are provided to avoid runtime
+ * OIDC discovery fetch to access.line.me, which hangs in Vercel
+ * serverless functions causing a Configuration error. Endpoints
+ * are from LINE's /.well-known/openid-configuration.
  */
 import NextAuth from "next-auth";
-import LINE from "next-auth/providers/line";
+import type { OAuthConfig } from "next-auth/providers";
 import { cookies } from "next/headers";
+
+/**
+ * LINE provider with explicit endpoints (no runtime discovery).
+ *
+ * The built-in LINE provider (next-auth/providers/line) uses type: "oidc"
+ * which triggers a runtime discovery fetch to access.line.me. In Vercel
+ * serverless functions, this fetch hangs causing a Configuration error.
+ *
+ * This custom provider uses type: "oauth" with explicit endpoints from
+ * LINE's OIDC discovery document, avoiding the runtime fetch entirely.
+ *
+ * LINE signs id_tokens with HS256 (HMAC-SHA256 using the channel secret).
+ */
+interface LineProfile {
+  /** LINE user ID (same as Messaging API userId when channels share a provider) */
+  sub: string;
+  name?: string;
+  picture?: string;
+  email?: string;
+}
+
+function LINEProvider(options: {
+  clientId?: string;
+  clientSecret?: string;
+  authorization?: {
+    url: string;
+    params?: Record<string, string>;
+  };
+}): OAuthConfig<LineProfile> {
+  return {
+    id: "line",
+    name: "LINE",
+    type: "oauth",
+    clientId: options.clientId,
+    clientSecret: options.clientSecret,
+    // Explicit endpoints from https://access.line.me/.well-known/openid-configuration
+    authorization: options.authorization ?? {
+      url: "https://access.line.me/oauth2/v2.1/authorize",
+      params: { scope: "profile openid email" },
+    },
+    token: "https://api.line.me/oauth2/v2.1/token",
+    userinfo: "https://api.line.me/oauth2/v2.1/userinfo",
+    client: {
+      id_token_signed_response_alg: "HS256",
+    },
+    // State-only checks (matches latest upstream LINE provider).
+    checks: ["state"],
+    profile(profile) {
+      return {
+        id: profile.sub,
+        name: profile.name ?? profile.sub,
+        email: profile.email ?? null,
+        image: profile.picture ?? null,
+      };
+    },
+    style: { bg: "#00C300", text: "#fff" },
+  };
+}
 
 const CHAT_API_BASE = (
   process.env.NEXT_PUBLIC_CHAT_API_URL ?? "http://localhost:8787/api/chat"
@@ -24,17 +87,14 @@ const CHAT_API_BASE = (
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [
-    LINE({
+    LINEProvider({
       clientId: process.env.AUTH_LINE_ID,
       clientSecret: process.env.AUTH_LINE_SECRET,
       authorization: {
+        url: "https://access.line.me/oauth2/v2.1/authorize",
         params: {
           bot_prompt: "aggressive",
           scope: "profile openid email",
-          // LINE のデフォルト挙動:
-          // モバイル: 「LINEアプリでログイン」ボタン + メール/パスワード
-          // PC: QRコード + メール/パスワード
-          // initial_amr_display は設定しない（モバイルで QR が出てしまうため）
         },
       },
     }),
