@@ -52,7 +52,7 @@ export function LineLoginButton({
     >
       {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- Intentional: <a> required for Universal Links to open LINE app. <Link> would use client-side navigation which breaks OAuth redirect. */}
       <a
-        href="/api/auth/signin/line"
+        href="/api/line-login"
         onClick={() => {
           // Ensure session_id cookie is fresh just before navigation
           try {
