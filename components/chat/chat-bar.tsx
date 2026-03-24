@@ -95,6 +95,27 @@ function DateSeparator({ label }: { label: string }) {
 }
 
 // ---------------------------------------------------------------------------
+// Greeting message (UI-only, not sent to API)
+// ---------------------------------------------------------------------------
+
+const GREETING_JA =
+  "こんにちは！elxea のお茶コンシェルジュです。お茶のおすすめや、淹れ方、ギフト選びなど、なんでも気軽に聞いてくださいね \uD83C\uDF75";
+const GREETING_EN =
+  "Hello! I'm elxea's tea concierge. Feel free to ask about tea recommendations, brewing tips, gift ideas, and more \uD83C\uDF75";
+
+function GreetingMessage() {
+  const { pathname } = useChatContext();
+  const isEn = pathname.startsWith("/en");
+  return (
+    <div className="flex justify-start">
+      <div className="max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed bg-muted text-foreground">
+        {isEn ? GREETING_EN : GREETING_JA}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Shared: Chat input form
 // ---------------------------------------------------------------------------
 
@@ -220,6 +241,8 @@ function MessagesList({
         className,
       )}
     >
+      {/* Greeting message when chat is empty (UI-only, not sent to API) */}
+      {messages.length === 0 && <GreetingMessage />}
       {messagesWithSeparators}
       {isStreaming &&
         messages.length > 0 &&
