@@ -9,20 +9,37 @@ import { cookies } from "next/headers";
  * Exchanges authorization code for tokens, gets user profile,
  * links LINE userId to cx-agent, and redirects to login complete page.
  */
+
+/**
+ * I4: Resolve locale from cookie or accept-language header, defaulting to "ja".
+ */
+function resolveLocale(request: NextRequest): string {
+  // Check NEXT_LOCALE cookie first (set by next-intl)
+  const localeCookie = request.cookies.get("NEXT_LOCALE")?.value;
+  if (localeCookie && /^[a-z]{2}$/.test(localeCookie)) {
+    return localeCookie;
+  }
+  // Fall back to accept-language header
+  const acceptLang = request.headers.get("accept-language") ?? "";
+  if (acceptLang.startsWith("en")) return "en";
+  return "ja";
+}
+
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const code = searchParams.get("code");
   const state = searchParams.get("state");
   const error = searchParams.get("error");
+  const locale = resolveLocale(request);
 
   // Handle LINE auth errors
   if (error) {
     console.error("[line-callback] LINE auth error:", error);
-    return NextResponse.redirect(new URL("/ja/login?error=LineAuthFailed", request.url));
+    return NextResponse.redirect(new URL(`/${locale}/login?error=LineAuthFailed`, request.url));
   }
 
   if (!code || !state) {
-    return NextResponse.redirect(new URL("/ja/login?error=MissingParams", request.url));
+    return NextResponse.redirect(new URL(`/${locale}/login?error=MissingParams`, request.url));
   }
 
   // Verify state (CSRF protection)
@@ -31,7 +48,7 @@ export async function GET(request: NextRequest) {
 
   if (!savedState || savedState !== state) {
     console.error("[line-callback] State mismatch");
-    return NextResponse.redirect(new URL("/ja/login?error=StateMismatch", request.url));
+    return NextResponse.redirect(new URL(`/${locale}/login?error=StateMismatch`, request.url));
   }
 
   // Clear state cookie
@@ -41,7 +58,7 @@ export async function GET(request: NextRequest) {
   const channelSecret = process.env.AUTH_LINE_SECRET;
 
   if (!channelId || !channelSecret) {
-    return NextResponse.redirect(new URL("/ja/login?error=NotConfigured", request.url));
+    return NextResponse.redirect(new URL(`/${locale}/login?error=NotConfigured`, request.url));
   }
 
   const baseUrl = process.env.NEXTAUTH_URL
@@ -69,7 +86,7 @@ export async function GET(request: NextRequest) {
     if (!tokenRes.ok) {
       const err = await tokenRes.text();
       console.error("[line-callback] Token exchange failed:", err);
-      return NextResponse.redirect(new URL("/ja/login?error=TokenFailed", request.url));
+      return NextResponse.redirect(new URL(`/${locale}/login?error=TokenFailed`, request.url));
     }
 
     const tokens = await tokenRes.json();
@@ -81,24 +98,33 @@ export async function GET(request: NextRequest) {
 
     if (!profileRes.ok) {
       console.error("[line-callback] Profile fetch failed");
-      return NextResponse.redirect(new URL("/ja/login?error=ProfileFailed", request.url));
+      return NextResponse.redirect(new URL(`/${locale}/login?error=ProfileFailed`, request.url));
     }
 
     const profile = await profileRes.json();
     const lineUserId = profile.userId;
     const displayName = profile.displayName;
 
-    // Get email from id_token if available
+    // I1: Verify id_token via LINE verify API before extracting claims
     let email: string | null = null;
     if (tokens.id_token) {
       try {
-        // Decode JWT payload (LINE uses HS256)
-        const payload = JSON.parse(
-          Buffer.from(tokens.id_token.split(".")[1], "base64url").toString()
-        );
-        email = payload.email || null;
+        const verifyRes = await fetch("https://api.line.me/oauth2/v2.1/verify", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            id_token: tokens.id_token,
+            client_id: channelId,
+          }),
+        });
+        if (verifyRes.ok) {
+          const verified = await verifyRes.json();
+          email = verified.email || null;
+        } else {
+          console.warn("[line-callback] id_token verification failed:", await verifyRes.text());
+        }
       } catch {
-        // id_token decode failed, continue without email
+        // id_token verification failed, continue without email
       }
     }
 
@@ -109,10 +135,16 @@ export async function GET(request: NextRequest) {
 
     const chatSessionId = cookieStore.get("chat_session_id")?.value;
 
+    // C1: Include X-API-Key header for authenticated identity linking
+    const syncApiSecret = process.env.SYNC_API_SECRET;
     try {
+      const linkHeaders: Record<string, string> = { "Content-Type": "application/json" };
+      if (syncApiSecret) {
+        linkHeaders["X-API-Key"] = syncApiSecret;
+      }
       await fetch(`${chatApiBase}/api/identity/link-line`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: linkHeaders,
         body: JSON.stringify({
           line_user_id: lineUserId,
           email,
@@ -125,9 +157,8 @@ export async function GET(request: NextRequest) {
       // Don't block login on link failure
     }
 
-    // Store LINE user info in cookie for client-side access
+    // I5: Store only displayName in cookie (userId stays server-side only)
     const lineUserCookie = JSON.stringify({
-      userId: lineUserId,
       displayName,
     });
 
@@ -140,9 +171,9 @@ export async function GET(request: NextRequest) {
     });
 
     // Redirect to login complete page
-    return NextResponse.redirect(new URL("/ja/login/complete?linked=true", request.url));
+    return NextResponse.redirect(new URL(`/${locale}/login/complete?linked=true`, request.url));
   } catch (err) {
     console.error("[line-callback] Unexpected error:", err);
-    return NextResponse.redirect(new URL("/ja/login?error=Unexpected", request.url));
+    return NextResponse.redirect(new URL(`/${locale}/login?error=Unexpected`, request.url));
   }
 }

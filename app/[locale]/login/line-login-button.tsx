@@ -37,7 +37,7 @@ export function LineLoginButton({
     try {
       const sessionId = localStorage.getItem("elxea-chat-session-id");
       if (sessionId) {
-        document.cookie = `chat_session_id=${sessionId};path=/;max-age=300;SameSite=Lax`;
+        document.cookie = `chat_session_id=${sessionId};path=/;max-age=300;SameSite=Lax;Secure`;
       }
     } catch {
       // localStorage not available
@@ -58,7 +58,7 @@ export function LineLoginButton({
           try {
             const sessionId = localStorage.getItem("elxea-chat-session-id");
             if (sessionId) {
-              document.cookie = `chat_session_id=${sessionId};path=/;max-age=300;SameSite=Lax`;
+              document.cookie = `chat_session_id=${sessionId};path=/;max-age=300;SameSite=Lax;Secure`;
             }
           } catch {
             // noop
