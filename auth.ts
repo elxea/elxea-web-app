@@ -110,14 +110,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return session;
     },
     async redirect({ url, baseUrl }) {
-      // After LINE Login, redirect to the completion page instead of
-      // back to the login page. The signIn action sets redirectTo with
-      // a query param ?linked=true which we detect here.
-      if (url.includes("/login") && url.includes("linked=true")) {
-        // Replace /login?linked=true with /login/complete
-        return url.replace(/\/login\?linked=true/, "/login/complete");
-      }
-      // Default: allow relative URLs, block external redirects
+      // Allow relative and same-origin redirects (including /login/complete)
       if (url.startsWith("/")) return `${baseUrl}${url}`;
       if (url.startsWith(baseUrl)) return url;
       return baseUrl;

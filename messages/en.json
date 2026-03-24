@@ -183,6 +183,13 @@
     "terms": "By signing in, you agree to our Terms of Service and Privacy Policy.",
     "linkedSuccess": "Your LINE account has been linked"
   },
+  "loginComplete": {
+    "title": "Account Linked",
+    "heading": "Your LINE account has been linked",
+    "description": "Your tea experience is now connected across LINE and Web.",
+    "exploreTea": "Explore our teas",
+    "startChat": "Chat with us"
+  },
   "legal": {
     "tokushoho": "Specified Commercial Transactions Act",
     "privacy": "Privacy Policy",

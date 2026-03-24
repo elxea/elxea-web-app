@@ -183,6 +183,13 @@
     "terms": "ログインすることで、利用規約とプライバシーポリシーに同意したものとみなされます。",
     "linkedSuccess": "LINE アカウントと連携しました"
   },
+  "loginComplete": {
+    "title": "連携完了",
+    "heading": "LINE アカウントと連携が完了しました",
+    "description": "LINE でも Web でも、あなたのお茶体験がつながります。",
+    "exploreTea": "お茶を探しに行く",
+    "startChat": "チャットで相談する"
+  },
   "legal": {
     "tokushoho": "特定商取引法に基づく表記",
     "privacy": "プライバシーポリシー",
