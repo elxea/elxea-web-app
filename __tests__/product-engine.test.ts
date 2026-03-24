@@ -25,7 +25,12 @@ function makeProduct(tags: string[]): Product {
     },
     featuredImage: null,
     images: [],
+    options: [],
     variants: [],
+    seo: { title: null, description: null },
+    productType: "",
+    createdAt: "2026-01-01T00:00:00Z",
+    updatedAt: "2026-01-01T00:00:00Z",
     sellingPlanGroups: [],
     metafields: {
       features: [],
