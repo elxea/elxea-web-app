@@ -1,3 +1,11 @@
+// Cloudflare Worker types (not available in Next.js build scope)
+declare global {
+  interface ExecutionContext {
+    waitUntil(promise: Promise<unknown>): void;
+    passThroughOnException(): void;
+  }
+}
+
 /**
  * elxea Checkout Router — Cloudflare Worker
  *
