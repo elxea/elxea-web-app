@@ -4,7 +4,16 @@ import { decryptToken } from "@/lib/shopify/customer";
 import { getSession, getCustomerFromSession } from "@/lib/shopify/auth";
 
 export async function GET(request: NextRequest) {
-  if (process.env.NODE_ENV === "production") {
+  // Block in production AND on preview deployments. Only allow when
+  // DEBUG_AUTH_SECRET is configured and matches the query parameter.
+  const debugSecret = process.env.DEBUG_AUTH_SECRET;
+  const providedSecret = request.nextUrl.searchParams.get("secret");
+
+  if (
+    process.env.NODE_ENV === "production" ||
+    !debugSecret ||
+    providedSecret !== debugSecret
+  ) {
     return NextResponse.json({ error: "Not available" }, { status: 404 });
   }
 

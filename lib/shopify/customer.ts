@@ -3,6 +3,16 @@ import { createHash, randomBytes, createCipheriv, createDecipheriv } from "crypt
 const CLIENT_ID = process.env.SHOPIFY_CUSTOMER_ACCOUNT_CLIENT_ID || "";
 const SESSION_SECRET = process.env.SESSION_SECRET || "";
 
+// Fail fast at module load time if SESSION_SECRET is missing.
+// This is used for token encryption; an empty secret would silently produce
+// insecure ciphertext.
+if (!SESSION_SECRET && typeof process !== "undefined" && process.env.NODE_ENV !== "test") {
+  throw new Error(
+    "SESSION_SECRET environment variable is required for token encryption. " +
+    "Set it in .env.local or your deployment environment.",
+  );
+}
+
 const ACCOUNT_DOMAIN = "account.elxea.com";
 const AUTHORIZE_URL = `https://${ACCOUNT_DOMAIN}/authentication/oauth/authorize`;
 const TOKEN_URL = `https://${ACCOUNT_DOMAIN}/authentication/oauth/token`;

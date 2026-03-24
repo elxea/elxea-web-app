@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import type { ProductCardItem } from "./elxea-chat-transport";
 import { cn } from "@/lib/utils";
 
@@ -20,12 +21,13 @@ export function ProductCard({ product }: ProductCardProps) {
       )}
     >
       {product.image && (
-        <div className="shrink-0 size-16 rounded-lg overflow-hidden bg-muted">
-          <img
+        <div className="shrink-0 size-16 rounded-lg overflow-hidden bg-muted relative">
+          <Image
             src={product.image}
             alt={product.name}
-            className="size-full object-cover"
-            loading="lazy"
+            fill
+            sizes="64px"
+            className="object-cover"
           />
         </div>
       )}

@@ -5,6 +5,7 @@ import { SendHorizontal, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 // vaul Drawer removed — replaced with a plain fixed panel for iOS keyboard compatibility
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { useChatContext } from "./chat-provider";
 import { ChatMessage } from "./chat-message";
 import { ChatLauncher } from "./chat-launcher";
@@ -470,10 +471,13 @@ function MobileChatDrawer() {
 // ---------------------------------------------------------------------------
 
 export function ChatBar() {
-  return (
-    <>
-      <DesktopChatBar />
-      <MobileChatDrawer />
-    </>
-  );
+  const isMobile = useIsMobile();
+
+  // Render only the variant that matches the current viewport.
+  // This avoids rendering both Desktop and Mobile DOM trees simultaneously.
+  if (isMobile) {
+    return <MobileChatDrawer />;
+  }
+
+  return <DesktopChatBar />;
 }

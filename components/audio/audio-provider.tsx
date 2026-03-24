@@ -19,7 +19,6 @@ const AudioContext = createContext<AudioContextValue>({
   toggle: () => {},
 });
 
-const STORAGE_KEY = "elxea-bgm-playing";
 const POSITION_KEY = "elxea-bgm-position";
 
 export function AudioProvider({ children }: { children: React.ReactNode }) {
@@ -32,16 +31,20 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     audio.volume = 0.3;
     audio.preload = "none";
 
-    // 前回の再生位置を復元
-    try {
-      const savedPosition = localStorage.getItem(POSITION_KEY);
-      if (savedPosition) {
-        const pos = parseFloat(savedPosition);
-        if (!isNaN(pos) && pos > 0) {
-          audio.currentTime = pos;
+    // Restore saved playback position once metadata is loaded.
+    // Setting currentTime before loadedmetadata is a no-op on many browsers.
+    const handleLoadedMetadata = () => {
+      try {
+        const savedPosition = localStorage.getItem(POSITION_KEY);
+        if (savedPosition) {
+          const pos = parseFloat(savedPosition);
+          if (!isNaN(pos) && pos > 0 && pos < audio.duration) {
+            audio.currentTime = pos;
+          }
         }
-      }
-    } catch {}
+      } catch {}
+    };
+    audio.addEventListener("loadedmetadata", handleLoadedMetadata);
 
     audioRef.current = audio;
 
@@ -55,6 +58,7 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     }, 5000);
 
     return () => {
+      audio.removeEventListener("loadedmetadata", handleLoadedMetadata);
       // 離脱時に最終位置を保存
       if (audio && isFinite(audio.currentTime)) {
         try {
@@ -75,9 +79,6 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     if (audio.paused) {
       audio.play().then(() => {
         setIsPlaying(true);
-        try {
-          localStorage.setItem(STORAGE_KEY, "true");
-        } catch {}
       }).catch(() => {
         // Browser blocked autoplay — user interaction required
       });
@@ -85,7 +86,6 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
       audio.pause();
       setIsPlaying(false);
       try {
-        localStorage.setItem(STORAGE_KEY, "false");
         localStorage.setItem(POSITION_KEY, String(audio.currentTime));
       } catch {}
     }

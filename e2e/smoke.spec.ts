@@ -158,41 +158,18 @@ test.describe("Footer", () => {
 });
 
 test.describe("Language switcher", () => {
-  test("switches from ja to en", async ({ page }) => {
-    await page.goto("/ja");
-    const footer = page.locator("footer");
+  // Middleware redirects /en/* to /ja/* (English content not ready).
+  // These tests verify the redirect behavior instead of English content.
 
-    // Click the English language button in footer
-    await footer.getByText("English").click();
-    await page.waitForURL(/\/en/);
-    expect(page.url()).toContain("/en");
-
-    // Verify page is now in English
-    const heading = page.locator("h1");
-    await expect(heading).toContainText("elxea");
-
-    // Navigation should be in English (scope to nav to avoid strict mode violation)
-    const nav = page.locator("nav").first();
-    await expect(nav.getByText("Products")).toBeVisible();
-  });
-
-  test("switches from en to ja", async ({ page }) => {
+  test("en redirects to ja (middleware 301)", async ({ page }) => {
     await page.goto("/en");
-    const footer = page.locator("footer");
-
-    // Click the Japanese language button in footer
-    await footer.getByText("日本語").click();
     await page.waitForURL(/\/ja/);
     expect(page.url()).toContain("/ja");
-
-    // Navigation should be in Japanese (scope to nav to avoid strict mode violation)
-    const nav = page.locator("nav").first();
-    await expect(nav.getByText("商品一覧")).toBeVisible();
   });
 
-  test("en locale products page loads correctly", async ({ page }) => {
+  test("en/products redirects to ja/products", async ({ page }) => {
     await page.goto("/en/products");
-    const heading = page.locator("h1");
-    await expect(heading).toContainText("Products");
+    await page.waitForURL(/\/ja\/products/);
+    expect(page.url()).toContain("/ja/products");
   });
 });

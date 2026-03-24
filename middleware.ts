@@ -6,11 +6,35 @@ const intlMiddleware = createMiddleware(routing);
 
 const SITE_PASSWORD = process.env.SITE_PASSWORD;
 
-function checkSitePassword(request: NextRequest): NextResponse | null {
+/**
+ * Compute HMAC-SHA256 hash of the site password using the Web Crypto API
+ * (available in Edge Runtime / middleware). This must produce the same output
+ * as the Node.js `hashSitePassword` in `app/api/site-auth/route.ts`.
+ */
+async function hashSitePasswordEdge(password: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const keyData = encoder.encode(password);
+  const key = await crypto.subtle.importKey(
+    "raw",
+    keyData,
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const signature = await crypto.subtle.sign("HMAC", key, keyData);
+  return Array.from(new Uint8Array(signature))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+async function checkSitePassword(request: NextRequest): Promise<NextResponse | null> {
   if (!SITE_PASSWORD) return null;
 
   const authCookie = request.cookies.get("site_auth")?.value;
-  if (authCookie === SITE_PASSWORD) return null;
+  if (authCookie) {
+    const expectedHash = await hashSitePasswordEdge(SITE_PASSWORD);
+    if (authCookie === expectedHash) return null;
+  }
 
   const { pathname } = request.nextUrl;
 
@@ -22,11 +46,11 @@ function checkSitePassword(request: NextRequest): NextResponse | null {
   return NextResponse.redirect(passwordUrl);
 }
 
-export default function middleware(request: NextRequest) {
+export default async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Site-wide password protection (staging/preview)
-  const passwordResponse = checkSitePassword(request);
+  const passwordResponse = await checkSitePassword(request);
   if (passwordResponse) return passwordResponse;
 
   // Redirect /en/* to /ja/* (English content not ready yet)

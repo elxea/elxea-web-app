@@ -46,6 +46,8 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 :root {
+  /* Third-party brand colors */
+  --brand-line: #06C755;
   --sidebar: hsl(0 0% 98%);
   --sidebar-foreground: hsl(240 5.3% 26.1%);
   --sidebar-primary: hsl(240 5.9% 10%);
@@ -68,6 +70,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 @theme inline {
+  --color-brand-line: var(--brand-line);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);

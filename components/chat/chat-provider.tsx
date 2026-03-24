@@ -257,8 +257,17 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         onQuickReplies: (items) => setQuickReplies(items),
       },
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Abort in-flight SSE request on unmount (I2: prevent leaked connections)
+  useEffect(() => {
+    const t = transport;
+    return () => {
+      if (t instanceof ElxeaChatTransport) {
+        t.abort();
+      }
+    };
+  }, [transport]);
 
   const { messages, sendMessage: rawSendMessage, status, error, setMessages } =
     useChat({ transport });
@@ -271,7 +280,11 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
     fetchChatHistory(sessionId, shopifyCustomerId).then((data) => {
       if (!data || data.messages.length === 0) return;
-      setMessages(historyToUIMessages(data.messages));
+      // Only hydrate history if no messages have been sent yet (race condition guard)
+      setMessages((prev) => {
+        if (prev.length > 0) return prev;
+        return historyToUIMessages(data.messages);
+      });
     });
     // 初回のみ実行。shopifyCustomerId の変化で再取得はしない
     // （認証後のリロードは別フローで対応）

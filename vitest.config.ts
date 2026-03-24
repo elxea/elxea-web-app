@@ -14,6 +14,21 @@ const dirname =
 export default defineConfig({
   test: {
     projects: [
+      // Unit tests (Node environment)
+      {
+        extends: true,
+        test: {
+          name: 'unit',
+          include: ['__tests__/**/*.test.ts'],
+          environment: 'node',
+        },
+        resolve: {
+          alias: {
+            '@': dirname,
+          },
+        },
+      },
+      // Storybook visual tests (browser environment)
       {
         extends: true,
         plugins: [

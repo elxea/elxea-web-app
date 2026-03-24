@@ -1,4 +1,14 @@
+import { createHmac } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
+
+/**
+ * Generate a hashed token from the site password.
+ * Uses HMAC-SHA256 with the password itself as both key and message,
+ * producing a deterministic but non-reversible token for cookie storage.
+ */
+function hashSitePassword(password: string): string {
+  return createHmac("sha256", password).update(password).digest("hex");
+}
 
 export async function POST(request: NextRequest) {
   const { password } = await request.json();
@@ -9,7 +19,7 @@ export async function POST(request: NextRequest) {
   }
 
   const response = NextResponse.json({ ok: true });
-  response.cookies.set("site_auth", sitePassword, {
+  response.cookies.set("site_auth", hashSitePassword(sitePassword), {
     httpOnly: true,
     secure: true,
     sameSite: "lax",

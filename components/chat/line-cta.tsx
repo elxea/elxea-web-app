@@ -50,7 +50,7 @@ export function LineCta() {
           "text-xs text-muted-foreground leading-relaxed",
         )}
       >
-        <LineIcon className="size-4 shrink-0 text-[#06C755]" />
+        <LineIcon className="size-4 shrink-0 text-brand-line" />
         <span>
           ログインすると、LINE でもこの会話を続けられます
         </span>
@@ -71,11 +71,11 @@ export function LineCta() {
         "flex items-center gap-2.5 rounded-xl px-3.5 py-2.5",
         "bg-muted/50 border border-border/30",
         "text-xs text-muted-foreground leading-relaxed",
-        "hover:border-[#06C755]/30 hover:bg-[#06C755]/5 transition-colors",
+        "hover:border-brand-line/30 hover:bg-brand-line/5 transition-colors",
         "no-underline",
       )}
     >
-      <LineIcon className="size-4 shrink-0 text-[#06C755]" />
+      <LineIcon className="size-4 shrink-0 text-brand-line" />
       <span>
         LINE でも会話を続けられます。
         <span className="font-medium text-foreground ml-0.5">

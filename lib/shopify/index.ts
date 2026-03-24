@@ -225,6 +225,12 @@ export async function createCart(
     cache: "no-store",
   });
 
+  if (data.cartCreate.userErrors.length > 0) {
+    throw new Error(
+      `Cart create error: ${data.cartCreate.userErrors.map((e) => e.message).join(", ")}`,
+    );
+  }
+
   return data.cartCreate.cart;
 }
 
@@ -239,6 +245,12 @@ export async function addToCart(
     variables: { cartId, lines },
     cache: "no-store",
   });
+
+  if (data.cartLinesAdd.userErrors.length > 0) {
+    throw new Error(
+      `Cart add error: ${data.cartLinesAdd.userErrors.map((e) => e.message).join(", ")}`,
+    );
+  }
 
   return data.cartLinesAdd.cart;
 }
@@ -258,6 +270,12 @@ export async function updateCart(
     cache: "no-store",
   });
 
+  if (data.cartLinesUpdate.userErrors.length > 0) {
+    throw new Error(
+      `Cart update error: ${data.cartLinesUpdate.userErrors.map((e) => e.message).join(", ")}`,
+    );
+  }
+
   return data.cartLinesUpdate.cart;
 }
 
@@ -272,6 +290,12 @@ export async function removeFromCart(cartId: string, lineIds: string[]) {
     variables: { cartId, lineIds },
     cache: "no-store",
   });
+
+  if (data.cartLinesRemove.userErrors.length > 0) {
+    throw new Error(
+      `Cart remove error: ${data.cartLinesRemove.userErrors.map((e) => e.message).join(", ")}`,
+    );
+  }
 
   return data.cartLinesRemove.cart;
 }

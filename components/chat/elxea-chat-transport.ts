@@ -49,12 +49,22 @@ export class ElxeaChatTransport implements ChatTransport<UIMessage> {
   private getSessionId: () => string;
   private getShopifyCustomerId: () => string | null;
   private callbacks: ChatEventCallbacks;
+  private abortController: AbortController | null = null;
 
   constructor(options: ElxeaChatTransportOptions) {
     this.api = options.api;
     this.getSessionId = options.getSessionId;
     this.getShopifyCustomerId = options.getShopifyCustomerId ?? (() => null);
     this.callbacks = options.callbacks ?? {};
+  }
+
+  /**
+   * Abort any in-flight SSE request. Call this on component unmount
+   * to prevent leaked connections and state updates after unmount.
+   */
+  abort(): void {
+    this.abortController?.abort();
+    this.abortController = null;
   }
 
   async sendMessages({
@@ -91,10 +101,15 @@ export class ElxeaChatTransport implements ChatTransport<UIMessage> {
       requestBody.shopify_customer_id = shopifyCustomerId;
     }
 
+    // Abort previous request if still in-flight
+    this.abortController?.abort();
+    this.abortController = new AbortController();
+
     const response = await fetch(this.api, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(requestBody),
+      signal: this.abortController.signal,
     });
 
     if (!response.ok) {
