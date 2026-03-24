@@ -52,6 +52,8 @@ interface ChatContextValue {
   clearQuickReplies: () => void;
   /** Whether the user is authenticated via Shopify */
   isAuthenticated: boolean;
+  /** LINE User ID from Auth.js session (null if not linked) */
+  lineUserId: string | null;
 }
 
 const ChatContext = createContext<ChatContextValue | null>(null);
@@ -207,6 +209,21 @@ async function fetchShopifyCustomerId(): Promise<string | null> {
   }
 }
 
+/**
+ * Fetch the LINE user ID from the Auth.js session API.
+ * Returns null if not authenticated via LINE or on error.
+ */
+async function fetchLineUserId(): Promise<string | null> {
+  try {
+    const res = await fetch("/api/auth/session");
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data?.user?.lineUserId ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export function ChatProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
@@ -214,6 +231,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   const [shopifyCustomerId, setShopifyCustomerId] = useState<string | null>(
     null,
   );
+  const [lineUserId, setLineUserId] = useState<string | null>(null);
   const [productCards, setProductCards] = useState<ProductCardItem[]>([]);
   const [quickReplies, setQuickReplies] = useState<QuickReplyItem[]>([]);
   const initialisedRef = useRef(false);
@@ -242,11 +260,21 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
-  // sessionId / shopifyCustomerId を ref に保持（transport が最新値を参照できるよう）
+  // Fetch LINE User ID from Auth.js session (once on mount)
+  const lineUserIdFetchedRef = useRef(false);
+  useEffect(() => {
+    if (lineUserIdFetchedRef.current) return;
+    lineUserIdFetchedRef.current = true;
+    fetchLineUserId().then(setLineUserId);
+  }, []);
+
+  // sessionId / shopifyCustomerId / lineUserId を ref に保持（transport が最新値を参照できるよう）
   const sessionIdRef = useRef(sessionId);
   sessionIdRef.current = sessionId;
   const shopifyCustomerIdRef = useRef(shopifyCustomerId);
   shopifyCustomerIdRef.current = shopifyCustomerId;
+  const lineUserIdRef = useRef(lineUserId);
+  lineUserIdRef.current = lineUserId;
 
   const transport = useMemo(() => {
     if (IS_MOCK) return new MockChatTransport();
@@ -254,6 +282,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       api: CHAT_API_URL,
       getSessionId: () => sessionIdRef.current,
       getShopifyCustomerId: () => shopifyCustomerIdRef.current,
+      getLineUserId: () => lineUserIdRef.current,
       callbacks: {
         onProductCards: (products) => setProductCards(products),
         onQuickReplies: (items) => setQuickReplies(items),
@@ -309,7 +338,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     setQuickReplies([]);
   }, []);
 
-  const isAuthenticated = shopifyCustomerId !== null;
+  const isAuthenticated = shopifyCustomerId !== null || lineUserId !== null;
 
   const value = useMemo<ChatContextValue>(
     () => ({
@@ -325,8 +354,9 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       quickReplies,
       clearQuickReplies,
       isAuthenticated,
+      lineUserId,
     }),
-    [messages, status, isOpen, pathname, sessionId, sendMessage, error, productCards, quickReplies, clearQuickReplies, isAuthenticated],
+    [messages, status, isOpen, pathname, sessionId, sendMessage, error, productCards, quickReplies, clearQuickReplies, isAuthenticated, lineUserId],
   );
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;

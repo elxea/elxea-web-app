@@ -173,6 +173,15 @@
     "confirmCancel": "本当に解約する",
     "actionError": "操作に失敗しました。もう一度お試しください。"
   },
+  "login": {
+    "title": "ログイン",
+    "heading": "elxea にログイン",
+    "description": "LINE でログインすると、Web でも LINE でも会話を引き継げます。",
+    "lineButton": "LINE でログイン",
+    "or": "または",
+    "shopifyButton": "メールアドレスでログイン",
+    "terms": "ログインすることで、利用規約とプライバシーポリシーに同意したものとみなされます。"
+  },
   "legal": {
     "tokushoho": "特定商取引法に基づく表記",
     "privacy": "プライバシーポリシー",

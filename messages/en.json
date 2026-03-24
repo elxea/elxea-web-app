@@ -173,6 +173,15 @@
     "confirmCancel": "Confirm cancel",
     "actionError": "Action failed. Please try again."
   },
+  "login": {
+    "title": "Login",
+    "heading": "Sign in to elxea",
+    "description": "Sign in with LINE to continue your conversation across Web and LINE.",
+    "lineButton": "Sign in with LINE",
+    "or": "or",
+    "shopifyButton": "Sign in with Email",
+    "terms": "By signing in, you agree to our Terms of Service and Privacy Policy."
+  },
   "legal": {
     "tokushoho": "Specified Commercial Transactions Act",
     "privacy": "Privacy Policy",

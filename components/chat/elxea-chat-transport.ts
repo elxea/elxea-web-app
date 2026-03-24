@@ -40,6 +40,8 @@ interface ElxeaChatTransportOptions {
   getSessionId: () => string;
   /** Shopify Customer ID を返す関数（null = 未ログイン） */
   getShopifyCustomerId?: () => string | null;
+  /** LINE User ID を返す関数（null = LINE 未連携） */
+  getLineUserId?: () => string | null;
   /** SSE イベントコールバック */
   callbacks?: ChatEventCallbacks;
 }
@@ -48,6 +50,7 @@ export class ElxeaChatTransport implements ChatTransport<UIMessage> {
   private api: string;
   private getSessionId: () => string;
   private getShopifyCustomerId: () => string | null;
+  private getLineUserId: () => string | null;
   private callbacks: ChatEventCallbacks;
   private abortController: AbortController | null = null;
 
@@ -55,6 +58,7 @@ export class ElxeaChatTransport implements ChatTransport<UIMessage> {
     this.api = options.api;
     this.getSessionId = options.getSessionId;
     this.getShopifyCustomerId = options.getShopifyCustomerId ?? (() => null);
+    this.getLineUserId = options.getLineUserId ?? (() => null);
     this.callbacks = options.callbacks ?? {};
   }
 
@@ -93,12 +97,16 @@ export class ElxeaChatTransport implements ChatTransport<UIMessage> {
     // ログイン済みユーザーは shopify_customer_id を送信して
     // cx-agent 側で identity resolution を行う
     const shopifyCustomerId = this.getShopifyCustomerId();
+    const lineUserId = this.getLineUserId();
     const requestBody: Record<string, string> = {
       message: messageText,
       session_id: sessionId,
     };
     if (shopifyCustomerId) {
       requestBody.shopify_customer_id = shopifyCustomerId;
+    }
+    if (lineUserId) {
+      requestBody.line_user_id = lineUserId;
     }
 
     // Abort previous request if still in-flight
