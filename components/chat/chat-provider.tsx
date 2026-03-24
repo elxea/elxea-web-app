@@ -128,9 +128,11 @@ class MockChatTransport implements ChatTransport<UIMessage> {
 // Provider
 // ---------------------------------------------------------------------------
 
-const CHAT_API_URL =
-  process.env.NEXT_PUBLIC_CHAT_API_URL ?? "http://localhost:8787/api/chat";
-const CHAT_API_BASE = CHAT_API_URL.replace(/\/api\/chat$/, "");
+const CHAT_API_URL = (
+  process.env.NEXT_PUBLIC_CHAT_API_URL ?? "http://localhost:8787/api/chat"
+).trim();
+// Strip trailing /api/chat (with or without trailing slash) to get the origin
+const CHAT_API_BASE = CHAT_API_URL.replace(/\/api\/chat\/?$/, "");
 const IS_MOCK = process.env.NEXT_PUBLIC_CHAT_MOCK === "true";
 
 // ---------------------------------------------------------------------------

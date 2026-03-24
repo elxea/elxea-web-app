@@ -107,7 +107,11 @@ export function CartProvider({
           sellingPlanAllocation: null,
         },
       });
-      await addItem(merchandiseId, quantity, sellingPlanId);
+      try {
+        await addItem(merchandiseId, quantity, sellingPlanId);
+      } catch (e) {
+        console.error("Failed to add to cart:", e);
+      }
     });
   }
 
@@ -122,14 +126,22 @@ export function CartProvider({
       } else {
         setOptimisticCart({ type: "UPDATE", lineId, quantity });
       }
-      await updateItem(lineId, merchandiseId, quantity);
+      try {
+        await updateItem(lineId, merchandiseId, quantity);
+      } catch (e) {
+        console.error("Failed to update cart:", e);
+      }
     });
   }
 
   async function handleRemoveFromCart(lineId: string) {
     startTransition(async () => {
       setOptimisticCart({ type: "REMOVE", lineId });
-      await removeItem(lineId);
+      try {
+        await removeItem(lineId);
+      } catch (e) {
+        console.error("Failed to remove from cart:", e);
+      }
     });
   }
 
