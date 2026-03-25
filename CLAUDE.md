@@ -4,6 +4,12 @@ elxea EC サイト（Next.js ヘッドレスコマース）のプロジェクト
 
 エージェント定義（責務・権限・Devlog・制約）は `elxea-developer/CLAUDE.md` を参照。
 
+## Git ルール（厳守）
+- 開発作業は developer ブランチで行う
+- main への直接 push は禁止
+- developer → main のマージは CI 全 PASS 後のみ
+- コミットメッセージは conventional commits に従う（feat:, fix:, ci:, test:, docs:, chore:）
+
 ## アーキテクチャ
 
 - Runtime: Next.js 15 + React 19 + TypeScript（App Router）
