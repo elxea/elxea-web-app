@@ -233,7 +233,20 @@
     "viewSubscriptions": "Manage Subscriptions",
     "viewOrders": "View Order History",
     "subscriptionNoteManage": "You can manage your subscriptions — change frequency, skip, pause, or cancel — from this page.",
-    "backToAccount": "Back to My Account"
+    "backToAccount": "Back to My Account",
+    "lineConnected": "Connected via LINE",
+    "connectShopifyHeading": "Connect Your Email",
+    "connectShopifyDescription": "Connect your email address to access all features, including order history, subscription management, and favorites.",
+    "connectShopifyButton": "Connect with Email",
+    "availableFeatures": "Available Features",
+    "featureChat": "AI chat for tea recommendations",
+    "featureBrowse": "Browse products and articles",
+    "featureLineNotifications": "Receive LINE notifications",
+    "lockedFeatures": "Features Available After Connection",
+    "lockedFeaturesDescription": "Connect your email to unlock the following features.",
+    "featureOrders": "View order history",
+    "featureSubscriptions": "Manage subscriptions",
+    "featureFavorites": "Favorites and follow features"
   },
   "membership": {
     "title": "Membership Plans",

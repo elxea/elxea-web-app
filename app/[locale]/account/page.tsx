@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import { getTranslations, getLocale } from "next-intl/server";
 import { getCustomerFromSession, getSubscriptionsFromSession } from "@/lib/shopify/auth";
 import { Link } from "@/i18n/navigation";
@@ -9,6 +10,7 @@ import { DashboardSummary } from "@/components/account/dashboard-summary";
 import { FavoritesSection } from "@/components/account/favorites-section";
 import { FollowsSection } from "@/components/account/follows-section";
 import { EventsSection } from "@/components/account/events-section";
+import { LineAccountView } from "@/components/account/line-account-view";
 
 function formatPrice(amount: string, currency: string, locale: string) {
   return new Intl.NumberFormat(locale, {
@@ -25,6 +27,20 @@ function formatDate(dateStr: string, locale: string) {
   });
 }
 
+/**
+ * Parse LINE user cookie to get display name.
+ * The cookie stores JSON: { displayName: string }
+ */
+function getLineDisplayName(cookieValue: string | undefined): string | null {
+  if (!cookieValue) return null;
+  try {
+    const parsed = JSON.parse(cookieValue);
+    return parsed.displayName ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export default async function AccountPage() {
   const t = await getTranslations("account");
   const tCommon = await getTranslations("common");
@@ -34,16 +50,34 @@ export default async function AccountPage() {
   try {
     customer = await getCustomerFromSession();
   } catch {
-    // fall through to login required
+    // fall through — check for LINE session below
   }
 
   if (!customer) {
+    // P7-fix: Check if user is logged in via LINE (without Shopify session).
+    // LINE-only users have line_session + line_user cookies but no shop_at/shop_rt.
+    const cookieStore = await cookies();
+    const hasLineSession = cookieStore.has("line_session");
+    const lineUserCookie = cookieStore.get("line_user")?.value;
+    const lineDisplayName = getLineDisplayName(lineUserCookie);
+
+    if (hasLineSession && lineDisplayName) {
+      // Show LINE-only account view with Shopify connection prompt
+      return (
+        <LineAccountView
+          displayName={lineDisplayName}
+          locale={locale}
+        />
+      );
+    }
+
+    // Fully unauthenticated — show login prompt
     return (
       <div className="max-w-2xl mx-auto px-6 py-16 text-center">
         <h1 className="mb-6">{tCommon("account")}</h1>
         <p className="text-muted-foreground mb-8">{t("loginRequired")}</p>
         <Button variant="outline" asChild>
-          <a href={`/api/auth/login?locale=${locale}`}>{tCommon("login")}</a>
+          <a href={`/${locale}/login`}>{tCommon("login")}</a>
         </Button>
       </div>
     );
