@@ -6,12 +6,17 @@ export async function GET(request: NextRequest) {
 
   const response = NextResponse.redirect(`${origin}/${locale}`);
 
-  // Clear all auth-related cookies with explicit path
+  // P4-fix: Clear ALL auth-related cookies (Shopify + LINE) with explicit path
   const deleteOptions = { path: "/", maxAge: 0 } as const;
+  // Shopify cookies
   response.cookies.set("shop_at", "", deleteOptions);
   response.cookies.set("shop_rt", "", deleteOptions);
   response.cookies.set("shop_exp", "", deleteOptions);
   response.cookies.set("shop_auth", "", deleteOptions);
+  response.cookies.set("shop_cid", "", deleteOptions);
+  // LINE cookies
+  response.cookies.set("line_user", "", deleteOptions);
+  response.cookies.set("line_session", "", deleteOptions);
 
   return response;
 }

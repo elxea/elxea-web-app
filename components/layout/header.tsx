@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Image from "next/image";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 import { Link, usePathname } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,6 +22,7 @@ type HeaderProps = { navItems?: NavItem[] };
 
 export function Header({ navItems: externalNavItems }: HeaderProps) {
   const t = useTranslations("common");
+  const locale = useLocale();
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -110,18 +111,33 @@ export function Header({ navItems: externalNavItems }: HeaderProps) {
                   </Link>
                 </Button>
                 {isLoggedIn ? (
-                  <Button
-                    variant="ghost"
-                    className="justify-start text-muted-foreground sm:hidden"
-                    asChild
-                  >
-                    <Link
-                      href="/account"
-                      onClick={() => setMobileOpen(false)}
+                  <>
+                    <Button
+                      variant="ghost"
+                      className="justify-start text-muted-foreground sm:hidden"
+                      asChild
                     >
-                      {t("account")}
-                    </Link>
-                  </Button>
+                      <Link
+                        href="/account"
+                        onClick={() => setMobileOpen(false)}
+                      >
+                        {t("account")}
+                      </Link>
+                    </Button>
+                    {/* P5-fix: Logout link accessible to all logged-in users including LINE-only */}
+                    <Button
+                      variant="ghost"
+                      className="justify-start text-muted-foreground sm:hidden"
+                      asChild
+                    >
+                      <a
+                        href={`/api/auth/logout?locale=${locale}`}
+                        onClick={() => setMobileOpen(false)}
+                      >
+                        {t("logout")}
+                      </a>
+                    </Button>
+                  </>
                 ) : (
                   <Button
                     variant="ghost"
@@ -166,14 +182,25 @@ export function Header({ navItems: externalNavItems }: HeaderProps) {
               <Link href="/search">{t("search")}</Link>
             </Button>
             {isLoggedIn ? (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-muted-foreground hidden sm:inline-flex"
-                asChild
-              >
-                <Link href="/account">{t("account")}</Link>
-              </Button>
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-muted-foreground hidden sm:inline-flex"
+                  asChild
+                >
+                  <Link href="/account">{t("account")}</Link>
+                </Button>
+                {/* P5-fix: Desktop logout link for all logged-in users */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-muted-foreground hidden sm:inline-flex"
+                  asChild
+                >
+                  <a href={`/api/auth/logout?locale=${locale}`}>{t("logout")}</a>
+                </Button>
+              </>
             ) : (
               <Button
                 variant="ghost"
