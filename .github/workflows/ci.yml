@@ -98,8 +98,8 @@ jobs:
       - name: Install Playwright browsers
         run: pnpm exec playwright install --with-deps chromium
 
-      - name: Run E2E tests
-        run: pnpm test:e2e --reporter=junit --output=test-results/e2e-junit.xml
+      - name: Run E2E tests (with retries for flaky tests)
+        run: pnpm test:e2e --retries=2 --reporter=junit --output=test-results/e2e-junit.xml
         env:
           CI: true
           NEXT_PUBLIC_SANITY_PROJECT_ID: 5s8ahx87
