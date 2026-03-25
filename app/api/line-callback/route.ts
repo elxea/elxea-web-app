@@ -162,7 +162,9 @@ export async function GET(request: NextRequest) {
       displayName,
     });
 
-    cookieStore.set("line_user", lineUserCookie, {
+    const response = NextResponse.redirect(new URL(`/${locale}/login/complete?linked=true`, request.url));
+
+    response.cookies.set("line_user", lineUserCookie, {
       httpOnly: false, // readable by client
       secure: true,
       sameSite: "lax",
@@ -170,8 +172,28 @@ export async function GET(request: NextRequest) {
       path: "/",
     });
 
+    // P1-fix: Set shop_auth=1 so client-side UI components recognize LINE users as logged in.
+    // This non-httpOnly flag is checked by header, favorite-button, follow-button, etc.
+    response.cookies.set("shop_auth", "1", {
+      httpOnly: false,
+      secure: true,
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24 * 30, // 30 days
+      path: "/",
+    });
+
+    // P1-fix: Set line_session=1 (httpOnly) so middleware can recognize LINE-authenticated users
+    // for /account route protection without requiring Shopify tokens.
+    response.cookies.set("line_session", "1", {
+      httpOnly: true,
+      secure: true,
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24 * 30, // 30 days
+      path: "/",
+    });
+
     // Redirect to login complete page
-    return NextResponse.redirect(new URL(`/${locale}/login/complete?linked=true`, request.url));
+    return response;
   } catch (err) {
     console.error("[line-callback] Unexpected error:", err);
     return NextResponse.redirect(new URL(`/${locale}/login?error=Unexpected`, request.url));

@@ -64,13 +64,13 @@ export default async function middleware(request: NextRequest) {
   // Check if this is an /account route that needs auth
   const accountMatch = pathname.match(/^\/(ja|en)\/account/);
   if (accountMatch) {
-    const hasSession =
+    const hasShopifySession =
       request.cookies.has("shop_at") && request.cookies.has("shop_rt");
-    if (!hasSession) {
+    const hasLineSession = request.cookies.has("line_session");
+    if (!hasShopifySession && !hasLineSession) {
+      // P3-fix: Redirect to /login (not Shopify OAuth) so LINE users can choose their login method
       const locale = accountMatch[1];
-      const loginUrl = new URL("/api/auth/login", request.url);
-      loginUrl.searchParams.set("locale", locale);
-      return NextResponse.redirect(loginUrl);
+      return NextResponse.redirect(new URL(`/${locale}/login`, request.url));
     }
   }
 

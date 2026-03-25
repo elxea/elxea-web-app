@@ -29,7 +29,11 @@ export function Header({ navItems: externalNavItems }: HeaderProps) {
   const cartCount = cart?.totalQuantity ?? 0;
 
   useEffect(() => {
-    setIsLoggedIn(document.cookie.includes("shop_auth=1"));
+    // P1-fix: Recognize both Shopify and LINE sessions as "logged in"
+    setIsLoggedIn(
+      document.cookie.includes("shop_auth=1") ||
+      document.cookie.includes("line_user=")
+    );
   }, [pathname]);
 
   const navItems =
