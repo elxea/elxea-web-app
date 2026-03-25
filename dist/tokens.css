@@ -67,7 +67,7 @@
   --typography-weight-black: 900;
   --typography-letterSpacing-tighter: -0.05em;
   --typography-letterSpacing-tight: -0.025em;
-  --typography-letterSpacing-normal: 0;
+  --typography-letterSpacing-normal: 0em;
   --typography-letterSpacing-narrow: 0.025em;
   --typography-letterSpacing-wide: 0.05em;
   --typography-letterSpacing-wider: 0.1em;
@@ -91,7 +91,7 @@
   --typography-style-caption: 400 0.75rem/1.5 aktiv-grotesk, kozuka-gothic-pro, sans-serif;
   --typography-style-overline: 600 0.75rem/1.5 aktiv-grotesk-extended, dnp-shuei-gothic-gin-std, sans-serif;
   --typography-style-code: 400 0.875rem/1.5 'SF Mono', Menlo, monospace;
-  --spacing-0: 0;
+  --spacing-0: 0px;
   --spacing-1: 0.25rem;
   --spacing-2: 0.5rem;
   --spacing-3: 0.75rem;
@@ -126,7 +126,7 @@
   --spacing-1-5: 0.375rem;
   --spacing-2-5: 0.625rem;
   --spacing-3-5: 0.875rem;
-  --shape-radius-none: 0;
+  --shape-radius-none: 0px;
   --shape-radius-sm: 0.25rem;
   --shape-radius-md: 0.375rem;
   --shape-radius-lg: 0.5rem;
@@ -134,7 +134,7 @@
   --shape-radius-2xl: 1rem;
   --shape-radius-3xl: 1.5rem;
   --shape-radius-full: 9999px;
-  --shape-borderWidth-0: 0;
+  --shape-borderWidth-0: 0px;
   --shape-borderWidth-1: 1px;
   --shape-borderWidth-2: 2px;
   --shape-borderWidth-4: 4px;
