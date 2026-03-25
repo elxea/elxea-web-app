@@ -102,8 +102,8 @@ jobs:
         run: pnpm test:e2e --reporter=junit --output=test-results/e2e-junit.xml
         env:
           CI: true
-          NEXT_PUBLIC_SANITY_PROJECT_ID: ${{ secrets.NEXT_PUBLIC_SANITY_PROJECT_ID }}
-          NEXT_PUBLIC_SANITY_DATASET: ${{ secrets.NEXT_PUBLIC_SANITY_DATASET }}
+          NEXT_PUBLIC_SANITY_PROJECT_ID: 5s8ahx87
+          NEXT_PUBLIC_SANITY_DATASET: production
 
       - name: Upload E2E results
         if: always()

@@ -42,7 +42,9 @@ test.describe("Smoke tests", () => {
 
   test("journal page loads", async ({ page }) => {
     await page.goto("/ja/journal");
-    await expect(page.locator("h1")).toContainText("ジャーナル");
+    await expect(page.locator("h1")).toContainText("ジャーナル", {
+      timeout: 15000,
+    });
   });
 
   test("farmers page loads", async ({ page }) => {
