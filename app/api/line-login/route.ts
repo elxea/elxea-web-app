@@ -7,8 +7,8 @@ import crypto from "crypto";
  *
  * GET /api/line-login → 302 redirect to access.line.me
  *
- * This route is intentionally OUTSIDE /api/auth/ to avoid
- * being caught by Auth.js [...nextauth] catch-all route.
+ * This route is kept at /api/line-login (outside /api/auth/)
+ * for clarity, separating LINE OAuth from Shopify OAuth routes.
  *
  * Uses <a href="/api/line-login"> for Universal Links to work:
  * - Mobile: LINE app opens directly via Universal Links

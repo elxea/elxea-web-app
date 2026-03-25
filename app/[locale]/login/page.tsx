@@ -1,19 +1,16 @@
 /**
- * Login page with LINE Login (Auth.js) and Shopify OAuth options.
+ * Login page with LINE Login and Shopify OAuth options.
  *
- * LINE Login is the primary CTA. Shopify OAuth is retained
- * for users who already have a Shopify account.
+ * LINE Login is the primary CTA (direct OAuth via /api/line-login).
+ * Shopify OAuth is retained for users who already have a Shopify account.
  *
  * Session integration flow:
  * 1. LineLoginButton saves chat session_id to cookie (client-side)
- * 2. Auth.js signIn callback reads the cookie and sends it to cx-agent
- * 3. cx-agent merges anonymous session conversations to the identified user
- * 4. After redirect, LinkSuccessBanner shows confirmation
+ * 2. /api/line-callback exchanges code for tokens and links identity
+ * 3. After redirect, LinkSuccessBanner shows confirmation
  */
 import { Suspense } from "react";
 import { getTranslations, getLocale } from "next-intl/server";
-import { signIn } from "@/auth";
-import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { LineLoginButton } from "./line-login-button";
@@ -55,12 +52,7 @@ export default async function LoginPage() {
         </div>
 
         {/* LINE Login — primary action */}
-        <LineLoginButton
-          signInAction={async () => {
-            "use server";
-            await signIn("line", { redirectTo: `/${locale}/login/complete` });
-          }}
-        >
+        <LineLoginButton>
           <LineIcon />
           {t("lineButton")}
         </LineLoginButton>

@@ -4,11 +4,11 @@ import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 
 /**
- * LINE Login button — Auth.js OAuth 2.0 via <a href>.
+ * LINE Login button — Direct OAuth 2.0 via <a href>.
  *
  * CRITICAL DESIGN DECISIONS (do not change without reading):
  *
- * 1. Uses <a href> to /api/auth/signin/line (Auth.js endpoint)
+ * 1. Uses <a href> to /api/line-login (direct OAuth endpoint)
  *    - This triggers a server-side redirect to access.line.me
  *    - On mobile: Universal Links / App Links open the LINE app directly
  *    - On desktop: LINE shows a QR code for scanning
@@ -30,7 +30,6 @@ export function LineLoginButton({
   children,
 }: {
   children: React.ReactNode;
-  signInAction?: () => Promise<void>; // unused, kept for API compat
 }) {
   // Save chat session_id to cookie before login (for identity linking in Auth.js callback)
   useEffect(() => {
