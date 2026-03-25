@@ -55,6 +55,7 @@ export async function GET() {
     state: state,
     scope: "profile openid email",
     bot_prompt: "aggressive",
+    prompt: "consent", // Always show consent screen to ensure fresh token exchange
   });
 
   const authUrl = `https://access.line.me/oauth2/v2.1/authorize?${params.toString()}`;
