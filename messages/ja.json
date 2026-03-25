@@ -281,7 +281,14 @@
     "or": "または",
     "shopifyButton": "メールアドレスでログイン",
     "terms": "ログインすることで、利用規約とプライバシーポリシーに同意したものとみなされます。",
-    "linkedSuccess": "LINE アカウントと連携しました"
+    "linkedSuccess": "LINE アカウントと連携しました",
+    "errorLineAuthFailed": "LINE ログインに失敗しました。もう一度お試しください。",
+    "errorStateMismatch": "セッションの有効期限が切れました。もう一度お試しください。",
+    "errorTokenFailed": "認証トークンの取得に失敗しました。もう一度お試しください。",
+    "errorProfileFailed": "LINE プロフィールの取得に失敗しました。もう一度お試しください。",
+    "errorNotConfigured": "LINE ログインが設定されていません。管理者にお問い合わせください。",
+    "errorMissingParams": "認証パラメータが不足しています。もう一度お試しください。",
+    "errorUnexpected": "予期しないエラーが発生しました。もう一度お試しください。"
   },
   "loginComplete": {
     "title": "連携完了",

@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { LineLoginButton } from "./line-login-button";
 import { LinkSuccessBanner } from "./link-success-banner";
+import { AuthErrorBanner } from "./auth-error-banner";
 
 export async function generateMetadata() {
   const t = await getTranslations("login");
@@ -33,6 +34,11 @@ export default async function LoginPage() {
   return (
     <div className="flex min-h-[60vh] items-center justify-center px-4 py-16">
       <div className="w-full max-w-sm space-y-8">
+        {/* P2-fix: Error banner for failed authentication attempts */}
+        <Suspense fallback={null}>
+          <AuthErrorBanner />
+        </Suspense>
+
         {/* Success banner after LINE Login */}
         <Suspense fallback={null}>
           <LinkSuccessBanner />
