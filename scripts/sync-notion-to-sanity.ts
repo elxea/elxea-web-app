@@ -167,6 +167,16 @@ function getRelationIds(page: PageObjectResponse, name: string): string[] {
   return [];
 }
 
+function getFileUrl(page: PageObjectResponse, name: string): string {
+  const prop = page.properties[name];
+  if (prop?.type === "files" && prop.files.length > 0) {
+    const file = prop.files[0];
+    if (file.type === "file") return file.file.url;
+    if (file.type === "external") return file.external.url;
+  }
+  return "";
+}
+
 function getStatus(page: PageObjectResponse, name: string): string {
   const prop = page.properties[name];
   if (prop?.type === "status" && prop.status) return prop.status.name;
@@ -415,9 +425,22 @@ async function blocksToPortableText(
 // ─── Notion Page Title Resolver ──────────────────────────────
 
 const pageTitleCache = new Map<string, string>();
+const pageSlugCache = new Map<string, string>();
 
 async function getPageTitle(pageId: string): Promise<string> {
   if (pageTitleCache.has(pageId)) return pageTitleCache.get(pageId)!;
+  await fetchPageTitleAndSlug(pageId);
+  return pageTitleCache.get(pageId) || "";
+}
+
+async function getPageSlug(pageId: string): Promise<string> {
+  if (pageSlugCache.has(pageId)) return pageSlugCache.get(pageId) || "";
+  await fetchPageTitleAndSlug(pageId);
+  return pageSlugCache.get(pageId) || "";
+}
+
+async function fetchPageTitleAndSlug(pageId: string): Promise<void> {
+  if (pageTitleCache.has(pageId)) return;
   try {
     const page = (await notion.pages.retrieve({
       page_id: pageId,
@@ -428,14 +451,26 @@ async function getPageTitle(pageId: string): Promise<string> {
       if (prop.type === "title") {
         const title = prop.title.map((t) => t.plain_text).join("");
         pageTitleCache.set(pageId, title);
-        return title;
+        break;
       }
+    }
+    if (!pageTitleCache.has(pageId)) {
+      pageTitleCache.set(pageId, "");
+    }
+
+    // Try to get Slug property (available on Roji Categories)
+    const slugProp = page.properties["Slug"];
+    if (slugProp?.type === "rich_text") {
+      const slug = slugProp.rich_text.map((t) => t.plain_text).join("");
+      pageSlugCache.set(pageId, slug);
+    } else {
+      pageSlugCache.set(pageId, "");
     }
   } catch {
     // Page might not be accessible
+    pageTitleCache.set(pageId, "");
+    pageSlugCache.set(pageId, "");
   }
-  pageTitleCache.set(pageId, "");
-  return "";
 }
 
 // ─── Slug helpers ────────────────────────────────────────────
@@ -461,11 +496,12 @@ async function ensureSanityCategory(
   title: string,
   categoryMap: Map<string, string>,
   client: SanityClient,
-  dryRun: boolean
+  dryRun: boolean,
+  notionSlug?: string
 ): Promise<string> {
   if (categoryMap.has(title)) return categoryMap.get(title)!;
 
-  const slug = slugify(title);
+  const slug = notionSlug || slugify(title);
   const sanityId = `notion-category-${slug}`;
 
   if (dryRun) {
@@ -546,12 +582,13 @@ async function resolveCategories(
   client: SanityClient,
   dryRun: boolean
 ): Promise<{ _type: "reference"; _ref: string } | null> {
-  // Content Hub categories are from a separate Roji Categories DB
-  // We need to match by title to Sanity categories, auto-creating if missing
+  // Content Hub categories are from Roji Categories DB which has a Slug field
+  // Use the Notion Slug for human-readable Sanity IDs
   for (const pageId of categoryPageIds) {
     const title = await getPageTitle(pageId);
+    const notionSlug = await getPageSlug(pageId);
     if (title) {
-      const ref = await ensureSanityCategory(title, categoryMap, client, dryRun);
+      const ref = await ensureSanityCategory(title, categoryMap, client, dryRun, notionSlug || undefined);
       return { _type: "reference", _ref: ref };
     }
   }
@@ -952,7 +989,7 @@ async function sync() {
         title: getTitle(p),
         slug,
         intro: getText(p, "🌐 Roji: Intro"),
-        headerImageUrl: getUrl(p, "🌐 Roji: Header Image"),
+        headerImageUrl: getFileUrl(p, "Featured Image"),
         metaDescription: getText(p, "🌐 Roji: Meta Description"),
         featured: getCheckbox(p, "🌐 Roji: Featured"),
         publishedDate: getDate(p, "Published Date"),
@@ -990,8 +1027,18 @@ async function sync() {
     ),
   ]);
 
-  const categoryMap = new Map(existingCats.map((c) => [c.title, c._id]));
-  const tagMap = new Map(existingTags.map((t) => [t.title, t._id]));
+  // Filter out old hash-based and manual IDs so they get recreated with proper slugs
+  const hashIdPattern = /^notion-(category|tag)-[0-9a-f]{12}$/;
+  const categoryMap = new Map(
+    existingCats
+      .filter((c) => !hashIdPattern.test(c._id) && !c._id.startsWith("cat-"))
+      .map((c) => [c.title, c._id])
+  );
+  const tagMap = new Map(
+    existingTags
+      .filter((t) => !hashIdPattern.test(t._id) && !t._id.startsWith("tag-"))
+      .map((t) => [t.title, t._id])
+  );
   const authorMap = new Map(existingAuthors.map((a) => [a.name, a._id]));
 
   console.log(
