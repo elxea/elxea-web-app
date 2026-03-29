@@ -17,8 +17,8 @@ export async function POST(req: NextRequest) {
       return new NextResponse("Bad request", { status: 400 });
     }
 
-    // Revalidate based on content type
-    revalidateTag(body._type);
+    // Revalidate based on content type (expire: 0 for immediate webhook revalidation)
+    revalidateTag(body._type, { expire: 0 });
 
     return NextResponse.json({ revalidated: true, now: Date.now() });
   } catch (err) {
