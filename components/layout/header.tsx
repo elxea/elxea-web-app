@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useSyncExternalStore, useCallback } from "react";
 import Image from "next/image";
 import { useTranslations, useLocale } from "next-intl";
 import { Link, usePathname } from "@/i18n/navigation";
@@ -17,6 +17,23 @@ import { useCart } from "@/components/cart/cart-context";
 import { AudioToggle } from "@/components/audio/audio-toggle";
 import { Menu } from "lucide-react";
 
+function subscribeToCookies(callback: () => void) {
+  // Re-check cookies on storage/visibilitychange events
+  window.addEventListener("visibilitychange", callback);
+  return () => window.removeEventListener("visibilitychange", callback);
+}
+
+function getCookieLoginSnapshot(): boolean {
+  return (
+    document.cookie.includes("shop_auth=1") ||
+    document.cookie.includes("line_user=")
+  );
+}
+
+function getServerSnapshot(): boolean {
+  return false;
+}
+
 type NavItem = { href: string; label: string };
 type HeaderProps = { navItems?: NavItem[] };
 
@@ -25,17 +42,20 @@ export function Header({ navItems: externalNavItems }: HeaderProps) {
   const locale = useLocale();
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  // P1-fix: Recognize both Shopify and LINE sessions as "logged in"
+  // Use useSyncExternalStore to read cookie state without setState-in-effect
+  const subscribeWithPathname = useCallback(
+    (callback: () => void) => subscribeToCookies(callback),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- pathname change triggers re-subscribe to re-snapshot
+    [pathname]
+  );
+  const isLoggedIn = useSyncExternalStore(
+    subscribeWithPathname,
+    getCookieLoginSnapshot,
+    getServerSnapshot
+  );
   const { cart } = useCart();
   const cartCount = cart?.totalQuantity ?? 0;
-
-  useEffect(() => {
-    // P1-fix: Recognize both Shopify and LINE sessions as "logged in"
-    setIsLoggedIn(
-      document.cookie.includes("shop_auth=1") ||
-      document.cookie.includes("line_user=")
-    );
-  }, [pathname]);
 
   const navItems =
     externalNavItems && externalNavItems.length > 0

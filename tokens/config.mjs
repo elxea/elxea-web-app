@@ -158,7 +158,7 @@ StyleDictionary.registerFormat({
 
 // --- Config ---
 
-export default {
+const config = {
   source: ["tokens/base.json"],
   platforms: {
     css: {
@@ -178,3 +178,5 @@ export default {
     },
   },
 };
+
+export default config;
