@@ -1,3 +1,5 @@
+// NOTE: ALLOWED_HOSTNAMES/ALLOWED_PATTERNS must stay in sync with next.config.ts remotePatterns
+
 /**
  * Validate that an image URL hostname is allowed by next.config.ts remotePatterns.
  * Returns the URL if valid, or null if the hostname is not in the allowlist.

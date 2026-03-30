@@ -1,22 +1,35 @@
 // For more info, see https://github.com/storybookjs/eslint-plugin-storybook#configuration-flat-config-format
 import storybook from "eslint-plugin-storybook";
-
-import { dirname } from "path";
-import { fileURLToPath } from "url";
-import { FlatCompat } from "@eslint/eslintrc";
+import nextCoreWebVitals from "eslint-config-next/core-web-vitals";
 
 import elxeaTokens from "./eslint-rules/index.mjs";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-const compat = new FlatCompat({
-  baseDirectory: __dirname,
-});
-
 const eslintConfig = [
-  ...compat.extends("next/core-web-vitals"),
+  {
+    ignores: [".next/**", "dist/**", "storybook-static/**", "node_modules/**"],
+  },
+  ...nextCoreWebVitals,
   ...storybook.configs["flat/recommended"],
+
+  // Server Components use try/catch for data-fetch error handling, which is
+  // the correct pattern (error boundaries only apply to client components).
+  {
+    files: ["app/**/*.tsx", "app/**/*.ts"],
+    rules: {
+      "react-hooks/error-boundaries": "off",
+    },
+  },
+
+  // Browser-only state initialization (cookies, localStorage) requires
+  // setState inside useEffect to avoid SSR hydration mismatches.
+  // shadcn/ui sidebar uses Math.random in useMemo for skeleton widths.
+  {
+    files: ["components/**/*.tsx"],
+    rules: {
+      "react-hooks/set-state-in-effect": "warn",
+      "react-hooks/purity": "warn",
+    },
+  },
 
   // Design token enforcement: detect raw color values in components
   {

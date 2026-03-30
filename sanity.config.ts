@@ -3,6 +3,7 @@ import { structureTool } from "sanity/structure";
 import { visionTool } from "@sanity/vision";
 import { schemaTypes } from "./sanity/schemas";
 
+// Fallback required: sanity deploy doesn't have access to Next.js env vars
 const projectId = process.env.NEXT_PUBLIC_SANITY_PROJECT_ID || "5s8ahx87";
 const dataset = process.env.NEXT_PUBLIC_SANITY_DATASET || "production";
 
