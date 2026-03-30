@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import crypto from "crypto";
+import { getBaseUrl } from "@/lib/base-url";
 
 /**
  * Direct LINE Login OAuth 2.0 redirect endpoint.
@@ -38,13 +39,7 @@ export async function GET() {
     path: "/",
   });
 
-  const baseUrl = process.env.NEXTAUTH_URL
-    || (process.env.VERCEL_PROJECT_PRODUCTION_URL
-      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
-      : null)
-    || (process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : "http://localhost:3000");
+  const baseUrl = getBaseUrl();
 
   const redirectUri = `${baseUrl}/api/line-callback`;
 

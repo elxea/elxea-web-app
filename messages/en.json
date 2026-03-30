@@ -246,7 +246,8 @@
     "lockedFeaturesDescription": "Connect your email to unlock the following features.",
     "featureOrders": "View order history",
     "featureSubscriptions": "Manage subscriptions",
-    "featureFavorites": "Favorites and follow features"
+    "featureFavorites": "Favorites and follow features",
+    "networkError": "A connection error occurred. Please try again later or log in again."
   },
   "membership": {
     "title": "Membership Plans",

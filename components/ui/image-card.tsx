@@ -1,6 +1,7 @@
 import Image, { type StaticImageData } from "next/image";
 import { ImagePlaceholder } from "@/components/ui/image-placeholder";
 import { cn } from "@/lib/utils";
+import { sanitizeImageUrl } from "@/lib/image-utils";
 
 type ImageCardProps = {
   /** Image source — URL string or StaticImageData. Omit for placeholder. */
@@ -58,7 +59,7 @@ export function ImageCard({
     >
       {children ? (
         children
-      ) : image ? (
+      ) : image && (typeof image !== "string" || sanitizeImageUrl(image)) ? (
         <Image
           src={image}
           alt={alt}

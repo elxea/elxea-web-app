@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import { getBaseUrl } from "@/lib/base-url";
 
 /**
  * LINE Login OAuth 2.0 callback endpoint.
@@ -61,13 +62,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL(`/${locale}/login?error=NotConfigured`, request.url));
   }
 
-  const baseUrl = process.env.NEXTAUTH_URL
-    || (process.env.VERCEL_PROJECT_PRODUCTION_URL
-      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
-      : null)
-    || (process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : "http://localhost:3000");
+  const baseUrl = getBaseUrl();
 
   try {
     // Exchange code for tokens

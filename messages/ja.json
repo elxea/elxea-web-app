@@ -246,7 +246,8 @@
     "lockedFeaturesDescription": "メールアドレスを連携すると以下の機能が使えるようになります。",
     "featureOrders": "注文履歴の確認",
     "featureSubscriptions": "定期便の管理",
-    "featureFavorites": "お気に入り・フォロー機能"
+    "featureFavorites": "お気に入り・フォロー機能",
+    "networkError": "通信エラーが発生しました。しばらく経ってからもう一度お試しいただくか、再度ログインしてください。"
   },
   "membership": {
     "title": "メンバーシッププラン",
