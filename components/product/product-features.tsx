@@ -2,6 +2,7 @@ import Image from "next/image";
 import { getTranslations } from "next-intl/server";
 import type { ProductMetafields } from "@/lib/shopify/types";
 import { Separator } from "@/components/ui/separator";
+import { sanitizeImageUrl } from "@/lib/image-utils";
 
 interface ProductFeaturesProps {
   metafields: ProductMetafields;
@@ -25,19 +26,21 @@ export async function ProductFeatures({ metafields }: ProductFeaturesProps) {
   return (
     <div className="mt-20 space-y-20">
       {/* Feature sections */}
-      {metafields.features.map((feature, index) => (
+      {metafields.features.map((feature, index) => {
+        const safeImageUrl = sanitizeImageUrl(feature.imageUrl);
+        return (
         <section
           key={`feature_${index + 1}`}
           className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center"
         >
-          {feature.imageUrl && (
+          {safeImageUrl && (
             <div
               className={`aspect-[4/3] relative overflow-hidden bg-muted rounded-md ${
                 index % 2 === 1 ? "lg:order-last" : ""
               }`}
             >
               <Image
-                src={feature.imageUrl}
+                src={safeImageUrl}
                 alt={feature.title}
                 fill
                 sizes="(max-width: 1024px) 100vw, 50vw"
@@ -47,9 +50,9 @@ export async function ProductFeatures({ metafields }: ProductFeaturesProps) {
           )}
           <div
             className={`space-y-4 ${
-              !feature.imageUrl ? "lg:col-span-2 max-w-2xl" : ""
+              !safeImageUrl ? "lg:col-span-2 max-w-2xl" : ""
             } ${
-              index % 2 === 1 && feature.imageUrl ? "lg:order-first" : ""
+              index % 2 === 1 && safeImageUrl ? "lg:order-first" : ""
             }`}
           >
             {feature.title && (
@@ -64,7 +67,8 @@ export async function ProductFeatures({ metafields }: ProductFeaturesProps) {
             )}
           </div>
         </section>
-      ))}
+        );
+      })}
 
       {/* Tea details */}
       {hasTeaDetails && (
