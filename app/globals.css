@@ -74,10 +74,10 @@ h6 { font: var(--typography-style-h6); }
   --brand-line: #06C755;
   
   /* Overlay colors for hero sections with background images */
-  --overlay: oklch(0 0 0 / 0.25);
-  --overlay-foreground: oklch(1 0 0);
-  --overlay-foreground-muted: oklch(1 0 0 / 0.7);
-  --overlay-border: oklch(1 0 0 / 0.5);
+  --overlay: oklch(0 0 0 / 0.15);
+  --overlay-foreground: oklch(0.98 0.01 60);
+  --overlay-foreground-muted: oklch(0.75 0.01 60);
+  --overlay-border: oklch(1 0.02 60 / 0.4);
   
   --sidebar: hsl(0 0% 98%);
   --sidebar-foreground: hsl(240 5.3% 26.1%);
