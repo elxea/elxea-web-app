@@ -63,33 +63,33 @@ export default async function PeoplePage({
   if (!author) notFound();
 
   return (
-    <div className="max-w-5xl mx-auto px-6 py-16">
+    <div className="max-w-5xl mx-auto px-6 py-20">
       {/* Profile */}
-      <div className="flex flex-col sm:flex-row items-start gap-8 mb-16">
+      <div className="flex flex-col sm:flex-row items-start gap-12 mb-20">
         {author.image?.asset && (
           <Image
             src={urlFor(author.image).width(200).height(200).url()}
             alt={author.name}
             width={200}
             height={200}
-            className="size-24 sm:size-32 rounded-full object-cover flex-shrink-0"
+            className="size-32 rounded-full object-cover flex-shrink-0"
             priority
           />
         )}
-        <div>
-          <h1 className="mb-2">{author.name}</h1>
+        <div className="flex-1">
+          <h1 className="mb-4">{author.name}</h1>
           {author.role && (
-            <p className="text-sm text-muted-foreground mb-4">{author.role}</p>
+            <p className="text-sm text-muted-foreground mb-6">{author.role}</p>
           )}
           {author.bio && (
-            <p className="text-sm text-muted-foreground leading-relaxed">{author.bio}</p>
+            <p className="text-sm text-muted-foreground leading-relaxed mb-6">{author.bio}</p>
           )}
           {author.website && (
             <a
               href={author.website}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-block mt-3 text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground transition-colors"
+              className="inline-block text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground transition-colors"
             >
               {author.website.replace(/^https?:\/\//, "")}
             </a>
@@ -100,8 +100,13 @@ export default async function PeoplePage({
       {/* Articles by this author */}
       {articles && articles.length > 0 && (
         <section>
-          <h2 className="text-lg font-medium mb-8">{t("articlesByAuthor")}</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-10">
+          <div className="text-center mb-16">
+            <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-4">
+              Articles
+            </p>
+            <h2 className="text-2xl font-normal">{t("articlesByAuthor")}</h2>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-14">
             {(articles as Parameters<typeof ArticleCard>[0]["article"][]).map(
               (article) => (
                 <ArticleCard

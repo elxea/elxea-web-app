@@ -73,12 +73,17 @@ export default async function AccountPage() {
 
     // Fully unauthenticated — show login prompt
     return (
-      <div className="max-w-2xl mx-auto px-6 py-16 text-center">
-        <h1 className="mb-6">{tCommon("account")}</h1>
-        <p className="text-muted-foreground mb-8">{t("loginRequired")}</p>
-        <Button variant="outline" asChild>
-          <a href={`/${locale}/login`}>{tCommon("login")}</a>
-        </Button>
+      <div className="min-h-[70vh] flex items-center justify-center px-4 py-24">
+        <div className="text-center max-w-sm">
+          <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-4">
+            Account
+          </p>
+          <h1 className="text-2xl font-normal mb-4">{tCommon("account")}</h1>
+          <p className="text-sm text-muted-foreground leading-relaxed mb-8">{t("loginRequired")}</p>
+          <Button variant="outline" asChild>
+            <a href={`/${locale}/login`}>{tCommon("login")}</a>
+          </Button>
+        </div>
       </div>
     );
   }
@@ -114,20 +119,19 @@ export default async function AccountPage() {
     premium: t("tierPremium").replace(/限定$/, "").replace(/ Only$/, ""),
   };
 
-  return (
-    <div className="section-narrow">
-      {/* Customer info */}
-      <div className="mb-12">
-        <h1 className="mb-2">{tCommon("account")}</h1>
-        {displayName && (
-          <p className="text-sm text-foreground">{displayName}</p>
-        )}
-        {email && <p className="text-sm text-muted-foreground">{email}</p>}
+    return (
+      <div className="section-narrow py-20">
+        <div className="mb-12">
+          <h1 className="mb-4">{tCommon("account")}</h1>
+          {displayName && (
+            <p className="text-sm text-muted-foreground">{displayName}</p>
+          )}
+          {email && <p className="text-sm text-muted-foreground">{email}</p>}
 
-        <Button variant="link" className="mt-6 p-0 h-auto text-muted-foreground" asChild>
-          <a href={`/api/auth/logout?locale=${locale}`}>{tCommon("logout")}</a>
-        </Button>
-      </div>
+          <Button variant="link" className="mt-6 p-0 h-auto text-muted-foreground text-sm" asChild>
+            <a href={`/api/auth/logout?locale=${locale}`}>{tCommon("logout")}</a>
+          </Button>
+        </div>
 
       {/* Dashboard summary — subscriptions card is clickable */}
       <DashboardSummary

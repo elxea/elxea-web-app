@@ -7,8 +7,13 @@ export default async function CollectionsPage() {
   const t = await getTranslations("common");
 
   return (
-    <div className="section-wide">
-      <h1 className="mb-12">{t("collections")}</h1>
+    <div className="section-wide py-20">
+      <div className="text-center mb-16">
+        <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-4">
+          Explore
+        </p>
+        <h1>{t("collections")}</h1>
+      </div>
       <CollectionsContent />
     </div>
   );
@@ -25,7 +30,7 @@ async function CollectionsContent() {
     }
 
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-14">
         {collections.map((collection) => (
           <Link
             key={collection.id}
@@ -35,17 +40,19 @@ async function CollectionsContent() {
             <ImageCard
               image={collection.image?.url}
               alt={collection.image?.altText || collection.title}
-              className="mb-4"
+              className="mb-5"
               hover
             />
-            <h2 className="text-sm font-medium group-hover:underline">
-              {collection.title}
-            </h2>
-            {collection.description && (
-              <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                {collection.description}
-              </p>
-            )}
+            <div className="space-y-2 text-center">
+              <h2 className="text-sm font-normal leading-relaxed group-hover:underline underline-offset-4">
+                {collection.title}
+              </h2>
+              {collection.description && (
+                <p className="text-[13px] text-muted-foreground leading-relaxed line-clamp-2">
+                  {collection.description}
+                </p>
+              )}
+            </div>
           </Link>
         ))}
       </div>
