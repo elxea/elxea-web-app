@@ -8,6 +8,7 @@ import {
   Dialog,
   DialogContent,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { ImageCard } from "@/components/ui/image-card";
@@ -75,6 +76,9 @@ export function ImageGallery({ images }: { images: ImageType[] }) {
           <DialogTitle className="sr-only">
             {images[selected].altText || "Product image"}
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            Image {selected + 1} of {images.length}
+          </DialogDescription>
           <div className="relative flex items-center justify-center">
             <Image
               src={images[selected].url}

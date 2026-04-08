@@ -37,7 +37,7 @@ export default function HomePage() {
           <p className="text-white/70 text-sm leading-relaxed mb-12 max-w-md mx-auto">
             {t("home.hero")}
           </p>
-          <Button variant="outline" className="border-white/40 text-white hover:bg-white/10" asChild>
+          <Button variant="outline" className="border-white/50 text-white bg-transparent hover:bg-white hover:text-foreground hover:border-white transition-colors" asChild>
             <Link href="/products">{t("common.products")}</Link>
           </Button>
         </div>
@@ -77,7 +77,7 @@ export default function HomePage() {
           <h2 className="text-white mb-8">
             {t("home.storyHeading")}
           </h2>
-          <Button variant="outline" className="border-white/40 text-white hover:bg-white/10" asChild>
+          <Button variant="outline" className="border-white/50 text-white bg-transparent hover:bg-white hover:text-foreground hover:border-white transition-colors" asChild>
             <Link href="/about">{t("common.about")}</Link>
           </Button>
         </div>
@@ -122,7 +122,7 @@ export default function HomePage() {
           <h2 className="text-white mb-8">
             {t("home.approachHeading")}
           </h2>
-          <Button variant="outline" className="border-white/40 text-white hover:bg-white/10" asChild>
+          <Button variant="outline" className="border-white/50 text-white bg-transparent hover:bg-white hover:text-foreground hover:border-white transition-colors" asChild>
             <Link href="/about">{t("common.about")}</Link>
           </Button>
         </div>
