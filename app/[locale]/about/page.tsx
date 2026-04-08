@@ -27,15 +27,15 @@ export default async function AboutPage() {
           className="object-cover"
           sizes="100vw"
         />
-        <div className="absolute inset-0 bg-black/30" />
+        <div className="absolute inset-0 bg-overlay" />
         <div className="relative text-center max-w-2xl px-8">
-          <p className="text-[11px] text-white/70 uppercase tracking-[0.25em] mb-6">
+          <p className="text-[11px] text-overlay-foreground-muted uppercase tracking-[0.25em] mb-6">
             About Us
           </p>
-          <h1 className="text-white mb-6">
+          <h1 className="text-overlay-foreground mb-6">
             {t("title")}
           </h1>
-          <p className="text-white/70 text-sm leading-relaxed max-w-md mx-auto">{t("subtitle")}</p>
+          <p className="text-overlay-foreground-muted text-sm leading-relaxed max-w-md mx-auto">{t("subtitle")}</p>
         </div>
       </section>
 
@@ -101,7 +101,7 @@ export default async function AboutPage() {
           className="object-cover"
           sizes="100vw"
         />
-        <div className="absolute inset-0 bg-black/20" />
+        <div className="absolute inset-0 bg-overlay" />
       </section>
     </>
   );

@@ -92,7 +92,7 @@ export default async function ElxeaJournalDetailPage({
       {/* ② Theme badge + Title + Summary */}
       <header className="max-w-4xl mx-auto px-6 pt-10 pb-8">
         <span
-          className="inline-block text-[10px] font-medium text-white px-2.5 py-1 uppercase tracking-wider mb-4"
+          className="inline-block text-[10px] font-medium text-brand-white px-2.5 py-1 uppercase tracking-wider mb-4"
           style={{ backgroundColor: themeColor }}
         >
           {themeLabel}

@@ -26,18 +26,18 @@ export default function HomePage() {
           className="object-cover"
           sizes="100vw"
         />
-        <div className="absolute inset-0 bg-black/20" />
+        <div className="absolute inset-0 bg-overlay" />
         <div className="relative text-center max-w-2xl px-8">
-          <p className="text-[11px] text-white/80 uppercase tracking-[0.25em] mb-8">
+          <p className="text-[11px] text-overlay-foreground-muted uppercase tracking-[0.25em] mb-8">
             {t("home.tagline")}
           </p>
-          <h1 className="mb-8 text-white">
+          <h1 className="mb-8 text-overlay-foreground">
             Tea for Creativity.
           </h1>
-          <p className="text-white/70 text-sm leading-relaxed mb-12 max-w-md mx-auto">
+          <p className="text-overlay-foreground-muted text-sm leading-relaxed mb-12 max-w-md mx-auto">
             {t("home.hero")}
           </p>
-          <Button variant="outline" className="border-white/50 text-white bg-transparent hover:bg-white hover:text-foreground hover:border-white transition-colors" asChild>
+          <Button variant="outline" className="border-overlay-border text-overlay-foreground bg-transparent hover:bg-overlay-foreground hover:text-foreground hover:border-overlay-foreground transition-colors" asChild>
             <Link href="/products">{t("common.products")}</Link>
           </Button>
         </div>
@@ -69,15 +69,15 @@ export default function HomePage() {
           className="object-cover"
           sizes="100vw"
         />
-        <div className="absolute inset-0 bg-black/30" />
+        <div className="absolute inset-0 bg-overlay" />
         <div className="relative text-center max-w-xl px-8">
-          <p className="text-[11px] text-white/80 uppercase tracking-[0.25em] mb-6">
+          <p className="text-[11px] text-overlay-foreground-muted uppercase tracking-[0.25em] mb-6">
             Our Story
           </p>
-          <h2 className="text-white mb-8">
+          <h2 className="text-overlay-foreground mb-8">
             {t("home.storyHeading")}
           </h2>
-          <Button variant="outline" className="border-white/50 text-white bg-transparent hover:bg-white hover:text-foreground hover:border-white transition-colors" asChild>
+          <Button variant="outline" className="border-overlay-border text-overlay-foreground bg-transparent hover:bg-overlay-foreground hover:text-foreground hover:border-overlay-foreground transition-colors" asChild>
             <Link href="/about">{t("common.about")}</Link>
           </Button>
         </div>
@@ -114,15 +114,15 @@ export default function HomePage() {
           className="object-cover"
           sizes="100vw"
         />
-        <div className="absolute inset-0 bg-black/30" />
+        <div className="absolute inset-0 bg-overlay" />
         <div className="relative text-center max-w-xl px-8">
-          <p className="text-[11px] text-white/80 uppercase tracking-[0.25em] mb-6">
+          <p className="text-[11px] text-overlay-foreground-muted uppercase tracking-[0.25em] mb-6">
             Our Approach
           </p>
-          <h2 className="text-white mb-8">
+          <h2 className="text-overlay-foreground mb-8">
             {t("home.approachHeading")}
           </h2>
-          <Button variant="outline" className="border-white/50 text-white bg-transparent hover:bg-white hover:text-foreground hover:border-white transition-colors" asChild>
+          <Button variant="outline" className="border-overlay-border text-overlay-foreground bg-transparent hover:bg-overlay-foreground hover:text-foreground hover:border-overlay-foreground transition-colors" asChild>
             <Link href="/about">{t("common.about")}</Link>
           </Button>
         </div>

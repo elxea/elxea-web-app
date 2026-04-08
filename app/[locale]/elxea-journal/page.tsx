@@ -69,7 +69,7 @@ async function JournalGrid() {
                   />
                   {/* Theme badge */}
                   <span
-                    className="absolute top-3 left-3 text-[10px] font-medium text-white px-2 py-0.5 rounded-sm uppercase tracking-wider z-10"
+                    className="absolute top-3 left-3 text-[10px] font-medium text-brand-white px-2 py-0.5 rounded-sm uppercase tracking-wider z-10"
                     style={{ backgroundColor: themeColors[j.theme] || "var(--color-brand-ash)" }}
                   >
                     {themeLabels[j.theme] || j.theme}
