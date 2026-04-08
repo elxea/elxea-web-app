@@ -17,30 +17,30 @@ export function ProductCard({ product }: { product: Product }) {
       <ImageCard
         image={product.featuredImage?.url}
         alt={product.featuredImage?.altText || product.title}
-        className="mb-4"
+        className="mb-5"
         hover
       />
 
       {/* Info */}
-      <div className="space-y-1.5">
+      <div className="space-y-2 text-center">
         {product.vendor && (
-          <p className="text-xs text-muted-foreground">{product.vendor}</p>
+          <p className="text-[11px] text-muted-foreground uppercase tracking-wider">{product.vendor}</p>
         )}
-        <h2 className="text-sm font-medium leading-snug group-hover:underline">
+        <h2 className="text-sm font-normal leading-relaxed group-hover:underline underline-offset-4">
           {product.title}
         </h2>
-        <div className="flex items-center gap-2">
-          <p className="text-sm">
+        <div className="flex items-center justify-center gap-2">
+          <p className="text-sm text-muted-foreground">
             {formatPrice(price.amount, price.currencyCode)}
           </p>
           {comparePrice && parseFloat(comparePrice.amount) > parseFloat(price.amount) && (
-            <p className="text-sm text-muted-foreground line-through">
+            <p className="text-sm text-muted-foreground/60 line-through">
               {formatPrice(comparePrice.amount, comparePrice.currencyCode)}
             </p>
           )}
         </div>
         {!product.availableForSale && (
-          <Badge variant="destructive" className="text-xs">
+          <Badge variant="destructive" className="text-[10px]">
             {t("soldOut")}
           </Badge>
         )}

@@ -12,8 +12,13 @@ export default async function ProductsPage() {
   const t = await getTranslations("common");
 
   return (
-    <div className="section-wide">
-      <h1 className="mb-12">{t("products")}</h1>
+    <div className="section-wide py-20">
+      <div className="text-center mb-16">
+        <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-4">
+          Collection
+        </p>
+        <h1>{t("products")}</h1>
+      </div>
       <ProductsContent />
     </div>
   );

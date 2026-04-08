@@ -17,58 +17,72 @@ export default async function AboutPage() {
   return (
     <>
       {/* Hero */}
-      <section className="relative min-h-[50vh] flex items-center justify-center">
+      <section className="relative min-h-[60vh] flex items-center justify-center">
         <Image
           src="/hero-night.jpg"
           alt=""
           aria-hidden="true"
           fill
           priority
-          className="object-cover rounded-md"
+          className="object-cover"
           sizes="100vw"
         />
-        <div className="absolute inset-0 bg-black/40" />
-        <div className="relative text-center max-w-xl px-6">
-          <h1 className="text-white mb-4">
+        <div className="absolute inset-0 bg-black/30" />
+        <div className="relative text-center max-w-2xl px-8">
+          <p className="text-[11px] text-white/70 uppercase tracking-[0.25em] mb-6">
+            About Us
+          </p>
+          <h1 className="text-white mb-6">
             {t("title")}
           </h1>
-          <p className="text-white/80 text-sm">{t("subtitle")}</p>
+          <p className="text-white/70 text-sm leading-relaxed max-w-md mx-auto">{t("subtitle")}</p>
         </div>
       </section>
 
-      <div className="section-narrow">
-        <div className="space-y-20">
+      <div className="section-narrow py-24">
+        <div className="space-y-24">
           {/* Mission */}
-          <section>
-            <h2 className="mb-6">{t("mission")}</h2>
-            <p className="text-sm text-muted-foreground leading-relaxed">
+          <section className="text-center">
+            <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-4">
+              Our Mission
+            </p>
+            <h2 className="mb-8">{t("mission")}</h2>
+            <p className="text-sm text-muted-foreground leading-relaxed max-w-xl mx-auto">
               {t("missionText")}
             </p>
           </section>
 
           {/* Image break */}
-          <div className="relative aspect-[16/7] w-full overflow-hidden rounded-md">
+          <div className="relative aspect-[16/9] w-full overflow-hidden">
             <Image
               src="/hero-day.jpg"
               alt="elxea tea"
               fill
-              className="object-cover rounded-md"
+              className="object-cover"
               sizes="(max-width: 768px) 100vw, 768px"
             />
           </div>
 
           {/* Story */}
-          <section>
-            <h2 className="mb-6">{t("story")}</h2>
-            <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-line">
+          <section className="text-center">
+            <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-4">
+              Our Story
+            </p>
+            <h2 className="mb-8">{t("story")}</h2>
+            <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-line max-w-xl mx-auto">
               {t("storyText")}
             </p>
           </section>
 
           {/* Values */}
           <section>
-            <h2 className="mb-8">{t("values")}</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="text-center mb-12">
+              <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-4">
+                Our Values
+              </p>
+              <h2>{t("values")}</h2>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               <ValueCard title={t("value1Title")} text={t("value1Text")} />
               <ValueCard title={t("value2Title")} text={t("value2Text")} />
               <ValueCard title={t("value3Title")} text={t("value3Text")} />
@@ -78,16 +92,16 @@ export default async function AboutPage() {
       </div>
 
       {/* Bottom image section */}
-      <section className="relative min-h-[40vh] flex items-center justify-center">
+      <section className="relative min-h-[50vh] flex items-center justify-center">
         <Image
           src="/hero-approach.jpg"
           alt=""
           aria-hidden="true"
           fill
-          className="object-cover rounded-md"
+          className="object-cover"
           sizes="100vw"
         />
-        <div className="absolute inset-0 bg-black/30" />
+        <div className="absolute inset-0 bg-black/20" />
       </section>
     </>
   );
@@ -95,11 +109,11 @@ export default async function AboutPage() {
 
 function ValueCard({ title, text }: { title: string; text: string }) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
+    <Card className="border-0 shadow-none bg-transparent text-center">
+      <CardHeader className="pb-4">
+        <CardTitle className="text-base font-medium">{title}</CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="pt-0">
         <p className="text-sm text-muted-foreground leading-relaxed">{text}</p>
       </CardContent>
     </Card>
