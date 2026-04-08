@@ -12,16 +12,21 @@ export default async function PrivacyPage() {
   const bt = await getTranslations("breadcrumb");
 
   return (
-    <div className="section-narrow">
+    <div className="section-narrow py-20">
       <Breadcrumb
         items={[
           { label: bt("home"), href: "/" },
           { label: t("privacy") },
         ]}
       />
-      <h1 className="mb-12">{t("privacy")}</h1>
+      <div className="mb-16">
+        <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-4">
+          Legal
+        </p>
+        <h1 className="mb-4">{t("privacy")}</h1>
+      </div>
 
-      <div className="space-y-10 text-sm leading-relaxed text-muted-foreground">
+      <div className="space-y-12 text-sm leading-relaxed text-muted-foreground">
         <Section title="1. 個人情報の取得">
           <p>
             当社は、以下の個人情報を適法かつ公正な手段により取得します。

@@ -69,39 +69,44 @@ export default async function EventPage({
   const hasAccess = !isGated || tierRank[userTier] >= tierRank[requiredTier];
 
   return (
-    <div className="section-narrow">
-      <header className="mb-12">
-        <p className="text-xs text-muted-foreground mb-4">
-          {new Date(event.date).toLocaleDateString(locale, {
-            year: "numeric",
-            month: "long",
-            day: "numeric",
-          })}
-          {event.endDate &&
-            ` — ${new Date(event.endDate).toLocaleDateString(locale, {
+    <div className="section-narrow py-20">
+      <header className="mb-16">
+        <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-4">
+          Event
+        </p>
+        <h1 className="mb-6">{event.title}</h1>
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            {new Date(event.date).toLocaleDateString(locale, {
               year: "numeric",
               month: "long",
               day: "numeric",
-            })}`}
-        </p>
-        <h1 className="mb-4">{event.title}</h1>
-        {event.location && (
-          <p className="text-muted-foreground text-sm">{event.location}</p>
-        )}
-        {isGated && (
-          <p className="text-xs text-muted-foreground mt-4">[{tCommon("memberOnly")}]</p>
-        )}
+            })}
+            {event.endDate &&
+              ` — ${new Date(event.endDate).toLocaleDateString(locale, {
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+              })}`}
+          </p>
+          {event.location && (
+            <p className="text-sm text-muted-foreground">{event.location}</p>
+          )}
+          {isGated && (
+            <p className="text-xs text-muted-foreground">[{tCommon("memberOnly")}]</p>
+          )}
+        </div>
       </header>
 
       {event.image?.asset && (
-        <div className="mb-12">
-          <Image
+        <div className="mb-16 -mx-6 sm:mx-0 sm:rounded-none">
+          <ImageWithFallback
             src={urlFor(event.image).width(1200).url()}
+            fallbackSrc="/placeholder-hero-approach.jpg"
             alt={event.title}
-            width={1200}
-            height={675}
+            fill
             sizes="(max-width: 768px) 100vw, 768px"
-            className="w-full"
+            className="w-full h-auto object-cover"
             priority
           />
         </div>
@@ -110,7 +115,7 @@ export default async function EventPage({
       {hasAccess ? (
         <>
           {/* One-tap event registration */}
-          <div className="mb-8">
+          <div className="mb-12">
             <EventRegisterButton
               eventSlug={slug}
               eventTitle={event.title}
@@ -129,19 +134,22 @@ export default async function EventPage({
             />
           </div>
 
-          {event.description && <PortableText value={event.description} />}
+          {event.description && (
+            <div className="prose-custom mb-12">
+              <PortableText value={event.description} />
+            </div>
+          )}
 
           {event.externalUrl && (
-            <div className="mt-12">
-              <Button variant="outline" asChild>
-                <a
-                  href={event.externalUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  {t("detailsLink")}
-                </a>
-              </Button>
+            <div className="pt-12 border-t border-border">
+              <a
+                href={event.externalUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex text-sm underline underline-offset-4 hover:text-muted-foreground transition-colors"
+              >
+                {t("detailsLink")} →
+              </a>
             </div>
           )}
         </>

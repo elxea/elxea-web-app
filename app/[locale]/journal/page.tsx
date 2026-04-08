@@ -33,10 +33,15 @@ export default async function JournalPage({
 function JournalHeader() {
   const t = useTranslations("journal");
   return (
-    <>
-      <h1 className="mb-2">{t("title")}</h1>
-      <p className="text-muted-foreground text-sm mb-12">{t("description")}</p>
-    </>
+    <div className="mb-16">
+      <div className="text-center mb-10">
+        <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-4">
+          Articles
+        </p>
+        <h1 className="mb-6">{t("title")}</h1>
+        <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl mx-auto">{t("description")}</p>
+      </div>
+    </div>
   );
 }
 
@@ -137,7 +142,7 @@ async function ArticlesList({ categorySlug }: { categorySlug: string | null }) {
         {!articles || articles.length === 0 ? (
           <p className="text-muted-foreground text-sm">{t("empty")}</p>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-10">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-14">
             {articles.map((article) => (
               <ArticleCard
                 key={article._id}

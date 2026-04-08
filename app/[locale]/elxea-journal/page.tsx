@@ -22,9 +22,14 @@ export default function ElxeaJournalPage() {
   const t = useTranslations("elxeaJournal");
 
   return (
-    <div className="section-wide">
-      <h1 className="mb-2">{t("title")}</h1>
-      <p className="text-muted-foreground text-sm mb-12">{t("description")}</p>
+    <div className="section-wide py-20">
+      <div className="text-center mb-16">
+        <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-4">
+          Journal
+        </p>
+        <h1 className="mb-6">{t("title")}</h1>
+        <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl mx-auto">{t("description")}</p>
+      </div>
       <JournalGrid />
     </div>
   );
@@ -43,7 +48,7 @@ async function JournalGrid() {
     }
 
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-10">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-14">
         {journals.map(
           (j: {
             _id: string;
@@ -61,7 +66,7 @@ async function JournalGrid() {
                 href={`/elxea-journal/${j.slug.current}`}
                 className="group block"
               >
-                <div className="relative mb-4">
+                <div className="relative mb-5">
                   <ImageCard
                     image={image?.asset ? urlFor(image).width(600).height(400).url() : undefined}
                     alt={image?.alt || j.title}
@@ -75,12 +80,12 @@ async function JournalGrid() {
                     {themeLabels[j.theme] || j.theme}
                   </span>
                 </div>
-                <div className="space-y-1.5">
-                  <h2 className="text-sm font-medium leading-snug group-hover:underline">
+                <div className="space-y-2 text-center">
+                  <h2 className="text-sm font-normal leading-relaxed group-hover:underline underline-offset-4">
                     {j.title}
                   </h2>
                   {j.summary && (
-                    <p className="text-sm text-muted-foreground line-clamp-2">
+                    <p className="text-[13px] text-muted-foreground line-clamp-2 leading-relaxed">
                       {j.summary}
                     </p>
                   )}
