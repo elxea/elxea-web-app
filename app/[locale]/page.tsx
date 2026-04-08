@@ -1,10 +1,10 @@
 import { Suspense } from "react";
-import Image from "next/image";
 import { useTranslations } from "next-intl";
 import { getLocale, getTranslations } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ImageWithFallback } from "@/components/ui/image-with-fallback";
 import { getClient } from "@/sanity/lib/client";
 import { FEATURED_ARTICLES_QUERY, EVENTS_QUERY } from "@/sanity/lib/queries";
 import { ArticleCard } from "@/components/journal/article-card";
@@ -17,8 +17,9 @@ export default function HomePage() {
     <>
       {/* Hero */}
       <section className="relative min-h-[90vh] flex items-center justify-center">
-        <Image
+        <ImageWithFallback
           src="/hero-day.jpg"
+          fallbackSrc="/placeholder-hero-day.jpg"
           alt=""
           aria-hidden="true"
           fill
@@ -61,8 +62,9 @@ export default function HomePage() {
 
       {/* Our Story — full-width image section */}
       <section className="relative min-h-[60vh] flex items-center justify-center">
-        <Image
+        <ImageWithFallback
           src="/hero-night.jpg"
+          fallbackSrc="/placeholder-hero-night.jpg"
           alt=""
           aria-hidden="true"
           fill
@@ -106,8 +108,9 @@ export default function HomePage() {
 
       {/* Approach — full-width image section */}
       <section className="relative min-h-[60vh] flex items-center justify-center">
-        <Image
+        <ImageWithFallback
           src="/hero-approach.jpg"
+          fallbackSrc="/placeholder-hero-approach.jpg"
           alt=""
           aria-hidden="true"
           fill

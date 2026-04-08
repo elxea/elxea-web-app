@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import { getTranslations } from "next-intl/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ImageWithFallback } from "@/components/ui/image-with-fallback";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("about");
@@ -18,8 +18,9 @@ export default async function AboutPage() {
     <>
       {/* Hero */}
       <section className="relative min-h-[60vh] flex items-center justify-center">
-        <Image
+        <ImageWithFallback
           src="/hero-night.jpg"
+          fallbackSrc="/placeholder-hero-night.jpg"
           alt=""
           aria-hidden="true"
           fill
@@ -54,8 +55,9 @@ export default async function AboutPage() {
 
           {/* Image break */}
           <div className="relative aspect-[16/9] w-full overflow-hidden">
-            <Image
+            <ImageWithFallback
               src="/hero-day.jpg"
+              fallbackSrc="/placeholder-hero-day.jpg"
               alt="elxea tea"
               fill
               className="object-cover"
@@ -93,8 +95,9 @@ export default async function AboutPage() {
 
       {/* Bottom image section */}
       <section className="relative min-h-[50vh] flex items-center justify-center">
-        <Image
+        <ImageWithFallback
           src="/hero-approach.jpg"
+          fallbackSrc="/placeholder-hero-approach.jpg"
           alt=""
           aria-hidden="true"
           fill
