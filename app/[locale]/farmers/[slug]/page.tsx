@@ -64,8 +64,8 @@ export default async function FarmerPage({
   if (!farmer) notFound();
 
   return (
-    <div className="max-w-5xl mx-auto px-6 py-16">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16">
+    <div className="max-w-5xl mx-auto px-6 py-20">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 lg:gap-20 mb-20">
         {/* Photo */}
         <ImageCard
           image={farmer.photo?.asset ? urlFor(farmer.photo).width(800).height(533).url() : undefined}
@@ -79,14 +79,14 @@ export default async function FarmerPage({
         {/* Info */}
         <div>
           {(farmer.region || farmer.country) && (
-            <p className="text-xs text-muted-foreground uppercase tracking-wider mb-4">
+            <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-6">
               {[farmer.region, farmer.country].filter(Boolean).join(", ")}
             </p>
           )}
           <h1 className="mb-8">{farmer.name}</h1>
 
           {/* Follow button */}
-          <div className="mb-8">
+          <div className="mb-12">
             <FollowButton
               farmerSlug={slug}
               farmerName={farmer.name}

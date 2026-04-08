@@ -10,9 +10,14 @@ export default function TeaMenuPage() {
   const t = useTranslations("teaMenu");
 
   return (
-    <div className="section-wide">
-      <h1 className="mb-2">{t("title")}</h1>
-      <p className="text-muted-foreground text-sm mb-12">{t("description")}</p>
+    <div className="section-wide py-20">
+      <div className="text-center mb-16">
+        <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-4">
+          Tea Selection
+        </p>
+        <h1 className="mb-6">{t("title")}</h1>
+        <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl mx-auto">{t("description")}</p>
+      </div>
       <TeaMenuList />
     </div>
   );
@@ -31,7 +36,7 @@ async function TeaMenuList() {
     }
 
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-10">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-14">
         {items.map(
           (item: {
             _id: string;
@@ -51,18 +56,18 @@ async function TeaMenuList() {
               <ImageCard
                 image={item.photo?.asset ? urlFor(item.photo).width(600).height(400).url() : undefined}
                 alt={item.photo?.alt || item.displayName}
-                className="mb-4"
+                className="mb-5"
                 style={item.color ? { backgroundColor: item.color } : undefined}
                 hover
               />
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground uppercase tracking-wider">
+              <div className="space-y-2 text-center">
+                <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em]">
                   {item.category}
                 </p>
-                <h2 className="text-sm font-medium group-hover:underline">
+                <h2 className="text-sm font-normal leading-relaxed group-hover:underline underline-offset-4">
                   {item.displayName}
                 </h2>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-[13px] text-muted-foreground">
                   {item.variety} · {item.origin}
                 </p>
               </div>

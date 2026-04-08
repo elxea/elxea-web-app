@@ -68,21 +68,21 @@ export default async function ProductPage({
     ) || product.variants[0];
 
   return (
-    <div className="section-wide">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16">
+    <div className="section-wide py-20">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 lg:gap-20">
         {/* Images */}
         <ImageGallery images={product.images} />
 
         {/* Info */}
-        <div className="space-y-8">
+        <div className="space-y-6">
           {product.vendor && (
-            <p className="text-[12px] text-muted-foreground uppercase tracking-wider">
+            <p className="text-[11px] text-muted-foreground uppercase tracking-[0.2em]">
               {product.vendor}
             </p>
           )}
 
           <div className="flex items-start justify-between gap-4">
-            <h1>{product.title}</h1>
+            <h1 className="text-2xl font-normal">{product.title}</h1>
             <FavoriteButton
               productHandle={product.handle}
               productTitle={product.title}
@@ -93,12 +93,12 @@ export default async function ProductPage({
               removedMessage={t("removedFromFavorites")}
               errorMessage={t("favoriteError")}
               loginRequiredMessage={t("loginRequiredForFavorite")}
-              className="shrink-0 mt-1"
+              className="shrink-0 mt-0.5"
             />
           </div>
 
           {product.sellingPlanGroups.length === 0 && (
-            <p className="text-lg">
+            <p className="text-base text-muted-foreground">
               {formatPrice(
                 selectedVariant.price.amount,
                 selectedVariant.price.currencyCode
@@ -135,8 +135,8 @@ export default async function ProductPage({
           )}
 
           {product.description && (
-            <div className="pt-8 border-t border-border">
-              <p className="text-[14px] text-muted-foreground leading-relaxed whitespace-pre-line">
+            <div className="pt-10 mt-4 border-t border-border">
+              <p className="text-[13px] text-muted-foreground leading-loose whitespace-pre-line">
                 {product.description}
               </p>
             </div>

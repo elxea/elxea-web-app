@@ -10,8 +10,13 @@ export default function FarmersPage() {
   const t = useTranslations("common");
 
   return (
-    <div className="section-wide">
-      <h1 className="mb-12">{t("farmers")}</h1>
+    <div className="section-wide py-20">
+      <div className="text-center mb-16">
+        <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-4">
+          Community
+        </p>
+        <h1>{t("farmers")}</h1>
+      </div>
       <FarmersList />
     </div>
   );
@@ -34,7 +39,7 @@ async function FarmersList() {
     }
 
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-10">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-14">
         {farmers.map(
           (farmer: {
             _id: string;
@@ -52,17 +57,19 @@ async function FarmersList() {
               <ImageCard
                 image={farmer.photo?.asset ? urlFor(farmer.photo).width(600).height(400).url() : undefined}
                 alt={farmer.photo?.alt || farmer.name}
-                className="mb-4"
+                className="mb-5"
                 hover
               />
-              <h3 className="text-sm font-medium group-hover:underline">
-                {farmer.name}
-              </h3>
-              {(farmer.region || farmer.country) && (
-                <p className="text-sm text-muted-foreground mt-1">
-                  {[farmer.region, farmer.country].filter(Boolean).join(", ")}
-                </p>
-              )}
+              <div className="space-y-2 text-center">
+                <h3 className="text-sm font-normal leading-relaxed group-hover:underline underline-offset-4">
+                  {farmer.name}
+                </h3>
+                {(farmer.region || farmer.country) && (
+                  <p className="text-[13px] text-muted-foreground">
+                    {[farmer.region, farmer.country].filter(Boolean).join(", ")}
+                  </p>
+                )}
+              </div>
             </Link>
           )
         )}

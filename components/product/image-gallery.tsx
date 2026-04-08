@@ -8,6 +8,7 @@ import {
   Dialog,
   DialogContent,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { ImageCard } from "@/components/ui/image-card";
@@ -27,7 +28,7 @@ export function ImageGallery({ images }: { images: ImageType[] }) {
       {/* Main image — click to zoom */}
       <button
         type="button"
-        className="aspect-[3/2] bg-muted mb-3 overflow-hidden rounded-md w-full cursor-zoom-in"
+        className="aspect-square bg-muted mb-4 overflow-hidden w-full cursor-zoom-in"
         onClick={() => setZoomOpen(true)}
       >
         <Image
@@ -43,13 +44,13 @@ export function ImageGallery({ images }: { images: ImageType[] }) {
 
       {/* Thumbnails */}
       {images.length > 1 && (
-        <div className="flex gap-2 overflow-x-auto" role="listbox" aria-label="Product images">
+        <div className="flex gap-3 overflow-x-auto" role="listbox" aria-label="Product images">
           {images.map((image, i) => (
             <Button
               key={i}
               variant="ghost"
-              className={`w-16 h-16 p-0 flex-shrink-0 overflow-hidden rounded-md border ${
-                i === selected ? "border-foreground" : "border-transparent"
+              className={`w-20 h-20 p-0 flex-shrink-0 overflow-hidden border transition-all duration-200 ${
+                i === selected ? "border-foreground" : "border-transparent hover:border-muted-foreground/30"
               }`}
               onClick={() => setSelected(i)}
               aria-selected={i === selected}
@@ -59,9 +60,9 @@ export function ImageGallery({ images }: { images: ImageType[] }) {
               <Image
                 src={image.url}
                 alt={image.altText || ""}
-                width={64}
-                height={64}
-                sizes="64px"
+                width={80}
+                height={80}
+                sizes="80px"
                 className="w-full h-full object-cover"
               />
             </Button>
@@ -75,6 +76,9 @@ export function ImageGallery({ images }: { images: ImageType[] }) {
           <DialogTitle className="sr-only">
             {images[selected].altText || "Product image"}
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            Image {selected + 1} of {images.length}
+          </DialogDescription>
           <div className="relative flex items-center justify-center">
             <Image
               src={images[selected].url}

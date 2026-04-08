@@ -5,8 +5,9 @@ export default function CartPage() {
   const t = useTranslations("common");
 
   return (
-    <div className="section-narrow">
-      <h1 className="mb-12">{t("cart")}</h1>
+    <div className="section-narrow py-20">
+      <h1 className="mb-4">{t("cart")}</h1>
+      <p className="text-muted-foreground text-sm mb-12">Items in your cart</p>
       <CartContent />
     </div>
   );

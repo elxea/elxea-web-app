@@ -17,15 +17,17 @@ export default async function ContactPage() {
   const bt = await getTranslations("breadcrumb");
 
   return (
-    <div className="section-narrow">
+    <div className="section-narrow py-20">
       <Breadcrumb
         items={[
           { label: bt("home"), href: "/" },
           { label: t("title") },
         ]}
       />
-      <h1 className="mb-4">{t("title")}</h1>
-      <p className="text-muted-foreground text-sm mb-16">{t("subtitle")}</p>
+      <div className="mb-16">
+        <h1 className="mb-4">{t("title")}</h1>
+        <p className="text-muted-foreground text-sm leading-relaxed">{t("subtitle")}</p>
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-16">
         <div className="md:col-span-2">
@@ -34,19 +36,19 @@ export default async function ContactPage() {
 
         <div className="space-y-8">
           <div>
-            <h2 className="mb-4">{t("emailDirect")}</h2>
+            <h2 className="text-sm font-medium mb-4">{t("emailDirect")}</h2>
             <a
               href={`mailto:${t("emailAddress")}`}
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors underline"
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors underline underline-offset-4"
             >
               {t("emailAddress")}
             </a>
           </div>
-          <p className="text-sm text-muted-foreground">{t("responseTime")}</p>
+          <p className="text-[13px] text-muted-foreground leading-relaxed">{t("responseTime")}</p>
           <div>
             <Link
               href="/contact/business"
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors underline"
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors underline underline-offset-4"
             >
               {t("businessLink")}
             </Link>

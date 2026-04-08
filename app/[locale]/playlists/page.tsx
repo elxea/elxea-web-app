@@ -10,9 +10,14 @@ export default function PlaylistsPage() {
   const t = useTranslations("playlist");
 
   return (
-    <div className="section-wide">
-      <h1 className="mb-2">{t("title")}</h1>
-      <p className="text-muted-foreground text-sm mb-12">{t("description")}</p>
+    <div className="section-wide py-20">
+      <div className="text-center mb-16">
+        <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-4">
+          Playlists
+        </p>
+        <h1 className="mb-6">{t("title")}</h1>
+        <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl mx-auto">{t("description")}</p>
+      </div>
       <PlaylistGrid />
     </div>
   );
@@ -30,7 +35,7 @@ async function PlaylistGrid() {
     }
 
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-10">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-14">
         {playlists.map(
           (pl: {
             _id: string;
@@ -50,19 +55,19 @@ async function PlaylistGrid() {
               <ImageCard
                 image={pl.albumImage?.asset ? urlFor(pl.albumImage).width(600).height(400).url() : undefined}
                 alt={pl.albumImage?.alt || pl.title}
-                className="mb-4"
+                className="mb-5"
                 style={(pl.colors?.color1 || pl.colors?.primary) ? { backgroundColor: pl.colors?.color1 || pl.colors?.primary } : undefined}
                 hover
               />
-              <div className="space-y-1">
+              <div className="space-y-2 text-center">
                 {pl.category && (
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider">
+                  <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em]">
                     {pl.category}
                   </p>
                 )}
-                <h2 className="text-sm font-medium group-hover:underline">{pl.title}</h2>
+                <h2 className="text-sm font-normal leading-relaxed group-hover:underline underline-offset-4">{pl.title}</h2>
                 {pl.artist && (
-                  <p className="text-xs text-muted-foreground">{pl.artist.name}</p>
+                  <p className="text-[13px] text-muted-foreground">{pl.artist.name}</p>
                 )}
               </div>
             </Link>

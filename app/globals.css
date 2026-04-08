@@ -72,6 +72,13 @@ h6 { font: var(--typography-style-h6); }
 :root {
   /* Third-party brand colors */
   --brand-line: #06C755;
+  
+  /* Overlay colors for hero sections with background images */
+  --overlay: oklch(0 0 0 / 0.15);
+  --overlay-foreground: oklch(0.98 0.01 60);
+  --overlay-foreground-muted: oklch(0.75 0.01 60);
+  --overlay-border: oklch(1 0.02 60 / 0.4);
+  
   --sidebar: hsl(0 0% 98%);
   --sidebar-foreground: hsl(240 5.3% 26.1%);
   --sidebar-primary: hsl(240 5.9% 10%);
@@ -95,6 +102,10 @@ h6 { font: var(--typography-style-h6); }
 
 @theme inline {
   --color-brand-line: var(--brand-line);
+  --color-overlay: var(--overlay);
+  --color-overlay-foreground: var(--overlay-foreground);
+  --color-overlay-foreground-muted: var(--overlay-foreground-muted);
+  --color-overlay-border: var(--overlay-border);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
