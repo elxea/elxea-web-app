@@ -35,6 +35,20 @@ export async function POST() {
 
   const state = crypto.randomBytes(32).toString("hex");
 
+  // Cookie must be readable on both elxea.com and www.elxea.com. The init POST
+  // may land on either host (depending on which one the user opened), but the
+  // callback always comes back to NEXTAUTH_URL, which is pinned to one host.
+  // A host-only cookie would miss the opposite host and the CSRF state check
+  // would fail (seen as "セッションの有効期限が切れました" in production).
+  // Scope to `.elxea.com` so both hosts share the same cookie jar. On
+  // localhost / preview deployments we fall back to host-only.
+  const baseUrl = getBaseUrl();
+  const hostname = new URL(baseUrl).hostname;
+  const cookieDomain =
+    hostname === "elxea.com" || hostname.endsWith(".elxea.com")
+      ? ".elxea.com"
+      : undefined;
+
   const cookieStore = await cookies();
   cookieStore.set("line_oauth_state", state, {
     httpOnly: true,
@@ -42,9 +56,9 @@ export async function POST() {
     sameSite: "lax",
     maxAge: 600,
     path: "/",
+    ...(cookieDomain ? { domain: cookieDomain } : {}),
   });
 
-  const baseUrl = getBaseUrl();
   const redirectUri = `${baseUrl}/api/line-callback`;
 
   const params = new URLSearchParams({
