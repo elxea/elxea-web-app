@@ -1,47 +1,147 @@
 /**
  * Rate limiting helper.
  *
- * CURRENT IMPLEMENTATION: In-memory sliding-window limiter.
+ * ## Backend selection
  *
- * TODO: Replace with a distributed limiter (Vercel KV or Upstash Ratelimit)
- * before production launch. The in-memory implementation is:
- *   - Per-instance only (each Vercel serverless invocation has its own map)
- *   - Lost on cold start
- *   - Ineffective for scaled deployments
+ * Per-limiter opt-in to Upstash. Each `Ratelimiter` has a `backend` field:
+ *   - `"upstash"` — use `@upstash/ratelimit` + Redis when env vars are set,
+ *     otherwise fall back to in-memory (with a warning in production).
+ *   - `"memory"` — always use in-memory, regardless of env vars.
  *
- * It is useful as a coarse-grained safety net during development and early
- * traffic, and as a structural placeholder so routes already carry the
- * limiting call-sites when we swap in the real backend.
+ * The per-limiter choice is driven by cost: Upstash Free plan caps daily
+ * commands, so we route only security-critical limiters (authed-user,
+ * contact-form) through Upstash. High-volume non-critical limiters
+ * (public-read) stay in-memory to avoid burning the command budget.
  *
- * To swap for @upstash/ratelimit + @upstash/redis:
- *   1. `pnpm add @upstash/ratelimit @upstash/redis`
- *   2. Set UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN env vars
- *   3. Replace the `consume` implementation below with a Ratelimit.limit()
- *      call keyed by `${limiter.name}:${key}`.
+ * ## Semantics note
+ *
+ * `@upstash/ratelimit`'s `slidingWindow` is an **approximated** sliding
+ * window: it combines the current fixed window and the previous window
+ * with a time-weighted proportion. Counts near window boundaries can
+ * temporarily exceed `limit` by up to 2x under burst conditions. This is
+ * acceptable for defensive rate limiting; for a strict enforce-limit
+ * semantics, use `fixedWindow` on the Upstash side.
  *
  * References:
  *   - https://upstash.com/docs/oss/sdks/ts/ratelimit/overview
- *   - https://vercel.com/docs/storage/vercel-kv
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { Ratelimit } from "@upstash/ratelimit";
+import { Redis } from "@upstash/redis";
+import * as Sentry from "@sentry/nextjs";
+import crypto from "crypto";
 
 export interface Ratelimiter {
   name: string;
   limit: number;
   windowMs: number;
+  /**
+   * `"upstash"`: use shared Redis when configured, fall back to in-memory
+   *              if env vars missing.
+   * `"memory"`:  always in-memory. Use for high-volume non-critical paths
+   *              to preserve Upstash Free plan command budget.
+   *
+   * Optional for backwards compatibility with tests that construct a
+   * `Ratelimiter` inline. Defaults to `"memory"` when omitted.
+   */
+  backend?: "upstash" | "memory";
 }
+
+// ---------------------------------------------------------------------------
+// Env detection
+// ---------------------------------------------------------------------------
+
+const UPSTASH_URL = process.env.UPSTASH_REDIS_REST_URL;
+const UPSTASH_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
+const USE_UPSTASH = Boolean(UPSTASH_URL && UPSTASH_TOKEN);
+
+// Detect partial (broken) Upstash configuration. Setting one without the
+// other is almost certainly a config mistake; silently falling through to
+// in-memory would mask it in production.
+if (!USE_UPSTASH && (UPSTASH_URL || UPSTASH_TOKEN)) {
+  const missing = !UPSTASH_URL ? "UPSTASH_REDIS_REST_URL" : "UPSTASH_REDIS_REST_TOKEN";
+  console.error(
+    `[ratelimit] Partial Upstash configuration: ${missing} is missing. ` +
+      `Both UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN are required. ` +
+      `Falling back to in-memory.`
+  );
+}
+
+// In production, warn if an Upstash-intended limiter cannot reach Upstash.
+if (!USE_UPSTASH && process.env.NODE_ENV === "production") {
+  console.warn(
+    `[ratelimit] Running in production without Upstash. Counters are per-instance only; ` +
+      `concurrent requests across Vercel serverless instances can exceed configured limits.`
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Upstash client and limiter cache
+// ---------------------------------------------------------------------------
+
+const redis = USE_UPSTASH
+  ? new Redis({ url: UPSTASH_URL!, token: UPSTASH_TOKEN! })
+  : null;
+
+const upstashLimiters = new Map<string, Ratelimit>();
+
+function getUpstashLimiter(limiter: Ratelimiter): Ratelimit | null {
+  if (!redis) return null;
+  let inst = upstashLimiters.get(limiter.name);
+  if (inst) return inst;
+  inst = new Ratelimit({
+    redis,
+    limiter: Ratelimit.slidingWindow(
+      limiter.limit,
+      millisecondsToDuration(limiter.windowMs)
+    ),
+    analytics: false, // stay within Free plan command budget
+    // `ratelimit:elxea-web:<name>` prefix to avoid collision with any other
+    // app sharing this Upstash instance in the future.
+    prefix: `ratelimit:elxea-web:${limiter.name}`,
+  });
+  upstashLimiters.set(limiter.name, inst);
+  return inst;
+}
+
+/**
+ * Convert a millisecond window into the `${n} ${unit}` string format that
+ * `@upstash/ratelimit`'s `slidingWindow()` expects. Picks the largest unit
+ * that divides cleanly for a human-readable Redis TTL.
+ *
+ * @throws if `ms < 1000`. Sub-second windows round up to `1 s`, which would
+ *         silently double (or more) the intended window size.
+ */
+export function millisecondsToDuration(
+  ms: number
+): `${number} ${"s" | "m" | "h" | "d"}` {
+  if (ms < 1000) {
+    throw new Error(
+      `millisecondsToDuration: windowMs must be >= 1000ms (got ${ms})`
+    );
+  }
+  if (ms % (24 * 60 * 60 * 1000) === 0)
+    return `${ms / (24 * 60 * 60 * 1000)} d` as const;
+  if (ms % (60 * 60 * 1000) === 0)
+    return `${ms / (60 * 60 * 1000)} h` as const;
+  if (ms % (60 * 1000) === 0) return `${ms / (60 * 1000)} m` as const;
+  return `${Math.round(ms / 1000)} s` as const;
+}
+
+// ---------------------------------------------------------------------------
+// In-memory fallback
+// ---------------------------------------------------------------------------
 
 interface Entry {
   timestamps: number[];
 }
 
-// Bucket: limiter name -> key -> entry
 const buckets = new Map<string, Map<string, Entry>>();
 
 /**
- * Consume one request for the given limiter and key.
- * Returns `{ ok: true, remaining, reset }` or `{ ok: false, retryAfter, reset }`.
+ * Consume one request for the given limiter and key using the in-memory
+ * backend. Exported for tests.
  */
 export function consume(
   limiter: Ratelimiter,
@@ -49,8 +149,8 @@ export function consume(
 ): {
   ok: boolean;
   remaining: number;
-  reset: number; // unix seconds when window will have space again
-  retryAfter: number; // seconds until a retry will succeed (0 if ok)
+  reset: number;
+  retryAfter: number;
 } {
   const now = Date.now();
   const windowStart = now - limiter.windowMs;
@@ -62,11 +162,9 @@ export function consume(
   }
 
   const entry = bucket.get(key) ?? { timestamps: [] };
-  // Drop timestamps outside the window.
   const fresh = entry.timestamps.filter((t) => t > windowStart);
 
   if (fresh.length >= limiter.limit) {
-    // Window is full. The oldest request must age out.
     const oldest = fresh[0]!;
     const resetMs = oldest + limiter.windowMs;
     const retryAfterSec = Math.max(1, Math.ceil((resetMs - now) / 1000));
@@ -91,21 +189,10 @@ export function consume(
   };
 }
 
-/**
- * Derive a rate-limit key for an incoming request from the best available
- * client identifier. Honors:
- *   1. x-forwarded-for (Vercel, most proxies)
- *   2. x-real-ip (nginx)
- *   3. x-vercel-forwarded-for (Vercel Edge)
- *
- * If no proxy header is present (e.g. direct dev traffic, misconfigured
- * proxy), we avoid the "unknown" catch-all bucket — that would cause a
- * single abusive client to exhaust the limit for every unauthenticated
- * caller. Instead, bucket by user-agent hash + accept-language so
- * unidentified clients share only with near-identical siblings. This is
- * NOT cryptographically secure (a client can rotate headers) but it is a
- * strict improvement over `"unknown"` as a global bucket key.
- */
+// ---------------------------------------------------------------------------
+// Client IP derivation
+// ---------------------------------------------------------------------------
+
 export function getClientIp(request: NextRequest): string {
   const xff = request.headers.get("x-forwarded-for");
   if (xff) {
@@ -121,8 +208,6 @@ export function getClientIp(request: NextRequest): string {
   }
   const ua = request.headers.get("user-agent") ?? "";
   const lang = request.headers.get("accept-language") ?? "";
-  // Short synchronous non-crypto hash keeps this O(1) and avoids pulling in
-  // node:crypto for a path that runs per request.
   let h = 2166136261;
   const s = ua + "|" + lang;
   for (let i = 0; i < s.length; i++) {
@@ -131,42 +216,41 @@ export function getClientIp(request: NextRequest): string {
   return `fallback-${(h >>> 0).toString(16)}`;
 }
 
-/**
- * Shared limiter definitions used across the API.
- */
+// ---------------------------------------------------------------------------
+// Limiter definitions
+// ---------------------------------------------------------------------------
+
 export const limiters = {
   authedUser: {
     name: "authed-user",
     limit: 100,
-    windowMs: 60 * 1000, // 100 requests / minute / user
+    windowMs: 60 * 1000,
+    backend: "upstash",
   } satisfies Ratelimiter,
   contactForm: {
     name: "contact-form",
     limit: 10,
-    windowMs: 60 * 60 * 1000, // 10 requests / hour / IP
+    windowMs: 60 * 60 * 1000,
+    backend: "upstash",
   } satisfies Ratelimiter,
+  // public-read stays in-memory: 300/min/IP × realistic traffic would burn
+  // the Upstash Free plan command budget (10k/day). Non-critical path, so
+  // per-instance counting is acceptable for now.
   publicRead: {
     name: "public-read",
     limit: 300,
-    windowMs: 60 * 1000, // 300 requests / minute / IP for public GET endpoints
+    windowMs: 60 * 1000,
+    backend: "memory",
   } satisfies Ratelimiter,
 } as const;
 
-/**
- * Periodically drop stale entries from the in-memory buckets.
- *
- * The limiter accumulates one Map entry per unique (limiter, key) pair.
- * Without cleanup, long-running instances leak memory as keys (customerIds,
- * IPs) churn. We run a wall-clock-gated sweep at most once every
- * CLEANUP_MIN_INTERVAL_MS so the amortized cost is bounded regardless of
- * request rate, and high-traffic instances do not pay O(n) on every request.
- *
- * The eventual Upstash/KV replacement will delegate TTL to Redis and this
- * helper can be deleted.
- */
-const CLEANUP_MIN_INTERVAL_MS = 5 * 60 * 1000; // at most one sweep every 5 min
+// ---------------------------------------------------------------------------
+// In-memory cleanup (prevents leak when fallback is active)
+// ---------------------------------------------------------------------------
+
+const CLEANUP_MIN_INTERVAL_MS = 5 * 60 * 1000;
 let lastCleanupAt = 0;
-const MAX_WINDOW_MS = 60 * 60 * 1000; // match the longest configured window
+const MAX_WINDOW_MS = 60 * 60 * 1000;
 
 function maybeCleanup(): void {
   const now = Date.now();
@@ -185,43 +269,103 @@ function maybeCleanup(): void {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Enforcement
+// ---------------------------------------------------------------------------
+
+/**
+ * Hash a rate-limit key for log output. Avoids leaking raw customerId /
+ * IP addresses into function logs (PII). 8-char sha256 prefix gives enough
+ * disambiguation for debugging while being irreversible.
+ */
+function hashKey(key: string): string {
+  return crypto.createHash("sha256").update(key).digest("hex").substring(0, 8);
+}
+
 /**
  * Enforce a rate limit on an incoming request. On rejection, returns a 429
  * NextResponse with Retry-After + RateLimit-* headers. On success, returns
  * null (the caller should continue handling).
  *
- * @example
- * ```ts
- * const limited = enforceRateLimit(request, limiters.authedUser, auth.customerId);
- * if (limited) return limited;
- * ```
+ * Upstash errors fail open: rate limiting is defensive, and 503ing
+ * legitimate traffic on transient Redis unavailability is worse than
+ * temporarily serving without the gate. Errors are reported to Sentry so
+ * sustained Upstash outages are visible to ops.
  */
 export async function enforceRateLimit(
   _request: NextRequest,
   limiter: Ratelimiter,
   key: string
 ): Promise<NextResponse | null> {
-  // Declared async so the interface is forward-compatible with the Upstash
-  // / Vercel KV distributed limiter, whose `limit()` returns a Promise.
-  // The in-memory body below is synchronous, but every call site already
-  // awaits — swapping the implementation is a no-touch change.
-  maybeCleanup();
-  const result = consume(limiter, key);
-  if (result.ok) return null;
+  let ok: boolean;
+  let remaining: number;
+  let reset: number; // unix seconds
+  let retryAfter: number; // seconds until retry succeeds
+
+  // Default to "memory" when backend is unspecified (backwards compat).
+  const backend = limiter.backend ?? "memory";
+  const upstash = backend === "upstash" ? getUpstashLimiter(limiter) : null;
+
+  if (upstash) {
+    try {
+      const result = await upstash.limit(key);
+      ok = result.success;
+      remaining = result.remaining;
+      reset = Math.ceil(result.reset / 1000);
+      retryAfter = ok
+        ? 0
+        : Math.max(1, Math.ceil((result.reset - Date.now()) / 1000));
+    } catch (err) {
+      const hashed = hashKey(key);
+      console.error(
+        `[ratelimit] Upstash limit() failed for ${limiter.name}:${hashed}; failing open.`,
+        err
+      );
+      Sentry.captureException(err, {
+        tags: { subsystem: "ratelimit", limiter: limiter.name },
+        extra: { keyHash: hashed },
+      });
+      return null;
+    }
+  } else {
+    maybeCleanup();
+    const result = consume(limiter, key);
+    ok = result.ok;
+    remaining = result.remaining;
+    reset = result.reset;
+    retryAfter = result.retryAfter;
+  }
+
+  if (ok) return null;
 
   return NextResponse.json(
     {
       error: "Too Many Requests",
-      retryAfter: result.retryAfter,
+      retryAfter,
     },
     {
       status: 429,
       headers: {
-        "Retry-After": String(result.retryAfter),
+        "Retry-After": String(retryAfter),
         "RateLimit-Limit": String(limiter.limit),
-        "RateLimit-Remaining": String(result.remaining),
-        "RateLimit-Reset": String(result.reset),
+        "RateLimit-Remaining": String(remaining),
+        "RateLimit-Reset": String(reset),
       },
     }
+  );
+}
+
+// Startup signal. Log once so ops knows which backend is active per
+// deployment. Skipped in test env to keep test output clean.
+if (process.env.NODE_ENV !== "test") {
+  const upstashPaths = Object.values(limiters)
+    .filter((l) => l.backend === "upstash")
+    .map((l) => l.name);
+  const memoryPaths = Object.values(limiters)
+    .filter((l) => l.backend === "memory")
+    .map((l) => l.name);
+  const upstashStatus = USE_UPSTASH ? "configured" : "NOT configured (fallback)";
+  console.log(
+    `[ratelimit] upstash=${upstashStatus}; upstash-limiters=[${upstashPaths.join(",")}]; memory-limiters=[${memoryPaths.join(",")}]`
   );
 }
