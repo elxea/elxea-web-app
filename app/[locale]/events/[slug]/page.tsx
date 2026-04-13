@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import { notFound } from "next/navigation";
 import { getLocale, getTranslations } from "next-intl/server";
 import { getClient } from "@/sanity/lib/client";
@@ -9,6 +8,7 @@ import { PortableText } from "@/components/sanity/portable-text";
 import { getMembershipTier } from "@/lib/shopify/auth";
 import type { MembershipTier } from "@/lib/shopify/customer";
 import { MemberGate } from "@/components/ui/member-gate";
+import { ImageWithFallback } from "@/components/ui/image-with-fallback";
 import { Button } from "@/components/ui/button";
 import { EventRegisterButton } from "@/components/events/event-register-button";
 
