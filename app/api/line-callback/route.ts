@@ -52,8 +52,20 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL(`/${locale}/login?error=StateMismatch`, request.url));
   }
 
-  // Clear state cookie
-  cookieStore.delete("line_oauth_state");
+  // Clear state cookie. Must match the domain used when the cookie was set
+  // in /api/line-login/init — otherwise the delete silently no-ops and the
+  // stale state cookie lingers until natural expiry.
+  const baseUrl = getBaseUrl();
+  const hostname = new URL(baseUrl).hostname;
+  const sharedCookieDomain =
+    hostname === "elxea.com" || hostname.endsWith(".elxea.com")
+      ? ".elxea.com"
+      : undefined;
+  cookieStore.delete({
+    name: "line_oauth_state",
+    path: "/",
+    ...(sharedCookieDomain ? { domain: sharedCookieDomain } : {}),
+  });
 
   const channelId = process.env.AUTH_LINE_ID;
   const channelSecret = process.env.AUTH_LINE_SECRET;
@@ -61,8 +73,6 @@ export async function GET(request: NextRequest) {
   if (!channelId || !channelSecret) {
     return NextResponse.redirect(new URL(`/${locale}/login?error=NotConfigured`, request.url));
   }
-
-  const baseUrl = getBaseUrl();
 
   try {
     // Exchange code for tokens
@@ -171,32 +181,33 @@ export async function GET(request: NextRequest) {
 
     const response = NextResponse.redirect(new URL(`/${locale}/login/complete?linked=true`, request.url));
 
-    response.cookies.set("line_user", lineUserCookie, {
-      httpOnly: false, // readable by client
+    // Scope session cookies to the apex so the user stays logged in whether
+    // they browse `elxea.com` or `www.elxea.com`. See init route for context.
+    const sharedCookieOpts = {
+      ...(sharedCookieDomain ? { domain: sharedCookieDomain } : {}),
       secure: true,
-      sameSite: "lax",
+      sameSite: "lax" as const,
       maxAge: 60 * 60 * 24 * 30, // 30 days
       path: "/",
+    };
+
+    response.cookies.set("line_user", lineUserCookie, {
+      ...sharedCookieOpts,
+      httpOnly: false, // readable by client
     });
 
     // P1-fix: Set shop_auth=1 so client-side UI components recognize LINE users as logged in.
     // This non-httpOnly flag is checked by header, favorite-button, follow-button, etc.
     response.cookies.set("shop_auth", "1", {
+      ...sharedCookieOpts,
       httpOnly: false,
-      secure: true,
-      sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 30, // 30 days
-      path: "/",
     });
 
     // P1-fix: Set line_session=1 (httpOnly) so middleware can recognize LINE-authenticated users
     // for /account route protection without requiring Shopify tokens.
     response.cookies.set("line_session", "1", {
+      ...sharedCookieOpts,
       httpOnly: true,
-      secure: true,
-      sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 30, // 30 days
-      path: "/",
     });
 
     // Redirect to login complete page
