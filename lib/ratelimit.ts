@@ -52,8 +52,12 @@ export interface Ratelimiter {
 // Env detection
 // ---------------------------------------------------------------------------
 
-const UPSTASH_URL = process.env.UPSTASH_REDIS_REST_URL;
-const UPSTASH_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
+// Trim to defend against accidental whitespace / newline in env var values
+// (common when env vars are set via `echo "$v" | vercel env add ...` which
+// appends a trailing newline). Upstash Redis client rejects whitespace,
+// so we normalize here instead of failing at module load.
+const UPSTASH_URL = process.env.UPSTASH_REDIS_REST_URL?.trim();
+const UPSTASH_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN?.trim();
 const USE_UPSTASH = Boolean(UPSTASH_URL && UPSTASH_TOKEN);
 
 // Detect partial (broken) Upstash configuration. Setting one without the
