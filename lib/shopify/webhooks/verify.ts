@@ -202,11 +202,19 @@ export async function checkWebhookIdempotency(
   }
 
   const markProcessed = async () => {
-    const { FieldValue } = await import("firebase-admin/firestore");
+    const { FieldValue, Timestamp } = await import("firebase-admin/firestore");
     await logRef.set({
       topic,
       source: "shopify",
       processedAt: FieldValue.serverTimestamp(),
+      // TTL: 7 days. Shopify retries within minutes, so a 7-day retention
+      // window is ample. Firestore TTL policy on field `ttl` deletes the
+      // doc after this timestamp passes. Configured via:
+      //   gcloud firestore fields ttls update ttl \
+      //     --collection-group=_webhookLogs --enable-ttl
+      ttl: Timestamp.fromDate(
+        new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      ),
     });
   };
 
