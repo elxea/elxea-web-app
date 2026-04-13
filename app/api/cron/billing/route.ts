@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import {
@@ -75,10 +76,28 @@ function isReadyForRetry(lastFailureAt: Date, now: Date): boolean {
   return hoursSinceFailure >= RETRY_INTERVAL_HOURS;
 }
 
+/**
+ * Timing-safe comparison of the incoming Authorization header against the
+ * expected Bearer token. Uses constant-time comparison after a length check
+ * to prevent timing side-channel attacks on the shared secret.
+ */
+function isAuthorizedCronRequest(authHeader: string | null): boolean {
+  if (!CRON_SECRET || !authHeader) return false;
+  const expected = `Bearer ${CRON_SECRET}`;
+  const a = Buffer.from(authHeader);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length) return false;
+  try {
+    return crypto.timingSafeEqual(a, b);
+  } catch {
+    return false;
+  }
+}
+
 export async function GET(request: NextRequest) {
-  // Auth check
+  // Auth check — use constant-time comparison
   const authHeader = request.headers.get("authorization");
-  if (!CRON_SECRET || authHeader !== `Bearer ${CRON_SECRET}`) {
+  if (!isAuthorizedCronRequest(authHeader)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

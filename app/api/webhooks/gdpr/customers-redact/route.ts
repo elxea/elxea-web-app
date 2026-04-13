@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { FieldValue } from "firebase-admin/firestore";
 import { validateWebhookRequest } from "@/lib/shopify/webhooks/verify";
 import { getAdminFirestore } from "@/lib/firebase/admin";
 import {
@@ -10,7 +11,6 @@ import {
   eventRegistrationsCol,
   conversationsCol,
 } from "@/lib/firebase/collections";
-import { extractCustomerId } from "@/lib/firebase/types";
 
 /**
  * Delete all documents in a Firestore subcollection.
@@ -54,8 +54,7 @@ export async function POST(request: NextRequest) {
   };
 
   console.log(
-    `[Webhook:GDPR] Received ${topic}: customers/redact`,
-    JSON.stringify(payload),
+    `[Webhook:GDPR] Received ${topic}: customers/redact (customerId=${body.customer?.id ?? "unknown"})`,
   );
 
   const shopifyCustomerId = body.customer?.id;
@@ -65,9 +64,29 @@ export async function POST(request: NextRequest) {
   }
 
   const customerId = String(shopifyCustomerId);
+  const webhookId = request.headers.get("x-shopify-webhook-id");
 
   try {
     const db = getAdminFirestore();
+
+    // Idempotency: if we have a webhook id, check whether this delivery has
+    // already been processed. Shopify may retry GDPR redact webhooks on 5xx
+    // or network errors, and we must not double-delete or race with another
+    // delivery.
+    if (webhookId) {
+      const logRef = db.collection("_webhookLogs").doc(webhookId);
+      const existing = await logRef.get();
+      if (existing.exists) {
+        console.log(
+          `[Webhook:GDPR] customers/redact already processed (webhookId=${webhookId}), returning 200`,
+        );
+        return NextResponse.json({ received: true, idempotent: true });
+      }
+    } else {
+      console.warn(
+        "[Webhook:GDPR] customers/redact missing x-shopify-webhook-id header; idempotency not enforced",
+      );
+    }
 
     // Delete all subcollections in parallel
     const subcollections = [
@@ -83,6 +102,10 @@ export async function POST(request: NextRequest) {
       subcollections.map((col) => deleteSubcollection(db, col)),
     );
 
+    // Track any subcollection deletion failures. We must NOT return 200 if
+    // any deletion failed — that would silently drop a GDPR request and
+    // leave orphan customer data.
+    const failedSubcollections: string[] = [];
     for (let i = 0; i < results.length; i++) {
       const result = results[i];
       if (result.status === "fulfilled") {
@@ -94,16 +117,60 @@ export async function POST(request: NextRequest) {
           `[Webhook:GDPR] Failed to delete ${subcollections[i]}:`,
           result.reason,
         );
+        failedSubcollections.push(subcollections[i]!);
       }
     }
 
-    // Delete the user document itself
-    await db.doc(userDoc(customerId)).delete();
-    console.log(`[Webhook:GDPR] Deleted user document: ${userDoc(customerId)}`);
+    if (failedSubcollections.length > 0) {
+      // Return 500 so Shopify retries. We intentionally do NOT write the
+      // idempotency log doc, so the retry will re-enter the try block.
+      console.error(
+        `[Webhook:GDPR] Aborting — subcollection deletion failures:`,
+        failedSubcollections,
+      );
+      return NextResponse.json(
+        { error: "Partial deletion failure" },
+        { status: 500 },
+      );
+    }
+
+    // Delete the user document itself. Failure here must also surface as 5xx
+    // so Shopify retries and the customer's root user doc is not orphaned.
+    try {
+      await db.doc(userDoc(customerId)).delete();
+      console.log(
+        `[Webhook:GDPR] Deleted user document: ${userDoc(customerId)}`,
+      );
+    } catch (userDocErr) {
+      console.error(
+        `[Webhook:GDPR] Failed to delete user document ${userDoc(customerId)}:`,
+        userDocErr,
+      );
+      return NextResponse.json(
+        { error: "User document deletion failed" },
+        { status: 500 },
+      );
+    }
+
+    // Record successful processing for idempotency. Only reached when all
+    // deletions succeeded.
+    if (webhookId) {
+      await db.collection("_webhookLogs").doc(webhookId).set({
+        topic,
+        source: "shopify",
+        kind: "customers/redact",
+        customerId,
+        processedAt: FieldValue.serverTimestamp(),
+      });
+    }
   } catch (error) {
+    // Unhandled error — return 500 so Shopify retries. Previous behavior
+    // returned 200 which silently dropped GDPR requests.
     console.error("[Webhook:GDPR] Error deleting customer data:", error);
-    // Return 200 to acknowledge receipt — Shopify will retry on non-200
-    // and we don't want infinite retries for transient errors.
+    return NextResponse.json(
+      { error: "Internal Server Error" },
+      { status: 500 },
+    );
   }
 
   return NextResponse.json({ received: true });

@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
-import { validateWebhookRequest } from "@/lib/shopify/webhooks/verify";
+import {
+  validateWebhookRequest,
+  checkWebhookIdempotency,
+} from "@/lib/shopify/webhooks/verify";
+import { getAdminFirestore } from "@/lib/firebase/admin";
 
 /**
  * Shopify Subscription Webhook handler.
@@ -54,6 +58,25 @@ interface BillingAttemptPayload {
   created_at: string;
 }
 
+/**
+ * Extract only non-PII identifiers from an unknown webhook payload for logging.
+ * Never include email, name, address, or other PII.
+ */
+function extractSafePayloadIds(payload: unknown): Record<string, unknown> {
+  if (!payload || typeof payload !== "object") {
+    return { payloadType: typeof payload };
+  }
+  const p = payload as Record<string, unknown>;
+  const customer = (p.customer ?? null) as { id?: number } | null;
+  return {
+    id: p.id,
+    subscriptionContractId: p.subscription_contract_id,
+    customerId: customer?.id,
+    status: p.status,
+    createdAt: p.created_at,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Topic handlers
 // ---------------------------------------------------------------------------
@@ -79,7 +102,7 @@ function handleContractUpdate(payload: SubscriptionContractPayload): void {
         extra: {
           contractId: payload.id,
           customerId: payload.customer?.id,
-          customerEmail: payload.customer?.email,
+          // PII (customerEmail) intentionally omitted — use Shopify Admin to correlate
         },
       },
     );
@@ -148,11 +171,18 @@ export async function POST(request: NextRequest) {
     return validation.response;
   }
 
-  const { payload, topic } = validation;
+  const { payload, topic, webhookId } = validation;
 
   console.log(`[Webhook:subscription] Received topic="${topic}"`);
 
   try {
+    // Idempotency check: drop duplicate deliveries of the same event.
+    const db = getAdminFirestore();
+    const idem = await checkWebhookIdempotency(db, webhookId, topic);
+    if (idem.alreadyProcessed) {
+      return NextResponse.json({ received: true, topic, idempotent: true });
+    }
+
     const handler = TOPIC_HANDLERS[topic];
 
     if (handler) {
@@ -163,6 +193,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Mark processed only after successful handling.
+    await idem.markProcessed();
+
     // Always return 200 to prevent Shopify retries
     return NextResponse.json({ received: true, topic });
   } catch (error) {
@@ -171,9 +204,11 @@ export async function POST(request: NextRequest) {
       error,
     );
 
+    // Extract only non-PII identifiers from the payload for observability.
+    const payloadIds = extractSafePayloadIds(payload);
     Sentry.captureException(error, {
       tags: { webhook: "subscription", topic },
-      extra: { payload },
+      extra: payloadIds,
     });
 
     // Return 500 so Shopify retries

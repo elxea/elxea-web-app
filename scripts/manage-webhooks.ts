@@ -184,6 +184,11 @@ const DESIRED_WEBHOOKS: { topic: string; path: string }[] = [
     topic: "subscription_billing_attempts/failure",
     path: "/api/subscription/webhook",
   },
+  // Inventory monitoring (triggers pipeline job)
+  {
+    topic: "inventory_levels/update",
+    path: "/api/webhooks/inventory",
+  },
   // GDPR mandatory webhooks
   {
     topic: "customers/data_request",

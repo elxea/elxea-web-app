@@ -46,8 +46,7 @@ export async function POST(request: NextRequest) {
   };
 
   console.log(
-    `[Webhook:GDPR] Received ${topic}: customers/data_request`,
-    JSON.stringify(payload),
+    `[Webhook:GDPR] Received ${topic}: customers/data_request (customerId=${body.customer?.id ?? "unknown"}, requestId=${body.data_request?.id ?? "unknown"})`,
   );
 
   const shopifyCustomerId = body.customer?.id;
@@ -78,25 +77,30 @@ export async function POST(request: NextRequest) {
         collectSubcollection(db, conversationsCol(customerId)),
       ]);
 
-    const exportedData = {
+    // Do NOT log the exportedData payload — it contains PII.
+    // In production, the exported data should be encrypted and sent to a secure
+    // endpoint (e.g. signed S3 URL, Shopify notification) or stored for customer
+    // retrieval. For now, log only counts for auditability.
+    const counts = {
       customerId,
       requestId: body.data_request?.id,
       exportedAt: new Date().toISOString(),
-      userProfile,
-      orders,
-      behaviorLog,
-      favorites,
-      follows,
-      eventRegistrations,
-      conversations,
+      hasUserProfile: userProfile != null,
+      orders: orders.length,
+      behaviorLog: behaviorLog.length,
+      favorites: favorites.length,
+      follows: follows.length,
+      eventRegistrations: eventRegistrations.length,
+      conversations: conversations.length,
     };
-
-    // Log the exported data. In production, this should be sent to a secure
-    // endpoint or stored for customer retrieval.
     console.log(
-      `[Webhook:GDPR] Exported data for customer ${customerId}:`,
-      JSON.stringify(exportedData),
+      `[Webhook:GDPR] Exported data counts for customer ${customerId}:`,
+      JSON.stringify(counts),
     );
+
+    // TODO: when SHOPIFY_GDPR_EXPORT_ENDPOINT is configured, forward the full
+    // (encrypted) exported data to that endpoint. Until then, only counts are
+    // persisted to logs and the actual payload is discarded.
   } catch (error) {
     console.error("[Webhook:GDPR] Error exporting customer data:", error);
   }
