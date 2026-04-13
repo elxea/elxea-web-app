@@ -6,6 +6,19 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
+/**
+ * Phase 1/2: treat either Shopify or LINE sessions as "logged in".
+ * The follows API resolves identity across both providers, so the client
+ * should surface the button for either auth cookie.
+ */
+function isAuthed() {
+  if (typeof document === "undefined") return false;
+  return (
+    document.cookie.includes("shop_auth=1") ||
+    document.cookie.includes("line_auth=1")
+  );
+}
+
 type FollowButtonProps = {
   /** Sanity farmer slug — used as farmerSlug in Firestore */
   farmerSlug: string;
@@ -68,7 +81,7 @@ export function FollowButton({
       }
     }
 
-    if (typeof document !== "undefined" && document.cookie.includes("shop_auth=1")) {
+    if (isAuthed()) {
       checkStatus();
     }
 
@@ -78,7 +91,7 @@ export function FollowButton({
   }, [farmerSlug]);
 
   const toggleFollow = useCallback(async () => {
-    if (typeof document !== "undefined" && !document.cookie.includes("shop_auth=1")) {
+    if (!isAuthed()) {
       toast(loginRequiredMessage);
       return;
     }

@@ -6,6 +6,19 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
+/**
+ * Phase 1/2: treat either Shopify or LINE sessions as "logged in".
+ * The favorites API resolves identity across both providers, so the client
+ * should surface the button for either auth cookie.
+ */
+function isAuthed() {
+  if (typeof document === "undefined") return false;
+  return (
+    document.cookie.includes("shop_auth=1") ||
+    document.cookie.includes("line_auth=1")
+  );
+}
+
 type FavoriteButtonProps = {
   /** Shopify product handle — used as targetId in Firestore */
   productHandle: string;
@@ -68,8 +81,8 @@ export function FavoriteButton({
       }
     }
 
-    // Only check if auth cookie exists (non-httpOnly flag)
-    if (typeof document !== "undefined" && document.cookie.includes("shop_auth=1")) {
+    // Only check if any auth cookie exists (non-httpOnly flag).
+    if (isAuthed()) {
       checkStatus();
     }
 
@@ -79,8 +92,8 @@ export function FavoriteButton({
   }, [productHandle]);
 
   const toggleFavorite = useCallback(async () => {
-    // Check if user is logged in via auth cookie
-    if (typeof document !== "undefined" && !document.cookie.includes("shop_auth=1")) {
+    // Check if user is logged in via any supported auth cookie.
+    if (!isAuthed()) {
       toast(loginRequiredMessage);
       return;
     }

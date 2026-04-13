@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { getBaseUrl } from "@/lib/base-url";
+import { encryptToken } from "@/lib/shopify/customer";
 
 /**
  * LINE Login OAuth 2.0 callback endpoint.
@@ -196,11 +197,23 @@ export async function GET(request: NextRequest) {
       httpOnly: false, // readable by client
     });
 
-    // P1-fix: Set shop_auth=1 so client-side UI components recognize LINE users as logged in.
-    // This non-httpOnly flag is checked by header, favorite-button, follow-button, etc.
-    response.cookies.set("shop_auth", "1", {
+    // Phase 1/2: dedicated client-visible flag so header / favorite-button /
+    // follow-button etc. can recognize LINE-authenticated users without
+    // masquerading as a Shopify session. We intentionally DO NOT set
+    // `shop_auth` here — that cookie is reserved for genuine Shopify
+    // sessions so that identity resolution (auth-guard) stays unambiguous.
+    response.cookies.set("line_auth", "1", {
       ...sharedCookieOpts,
       httpOnly: false,
+    });
+
+    // Phase 1/2: encrypted LINE user id. Used by `resolveIdentity()` to derive
+    // `userKey = "line:" + lineUserId` for Firestore subcollection lookups,
+    // and by the Shopify OAuth callback to merge LINE-only data into the
+    // Shopify user key after account linking.
+    response.cookies.set("line_uid", encryptToken(lineUserId), {
+      ...sharedCookieOpts,
+      httpOnly: true,
     });
 
     // P1-fix: Set line_session=1 (httpOnly) so middleware can recognize LINE-authenticated users
