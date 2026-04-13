@@ -56,7 +56,7 @@ function isShopifyPath(pathname: string): boolean {
   );
 }
 
-export default {
+const worker = {
   async fetch(
     request: Request,
     env: Env,
@@ -102,3 +102,5 @@ export default {
     return newResponse;
   },
 };
+
+export default worker;

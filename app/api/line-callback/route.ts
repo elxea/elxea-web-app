@@ -130,26 +130,38 @@ export async function GET(request: NextRequest) {
 
     const chatSessionId = cookieStore.get("chat_session_id")?.value;
 
-    // C1: Include X-API-Key header for authenticated identity linking
+    // C1: Include X-API-Key for identity linking. In production, never call the worker without it
+    // (avoids silently sending unauthenticated requests).
     const syncApiSecret = process.env.SYNC_API_SECRET;
-    try {
-      const linkHeaders: Record<string, string> = { "Content-Type": "application/json" };
-      if (syncApiSecret) {
-        linkHeaders["X-API-Key"] = syncApiSecret;
+    const isProd = process.env.NODE_ENV === "production";
+    const shouldLinkIdentity = !isProd || Boolean(syncApiSecret);
+
+    if (isProd && !syncApiSecret) {
+      console.error(
+        "[line-callback] SYNC_API_SECRET not set; skipping identity link (set in production)",
+      );
+    }
+
+    if (shouldLinkIdentity) {
+      try {
+        const linkHeaders: Record<string, string> = { "Content-Type": "application/json" };
+        if (syncApiSecret) {
+          linkHeaders["X-API-Key"] = syncApiSecret;
+        }
+        await fetch(`${chatApiBase}/api/identity/link-line`, {
+          method: "POST",
+          headers: linkHeaders,
+          body: JSON.stringify({
+            line_user_id: lineUserId,
+            email,
+            display_name: displayName,
+            session_id: chatSessionId ?? null,
+          }),
+        });
+      } catch (e) {
+        console.error("[line-callback] Identity link failed:", e);
+        // Don't block login on link failure
       }
-      await fetch(`${chatApiBase}/api/identity/link-line`, {
-        method: "POST",
-        headers: linkHeaders,
-        body: JSON.stringify({
-          line_user_id: lineUserId,
-          email,
-          display_name: displayName,
-          session_id: chatSessionId ?? null,
-        }),
-      });
-    } catch (e) {
-      console.error("[line-callback] Identity link failed:", e);
-      // Don't block login on link failure
     }
 
     // I5: Store only displayName in cookie (userId stays server-side only)

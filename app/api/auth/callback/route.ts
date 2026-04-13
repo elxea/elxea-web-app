@@ -60,6 +60,15 @@ export async function GET(request: NextRequest) {
       maxAge: tokens.expires_in,
     });
 
+    // Preserve the id_token so we can pass it as `id_token_hint` to the
+    // Shopify logout endpoint at sign-out time. Without this, RP-initiated
+    // logout cannot identify the session to terminate and Shopify SSO
+    // cookies are left in place (causing silent re-login on shared PCs).
+    response.cookies.set("shop_it", encryptToken(tokens.id_token), {
+      ...cookieOptions,
+      maxAge: 60 * 60 * 24 * 30, // 30 days (must outlive access token)
+    });
+
     // Cache the Shopify Customer ID extracted from the id_token JWT.
     // This avoids an extra Shopify Customer API call on every authenticated request.
     // The numeric customer ID (e.g. "7654321") is encrypted and stored as shop_cid.

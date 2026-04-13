@@ -60,6 +60,7 @@ export function TastingNoteCta() {
   useEffect(() => {
     if (shouldShow) {
       markCTAShown();
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time CTA visibility after async chat threshold
       setVisible(true);
     }
   }, [shouldShow]);

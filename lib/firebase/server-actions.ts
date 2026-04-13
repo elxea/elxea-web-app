@@ -341,6 +341,24 @@ export async function getComments(
   }));
 }
 
+/**
+ * Fetch a single comment by ID. Returns null if not found.
+ * Used by the DELETE route for an explicit BOLA check before calling
+ * `deleteComment`.
+ */
+export async function getCommentById(commentId: string) {
+  const db = getAdminFirestore();
+  const doc = await db.collection(COLLECTIONS.comments).doc(commentId).get();
+  if (!doc.exists) return null;
+  const data = doc.data() ?? {};
+  return {
+    id: doc.id,
+    authorId: (data.authorId as string | undefined) ?? null,
+    targetType: (data.targetType as string | undefined) ?? null,
+    targetId: (data.targetId as string | undefined) ?? null,
+  };
+}
+
 export async function deleteComment(customerId: string, commentId: string) {
   const db = getAdminFirestore();
   const docRef = db.collection(COLLECTIONS.comments).doc(commentId);

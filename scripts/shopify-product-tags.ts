@@ -21,7 +21,7 @@ import { join } from "path";
 // Load token from elxea-broadcaster .env.local
 const broadcasterEnvPath = join(
   process.env.HOME || "",
-  "github/elxea/elxea-broadcaster/.env.local"
+  "github/elxea/agents/elxea-broadcaster/.env.local"
 );
 let SHOPIFY_ACCESS_TOKEN = "";
 let SHOPIFY_STORE_DOMAIN = "";
