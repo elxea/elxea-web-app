@@ -6,6 +6,14 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
+function isAuthed() {
+  if (typeof document === "undefined") return false;
+  return (
+    document.cookie.includes("shop_auth=1") ||
+    document.cookie.includes("line_auth=1")
+  );
+}
+
 type EventRegisterButtonProps = {
   /** Sanity event slug — used as eventSlug in Firestore */
   eventSlug: string;
@@ -68,7 +76,7 @@ export function EventRegisterButton({
       }
     }
 
-    if (typeof document !== "undefined" && document.cookie.includes("shop_auth=1")) {
+    if (isAuthed()) {
       checkStatus();
     }
 
@@ -78,7 +86,7 @@ export function EventRegisterButton({
   }, [eventSlug]);
 
   const handleClick = useCallback(async () => {
-    if (typeof document !== "undefined" && !document.cookie.includes("shop_auth=1")) {
+    if (!isAuthed()) {
       toast(loginRequiredMessage);
       return;
     }
