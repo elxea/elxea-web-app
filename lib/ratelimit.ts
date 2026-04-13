@@ -1,16 +1,26 @@
 /**
  * Rate limiting helper.
  *
- * Backend selection at module load time:
- *   - If UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN are set,
- *     `@upstash/ratelimit` with Redis is used. Counters are shared across
- *     all Vercel serverless instances, so concurrency-based bypass attacks
- *     are prevented.
- *   - Otherwise, an in-memory sliding-window limiter runs per-instance.
- *     This is a development/fallback mode; limits are NOT enforced globally.
+ * ## Backend selection
  *
- * The `enforceRateLimit` interface is stable across backends, so call sites
- * never change when credentials are added or removed.
+ * Per-limiter opt-in to Upstash. Each `Ratelimiter` has a `backend` field:
+ *   - `"upstash"` — use `@upstash/ratelimit` + Redis when env vars are set,
+ *     otherwise fall back to in-memory (with a warning in production).
+ *   - `"memory"` — always use in-memory, regardless of env vars.
+ *
+ * The per-limiter choice is driven by cost: Upstash Free plan caps daily
+ * commands, so we route only security-critical limiters (authed-user,
+ * contact-form) through Upstash. High-volume non-critical limiters
+ * (public-read) stay in-memory to avoid burning the command budget.
+ *
+ * ## Semantics note
+ *
+ * `@upstash/ratelimit`'s `slidingWindow` is an **approximated** sliding
+ * window: it combines the current fixed window and the previous window
+ * with a time-weighted proportion. Counts near window boundaries can
+ * temporarily exceed `limit` by up to 2x under burst conditions. This is
+ * acceptable for defensive rate limiting; for a strict enforce-limit
+ * semantics, use `fixedWindow` on the Upstash side.
  *
  * References:
  *   - https://upstash.com/docs/oss/sdks/ts/ratelimit/overview
@@ -19,30 +29,61 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
+import * as Sentry from "@sentry/nextjs";
+import crypto from "crypto";
 
 export interface Ratelimiter {
   name: string;
   limit: number;
   windowMs: number;
+  /**
+   * `"upstash"`: use shared Redis when configured, fall back to in-memory
+   *              if env vars missing.
+   * `"memory"`:  always in-memory. Use for high-volume non-critical paths
+   *              to preserve Upstash Free plan command budget.
+   *
+   * Optional for backwards compatibility with tests that construct a
+   * `Ratelimiter` inline. Defaults to `"memory"` when omitted.
+   */
+  backend?: "upstash" | "memory";
 }
 
 // ---------------------------------------------------------------------------
-// Backend detection
+// Env detection
 // ---------------------------------------------------------------------------
 
 const UPSTASH_URL = process.env.UPSTASH_REDIS_REST_URL;
 const UPSTASH_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
 const USE_UPSTASH = Boolean(UPSTASH_URL && UPSTASH_TOKEN);
 
-// Lazy: only construct Redis client when Upstash is configured. Skipping
-// this when env vars are missing means tests and local dev without Upstash
-// continue to work via the in-memory fallback.
+// Detect partial (broken) Upstash configuration. Setting one without the
+// other is almost certainly a config mistake; silently falling through to
+// in-memory would mask it in production.
+if (!USE_UPSTASH && (UPSTASH_URL || UPSTASH_TOKEN)) {
+  const missing = !UPSTASH_URL ? "UPSTASH_REDIS_REST_URL" : "UPSTASH_REDIS_REST_TOKEN";
+  console.error(
+    `[ratelimit] Partial Upstash configuration: ${missing} is missing. ` +
+      `Both UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN are required. ` +
+      `Falling back to in-memory.`
+  );
+}
+
+// In production, warn if an Upstash-intended limiter cannot reach Upstash.
+if (!USE_UPSTASH && process.env.NODE_ENV === "production") {
+  console.warn(
+    `[ratelimit] Running in production without Upstash. Counters are per-instance only; ` +
+      `concurrent requests across Vercel serverless instances can exceed configured limits.`
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Upstash client and limiter cache
+// ---------------------------------------------------------------------------
+
 const redis = USE_UPSTASH
   ? new Redis({ url: UPSTASH_URL!, token: UPSTASH_TOKEN! })
   : null;
 
-// Map of `limiter.name` -> Upstash Ratelimit instance. We cache per-name so
-// we don't construct a new `Ratelimit` on every request.
 const upstashLimiters = new Map<string, Ratelimit>();
 
 function getUpstashLimiter(limiter: Ratelimiter): Ratelimit | null {
@@ -51,11 +92,14 @@ function getUpstashLimiter(limiter: Ratelimiter): Ratelimit | null {
   if (inst) return inst;
   inst = new Ratelimit({
     redis,
-    // Sliding window with `limiter.limit` requests per `windowMs` interval.
-    // Upstash expresses windows as e.g. "1 m", "1 h"; we translate from ms.
-    limiter: Ratelimit.slidingWindow(limiter.limit, millisecondsToDuration(limiter.windowMs)),
-    analytics: false, // stay under free-plan command budget
-    prefix: `ratelimit:${limiter.name}`,
+    limiter: Ratelimit.slidingWindow(
+      limiter.limit,
+      millisecondsToDuration(limiter.windowMs)
+    ),
+    analytics: false, // stay within Free plan command budget
+    // `ratelimit:elxea-web:<name>` prefix to avoid collision with any other
+    // app sharing this Upstash instance in the future.
+    prefix: `ratelimit:elxea-web:${limiter.name}`,
   });
   upstashLimiters.set(limiter.name, inst);
   return inst;
@@ -63,18 +107,30 @@ function getUpstashLimiter(limiter: Ratelimiter): Ratelimit | null {
 
 /**
  * Convert a millisecond window into the `${n} ${unit}` string format that
- * `@upstash/ratelimit`'s slidingWindow() expects. We pick the largest unit
- * that divides cleanly to keep the Redis key TTL human-readable.
+ * `@upstash/ratelimit`'s `slidingWindow()` expects. Picks the largest unit
+ * that divides cleanly for a human-readable Redis TTL.
+ *
+ * @throws if `ms < 1000`. Sub-second windows round up to `1 s`, which would
+ *         silently double (or more) the intended window size.
  */
-function millisecondsToDuration(ms: number): `${number} ${"s" | "m" | "h" | "d"}` {
-  if (ms % (24 * 60 * 60 * 1000) === 0) return `${ms / (24 * 60 * 60 * 1000)} d` as const;
-  if (ms % (60 * 60 * 1000) === 0) return `${ms / (60 * 60 * 1000)} h` as const;
+export function millisecondsToDuration(
+  ms: number
+): `${number} ${"s" | "m" | "h" | "d"}` {
+  if (ms < 1000) {
+    throw new Error(
+      `millisecondsToDuration: windowMs must be >= 1000ms (got ${ms})`
+    );
+  }
+  if (ms % (24 * 60 * 60 * 1000) === 0)
+    return `${ms / (24 * 60 * 60 * 1000)} d` as const;
+  if (ms % (60 * 60 * 1000) === 0)
+    return `${ms / (60 * 60 * 1000)} h` as const;
   if (ms % (60 * 1000) === 0) return `${ms / (60 * 1000)} m` as const;
-  return `${Math.max(1, Math.round(ms / 1000))} s` as const;
+  return `${Math.round(ms / 1000)} s` as const;
 }
 
 // ---------------------------------------------------------------------------
-// In-memory fallback (dev / tests / unconfigured environments)
+// In-memory fallback
 // ---------------------------------------------------------------------------
 
 interface Entry {
@@ -137,11 +193,6 @@ export function consume(
 // Client IP derivation
 // ---------------------------------------------------------------------------
 
-/**
- * Derive a rate-limit key for an incoming request from the best available
- * client identifier. Avoids a global "unknown" catch-all by hashing UA +
- * Accept-Language when no proxy header is present.
- */
 export function getClientIp(request: NextRequest): string {
   const xff = request.headers.get("x-forwarded-for");
   if (xff) {
@@ -174,16 +225,22 @@ export const limiters = {
     name: "authed-user",
     limit: 100,
     windowMs: 60 * 1000,
+    backend: "upstash",
   } satisfies Ratelimiter,
   contactForm: {
     name: "contact-form",
     limit: 10,
     windowMs: 60 * 60 * 1000,
+    backend: "upstash",
   } satisfies Ratelimiter,
+  // public-read stays in-memory: 300/min/IP × realistic traffic would burn
+  // the Upstash Free plan command budget (10k/day). Non-critical path, so
+  // per-instance counting is acceptable for now.
   publicRead: {
     name: "public-read",
     limit: 300,
     windowMs: 60 * 1000,
+    backend: "memory",
   } satisfies Ratelimiter,
 } as const;
 
@@ -217,43 +274,60 @@ function maybeCleanup(): void {
 // ---------------------------------------------------------------------------
 
 /**
+ * Hash a rate-limit key for log output. Avoids leaking raw customerId /
+ * IP addresses into function logs (PII). 8-char sha256 prefix gives enough
+ * disambiguation for debugging while being irreversible.
+ */
+function hashKey(key: string): string {
+  return crypto.createHash("sha256").update(key).digest("hex").substring(0, 8);
+}
+
+/**
  * Enforce a rate limit on an incoming request. On rejection, returns a 429
  * NextResponse with Retry-After + RateLimit-* headers. On success, returns
  * null (the caller should continue handling).
+ *
+ * Upstash errors fail open: rate limiting is defensive, and 503ing
+ * legitimate traffic on transient Redis unavailability is worse than
+ * temporarily serving without the gate. Errors are reported to Sentry so
+ * sustained Upstash outages are visible to ops.
  */
 export async function enforceRateLimit(
   _request: NextRequest,
   limiter: Ratelimiter,
   key: string
 ): Promise<NextResponse | null> {
-  const upstash = getUpstashLimiter(limiter);
-
   let ok: boolean;
   let remaining: number;
   let reset: number; // unix seconds
   let retryAfter: number; // seconds until retry succeeds
 
+  // Default to "memory" when backend is unspecified (backwards compat).
+  const backend = limiter.backend ?? "memory";
+  const upstash = backend === "upstash" ? getUpstashLimiter(limiter) : null;
+
   if (upstash) {
-    // Upstash path. `limit()` performs a single atomic Redis round-trip and
-    // returns normalized state. If Redis is unreachable, we log and fail
-    // open (null) — rate limiting is defensive, not a hard gate, so letting
-    // legitimate traffic through is safer than 503'ing on a flaky network.
     try {
       const result = await upstash.limit(key);
       ok = result.success;
       remaining = result.remaining;
       reset = Math.ceil(result.reset / 1000);
-      retryAfter = ok ? 0 : Math.max(1, Math.ceil((result.reset - Date.now()) / 1000));
+      retryAfter = ok
+        ? 0
+        : Math.max(1, Math.ceil((result.reset - Date.now()) / 1000));
     } catch (err) {
+      const hashed = hashKey(key);
       console.error(
-        `[ratelimit] Upstash limit() failed for ${limiter.name}:${key}; failing open.`,
+        `[ratelimit] Upstash limit() failed for ${limiter.name}:${hashed}; failing open.`,
         err
       );
+      Sentry.captureException(err, {
+        tags: { subsystem: "ratelimit", limiter: limiter.name },
+        extra: { keyHash: hashed },
+      });
       return null;
     }
   } else {
-    // In-memory fallback. Warns once at module load if this branch is used
-    // in production-like environments.
     maybeCleanup();
     const result = consume(limiter, key);
     ok = result.ok;
@@ -281,9 +355,17 @@ export async function enforceRateLimit(
   );
 }
 
-// Startup signal: log which backend is in use so ops knows at a glance.
-// This runs once when the module is first imported.
+// Startup signal. Log once so ops knows which backend is active per
+// deployment. Skipped in test env to keep test output clean.
 if (process.env.NODE_ENV !== "test") {
-  const backend = USE_UPSTASH ? "upstash-redis" : "in-memory (per-instance)";
-  console.log(`[ratelimit] backend=${backend}`);
+  const upstashPaths = Object.values(limiters)
+    .filter((l) => l.backend === "upstash")
+    .map((l) => l.name);
+  const memoryPaths = Object.values(limiters)
+    .filter((l) => l.backend === "memory")
+    .map((l) => l.name);
+  const upstashStatus = USE_UPSTASH ? "configured" : "NOT configured (fallback)";
+  console.log(
+    `[ratelimit] upstash=${upstashStatus}; upstash-limiters=[${upstashPaths.join(",")}]; memory-limiters=[${memoryPaths.join(",")}]`
+  );
 }
