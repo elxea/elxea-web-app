@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAuth } from "@/lib/firebase/auth-guard";
+import { resolveIdentity } from "@/lib/firebase/auth-guard";
 import {
   registerForEvent,
   cancelEventRegistration,
@@ -51,23 +51,23 @@ const DeleteEventSchema = z.object({
  */
 export async function GET(request: NextRequest) {
   try {
-    const auth = await requireAuth();
+    const auth = await resolveIdentity();
     if (!auth.authenticated) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
 
-    const limited = await enforceRateLimit(request, limiters.authedUser, auth.customerId);
+    const limited = await enforceRateLimit(request, limiters.authedUser, auth.userKey);
     if (limited) return limited;
 
     const { searchParams } = request.nextUrl;
     const checkSlug = searchParams.get("check");
 
     if (checkSlug) {
-      const registered = await isRegisteredForEvent(auth.customerId, checkSlug);
+      const registered = await isRegisteredForEvent(auth.userKey, checkSlug);
       return NextResponse.json({ registered });
     }
 
-    const registrations = await getEventRegistrations(auth.customerId);
+    const registrations = await getEventRegistrations(auth.userKey);
     return NextResponse.json({ registrations });
   } catch (err) {
     console.error("[GET /api/user/events]", err);
@@ -81,18 +81,18 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const auth = await requireAuth();
+    const auth = await resolveIdentity();
     if (!auth.authenticated) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
 
-    const limited = await enforceRateLimit(request, limiters.authedUser, auth.customerId);
+    const limited = await enforceRateLimit(request, limiters.authedUser, auth.userKey);
     if (limited) return limited;
 
     const parsed = await parseJsonBody(request, PostEventSchema);
     if (!parsed.ok) return parsed.response;
 
-    const result = await registerForEvent(auth.customerId, {
+    const result = await registerForEvent(auth.userKey, {
       eventSlug: parsed.data.eventSlug,
       eventTitle: parsed.data.eventTitle,
       eventDate: parsed.data.eventDate ?? null,
@@ -112,19 +112,19 @@ export async function POST(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
-    const auth = await requireAuth();
+    const auth = await resolveIdentity();
     if (!auth.authenticated) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
 
-    const limited = await enforceRateLimit(request, limiters.authedUser, auth.customerId);
+    const limited = await enforceRateLimit(request, limiters.authedUser, auth.userKey);
     if (limited) return limited;
 
     const parsed = await parseJsonBody(request, DeleteEventSchema);
     if (!parsed.ok) return parsed.response;
 
     const result = await cancelEventRegistration(
-      auth.customerId,
+      auth.userKey,
       parsed.data.eventSlug
     );
     return NextResponse.json(result);

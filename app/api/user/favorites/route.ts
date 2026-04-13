@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAuth } from "@/lib/firebase/auth-guard";
+import { resolveIdentity } from "@/lib/firebase/auth-guard";
 import {
   addFavorite,
   removeFavorite,
@@ -31,12 +31,12 @@ const DeleteFavoriteSchema = z.object({
  */
 export async function GET(request: NextRequest) {
   try {
-    const auth = await requireAuth();
+    const auth = await resolveIdentity();
     if (!auth.authenticated) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
 
-    const limited = await enforceRateLimit(request, limiters.authedUser, auth.customerId);
+    const limited = await enforceRateLimit(request, limiters.authedUser, auth.userKey);
     if (limited) return limited;
 
     const { searchParams } = request.nextUrl;
@@ -45,13 +45,13 @@ export async function GET(request: NextRequest) {
 
     // Check mode: is a specific item favorited?
     if (checkTarget && checkType) {
-      const favorited = await isFavorited(auth.customerId, checkType, checkTarget);
+      const favorited = await isFavorited(auth.userKey, checkType, checkTarget);
       return NextResponse.json({ favorited });
     }
 
     // List mode: get all favorites
     const type = searchParams.get("type") as FavoriteType | undefined;
-    const favorites = await getFavorites(auth.customerId, type || undefined);
+    const favorites = await getFavorites(auth.userKey, type || undefined);
     return NextResponse.json({ favorites });
   } catch (err) {
     console.error("[GET /api/user/favorites]", err);
@@ -65,18 +65,18 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const auth = await requireAuth();
+    const auth = await resolveIdentity();
     if (!auth.authenticated) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
 
-    const limited = await enforceRateLimit(request, limiters.authedUser, auth.customerId);
+    const limited = await enforceRateLimit(request, limiters.authedUser, auth.userKey);
     if (limited) return limited;
 
     const parsed = await parseJsonBody(request, PostFavoriteSchema);
     if (!parsed.ok) return parsed.response;
 
-    const result = await addFavorite(auth.customerId, {
+    const result = await addFavorite(auth.userKey, {
       type: parsed.data.type,
       targetId: parsed.data.targetId,
       title: parsed.data.title,
@@ -96,19 +96,19 @@ export async function POST(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
-    const auth = await requireAuth();
+    const auth = await resolveIdentity();
     if (!auth.authenticated) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
 
-    const limited = await enforceRateLimit(request, limiters.authedUser, auth.customerId);
+    const limited = await enforceRateLimit(request, limiters.authedUser, auth.userKey);
     if (limited) return limited;
 
     const parsed = await parseJsonBody(request, DeleteFavoriteSchema);
     if (!parsed.ok) return parsed.response;
 
     const result = await removeFavorite(
-      auth.customerId,
+      auth.userKey,
       parsed.data.type,
       parsed.data.targetId
     );

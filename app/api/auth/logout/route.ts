@@ -48,6 +48,8 @@ export async function GET(request: NextRequest) {
   // LINE cookies
   response.cookies.set("line_user", "", deleteOptions);
   response.cookies.set("line_session", "", deleteOptions);
+  response.cookies.set("line_auth", "", deleteOptions);
+  response.cookies.set("line_uid", "", deleteOptions);
 
   return response;
 }

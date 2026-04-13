@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAuth } from "@/lib/firebase/auth-guard";
+import { resolveIdentity } from "@/lib/firebase/auth-guard";
 import {
   followFarmer,
   unfollowFarmer,
@@ -34,23 +34,23 @@ const DeleteFollowSchema = z.object({
  */
 export async function GET(request: NextRequest) {
   try {
-    const auth = await requireAuth();
+    const auth = await resolveIdentity();
     if (!auth.authenticated) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
 
-    const limited = await enforceRateLimit(request, limiters.authedUser, auth.customerId);
+    const limited = await enforceRateLimit(request, limiters.authedUser, auth.userKey);
     if (limited) return limited;
 
     const { searchParams } = request.nextUrl;
     const checkSlug = searchParams.get("check");
 
     if (checkSlug) {
-      const following = await isFollowing(auth.customerId, checkSlug);
+      const following = await isFollowing(auth.userKey, checkSlug);
       return NextResponse.json({ following });
     }
 
-    const follows = await getFollows(auth.customerId);
+    const follows = await getFollows(auth.userKey);
     return NextResponse.json({ follows });
   } catch (err) {
     console.error("[GET /api/user/follows]", err);
@@ -64,18 +64,18 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const auth = await requireAuth();
+    const auth = await resolveIdentity();
     if (!auth.authenticated) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
 
-    const limited = await enforceRateLimit(request, limiters.authedUser, auth.customerId);
+    const limited = await enforceRateLimit(request, limiters.authedUser, auth.userKey);
     if (limited) return limited;
 
     const parsed = await parseJsonBody(request, PostFollowSchema);
     if (!parsed.ok) return parsed.response;
 
-    const result = await followFarmer(auth.customerId, {
+    const result = await followFarmer(auth.userKey, {
       farmerSlug: parsed.data.farmerSlug,
       farmerName: parsed.data.farmerName,
       farmerImageUrl: parsed.data.farmerImageUrl ?? null,
@@ -94,18 +94,18 @@ export async function POST(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
-    const auth = await requireAuth();
+    const auth = await resolveIdentity();
     if (!auth.authenticated) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
 
-    const limited = await enforceRateLimit(request, limiters.authedUser, auth.customerId);
+    const limited = await enforceRateLimit(request, limiters.authedUser, auth.userKey);
     if (limited) return limited;
 
     const parsed = await parseJsonBody(request, DeleteFollowSchema);
     if (!parsed.ok) return parsed.response;
 
-    const result = await unfollowFarmer(auth.customerId, parsed.data.farmerSlug);
+    const result = await unfollowFarmer(auth.userKey, parsed.data.farmerSlug);
     return NextResponse.json(result);
   } catch (err) {
     console.error("[DELETE /api/user/follows]", err);

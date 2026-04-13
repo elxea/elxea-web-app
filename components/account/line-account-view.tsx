@@ -2,6 +2,8 @@ import { getTranslations } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { FavoritesSection } from "@/components/account/favorites-section";
+import { FollowsSection } from "@/components/account/follows-section";
 
 type LineAccountViewProps = {
   displayName: string;
@@ -75,8 +77,48 @@ export async function LineAccountView({
             <span className="text-foreground">&#10003;</span>
             {t("featureLineNotifications")}
           </li>
+          <li className="flex items-center gap-2">
+            <span className="text-foreground">&#10003;</span>
+            {t("featureFavorites")}
+          </li>
         </ul>
       </section>
+
+      {/* Favorite products — Phase 1/2: available to LINE-only users.
+          FavoritesSection is a client component that fetches via
+          /api/user/favorites, which now resolves LINE identity via
+          `resolveIdentity()` on the server. */}
+      <FavoritesSection
+        type="product"
+        title={t("favoriteProducts")}
+        emptyMessage={t("noFavoriteProducts")}
+        errorMessage={t("actionError")}
+        removedMessage={t("removedFromFavorites")}
+        locale={locale}
+        productBaseUrl="/products"
+        articleBaseUrl="/journal"
+      />
+
+      {/* Favorite articles */}
+      <FavoritesSection
+        type="article"
+        title={t("favoriteArticles")}
+        emptyMessage={t("noFavoriteArticles")}
+        errorMessage={t("actionError")}
+        removedMessage={t("removedFromFavorites")}
+        locale={locale}
+        productBaseUrl="/products"
+        articleBaseUrl="/journal"
+      />
+
+      {/* Following farmers */}
+      <FollowsSection
+        title={t("followingFarmers")}
+        emptyMessage={t("noFollows")}
+        errorMessage={t("actionError")}
+        removedMessage={t("unfollowed")}
+        locale={locale}
+      />
 
       {/* Locked features */}
       <section className="mb-12">
@@ -94,10 +136,6 @@ export async function LineAccountView({
           <li className="flex items-center gap-2">
             <span className="opacity-40">&#10003;</span>
             {t("featureSubscriptions")}
-          </li>
-          <li className="flex items-center gap-2">
-            <span className="opacity-40">&#10003;</span>
-            {t("featureFavorites")}
           </li>
         </ul>
       </section>

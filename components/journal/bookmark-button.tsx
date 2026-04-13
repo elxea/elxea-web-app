@@ -65,7 +65,12 @@ export function BookmarkButton({
       }
     }
 
-    if (typeof document !== "undefined" && document.cookie.includes("shop_auth=1")) {
+    // Phase 1/2: bookmark uses /api/user/favorites which now supports LINE.
+    if (
+      typeof document !== "undefined" &&
+      (document.cookie.includes("shop_auth=1") ||
+        document.cookie.includes("line_auth=1"))
+    ) {
       checkStatus();
     }
 
@@ -75,7 +80,11 @@ export function BookmarkButton({
   }, [articleSlug]);
 
   const toggleBookmark = useCallback(async () => {
-    if (typeof document !== "undefined" && !document.cookie.includes("shop_auth=1")) {
+    if (
+      typeof document !== "undefined" &&
+      !document.cookie.includes("shop_auth=1") &&
+      !document.cookie.includes("line_auth=1")
+    ) {
       toast(loginRequiredMessage);
       return;
     }
