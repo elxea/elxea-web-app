@@ -179,7 +179,17 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium
 
       - name: Run staging smoke tests
-        run: pnpm exec playwright test --config e2e/playwright-staging.config.ts
+        # Graceful skip when STAGING_URL secret is not configured.
+        # Without this guard the spec falls through to its localhost:3000
+        # default and the job fails every main push with ERR_CONNECTION_REFUSED
+        # because the CI runner has no dev server. Once a dedicated staging
+        # domain is provisioned, set `STAGING_URL` in repo secrets to enable.
+        run: |
+          if [ -z "$BASE_URL" ]; then
+            echo "STAGING_URL secret not configured — skipping staging smoke tests."
+            exit 0
+          fi
+          pnpm exec playwright test --config e2e/playwright-staging.config.ts
         env:
           BASE_URL: ${{ secrets.STAGING_URL }}
           CI: true
