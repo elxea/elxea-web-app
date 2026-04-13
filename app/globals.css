@@ -4,6 +4,13 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Prevent horizontal viewport overflow from off-screen children (e.g. wide
+ * cookie banners on narrow viewports). `clip` on <html> keeps Lenis smooth
+ * scroll working — `overflow-x: hidden` on <body> would make Lenis stutter. */
+html {
+  overflow-x: clip;
+}
+
 /* Lenis smooth scroll */
 html.lenis, html.lenis body {
   height: auto;

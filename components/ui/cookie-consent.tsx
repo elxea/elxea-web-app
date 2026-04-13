@@ -41,9 +41,9 @@ export function CookieConsent() {
   if (!visible) return null;
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-background">
-      <div className="max-w-7xl mx-auto px-6 py-4 flex flex-col sm:flex-row items-start sm:items-center gap-4">
-        <p className="text-sm text-muted-foreground flex-1">
+    <div className="fixed bottom-0 left-0 right-0 z-50 w-full max-w-full border-t border-border bg-background">
+      <div className="w-full max-w-7xl mx-auto px-6 py-4 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+        <p className="text-sm text-muted-foreground flex-1 min-w-0 break-words">
           {t("message")}{" "}
           <Link
             href="/legal/privacy"
@@ -52,7 +52,7 @@ export function CookieConsent() {
             {t("learnMore")}
           </Link>
         </p>
-        <div className="flex gap-3 shrink-0">
+        <div className="flex flex-wrap gap-3">
           <Button variant="outline" size="sm" onClick={handleDecline}>
             {t("decline")}
           </Button>
