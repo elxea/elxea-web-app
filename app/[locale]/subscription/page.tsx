@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/card";
 import { Breadcrumb } from "@/components/seo/breadcrumb";
 import { ImageCard } from "@/components/ui/image-card";
+import { ImageWithFallback } from "@/components/ui/image-with-fallback";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("subscriptionLp");
@@ -49,31 +50,48 @@ export default async function SubscriptionLPPage() {
   return (
     <>
       {/* ─── 1. Hero ─── */}
-      <section className="relative min-h-[80vh] flex items-center justify-center">
-        <div className="absolute inset-0 bg-muted" />
-        {/* TODO: hero image */}
-        <div className="relative text-center max-w-xl px-6">
-          <h1 className="mb-6 whitespace-pre-line">
+      <section className="relative min-h-[90vh] flex items-center justify-center">
+        <ImageWithFallback
+          src="/placeholder-hero-day.jpg"
+          fallbackSrc="/placeholder-hero-day.jpg"
+          alt=""
+          aria-hidden="true"
+          fill
+          priority
+          className="object-cover"
+          sizes="100vw"
+        />
+        <div className="absolute inset-0 bg-overlay" />
+        <div className="relative text-center max-w-2xl px-8">
+          <p className="text-[11px] text-overlay-foreground-muted uppercase tracking-[0.25em] mb-6">
+            {t("heroSubtitle")}
+          </p>
+          <h1 className="mb-8 text-overlay-foreground whitespace-pre-line">
             {t("heroHeading")}
           </h1>
-          <Button asChild>
+          <Button className="bg-overlay-foreground text-foreground hover:bg-overlay-foreground/90" asChild>
             <a href="#">{t("heroCta")}</a>
           </Button>
         </div>
       </section>
 
       {/* ─── 2. Brand Introduction ─── */}
-      <section className="section-narrow">
+      <section className="section-narrow py-20">
         <Breadcrumb
           items={[
             { label: bt("home"), href: "/" },
             { label: t("title") },
           ]}
         />
-        <h2 className="mb-6">{t("brandHeading")}</h2>
-        <p className="text-sm text-muted-foreground leading-relaxed mb-10">
-          {t("brandBody")}
-        </p>
+        <div className="mb-12">
+          <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-4">
+            About
+          </p>
+          <h2 className="mb-6">{t("brandHeading")}</h2>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            {t("brandBody")}
+          </p>
+        </div>
 
         {/* Image grid (placeholder) */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

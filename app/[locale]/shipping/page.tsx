@@ -15,17 +15,22 @@ export default async function ShippingPage() {
   const bt = await getTranslations("breadcrumb");
 
   return (
-    <div className="section-narrow">
+    <div className="section-narrow py-20">
       <Breadcrumb
         items={[
           { label: bt("home"), href: "/" },
           { label: t("title") },
         ]}
       />
-      <h1 className="mb-4">{t("title")}</h1>
-      <p className="text-muted-foreground text-sm mb-16">{t("subtitle")}</p>
+      <div className="mb-16">
+        <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-4">
+          Info
+        </p>
+        <h1 className="mb-4">{t("title")}</h1>
+        <p className="text-muted-foreground text-sm leading-relaxed">{t("subtitle")}</p>
+      </div>
 
-      <div className="space-y-16">
+      <div className="space-y-20">
         {/* Rates */}
         <section>
           <h2 className="mb-6">{t("domestic")}</h2>

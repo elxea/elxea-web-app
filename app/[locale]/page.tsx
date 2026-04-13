@@ -5,6 +5,7 @@ import { getLocale, getTranslations } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ImageWithFallback } from "@/components/ui/image-with-fallback";
 import { getClient } from "@/sanity/lib/client";
 import { FEATURED_ARTICLES_QUERY, EVENTS_QUERY } from "@/sanity/lib/queries";
 import { ArticleCard } from "@/components/journal/article-card";
@@ -16,9 +17,10 @@ export default function HomePage() {
   return (
     <>
       {/* Hero */}
-      <section className="relative min-h-[80vh] flex items-center justify-center">
-        <Image
+      <section className="relative min-h-[90vh] flex items-center justify-center">
+        <ImageWithFallback
           src="/hero-day.jpg"
+          fallbackSrc="/placeholder-hero-day.jpg"
           alt=""
           aria-hidden="true"
           fill
@@ -26,27 +28,31 @@ export default function HomePage() {
           className="object-cover"
           sizes="100vw"
         />
-        <div className="relative text-center max-w-xl px-6">
-          <p className="text-xs text-foreground/70 uppercase tracking-[0.2em] mb-6">
+        <div className="absolute inset-0 bg-overlay" />
+        <div className="relative text-center max-w-2xl px-8">
+          <p className="text-[11px] text-overlay-foreground-muted uppercase tracking-[0.25em] mb-8">
             {t("home.tagline")}
           </p>
-          <h1 className="mb-6 text-foreground">
+          <h1 className="mb-8 text-overlay-foreground">
             Tea for Creativity.
           </h1>
-          <p className="text-foreground/70 text-sm leading-relaxed mb-10">
+          <p className="text-overlay-foreground-muted text-sm leading-relaxed mb-12 max-w-md mx-auto">
             {t("home.hero")}
           </p>
-          <Button variant="outline" asChild>
+          <Button variant="outline" className="border-overlay-border text-overlay-foreground bg-transparent hover:bg-overlay-foreground hover:text-foreground hover:border-overlay-foreground transition-colors" asChild>
             <Link href="/products">{t("common.products")}</Link>
           </Button>
         </div>
       </section>
 
       {/* Featured Products */}
-      <section className="section-wide">
-        <div className="flex items-end justify-between mb-10">
-          <h2>{t("home.featuredProducts")}</h2>
-          <Button variant="link" className="p-0 h-auto text-muted-foreground" asChild>
+      <section className="section-wide py-24">
+        <div className="flex flex-col items-center text-center mb-16">
+          <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-4">
+            Discover
+          </p>
+          <h2 className="mb-6">{t("home.featuredProducts")}</h2>
+          <Button variant="link" className="p-0 h-auto text-muted-foreground text-sm" asChild>
             <Link href="/products">{t("common.viewAll")} →</Link>
           </Button>
         </div>
@@ -56,33 +62,38 @@ export default function HomePage() {
       </section>
 
       {/* Our Story — full-width image section */}
-      <section className="relative min-h-[50vh] flex items-center justify-center">
-        <Image
+      <section className="relative min-h-[60vh] flex items-center justify-center">
+        <ImageWithFallback
           src="/hero-night.jpg"
+          fallbackSrc="/placeholder-hero-night.jpg"
           alt=""
           aria-hidden="true"
           fill
           className="object-cover"
           sizes="100vw"
         />
-        <div className="relative text-center max-w-lg px-6">
-          <p className="text-xs text-foreground/70 uppercase tracking-[0.2em] mb-4">
+        <div className="absolute inset-0 bg-overlay" />
+        <div className="relative text-center max-w-xl px-8">
+          <p className="text-[11px] text-overlay-foreground-muted uppercase tracking-[0.25em] mb-6">
             Our Story
           </p>
-          <h2 className="text-foreground mb-6">
+          <h2 className="text-overlay-foreground mb-8">
             {t("home.storyHeading")}
           </h2>
-          <Button variant="outline" asChild>
+          <Button variant="outline" className="border-overlay-border text-overlay-foreground bg-transparent hover:bg-overlay-foreground hover:text-foreground hover:border-overlay-foreground transition-colors" asChild>
             <Link href="/about">{t("common.about")}</Link>
           </Button>
         </div>
       </section>
 
       {/* Journal */}
-      <section className="section-wide">
-        <div className="flex items-end justify-between mb-10">
-          <h2>{t("home.latestJournal")}</h2>
-          <Button variant="link" className="p-0 h-auto text-muted-foreground" asChild>
+      <section className="section-wide py-24">
+        <div className="flex flex-col items-center text-center mb-16">
+          <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-4">
+            Stories
+          </p>
+          <h2 className="mb-6">{t("home.latestJournal")}</h2>
+          <Button variant="link" className="p-0 h-auto text-muted-foreground text-sm" asChild>
             <Link href="/journal">{t("common.viewAll")} →</Link>
           </Button>
         </div>
@@ -97,23 +108,25 @@ export default function HomePage() {
       </Suspense>
 
       {/* Approach — full-width image section */}
-      <section className="relative min-h-[50vh] flex items-center justify-center">
-        <Image
+      <section className="relative min-h-[60vh] flex items-center justify-center">
+        <ImageWithFallback
           src="/hero-approach.jpg"
+          fallbackSrc="/placeholder-hero-approach.jpg"
           alt=""
           aria-hidden="true"
           fill
           className="object-cover"
           sizes="100vw"
         />
-        <div className="relative text-center max-w-lg px-6">
-          <p className="text-xs text-foreground/70 uppercase tracking-[0.2em] mb-4">
+        <div className="absolute inset-0 bg-overlay" />
+        <div className="relative text-center max-w-xl px-8">
+          <p className="text-[11px] text-overlay-foreground-muted uppercase tracking-[0.25em] mb-6">
             Our Approach
           </p>
-          <h2 className="text-foreground mb-6">
+          <h2 className="text-overlay-foreground mb-8">
             {t("home.approachHeading")}
           </h2>
-          <Button variant="outline" asChild>
+          <Button variant="outline" className="border-overlay-border text-overlay-foreground bg-transparent hover:bg-overlay-foreground hover:text-foreground hover:border-overlay-foreground transition-colors" asChild>
             <Link href="/about">{t("common.about")}</Link>
           </Button>
         </div>
@@ -178,10 +191,13 @@ async function UpcomingEvents() {
     }>;
 
     return (
-      <section className="max-w-7xl mx-auto px-6 py-20">
-        <div className="flex items-end justify-between mb-10">
-          <h2>{t("home.upcomingEvents")}</h2>
-          <Button variant="link" className="p-0 h-auto text-muted-foreground" asChild>
+      <section className="max-w-7xl mx-auto px-6 py-24">
+        <div className="flex flex-col items-center text-center mb-16">
+          <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-4">
+            Upcoming
+          </p>
+          <h2 className="mb-6">{t("home.upcomingEvents")}</h2>
+          <Button variant="link" className="p-0 h-auto text-muted-foreground text-sm" asChild>
             <Link href="/events">{t("common.viewAll")} →</Link>
           </Button>
         </div>

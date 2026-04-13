@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/farmer-notification",
       "schedule": "0 1 * * *"
+    },
+    {
+      "path": "/api/cron/webhook-logs-cleanup",
+      "schedule": "0 18 * * *"
     }
   ]
 }

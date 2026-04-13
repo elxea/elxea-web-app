@@ -43,13 +43,20 @@ export async function GET() {
 
   const redirectUri = `${baseUrl}/api/line-callback`;
 
+  // Note: bot_prompt=aggressive removed 2026-04-13. The production LINE Official
+  // Account (@307tzhkw) is owned under a different LINE Developers Console
+  // provider (channel 2008324925, 404 from setaka-on@elxea.com). Linked OA on
+  // the elxea provider's LINE Login channel can only point to the test OA
+  // (@426vlcyb), which is wrong for production users. Until the channel
+  // ownership is reconciled, login proceeds without the friend-add prompt.
+  // Restore bot_prompt: "aggressive" once the production OA's channel can be
+  // linked to this LINE Login channel.
   const params = new URLSearchParams({
     response_type: "code",
     client_id: channelId,
     redirect_uri: redirectUri,
     state: state,
     scope: "profile openid email",
-    bot_prompt: "aggressive",
     prompt: "consent", // Always show consent screen to ensure fresh token exchange
   });
 

@@ -29,9 +29,9 @@ export default async function LoginPage() {
   const locale = await getLocale();
 
   return (
-    <div className="flex min-h-[60vh] items-center justify-center px-4 py-16">
+    <div className="min-h-[70vh] flex items-center justify-center px-4 py-24">
       <div className="w-full max-w-sm space-y-8">
-        {/* P2-fix: Error banner for failed authentication attempts */}
+        {/* Error banner for failed authentication attempts */}
         <Suspense fallback={null}>
           <AuthErrorBanner />
         </Suspense>
@@ -42,11 +42,12 @@ export default async function LoginPage() {
         </Suspense>
 
         {/* Heading */}
-        <div className="text-center space-y-2">
-          <h1 className="font-heading text-2xl tracking-tight">
-            {t("heading")}
-          </h1>
-          <p className="text-sm text-muted-foreground">
+        <div className="text-center space-y-4">
+          <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em]">
+            Account
+          </p>
+          <h1 className="text-2xl font-normal">{t("heading")}</h1>
+          <p className="text-sm text-muted-foreground leading-relaxed">
             {t("description")}
           </p>
         </div>

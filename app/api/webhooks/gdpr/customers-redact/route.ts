@@ -155,12 +155,17 @@ export async function POST(request: NextRequest) {
     // Record successful processing for idempotency. Only reached when all
     // deletions succeeded.
     if (webhookId) {
+      const { Timestamp } = await import("firebase-admin/firestore");
       await db.collection("_webhookLogs").doc(webhookId).set({
         topic,
         source: "shopify",
         kind: "customers/redact",
         customerId,
         processedAt: FieldValue.serverTimestamp(),
+        // TTL: 7 days. Dedup log is GC'd by Firestore TTL policy.
+        ttl: Timestamp.fromDate(
+          new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        ),
       });
     }
   } catch (error) {

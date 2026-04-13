@@ -27,7 +27,7 @@ export default async function FAQPage() {
   ];
 
   return (
-    <div className="section-narrow">
+    <div className="section-narrow py-20">
       <FAQJsonLd questions={questions} />
       <Breadcrumb
         items={[
@@ -35,21 +35,23 @@ export default async function FAQPage() {
           { label: t("title") },
         ]}
       />
-      <h1 className="mb-4">{t("title")}</h1>
-      <p className="text-muted-foreground text-sm mb-16">{t("subtitle")}</p>
+      <div className="mb-16">
+        <h1 className="mb-4">{t("title")}</h1>
+        <p className="text-muted-foreground text-sm leading-relaxed">{t("subtitle")}</p>
+      </div>
 
       <div className="divide-y divide-border">
         {questions.map((q, i) => (
           <details key={i} className="group py-6">
             <summary className="flex items-center justify-between cursor-pointer list-none">
-              <span className="text-sm text-foreground font-medium pr-4">
+              <span className="text-sm font-medium leading-relaxed pr-4">
                 {q.question}
               </span>
               <span className="text-muted-foreground text-lg shrink-0 group-open:rotate-45 transition-transform">
                 +
               </span>
             </summary>
-            <p className="text-sm text-muted-foreground leading-relaxed mt-4 pr-8">
+            <p className="text-[13px] text-muted-foreground leading-relaxed mt-4 pr-8">
               {q.answer}
             </p>
           </details>

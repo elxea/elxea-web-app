@@ -16,6 +16,7 @@ import {
   enforceRateLimit,
   getClientIp,
   limiters,
+  millisecondsToDuration,
   type Ratelimiter,
 } from "@/lib/ratelimit";
 
@@ -165,5 +166,43 @@ describe("exported limiter presets", () => {
     expect(limiters.contactForm.windowMs).toBe(60 * 60 * 1000);
     expect(limiters.publicRead.limit).toBe(300);
     expect(limiters.publicRead.windowMs).toBe(60 * 1000);
+  });
+
+  it("routes authedUser and contactForm through upstash, publicRead through memory", () => {
+    expect(limiters.authedUser.backend).toBe("upstash");
+    expect(limiters.contactForm.backend).toBe("upstash");
+    expect(limiters.publicRead.backend).toBe("memory");
+  });
+});
+
+describe("millisecondsToDuration", () => {
+  it("converts whole days to d", () => {
+    expect(millisecondsToDuration(24 * 60 * 60 * 1000)).toBe("1 d");
+    expect(millisecondsToDuration(2 * 24 * 60 * 60 * 1000)).toBe("2 d");
+  });
+
+  it("converts whole hours to h", () => {
+    expect(millisecondsToDuration(60 * 60 * 1000)).toBe("1 h");
+    expect(millisecondsToDuration(12 * 60 * 60 * 1000)).toBe("12 h");
+  });
+
+  it("converts whole minutes to m", () => {
+    expect(millisecondsToDuration(60 * 1000)).toBe("1 m");
+    expect(millisecondsToDuration(5 * 60 * 1000)).toBe("5 m");
+  });
+
+  it("converts residual seconds to s", () => {
+    expect(millisecondsToDuration(30 * 1000)).toBe("30 s");
+    expect(millisecondsToDuration(90 * 1000)).toBe("90 s");
+  });
+
+  it("throws on sub-second windows to prevent silent window expansion", () => {
+    expect(() => millisecondsToDuration(500)).toThrow(/windowMs must be >= 1000/);
+    expect(() => millisecondsToDuration(0)).toThrow();
+    expect(() => millisecondsToDuration(999)).toThrow();
+  });
+
+  it("accepts exactly 1 second", () => {
+    expect(millisecondsToDuration(1000)).toBe("1 s");
   });
 });

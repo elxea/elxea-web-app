@@ -56,14 +56,17 @@ export default async function MembershipPage() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-6 py-16">
+    <div className="section-narrow py-20">
       <div className="text-center mb-16">
-        <h1 className="text-2xl mb-3">{t("title")}</h1>
-        <p className="text-sm text-muted-foreground">{t("description")}</p>
+        <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-4">
+          Plans
+        </p>
+        <h1 className="mb-6">{t("title")}</h1>
+        <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl mx-auto">{t("description")}</p>
       </div>
 
       {/* Plan cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
         {TIERS.map((tier) => {
           const config = tierConfig[tier];
           const isCurrent = tier === currentTier;

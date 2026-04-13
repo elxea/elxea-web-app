@@ -26,11 +26,11 @@ export default async function SearchPage({
   }
 
   return (
-    <div className="section-wide">
+    <div className="section-wide py-20">
       <SearchForm initialQuery={q || ""} />
 
       {q && results && (
-        <div className="mt-12">
+        <div className="mt-16">
           <p className="text-sm text-muted-foreground mb-8">
             {t("results", { count: results.totalCount })}
           </p>

@@ -94,7 +94,7 @@ export function LineLoginButton({
     <Button
       asChild
       size="lg"
-      className="w-full bg-[#06C755] text-white hover:bg-[#06C755]/90 active:bg-[#06C755]/80"
+      className="w-full bg-brand-line text-brand-white hover:bg-brand-line/90 active:bg-brand-line/80"
     >
       {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- Intentional: <a> with external href required for Universal Links to open LINE app. Must NOT be <Link>. */}
       <a href={authUrl} onClick={handleClick}>
