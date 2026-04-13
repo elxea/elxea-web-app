@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import Image from "next/image";
 import { useTranslations } from "next-intl";
 import { getLocale, getTranslations } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
