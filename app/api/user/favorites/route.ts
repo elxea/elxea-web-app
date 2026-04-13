@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { requireAuth } from "@/lib/firebase/auth-guard";
 import {
   addFavorite,
@@ -7,6 +8,22 @@ import {
   isFavorited,
 } from "@/lib/firebase/server-actions";
 import type { FavoriteType } from "@/lib/firebase/types";
+import { parseJsonBody } from "@/lib/validation/zod-helpers";
+import { enforceRateLimit, limiters } from "@/lib/ratelimit";
+
+const FavoriteTypeSchema = z.enum(["product", "article"]);
+
+const PostFavoriteSchema = z.object({
+  type: FavoriteTypeSchema,
+  targetId: z.string().min(1).max(200),
+  title: z.string().min(1).max(500),
+  imageUrl: z.string().url().max(2048).nullish(),
+});
+
+const DeleteFavoriteSchema = z.object({
+  type: FavoriteTypeSchema,
+  targetId: z.string().min(1).max(200),
+});
 
 /**
  * GET /api/user/favorites
@@ -18,6 +35,9 @@ export async function GET(request: NextRequest) {
     if (!auth.authenticated) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
+
+    const limited = await enforceRateLimit(request, limiters.authedUser, auth.customerId);
+    if (limited) return limited;
 
     const { searchParams } = request.nextUrl;
     const checkTarget = searchParams.get("check");
@@ -35,10 +55,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ favorites });
   } catch (err) {
     console.error("[GET /api/user/favorites]", err);
-    return NextResponse.json(
-      { error: "Internal server error", detail: err instanceof Error ? err.message : String(err) },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
 
@@ -53,37 +70,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
 
-    const body = await request.json();
-    const { type, targetId, title, imageUrl } = body;
+    const limited = await enforceRateLimit(request, limiters.authedUser, auth.customerId);
+    if (limited) return limited;
 
-    if (!type || !targetId || !title) {
-      return NextResponse.json(
-        { error: "Missing required fields: type, targetId, title" },
-        { status: 400 }
-      );
-    }
-
-    if (type !== "product" && type !== "article") {
-      return NextResponse.json(
-        { error: "Invalid type. Must be 'product' or 'article'" },
-        { status: 400 }
-      );
-    }
+    const parsed = await parseJsonBody(request, PostFavoriteSchema);
+    if (!parsed.ok) return parsed.response;
 
     const result = await addFavorite(auth.customerId, {
-      type,
-      targetId,
-      title,
-      imageUrl: imageUrl ?? null,
+      type: parsed.data.type,
+      targetId: parsed.data.targetId,
+      title: parsed.data.title,
+      imageUrl: parsed.data.imageUrl ?? null,
     });
 
     return NextResponse.json(result);
   } catch (err) {
     console.error("[POST /api/user/favorites]", err);
-    return NextResponse.json(
-      { error: "Internal server error", detail: err instanceof Error ? err.message : String(err) },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
 
@@ -98,23 +101,20 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
 
-    const body = await request.json();
-    const { type, targetId } = body;
+    const limited = await enforceRateLimit(request, limiters.authedUser, auth.customerId);
+    if (limited) return limited;
 
-    if (!type || !targetId) {
-      return NextResponse.json(
-        { error: "Missing required fields: type, targetId" },
-        { status: 400 }
-      );
-    }
+    const parsed = await parseJsonBody(request, DeleteFavoriteSchema);
+    if (!parsed.ok) return parsed.response;
 
-    const result = await removeFavorite(auth.customerId, type, targetId);
+    const result = await removeFavorite(
+      auth.customerId,
+      parsed.data.type,
+      parsed.data.targetId
+    );
     return NextResponse.json(result);
   } catch (err) {
     console.error("[DELETE /api/user/favorites]", err);
-    return NextResponse.json(
-      { error: "Internal server error", detail: err instanceof Error ? err.message : String(err) },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

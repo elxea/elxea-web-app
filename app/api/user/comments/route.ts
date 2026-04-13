@@ -1,52 +1,84 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { requireAuth } from "@/lib/firebase/auth-guard";
 import {
   addComment,
   getComments,
   deleteComment,
+  getCommentById,
 } from "@/lib/firebase/server-actions";
 import type { CommentTargetType } from "@/lib/firebase/types";
+import { parseJsonBody, formatZodError } from "@/lib/validation/zod-helpers";
+import { enforceRateLimit, limiters, getClientIp } from "@/lib/ratelimit";
 
-/**
- * GET /api/user/comments
- * Query params: targetType (article|farmer) & targetId (required)
- */
+// ---------------------------------------------------------------------------
+// Schemas
+// ---------------------------------------------------------------------------
+
+const TargetTypeSchema = z.enum(["article", "farmer"]);
+
+const PostCommentSchema = z.object({
+  targetType: TargetTypeSchema,
+  targetId: z.string().min(1).max(200),
+  body: z.string().min(1).max(2000),
+});
+
+const DeleteCommentSchema = z.object({
+  commentId: z.string().min(1).max(200),
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/user/comments
+// Query params: targetType (article|farmer) & targetId (required)
+// ---------------------------------------------------------------------------
+
 export async function GET(request: NextRequest) {
+  // Public endpoint — rate limit by client IP.
+  const limited = await enforceRateLimit(request, limiters.publicRead, getClientIp(request));
+  if (limited) return limited;
+
   const { searchParams } = request.nextUrl;
-  const targetType = searchParams.get("targetType") as CommentTargetType | null;
+  const targetTypeRaw = searchParams.get("targetType");
   const targetId = searchParams.get("targetId");
-  const limit = parseInt(searchParams.get("limit") ?? "50", 10);
+  const limitRaw = searchParams.get("limit") ?? "50";
 
-  if (!targetType || !targetId) {
-    return NextResponse.json(
-      { error: "Missing required params: targetType, targetId" },
-      { status: 400 }
-    );
-  }
+  const parsed = z
+    .object({
+      targetType: TargetTypeSchema,
+      targetId: z.string().min(1).max(200),
+      limit: z.coerce.number().int().min(1).max(100).default(50),
+    })
+    .safeParse({
+      targetType: targetTypeRaw,
+      targetId,
+      limit: limitRaw,
+    });
 
-  if (targetType !== "article" && targetType !== "farmer") {
+  if (!parsed.success) {
     return NextResponse.json(
-      { error: "Invalid targetType. Must be 'article' or 'farmer'" },
+      { error: "Invalid query parameters", details: formatZodError(parsed.error) },
       { status: 400 }
     );
   }
 
   try {
-    const comments = await getComments(targetType, targetId, limit);
+    const comments = await getComments(
+      parsed.data.targetType as CommentTargetType,
+      parsed.data.targetId,
+      parsed.data.limit
+    );
     return NextResponse.json({ comments });
   } catch (err) {
     console.error("[GET /api/user/comments]", err);
-    return NextResponse.json(
-      { error: "Internal server error", detail: err instanceof Error ? err.message : String(err) },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
 
-/**
- * POST /api/user/comments
- * Body: { targetType, targetId, body }
- */
+// ---------------------------------------------------------------------------
+// POST /api/user/comments
+// Body: { targetType, targetId, body }
+// ---------------------------------------------------------------------------
+
 export async function POST(request: NextRequest) {
   try {
     const auth = await requireAuth();
@@ -54,28 +86,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
 
-    const reqBody = await request.json();
-    const { targetType, targetId, body } = reqBody;
+    const limited = await enforceRateLimit(request, limiters.authedUser, auth.customerId);
+    if (limited) return limited;
 
-    if (!targetType || !targetId || !body) {
-      return NextResponse.json(
-        { error: "Missing required fields: targetType, targetId, body" },
-        { status: 400 }
-      );
-    }
-
-    if (targetType !== "article" && targetType !== "farmer") {
-      return NextResponse.json(
-        { error: "Invalid targetType. Must be 'article' or 'farmer'" },
-        { status: 400 }
-      );
-    }
+    const parsed = await parseJsonBody(request, PostCommentSchema);
+    if (!parsed.ok) return parsed.response;
 
     const result = await addComment(auth.customerId, {
-      targetType,
-      targetId,
+      targetType: parsed.data.targetType,
+      targetId: parsed.data.targetId,
       authorName: auth.customerName,
-      body,
+      body: parsed.data.body,
     });
 
     if (!result.success) {
@@ -85,17 +106,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(result);
   } catch (err) {
     console.error("[POST /api/user/comments]", err);
-    return NextResponse.json(
-      { error: "Internal server error", detail: err instanceof Error ? err.message : String(err) },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
 
-/**
- * DELETE /api/user/comments
- * Body: { commentId }
- */
+// ---------------------------------------------------------------------------
+// DELETE /api/user/comments
+// Body: { commentId }
+// ---------------------------------------------------------------------------
+
 export async function DELETE(request: NextRequest) {
   try {
     const auth = await requireAuth();
@@ -103,17 +122,27 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
 
-    const reqBody = await request.json();
-    const { commentId } = reqBody;
+    const limited = await enforceRateLimit(request, limiters.authedUser, auth.customerId);
+    if (limited) return limited;
 
-    if (!commentId) {
+    const parsed = await parseJsonBody(request, DeleteCommentSchema);
+    if (!parsed.ok) return parsed.response;
+
+    // Explicit BOLA check: fetch the comment and verify authorship BEFORE
+    // calling deleteComment. Defense-in-depth on top of the check inside
+    // deleteComment itself.
+    const comment = await getCommentById(parsed.data.commentId);
+    if (!comment) {
+      return NextResponse.json({ error: "Comment not found" }, { status: 404 });
+    }
+    if (comment.authorId !== auth.customerId) {
       return NextResponse.json(
-        { error: "Missing required field: commentId" },
-        { status: 400 }
+        { error: "Not authorized to delete this comment" },
+        { status: 403 }
       );
     }
 
-    const result = await deleteComment(auth.customerId, commentId);
+    const result = await deleteComment(auth.customerId, parsed.data.commentId);
 
     if (!result.success) {
       return NextResponse.json(
@@ -125,9 +154,6 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json(result);
   } catch (err) {
     console.error("[DELETE /api/user/comments]", err);
-    return NextResponse.json(
-      { error: "Internal server error", detail: err instanceof Error ? err.message : String(err) },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

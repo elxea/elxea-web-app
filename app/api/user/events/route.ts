@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { requireAuth } from "@/lib/firebase/auth-guard";
 import {
   registerForEvent,
@@ -6,6 +7,43 @@ import {
   getEventRegistrations,
   isRegisteredForEvent,
 } from "@/lib/firebase/server-actions";
+import { parseJsonBody } from "@/lib/validation/zod-helpers";
+import { enforceRateLimit, limiters } from "@/lib/ratelimit";
+
+const SlugSchema = z
+  .string()
+  .min(1)
+  .max(200)
+  .regex(/^[a-zA-Z0-9][a-zA-Z0-9\-_]*$/, "Invalid slug format");
+
+// eventDate is either:
+//   - a full ISO-8601 datetime string, OR
+//   - a short calendar-day token (e.g. "2026-05-01" or "2026/05/01"), OR
+//   - null
+// Both shapes are explicitly allowed; unknown formats are rejected.
+const EventDateSchema = z
+  .union([
+    z.string().datetime(),
+    z
+      .string()
+      .regex(
+        /^\d{4}[-/]\d{1,2}[-/]\d{1,2}$/,
+        "eventDate must be ISO datetime or YYYY-MM-DD date"
+      )
+      .max(50),
+  ])
+  .nullish();
+
+const PostEventSchema = z.object({
+  eventSlug: SlugSchema,
+  eventTitle: z.string().min(1).max(300),
+  eventDate: EventDateSchema,
+  eventImageUrl: z.string().url().max(2048).nullish(),
+});
+
+const DeleteEventSchema = z.object({
+  eventSlug: SlugSchema,
+});
 
 /**
  * GET /api/user/events
@@ -17,6 +55,9 @@ export async function GET(request: NextRequest) {
     if (!auth.authenticated) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
+
+    const limited = await enforceRateLimit(request, limiters.authedUser, auth.customerId);
+    if (limited) return limited;
 
     const { searchParams } = request.nextUrl;
     const checkSlug = searchParams.get("check");
@@ -30,10 +71,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ registrations });
   } catch (err) {
     console.error("[GET /api/user/events]", err);
-    return NextResponse.json(
-      { error: "Internal server error", detail: err instanceof Error ? err.message : String(err) },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
 
@@ -48,30 +86,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
 
-    const body = await request.json();
-    const { eventSlug, eventTitle, eventDate, eventImageUrl } = body;
+    const limited = await enforceRateLimit(request, limiters.authedUser, auth.customerId);
+    if (limited) return limited;
 
-    if (!eventSlug || !eventTitle) {
-      return NextResponse.json(
-        { error: "Missing required fields: eventSlug, eventTitle" },
-        { status: 400 }
-      );
-    }
+    const parsed = await parseJsonBody(request, PostEventSchema);
+    if (!parsed.ok) return parsed.response;
 
     const result = await registerForEvent(auth.customerId, {
-      eventSlug,
-      eventTitle,
-      eventDate: eventDate ?? null,
-      eventImageUrl: eventImageUrl ?? null,
+      eventSlug: parsed.data.eventSlug,
+      eventTitle: parsed.data.eventTitle,
+      eventDate: parsed.data.eventDate ?? null,
+      eventImageUrl: parsed.data.eventImageUrl ?? null,
     });
 
     return NextResponse.json(result);
   } catch (err) {
     console.error("[POST /api/user/events]", err);
-    return NextResponse.json(
-      { error: "Internal server error", detail: err instanceof Error ? err.message : String(err) },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
 
@@ -86,23 +117,19 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
 
-    const body = await request.json();
-    const { eventSlug } = body;
+    const limited = await enforceRateLimit(request, limiters.authedUser, auth.customerId);
+    if (limited) return limited;
 
-    if (!eventSlug) {
-      return NextResponse.json(
-        { error: "Missing required field: eventSlug" },
-        { status: 400 }
-      );
-    }
+    const parsed = await parseJsonBody(request, DeleteEventSchema);
+    if (!parsed.ok) return parsed.response;
 
-    const result = await cancelEventRegistration(auth.customerId, eventSlug);
+    const result = await cancelEventRegistration(
+      auth.customerId,
+      parsed.data.eventSlug
+    );
     return NextResponse.json(result);
   } catch (err) {
     console.error("[DELETE /api/user/events]", err);
-    return NextResponse.json(
-      { error: "Internal server error", detail: err instanceof Error ? err.message : String(err) },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
