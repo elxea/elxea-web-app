@@ -46,11 +46,13 @@ export function buildAuthorizeUrl({
   state,
   nonce,
   codeChallenge,
+  prompt,
 }: {
   redirectUri: string;
   state: string;
   nonce: string;
   codeChallenge: string;
+  prompt?: "login" | "none" | "consent" | "select_account";
 }): string {
   const params = new URLSearchParams({
     client_id: CLIENT_ID,
@@ -62,7 +64,42 @@ export function buildAuthorizeUrl({
     code_challenge: codeChallenge,
     code_challenge_method: "S256",
   });
+  // Fix (shared PC / account switching): force re-authentication at IdP.
+  // Without this, Shopify SSO cookie silently re-authenticates the previous user
+  // on the next login attempt, making it impossible to switch accounts or
+  // leaking the previous user's session on shared devices.
+  // Ref: RFC 6749 §4.1.1, OIDC Core 1.0 §3.1.2.1
+  if (prompt) {
+    params.set("prompt", prompt);
+  }
   return `${AUTHORIZE_URL}?${params.toString()}`;
+}
+
+/**
+ * Build the Shopify Customer Account API RP-initiated logout URL.
+ *
+ * Calling this endpoint clears the Shopify-side SSO session so the next
+ * authorize request actually prompts for credentials. Without this, logging
+ * out of our site alone leaves Shopify's session cookie intact and the next
+ * login silently re-authenticates the previous user.
+ *
+ * Ref: OpenID Connect RP-Initiated Logout 1.0
+ * https://openid.net/specs/openid-connect-rpinitiated-1_0.html
+ */
+export function buildLogoutUrl({
+  idTokenHint,
+  postLogoutRedirectUri,
+}: {
+  idTokenHint?: string;
+  postLogoutRedirectUri: string;
+}): string {
+  const params = new URLSearchParams({
+    post_logout_redirect_uri: postLogoutRedirectUri,
+  });
+  if (idTokenHint) {
+    params.set("id_token_hint", idTokenHint);
+  }
+  return `${LOGOUT_URL}?${params.toString()}`;
 }
 
 // --- Token exchange ---

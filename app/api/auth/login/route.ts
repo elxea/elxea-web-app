@@ -22,6 +22,12 @@ export async function GET(request: NextRequest) {
     state,
     nonce,
     codeChallenge,
+    // Force Shopify to show its login form every time instead of silently
+    // re-authenticating via its SSO cookie. This is required for shared
+    // devices and account switching: without prompt=login, a user who
+    // logged out of elxea but still has a Shopify SSO cookie would be
+    // instantly logged back in as the previous account.
+    prompt: "login",
   });
 
   const response = NextResponse.redirect(authorizeUrl);
