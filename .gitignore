@@ -26,6 +26,9 @@ node_modules
 .DS_Store
 *.pem
 
+# phase A run artifacts (local-only, never commit)
+.phase-a-*
+
 # debug
 npm-debug.log*
 yarn-debug.log*
