@@ -23,11 +23,19 @@ elxea EC サイト（Next.js ヘッドレスコマース）のプロジェクト
 
 ## デザインシステム方針
 
-### 原則: コードファースト
+### 原則: SoT は対象テンプレートによって分離
 
-Figma は探索・スケッチ用。**コードがソース・オブ・トゥルース**。デザイントークン・コンポーネントの正規定義はすべてコード側に置き、Figma はそれを参照する構造にする。
+デザインシステムの Source of Truth (SoT) は一律ではなく、テンプレートの優先度に応じて段階的に移行する。
 
-根拠: Shopify Polaris ですら Figma 起点のガバナンスで1年で14%のUIドリフトが発生（Builder.io 調査）。小規模チームでは Figma とコードの二重管理は維持不可能。
+| 対象 | SoT | 運用方針 |
+|---|---|---|
+| Critical 2 テンプレート (商品詳細 + 購入フロー) | **Figma = SoT (新 DS)** | dogfood Spec section 3 の方針逆転を適用。Figma の変数・コンポーネントを正規定義とし、コードはそれに追従する |
+| 他テンプレート（凍結期間中） | **Code = SoT (既存 DS)** | 凍結期間中は現行コード定義を維持。変更は最小限 |
+| 段階移行 | 別タスクで策定 | dogfood Phase B 完了後に全テンプレートの Figma=SoT 化を検討 |
+
+関連ドキュメント:
+- dogfood Spec: https://www.notion.so/36970c9d064c8166b31ef4be3b60a8c5
+- Decision Log: https://www.notion.so/36970c9d064c818ab8e9f9a16b37e2a1
 
 ### Design Token アーキテクチャ
 
