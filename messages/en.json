@@ -88,7 +88,21 @@
   },
   "search": {
     "results": "{count} results",
-    "loadError": "Search failed."
+    "loadError": "Search failed.",
+    "emptyZeroTitle": "No products found for \"{query}\"",
+    "emptyZeroHintsLabel": "Search tips",
+    "emptyZeroHint1": "Try different keywords",
+    "emptyZeroHint2": "Use more general terms",
+    "emptyZeroHint3": "Check the spelling",
+    "emptyNoQueryTitle": "What are you looking for?",
+    "emptyNoQueryDescription": "Search by product name, flavor, or origin.",
+    "popularKeywordsLabel": "Popular keywords",
+    "popularKeyword1": "Herbal tea",
+    "popularKeyword2": "Blend",
+    "popularKeyword3": "Single origin",
+    "browseLabel": "Other ways to browse",
+    "browseAllProducts": "Browse all products",
+    "browseCollections": "View collections"
   },
   "journal": {
     "title": "Journal",

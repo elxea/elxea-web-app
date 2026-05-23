@@ -88,7 +88,21 @@
   },
   "search": {
     "results": "{count} 件の結果",
-    "loadError": "検索できませんでした。"
+    "loadError": "検索できませんでした。",
+    "emptyZeroTitle": "「{query}」に一致する商品が見つかりませんでした",
+    "emptyZeroHintsLabel": "検索のヒント",
+    "emptyZeroHint1": "別のキーワードで試す",
+    "emptyZeroHint2": "より一般的な言葉を使う",
+    "emptyZeroHint3": "スペルを確認する",
+    "emptyNoQueryTitle": "何をお探しですか？",
+    "emptyNoQueryDescription": "商品名、フレーバー、生産地などで検索できます。",
+    "popularKeywordsLabel": "人気のキーワード",
+    "popularKeyword1": "ハーブティー",
+    "popularKeyword2": "ブレンド",
+    "popularKeyword3": "シングルオリジン",
+    "browseLabel": "他の探し方",
+    "browseAllProducts": "商品一覧をすべて見る",
+    "browseCollections": "コレクション一覧"
   },
   "journal": {
     "title": "ジャーナル",
