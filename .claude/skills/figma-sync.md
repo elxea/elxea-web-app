@@ -26,7 +26,7 @@ tokens/base.json  ←──────  Figma Variables
 ## Figma API 設定
 
 - **トークン**: `.env.local` の `FIGMA_PERSONAL_ACCESS_TOKEN`
-- **ファイルキー**: `AWLnI0XF07e8rScuxPYPc7`（elxea Design System / 正本ファイル。旧 `alDl0i3hZvRlqCxH9Li5Q4` は使用しない）
+- **ファイルキー**: `alDl0i3hZvRlqCxH9Li5Q4`（elxea Design System）
 - **チーム ID**: `1449034364656814551`（CIRCL）
 - **有効期限**: 2026/6/17（90日、再発行が必要）
 - **スコープ**: file_content:read, file_metadata:read, file_versions:read, library_assets:read, library_content:read, team_library_content:read

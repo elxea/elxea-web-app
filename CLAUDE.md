@@ -47,12 +47,6 @@ Figma は探索・スケッチ用。**コードがソース・オブ・トゥル
 - 色は OKLCH カラースペースで統一（知覚的均一性）
 - フォントは `--font-sans`（本文）/ `--font-heading`（見出し）の2系統。追加する場合は `@theme` に定義
 
-### Figma 正本ファイルと SoT 方針（案 B）
-
-- **Figma 正本ファイルキー = `AWLnI0XF07e8rScuxPYPc7`**（旧 `alDl0i3hZvRlqCxH9Li5Q4` は使用しない）。`scripts/design-system/sync-figma-read.ts` の `DEFAULT_FILE_KEY` および `.claude/skills/figma-sync.md` と一致させる。
-- **SoT 方針（案 B）**: トークン値の正本は Code（`tokens/elxea-custom.json` + `base.json` / `globals.css` の `@theme`）。Figma は参照用であり、値の二重管理はしない。
-- **Code Connect は現状不採用**: Figma Organization プラン必須のため、当面は採用しない（コード→Figma の同期は Variable Rebinder プラグインで運用）。
-
 ### コンポーネントシステム: shadcn/ui
 
 **shadcn/ui（new-york スタイル）を公式コンポーネント基盤とする。**
