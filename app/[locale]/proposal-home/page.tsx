@@ -6,7 +6,7 @@
  *
  * Purpose: convey the *intent* of a re-built Top page at low fidelity.
  *   - Real DS tokens (color/typography/spacing/radius from tokens/base.json)
- *   - Real shadcn primitives (Button, Badge, Separator, AspectRatio)
+ * *   - Real shadcn primitives (Button, Badge, AspectRatio)
  *   - Grey placeholder blocks stand in for photography / product imagery
  *   - Placeholder copy in elxea External Voice register
  *
