@@ -17,7 +17,9 @@ import { resolve } from "node:path";
 // Config
 // ---------------------------------------------------------------------------
 
-const DEFAULT_FILE_KEY = "alDl0i3hZvRlqCxH9Li5Q4";
+// elxea Design System 正本ファイル (Setaka 承認済, Decision Log 36f70c9d)。
+// 旧ファイル alDl0i3hZvRlqCxH9Li5Q4 は使用しない。
+const DEFAULT_FILE_KEY = "AWLnI0XF07e8rScuxPYPc7";
 const FIGMA_API_BASE = "https://api.figma.com";
 
 // ---------------------------------------------------------------------------
