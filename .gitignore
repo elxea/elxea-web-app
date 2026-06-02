@@ -81,3 +81,6 @@ build-storybook.log
 # cloudflare workers
 workers/*/.wrangler/
 .next-backup/
+
+# local-only scratch / one-off recheck scripts (live in /tmp, never committed)
+.phase-*
