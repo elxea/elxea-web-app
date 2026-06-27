@@ -1,0 +1,11 @@
+name: Central CI
+on:
+  push:
+    branches: [docs/figma-first-sot-20260529]
+  workflow_dispatch:
+jobs:
+  ci:
+    uses: elxea/.github/.github/workflows/ci.yml@main
+    with:
+      stack: lite
+      package_manager: pnpm
