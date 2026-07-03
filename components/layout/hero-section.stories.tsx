@@ -1,0 +1,185 @@
+/**
+ * HeroSection Stories
+ *
+ * Covers all 12 Variant: Bg (cream/sand/white/dark) × Size (L/M/S)
+ * Figma: https://www.figma.com/design/AWLnI0XF07e8rScuxPYPc7/?node-id=5162-122
+ */
+
+import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { HeroSection } from "./hero-section";
+
+const meta = {
+  title: "elxea/Business/HeroSection",
+  component: HeroSection,
+  parameters: {
+    layout: "fullscreen",
+    nextjs: { appDirectory: true },
+    docs: {
+      description: {
+        component:
+          "Full-width hero section. 12 variants: Bg (cream/sand/white/dark) × Size (L/M/S). All colors and spacing via design tokens.",
+      },
+    },
+  },
+  argTypes: {
+    bg: {
+      control: "select",
+      options: ["cream", "sand", "white", "dark"],
+      description: "Background color variant (binds to color.brand.* tokens)",
+    },
+    size: {
+      control: "select",
+      options: ["L", "M", "S"],
+      description: "Size variant — controls padding, container width, and typography scale",
+    },
+    align: {
+      control: "radio",
+      options: ["center", "left"],
+    },
+    title: { control: "text" },
+    eyebrow: { control: "text" },
+    description: { control: "text" },
+    ctaLabel: { control: "text" },
+    ctaSecondaryLabel: { control: "text" },
+  },
+  args: {
+    title: "Tea for Creativity.",
+    eyebrow: "Specialty Tea",
+    description: "Discover single-origin teas from Japan's finest small farms.",
+    ctaLabel: "Shop Now",
+    ctaHref: "/products",
+    ctaSecondaryLabel: "Learn More",
+    ctaSecondaryHref: "/about",
+    align: "center",
+  },
+} satisfies Meta<typeof HeroSection>;
+
+export default meta;
+type Story = StoryObj<typeof meta>;
+
+// ── Cream × L ──────────────────────────────────────────────────────────────
+export const CreamL: Story = {
+  name: "Cream / L",
+  args: { bg: "cream", size: "L" },
+};
+
+// ── Cream × M ──────────────────────────────────────────────────────────────
+export const CreamM: Story = {
+  name: "Cream / M",
+  args: { bg: "cream", size: "M" },
+};
+
+// ── Cream × S ──────────────────────────────────────────────────────────────
+export const CreamS: Story = {
+  name: "Cream / S",
+  args: { bg: "cream", size: "S" },
+};
+
+// ── Sand × L ───────────────────────────────────────────────────────────────
+export const SandL: Story = {
+  name: "Sand / L",
+  args: { bg: "sand", size: "L" },
+};
+
+// ── Sand × M ───────────────────────────────────────────────────────────────
+export const SandM: Story = {
+  name: "Sand / M",
+  args: { bg: "sand", size: "M" },
+};
+
+// ── Sand × S ───────────────────────────────────────────────────────────────
+export const SandS: Story = {
+  name: "Sand / S",
+  args: { bg: "sand", size: "S" },
+};
+
+// ── White × L ──────────────────────────────────────────────────────────────
+export const WhiteL: Story = {
+  name: "White / L",
+  args: { bg: "white", size: "L" },
+};
+
+// ── White × M ──────────────────────────────────────────────────────────────
+export const WhiteM: Story = {
+  name: "White / M",
+  args: { bg: "white", size: "M" },
+};
+
+// ── White × S ──────────────────────────────────────────────────────────────
+export const WhiteS: Story = {
+  name: "White / S",
+  args: { bg: "white", size: "S" },
+};
+
+// ── Dark × L ───────────────────────────────────────────────────────────────
+export const DarkL: Story = {
+  name: "Dark / L",
+  args: { bg: "dark", size: "L" },
+};
+
+// ── Dark × M ───────────────────────────────────────────────────────────────
+export const DarkM: Story = {
+  name: "Dark / M",
+  args: { bg: "dark", size: "M" },
+};
+
+// ── Dark × S ───────────────────────────────────────────────────────────────
+export const DarkS: Story = {
+  name: "Dark / S",
+  args: { bg: "dark", size: "S" },
+};
+
+// ── Alignment: Left ────────────────────────────────────────────────────────
+export const AlignLeft: Story = {
+  name: "Align Left / Cream L",
+  args: { bg: "cream", size: "L", align: "left" },
+};
+
+// ── Image Background ───────────────────────────────────────────────────────
+export const WithImage: Story = {
+  name: "With Background Image",
+  args: {
+    bg: "dark",
+    size: "L",
+    imageSrc: "/placeholder-hero-day.jpg",
+    imageAlt: "",
+    title: "Crafted with Care.",
+    description: "Single-origin teas from Japan's finest farms.",
+    ctaLabel: "Explore",
+    ctaHref: "/products",
+  },
+};
+
+// ── No CTA ─────────────────────────────────────────────────────────────────
+export const NoCTA: Story = {
+  name: "No CTA / Sand M",
+  args: {
+    bg: "sand",
+    size: "M",
+    ctaLabel: undefined,
+    ctaSecondaryLabel: undefined,
+  },
+};
+
+// ── Overview: All 12 Variants ──────────────────────────────────────────────
+export const AllVariants: Story = {
+  name: "All 12 Variants",
+  render: () => (
+    <div className="space-y-0">
+      {(["cream", "sand", "white", "dark"] as const).map((bg) =>
+        (["L", "M", "S"] as const).map((size) => (
+          <HeroSection
+            key={`${bg}-${size}`}
+            bg={bg}
+            size={size}
+            eyebrow={`${bg.charAt(0).toUpperCase() + bg.slice(1)} / ${size}`}
+            title="Tea for Creativity."
+            description="Single-origin teas from Japan's finest small farms."
+            ctaLabel="Shop Now"
+            ctaHref="/products"
+          />
+        ))
+      )}
+    </div>
+  ),
+};
