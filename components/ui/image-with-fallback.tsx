@@ -16,6 +16,7 @@ interface ImageWithFallbackProps extends Omit<ImageProps, 'onError'> {
  */
 export function ImageWithFallback({
   src,
+  alt = '',
   fallbackSrc = '/placeholder-hero-day.jpg',
   ...props
 }: ImageWithFallbackProps) {
@@ -33,6 +34,7 @@ export function ImageWithFallback({
 
   return (
     <Image
+      alt={alt}
       {...props}
       src={imgSrc}
       onError={handleError}

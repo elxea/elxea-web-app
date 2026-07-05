@@ -1,20 +1,34 @@
 /**
  * ESLint rule: no-raw-colors
  *
- * Detects raw color values in JSX/TSX files and enforces the use of
- * design tokens (@theme) instead.
+ * Detects raw design values in JSX/TSX files and enforces the use of
+ * design tokens (@theme / Tailwind token utilities) instead.
  *
  * Targets:
  * 1. Tailwind arbitrary color values in className strings:
  *    bg-[#xxx], text-[rgb(...)], border-[oklch(...)], etc.
  * 2. Raw color values in style props:
  *    style={{ color: "#fff" }}, style={{ backgroundColor: "rgb(...)" }}
+ * 3. Tailwind arbitrary length values in className strings (px/rem/em):
+ *    p-[16px], gap-[10px], text-[13px], -mt-[2px], w-[1.5rem], leading-[1.2em]
+ *    These should use the spacing / sizing / typography token scale instead.
+ *
+ * The arbitrary-length check can be disabled via rule options:
+ *    "elxea-tokens/no-raw-colors": ["error", { checkArbitraryValues: false }]
  */
 
 // Regex for Tailwind arbitrary color values in className strings
 // Matches patterns like: bg-[#fff], text-[rgb(0,0,0)], border-[oklch(...)], fill-[hsl(...)]
 const TAILWIND_ARBITRARY_COLOR_RE =
   /(?:bg|text|border|outline|ring|shadow|fill|stroke|accent|caret|decoration|divide|from|via|to|placeholder)-\[(?:#[0-9a-fA-F]{3,8}|(?:rgb|rgba|hsl|hsla|oklch|oklab|lch|lab|color)\()/g;
+
+// Regex for Tailwind arbitrary *length* values with an explicit unit (px/rem/em).
+// Prefix-agnostic on purpose: any `-[<number><unit>]` is a raw value that should
+// come from the token scale. Requires a numeric + unit so it does NOT match
+// legitimate escape hatches like grid-cols-[1fr_2fr], w-[calc(...)], top-[var(--x)],
+// bg-[url(...)] or percentage/viewport values (w-[47%], h-[100vh]).
+const TAILWIND_ARBITRARY_LENGTH_RE =
+  /-\[-?(?:\d+|\d*\.\d+)(?:px|rem|em)\]/g;
 
 // Regex for raw color values (standalone, for style props)
 const RAW_COLOR_VALUE_RE =
@@ -42,8 +56,11 @@ const COLOR_PROPERTIES = new Set([
   "background",
 ]);
 
-const MESSAGE =
+const COLOR_MESSAGE =
   "Raw color value detected. Use a @theme design token instead (e.g., Tailwind utility class like `bg-primary` or CSS variable like `var(--color-primary)`).";
+
+const LENGTH_MESSAGE =
+  "Raw arbitrary length value detected (px/rem/em). Use a spacing/sizing/typography token from the scale instead (e.g., `p-4`, `gap-2`, `text-sm`) rather than an arbitrary `[..px]` value.";
 
 /** @type {import('eslint').Rule.RuleModule} */
 const rule = {
@@ -51,33 +68,41 @@ const rule = {
     type: "suggestion",
     docs: {
       description:
-        "Disallow raw color values (HEX, rgb, oklch, etc.) in favor of design tokens",
+        "Disallow raw color values (HEX, rgb, oklch, etc.) and arbitrary length values (px/rem/em) in favor of design tokens",
       recommended: true,
     },
     messages: {
-      noRawColor: MESSAGE,
+      noRawColor: COLOR_MESSAGE,
+      noArbitraryValue: LENGTH_MESSAGE,
     },
-    schema: [],
+    schema: [
+      {
+        type: "object",
+        properties: {
+          checkArbitraryValues: { type: "boolean" },
+        },
+        additionalProperties: false,
+      },
+    ],
   },
   create(context) {
+    const options = context.options[0] || {};
+    const checkArbitraryValues = options.checkArbitraryValues !== false;
+
     return {
-      // Detect arbitrary color values in className string literals
+      // Detect arbitrary color / length values in className string literals
       // Handles: className="bg-[#fff]", className={`bg-[#fff]`}
       Literal(node) {
         if (typeof node.value !== "string") return;
         if (!isInClassNameContext(node)) return;
-        checkStringForArbitraryColors(context, node, node.value);
+        checkString(context, node, node.value, checkArbitraryValues);
       },
 
       // Detect in template literal expressions (className={`...`})
       TemplateLiteral(node) {
         if (!isInClassNameContext(node)) return;
         for (const quasi of node.quasis) {
-          checkStringForArbitraryColors(
-            context,
-            quasi,
-            quasi.value.raw,
-          );
+          checkString(context, quasi, quasi.value.raw, checkArbitraryValues);
         }
       },
 
@@ -169,15 +194,25 @@ function isInStyleProp(node) {
 }
 
 /**
- * Check a string value for Tailwind arbitrary color patterns and report.
+ * Check a string value for Tailwind arbitrary color / length patterns and report.
  */
-function checkStringForArbitraryColors(context, node, value) {
+function checkString(context, node, value, checkArbitraryValues) {
   TAILWIND_ARBITRARY_COLOR_RE.lastIndex = 0;
   if (TAILWIND_ARBITRARY_COLOR_RE.test(value)) {
     context.report({
       node,
       messageId: "noRawColor",
     });
+  }
+
+  if (checkArbitraryValues) {
+    TAILWIND_ARBITRARY_LENGTH_RE.lastIndex = 0;
+    if (TAILWIND_ARBITRARY_LENGTH_RE.test(value)) {
+      context.report({
+        node,
+        messageId: "noArbitraryValue",
+      });
+    }
   }
 }
 

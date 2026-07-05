@@ -10,7 +10,9 @@ const preview: Preview = {
       },
     },
     a11y: {
-      test: "todo",
+      // "error" makes accessibility violations FAIL the Storybook vitest run
+      // (was "todo" = report-only). CI runs `pnpm test --project storybook`.
+      test: "error",
     },
   },
 };
