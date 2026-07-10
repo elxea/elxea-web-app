@@ -51,18 +51,32 @@ export default async function TagPage({
 
   return (
     <div className="section-wide">
-      <Link
-        href="/journal"
-        className="text-xs text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors"
-      >
-        {t("title")}
-      </Link>
-      <h1 className="mt-2 mb-12">{tag.title}</h1>
+      {/* 変A: centered editorial archive header */}
+      <div className="text-center mb-12 md:mb-16">
+        <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-4">
+          Tag
+        </p>
+        <h1 className="mb-4">{t("tagArchiveTitle", { name: tag.title })}</h1>
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          {t("tagArchiveDescription", { name: tag.title })}
+        </p>
+        <div className="flex flex-wrap items-center justify-center gap-2 mt-8">
+          <span className="text-xs font-medium px-3 py-1.5 rounded-full bg-foreground text-background">
+            {tag.title}
+          </span>
+          <Link
+            href="/journal"
+            className="text-xs px-3 py-1.5 rounded-full border border-border text-muted-foreground hover:text-foreground hover:border-foreground transition-colors"
+          >
+            {tCommon("viewAll")}
+          </Link>
+        </div>
+      </div>
 
       {!articles || articles.length === 0 ? (
         <p className="text-muted-foreground text-sm">{t("empty")}</p>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-10">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-14">
           {articles.map(
             (article: {
               _id: string;
