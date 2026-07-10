@@ -6,6 +6,7 @@ import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 
 export function ContactForm() {
@@ -90,13 +91,13 @@ export function ContactForm() {
 
       <div className="space-y-2">
         <Label htmlFor="message">{t("message")}</Label>
-        <textarea
+        <Textarea
           id="message"
           name="message"
           rows={6}
           required
           disabled={sending}
-          className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
+          className="resize-none"
         />
       </div>
 
