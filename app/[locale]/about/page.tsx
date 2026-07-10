@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ImageWithFallback } from "@/components/ui/image-with-fallback";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -16,8 +15,8 @@ export default async function AboutPage() {
 
   return (
     <>
-      {/* Hero */}
-      <section className="relative min-h-[60vh] flex items-center justify-center">
+      {/* Hero (写真ヒーロー温存 / 変A タイポ処理) */}
+      <section className="relative flex min-h-[60vh] items-center justify-center">
         <ImageWithFallback
           src="/hero-night.jpg"
           fallbackSrc="/placeholder-hero-night.jpg"
@@ -29,31 +28,34 @@ export default async function AboutPage() {
           sizes="100vw"
         />
         <div className="absolute inset-0 bg-overlay" />
-        <div className="relative text-center max-w-2xl px-8">
-          <p className="text-[11px] text-overlay-foreground-muted uppercase tracking-[0.25em] mb-6">
-            About Us
-          </p>
-          <h1 className="text-overlay-foreground mb-6">
-            {t("title")}
-          </h1>
-          <p className="text-overlay-foreground-muted text-sm leading-relaxed max-w-md mx-auto">{t("subtitle")}</p>
+        <div className="relative mx-auto max-w-2xl px-8 text-center">
+          <div className="flex flex-col gap-6">
+            <p className="text-xs uppercase tracking-widest text-overlay-foreground-muted">
+              About Us
+            </p>
+            <h1 className="text-overlay-foreground">{t("title")}</h1>
+            <p className="mx-auto max-w-md text-sm leading-relaxed text-overlay-foreground-muted">
+              {t("subtitle")}
+            </p>
+          </div>
         </div>
       </section>
 
-      <div className="section-narrow py-24">
-        <div className="space-y-24">
+      {/* Body (変A Reading Column / 左寄せ縦リズム) */}
+      <div className="mx-auto max-w-3xl px-5 pt-16 pb-20 md:px-6 md:pt-28 md:pb-32">
+        <div className="flex flex-col gap-20 md:gap-28">
           {/* Mission */}
-          <section className="text-center">
-            <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-4">
+          <section className="flex flex-col gap-4 md:gap-6">
+            <p className="text-xs uppercase tracking-widest text-muted-foreground">
               Our Mission
             </p>
-            <h2 className="mb-8">{t("mission")}</h2>
-            <p className="text-sm text-muted-foreground leading-relaxed max-w-xl mx-auto">
+            <h2>{t("mission")}</h2>
+            <p className="text-base leading-relaxed text-foreground">
               {t("missionText")}
             </p>
           </section>
 
-          {/* Image break */}
+          {/* Image break (温存) */}
           <div className="relative aspect-[16/9] w-full overflow-hidden">
             <ImageWithFallback
               src="/hero-day.jpg"
@@ -66,25 +68,25 @@ export default async function AboutPage() {
           </div>
 
           {/* Story */}
-          <section className="text-center">
-            <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-4">
+          <section className="flex flex-col gap-4 md:gap-6">
+            <p className="text-xs uppercase tracking-widest text-muted-foreground">
               Our Story
             </p>
-            <h2 className="mb-8">{t("story")}</h2>
-            <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-line max-w-xl mx-auto">
+            <h2>{t("story")}</h2>
+            <p className="whitespace-pre-line text-base leading-relaxed text-foreground">
               {t("storyText")}
             </p>
           </section>
 
           {/* Values */}
-          <section>
-            <div className="text-center mb-12">
-              <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-4">
+          <section className="flex flex-col gap-8 md:gap-12">
+            <div className="flex flex-col gap-4 md:gap-6">
+              <p className="text-xs uppercase tracking-widest text-muted-foreground">
                 Our Values
               </p>
               <h2>{t("values")}</h2>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 gap-10 md:grid-cols-3 md:gap-8">
               <ValueCard title={t("value1Title")} text={t("value1Text")} />
               <ValueCard title={t("value2Title")} text={t("value2Text")} />
               <ValueCard title={t("value3Title")} text={t("value3Text")} />
@@ -93,8 +95,8 @@ export default async function AboutPage() {
         </div>
       </div>
 
-      {/* Bottom image section */}
-      <section className="relative min-h-[50vh] flex items-center justify-center">
+      {/* Bottom image band (温存) */}
+      <section className="relative flex min-h-[50vh] items-center justify-center">
         <ImageWithFallback
           src="/hero-approach.jpg"
           fallbackSrc="/placeholder-hero-approach.jpg"
@@ -112,13 +114,9 @@ export default async function AboutPage() {
 
 function ValueCard({ title, text }: { title: string; text: string }) {
   return (
-    <Card className="border-0 shadow-none bg-transparent text-center">
-      <CardHeader className="pb-4">
-        <CardTitle className="text-base font-medium">{title}</CardTitle>
-      </CardHeader>
-      <CardContent className="pt-0">
-        <p className="text-sm text-muted-foreground leading-relaxed">{text}</p>
-      </CardContent>
-    </Card>
+    <div className="flex flex-col gap-3">
+      <h3 className="text-base font-medium text-foreground">{title}</h3>
+      <p className="text-sm leading-relaxed text-muted-foreground">{text}</p>
+    </div>
   );
 }

@@ -37,7 +37,7 @@ export default async function GenericPage({
     page = await client.fetch(PAGE_BY_SLUG_QUERY, { slug, language: locale });
   } catch {
     return (
-      <div className="section-narrow">
+      <div className="mx-auto max-w-3xl px-5 py-20 md:px-6 md:py-28">
         <p className="text-muted-foreground">{t("loadError")}</p>
       </div>
     );
@@ -46,9 +46,23 @@ export default async function GenericPage({
   if (!page) notFound();
 
   return (
-    <div className="section-narrow">
-      <h1 className="mb-12">{page.title}</h1>
-      {page.body && <PortableText value={page.body} />}
-    </div>
+    <>
+      {/* Title band (変A / 中央寄せヘッダー) */}
+      <div className="bg-muted">
+        <div className="mx-auto max-w-3xl px-5 py-16 text-center md:px-6 md:py-24">
+          <div className="flex flex-col gap-4 md:gap-5">
+            <p className="text-xs uppercase tracking-widest text-muted-foreground">
+              Page
+            </p>
+            <h1>{page.title}</h1>
+          </div>
+        </div>
+      </div>
+
+      {/* Body (変A Reading Column / CMS 描画温存) */}
+      <div className="mx-auto max-w-3xl px-5 py-16 pb-20 md:px-6 md:py-24 md:pb-32">
+        {page.body && <PortableText value={page.body} />}
+      </div>
+    </>
   );
 }
