@@ -121,14 +121,19 @@ export default async function AccountPage() {
 
     return (
       <div className="section-narrow py-20">
-        <div className="mb-12">
-          <h1 className="mb-4">{tCommon("account")}</h1>
-          {displayName && (
-            <p className="text-sm text-muted-foreground">{displayName}</p>
-          )}
-          {email && <p className="text-sm text-muted-foreground">{email}</p>}
+        <div className="mb-12 flex items-start justify-between gap-6">
+          <div>
+            <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-4">
+              Account
+            </p>
+            <h1 className="mb-4">{tCommon("account")}</h1>
+            {displayName && (
+              <p className="text-sm text-muted-foreground">{displayName}</p>
+            )}
+            {email && <p className="text-sm text-muted-foreground">{email}</p>}
+          </div>
 
-          <Button variant="link" className="mt-6 p-0 h-auto text-muted-foreground text-sm" asChild>
+          <Button variant="outline" size="sm" className="shrink-0" asChild>
             <a href={`/api/auth/logout?locale=${locale}`}>{tCommon("logout")}</a>
           </Button>
         </div>

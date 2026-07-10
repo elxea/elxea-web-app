@@ -187,6 +187,7 @@
     "noOrders": "You have no orders yet.",
     "memberOnlyDescription": "This content is for members only. Log in to access the full content.",
     "subscriptions": "Subscriptions",
+    "currentSubscriptions": "Your Subscriptions",
     "noSubscriptions": "You have no active subscriptions.",
     "subscriptionActive": "Active",
     "subscriptionPaused": "Paused",
