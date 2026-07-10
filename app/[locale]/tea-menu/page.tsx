@@ -10,13 +10,14 @@ export default function TeaMenuPage() {
   const t = useTranslations("teaMenu");
 
   return (
-    <div className="section-wide py-20">
-      <div className="text-center mb-16">
+    <div className="section-wide">
+      {/* 変A: 左寄せ editorial header (Figma 6639:13048) */}
+      <div className="mb-12 md:mb-16">
         <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-4">
           Tea Selection
         </p>
-        <h1 className="mb-6">{t("title")}</h1>
-        <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl mx-auto">{t("description")}</p>
+        <h1 className="mb-4">{t("title")}</h1>
+        <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl">{t("description")}</p>
       </div>
       <TeaMenuList />
     </div>
@@ -56,18 +57,19 @@ async function TeaMenuList() {
               <ImageCard
                 image={item.photo?.asset ? urlFor(item.photo).width(600).height(400).url() : undefined}
                 alt={item.photo?.alt || item.displayName}
-                className="mb-5"
+                className="mb-3"
                 style={item.color ? { backgroundColor: item.color } : undefined}
                 hover
               />
-              <div className="space-y-2 text-center">
+              {/* 変A: カードテキスト 左寄せ (Figma Card Text 6639:13149) */}
+              <div className="space-y-1">
                 <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em]">
                   {item.category}
                 </p>
-                <h2 className="text-sm font-normal leading-relaxed group-hover:underline underline-offset-4">
+                <h2 className="text-base font-medium leading-relaxed group-hover:underline underline-offset-4">
                   {item.displayName}
                 </h2>
-                <p className="text-[13px] text-muted-foreground">
+                <p className="text-xs text-muted-foreground">
                   {item.variety} · {item.origin}
                 </p>
               </div>
