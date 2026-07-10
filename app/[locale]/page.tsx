@@ -11,13 +11,49 @@ import { FEATURED_ARTICLES_QUERY, EVENTS_QUERY } from "@/sanity/lib/queries";
 import { ArticleCard } from "@/components/journal/article-card";
 import { urlFor } from "@/sanity/lib/image";
 
+/**
+ * 変A section header for data-driven blocks (Products / Journal / Events):
+ * eyebrow + title on the left, "view all" pinned to the right on the same row.
+ * Plain function (no hooks) so it is safe in both client and async-server callers.
+ */
+function SectionHeader({
+  eyebrow,
+  title,
+  viewAllHref,
+  viewAllLabel,
+}: {
+  eyebrow: string;
+  title: string;
+  viewAllHref: string;
+  viewAllLabel: string;
+}) {
+  return (
+    <div className="flex items-end justify-between gap-6 mb-12 md:mb-16">
+      <div className="flex flex-col">
+        <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-3">
+          {eyebrow}
+        </p>
+        <h2>{title}</h2>
+      </div>
+      <Button
+        variant="outline"
+        size="sm"
+        className="shrink-0 border-border text-muted-foreground hover:text-foreground"
+        asChild
+      >
+        <Link href={viewAllHref}>{viewAllLabel} →</Link>
+      </Button>
+    </div>
+  );
+}
+
 export default function HomePage() {
   const t = useTranslations();
 
   return (
     <>
-      {/* Hero */}
-      <section className="relative min-h-[90vh] flex items-center justify-center">
+      {/* Hero — 変A: left-aligned content over the day/night image (image + fallback preserved) */}
+      <section className="relative min-h-[90vh] flex items-center justify-start">
         <ImageWithFallback
           src="/hero-day.jpg"
           fallbackSrc="/placeholder-hero-day.jpg"
@@ -29,39 +65,40 @@ export default function HomePage() {
           sizes="100vw"
         />
         <div className="absolute inset-0 bg-overlay" />
-        <div className="relative text-center max-w-2xl px-8">
-          <p className="text-[11px] text-overlay-foreground-muted uppercase tracking-[0.25em] mb-8">
-            {t("home.tagline")}
-          </p>
-          <h1 className="mb-8 text-overlay-foreground">
-            Tea for Creativity.
-          </h1>
-          <p className="text-overlay-foreground-muted text-sm leading-relaxed mb-12 max-w-md mx-auto">
-            {t("home.hero")}
-          </p>
-          <Button variant="outline" className="border-overlay-border text-overlay-foreground bg-transparent hover:bg-overlay-foreground hover:text-foreground hover:border-overlay-foreground transition-colors" asChild>
-            <Link href="/products">{t("common.products")}</Link>
-          </Button>
+        <div className="relative w-full max-w-7xl mx-auto px-6 md:px-8">
+          <div className="max-w-xl text-left">
+            <p className="text-[11px] text-overlay-foreground-muted uppercase tracking-[0.25em] mb-8">
+              {t("home.tagline")}
+            </p>
+            <h1 className="mb-6 text-overlay-foreground">Tea for Creativity.</h1>
+            <p className="text-overlay-foreground-muted text-sm leading-relaxed mb-10 max-w-md">
+              {t("home.hero")}
+            </p>
+            <Button
+              variant="outline"
+              className="border-overlay-border text-overlay-foreground bg-transparent hover:bg-overlay-foreground hover:text-foreground hover:border-overlay-foreground transition-colors"
+              asChild
+            >
+              <Link href="/products">{t("common.products")}</Link>
+            </Button>
+          </div>
         </div>
       </section>
 
       {/* Featured Products */}
       <section className="section-wide py-24">
-        <div className="flex flex-col items-center text-center mb-16">
-          <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-4">
-            Discover
-          </p>
-          <h2 className="mb-6">{t("home.featuredProducts")}</h2>
-          <Button variant="link" className="p-0 h-auto text-muted-foreground text-sm" asChild>
-            <Link href="/products">{t("common.viewAll")} →</Link>
-          </Button>
-        </div>
+        <SectionHeader
+          eyebrow="Discover"
+          title={t("home.featuredProducts")}
+          viewAllHref="/products"
+          viewAllLabel={t("common.viewAll")}
+        />
         <Suspense fallback={<FeaturedProductsSkeleton />}>
           <FeaturedProducts />
         </Suspense>
       </section>
 
-      {/* Our Story — full-width image section */}
+      {/* Our Story — full-width image section (image + fallback preserved) */}
       <section className="relative min-h-[60vh] flex items-center justify-center">
         <ImageWithFallback
           src="/hero-night.jpg"
@@ -80,23 +117,24 @@ export default function HomePage() {
           <h2 className="text-overlay-foreground mb-8">
             {t("home.storyHeading")}
           </h2>
-          <Button variant="outline" className="border-overlay-border text-overlay-foreground bg-transparent hover:bg-overlay-foreground hover:text-foreground hover:border-overlay-foreground transition-colors" asChild>
+          <Button
+            variant="outline"
+            className="border-overlay-border text-overlay-foreground bg-transparent hover:bg-overlay-foreground hover:text-foreground hover:border-overlay-foreground transition-colors"
+            asChild
+          >
             <Link href="/about">{t("common.about")}</Link>
           </Button>
         </div>
       </section>
 
-      {/* Journal */}
+      {/* Journal — 変A: 2-column editorial grid */}
       <section className="section-wide py-24">
-        <div className="flex flex-col items-center text-center mb-16">
-          <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-4">
-            Stories
-          </p>
-          <h2 className="mb-6">{t("home.latestJournal")}</h2>
-          <Button variant="link" className="p-0 h-auto text-muted-foreground text-sm" asChild>
-            <Link href="/journal">{t("common.viewAll")} →</Link>
-          </Button>
-        </div>
+        <SectionHeader
+          eyebrow="Stories"
+          title={t("home.latestJournal")}
+          viewAllHref="/journal"
+          viewAllLabel={t("common.viewAll")}
+        />
         <Suspense fallback={<ArticlesSkeleton />}>
           <FeaturedArticles />
         </Suspense>
@@ -107,7 +145,7 @@ export default function HomePage() {
         <UpcomingEvents />
       </Suspense>
 
-      {/* Approach — full-width image section */}
+      {/* Approach — full-width image section (image + fallback preserved) */}
       <section className="relative min-h-[60vh] flex items-center justify-center">
         <ImageWithFallback
           src="/hero-approach.jpg"
@@ -126,7 +164,11 @@ export default function HomePage() {
           <h2 className="text-overlay-foreground mb-8">
             {t("home.approachHeading")}
           </h2>
-          <Button variant="outline" className="border-overlay-border text-overlay-foreground bg-transparent hover:bg-overlay-foreground hover:text-foreground hover:border-overlay-foreground transition-colors" asChild>
+          <Button
+            variant="outline"
+            className="border-overlay-border text-overlay-foreground bg-transparent hover:bg-overlay-foreground hover:text-foreground hover:border-overlay-foreground transition-colors"
+            asChild
+          >
             <Link href="/about">{t("common.about")}</Link>
           </Button>
         </div>
@@ -137,11 +179,11 @@ export default function HomePage() {
 
 function FeaturedProductsSkeleton() {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-14">
       {Array.from({ length: 6 }).map((_, i) => (
         <div key={i}>
-          <Skeleton className="aspect-[3/2] w-full mb-4" />
-          <div className="space-y-2">
+          <Skeleton className="aspect-[3/2] w-full mb-5" />
+          <div className="space-y-2 flex flex-col items-center">
             <Skeleton className="h-3 w-1/3" />
             <Skeleton className="h-4 w-2/3" />
             <Skeleton className="h-4 w-1/4" />
@@ -154,13 +196,14 @@ function FeaturedProductsSkeleton() {
 
 function ArticlesSkeleton() {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-12">
       {Array.from({ length: 4 }).map((_, i) => (
         <div key={i}>
           <Skeleton className="aspect-[3/2] w-full mb-4" />
           <div className="space-y-2">
             <Skeleton className="h-3 w-16" />
             <Skeleton className="h-4 w-3/4" />
+            <Skeleton className="h-4 w-1/2" />
           </div>
         </div>
       ))}
@@ -192,19 +235,16 @@ async function UpcomingEvents() {
 
     return (
       <section className="max-w-7xl mx-auto px-6 py-24">
-        <div className="flex flex-col items-center text-center mb-16">
-          <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-4">
-            Upcoming
-          </p>
-          <h2 className="mb-6">{t("home.upcomingEvents")}</h2>
-          <Button variant="link" className="p-0 h-auto text-muted-foreground text-sm" asChild>
-            <Link href="/events">{t("common.viewAll")} →</Link>
-          </Button>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <SectionHeader
+          eyebrow="Upcoming"
+          title={t("home.upcomingEvents")}
+          viewAllHref="/events"
+          viewAllLabel={t("common.viewAll")}
+        />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-12">
           {upcomingEvents.map((event) => (
             <Link key={event._id} href={`/events/${event.slug.current}`} className="group block">
-              <div className="aspect-[4/3] bg-muted overflow-hidden mb-4">
+              <div className="aspect-[3/2] bg-muted overflow-hidden mb-4">
                 {event.image?.asset ? (
                   <Image
                     src={urlFor(event.image).width(400).height(300).url()}
@@ -220,15 +260,17 @@ async function UpcomingEvents() {
                   </div>
                 )}
               </div>
-              <p className="text-xs text-muted-foreground mb-1">
+              <p className="text-xs text-muted-foreground mb-1.5">
                 {new Date(event.date).toLocaleDateString(locale, {
                   year: "numeric",
                   month: "long",
                   day: "numeric",
                 })}
-                {event.location && ` · ${event.location}`}
               </p>
-              <p className="text-sm">{event.title}</p>
+              <p className="text-sm mb-1">{event.title}</p>
+              {event.location && (
+                <p className="text-xs text-muted-foreground">{event.location}</p>
+              )}
             </Link>
           ))}
         </div>
@@ -277,7 +319,7 @@ async function FeaturedArticles() {
     }
 
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-10">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-12">
         {articles.map(
           (article: {
             _id: string;
