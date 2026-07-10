@@ -10,8 +10,9 @@ export default function FarmersPage() {
   const t = useTranslations("common");
 
   return (
-    <div className="section-wide py-20">
-      <div className="text-center mb-16">
+    <div className="section-wide">
+      {/* 変A: centered editorial header */}
+      <div className="text-center mb-12 md:mb-16">
         <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-4">
           Community
         </p>
@@ -39,7 +40,7 @@ async function FarmersList() {
     }
 
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-14">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-10 md:gap-x-8 md:gap-y-14">
         {farmers.map(
           (farmer: {
             _id: string;
