@@ -27,35 +27,43 @@ export default async function FAQPage() {
   ];
 
   return (
-    <div className="section-narrow py-20">
+    <div className="mx-auto max-w-3xl px-5 pt-12 pb-20 md:px-6 md:pt-24 md:pb-40">
       <FAQJsonLd questions={questions} />
-      <Breadcrumb
-        items={[
-          { label: bt("home"), href: "/" },
-          { label: t("title") },
-        ]}
-      />
-      <div className="mb-16">
-        <h1 className="mb-4">{t("title")}</h1>
-        <p className="text-muted-foreground text-sm leading-relaxed">{t("subtitle")}</p>
-      </div>
-
-      <div className="divide-y divide-border">
-        {questions.map((q, i) => (
-          <details key={i} className="group py-6">
-            <summary className="flex items-center justify-between cursor-pointer list-none">
-              <span className="text-sm font-medium leading-relaxed pr-4">
-                {q.question}
-              </span>
-              <span className="text-muted-foreground text-lg shrink-0 group-open:rotate-45 transition-transform">
-                +
-              </span>
-            </summary>
-            <p className="text-[13px] text-muted-foreground leading-relaxed mt-4 pr-8">
-              {q.answer}
+      <div className="flex flex-col gap-12 md:gap-16">
+        {/* Top: breadcrumb + title + lead (変A Reading Column / Top) */}
+        <div className="flex flex-col gap-5 md:gap-6">
+          <Breadcrumb
+            items={[
+              { label: bt("home"), href: "/" },
+              { label: t("title") },
+            ]}
+          />
+          <div className="flex flex-col gap-3">
+            <h1>{t("title")}</h1>
+            <p className="text-base leading-relaxed text-muted-foreground">
+              {t("subtitle")}
             </p>
-          </details>
-        ))}
+          </div>
+        </div>
+
+        {/* Accordion (変A Reading Column / FAQ list, native details/summary 温存) */}
+        <div className="divide-y divide-border border-t border-border">
+          {questions.map((q, i) => (
+            <details key={i} className="group py-5 md:py-6">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-4">
+                <span className="text-base font-medium leading-relaxed text-foreground">
+                  {q.question}
+                </span>
+                <span className="shrink-0 text-lg text-muted-foreground transition-transform group-open:rotate-45">
+                  +
+                </span>
+              </summary>
+              <p className="mt-4 pr-8 text-base leading-relaxed text-muted-foreground">
+                {q.answer}
+              </p>
+            </details>
+          ))}
+        </div>
       </div>
     </div>
   );
