@@ -10,8 +10,9 @@ export default function EventsPage() {
   const t = useTranslations("common");
 
   return (
-    <div className="section-wide py-20">
-      <div className="text-center mb-16">
+    <div className="section-wide">
+      {/* 変A: centered editorial header */}
+      <div className="text-center mb-12 md:mb-16">
         <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-4">
           Upcoming
         </p>
@@ -40,7 +41,8 @@ async function EventsList() {
     }
 
     return (
-      <div className="space-y-12">
+      // 変A: image-top card grid (page-local card). PC 3col / SP 1col.
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-14">
         {events.map(
           (event: {
             _id: string;
@@ -53,42 +55,43 @@ async function EventsList() {
             memberOnly?: boolean;
             externalUrl?: string;
           }) => {
-            const cardClass =
-              "group grid grid-cols-1 md:grid-cols-[1fr_2fr] gap-6";
+            const cardClass = "group block";
             const inner = (
               <>
-                <ImageCard
-                  image={event.image?.asset ? urlFor(event.image).width(600).height(400).url() : undefined}
-                  alt={event.title}
-                  sizes="(max-width: 768px) 100vw, 33vw"
-                  hover
-                />
-                <div className="flex flex-col justify-center">
-                  <p className="text-xs text-muted-foreground mb-2">
-                    {new Date(event.date).toLocaleDateString(locale, {
+                <div className="relative mb-4">
+                  <ImageCard
+                    image={event.image?.asset ? urlFor(event.image).width(600).height(400).url() : undefined}
+                    alt={event.title}
+                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                    hover
+                  />
+                  {event.memberOnly && (
+                    <span className="absolute top-3 left-3 bg-foreground text-background text-[10px] uppercase tracking-[0.15em] px-2 py-1">
+                      {tCommon("memberOnly")}
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground mb-1.5">
+                  {new Date(event.date).toLocaleDateString(locale, {
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                  })}
+                  {event.endDate &&
+                    ` — ${new Date(event.endDate).toLocaleDateString(locale, {
                       year: "numeric",
                       month: "long",
                       day: "numeric",
-                    })}
-                    {event.endDate &&
-                      ` — ${new Date(event.endDate).toLocaleDateString(locale, {
-                        year: "numeric",
-                        month: "long",
-                        day: "numeric",
-                      })}`}
+                    })}`}
+                </p>
+                <h3 className="text-sm font-normal leading-relaxed group-hover:underline underline-offset-4 mb-1.5">
+                  {event.title}
+                </h3>
+                {event.location && (
+                  <p className="text-[13px] text-muted-foreground">
+                    {t("locationLabel")}：{event.location}
                   </p>
-                  <h3 className="text-lg font-medium group-hover:underline mb-2">
-                    {event.memberOnly && (
-                      <span className="text-xs text-muted-foreground mr-1.5">
-                        [{tCommon("memberOnly")}]
-                      </span>
-                    )}
-                    {event.title}
-                  </h3>
-                  {event.location && (
-                    <p className="text-sm text-muted-foreground">{event.location}</p>
-                  )}
-                </div>
+                )}
               </>
             );
 

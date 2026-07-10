@@ -170,7 +170,11 @@
     "register": "参加登録する",
     "cancelRegistration": "登録をキャンセル",
     "registeredMessage": "イベントへの参加登録が完了しました",
-    "cancelledMessage": "イベント登録をキャンセルしました"
+    "cancelledMessage": "イベント登録をキャンセルしました",
+    "dateLabel": "日時",
+    "locationLabel": "開催地",
+    "detailsHeading": "詳細・申し込み",
+    "detailsPageLink": "詳細・申し込みページを開く"
   },
   "page": {
     "loadError": "ページを読み込めませんでした。"

@@ -170,7 +170,11 @@
     "register": "Register",
     "cancelRegistration": "Cancel Registration",
     "registeredMessage": "You are registered for this event",
-    "cancelledMessage": "Registration cancelled"
+    "cancelledMessage": "Registration cancelled",
+    "dateLabel": "Date",
+    "locationLabel": "Location",
+    "detailsHeading": "Details & Registration",
+    "detailsPageLink": "Open details & registration page"
   },
   "page": {
     "loadError": "Could not load page."
