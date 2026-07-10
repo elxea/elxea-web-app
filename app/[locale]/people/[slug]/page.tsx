@@ -63,44 +63,43 @@ export default async function PeoplePage({
   if (!author) notFound();
 
   return (
-    <div className="max-w-5xl mx-auto px-6 py-20">
-      {/* Profile */}
-      <div className="flex flex-col sm:flex-row items-start gap-12 mb-20">
+    <div className="section-wide">
+      {/* 変A: 中央寄せ profile (avatar上 / name / role / bio / website) — Figma 6703:14332 */}
+      <div className="flex flex-col items-center text-center mb-16 md:mb-24">
         {author.image?.asset && (
           <Image
             src={urlFor(author.image).width(200).height(200).url()}
             alt={author.name}
             width={200}
             height={200}
-            className="size-32 rounded-full object-cover flex-shrink-0"
+            className="size-28 rounded-full object-cover mb-6"
             priority
           />
         )}
-        <div className="flex-1">
-          <h1 className="mb-4">{author.name}</h1>
-          {author.role && (
-            <p className="text-sm text-muted-foreground mb-6">{author.role}</p>
-          )}
-          {author.bio && (
-            <p className="text-sm text-muted-foreground leading-relaxed mb-6">{author.bio}</p>
-          )}
-          {author.website && (
-            <a
-              href={author.website}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-block text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground transition-colors"
-            >
-              {author.website.replace(/^https?:\/\//, "")}
-            </a>
-          )}
-        </div>
+        <h1 className="mb-2">{author.name}</h1>
+        {author.role && (
+          <p className="text-sm text-muted-foreground mb-4">{author.role}</p>
+        )}
+        {author.bio && (
+          <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl">{author.bio}</p>
+        )}
+        {author.website && (
+          <a
+            href={author.website}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-block text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground transition-colors mt-4"
+          >
+            {author.website.replace(/^https?:\/\//, "")}
+          </a>
+        )}
       </div>
 
       {/* Articles by this author */}
       {articles && articles.length > 0 && (
         <section>
-          <div className="text-center mb-16">
+          {/* 変A: 中央寄せ editorial header */}
+          <div className="text-center mb-12 md:mb-16">
             <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-4">
               Articles
             </p>

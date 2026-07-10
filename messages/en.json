@@ -115,6 +115,7 @@
     "description": "Our curated selection of specialty teas",
     "empty": "No tea items yet.",
     "loadError": "Could not load tea menu.",
+    "details": "Details",
     "variety": "Variety",
     "origin": "Origin",
     "season": "Season",
