@@ -93,6 +93,10 @@
   "journal": {
     "title": "ジャーナル",
     "description": "コーヒーとお茶にまつわるストーリー",
+    "tagArchiveTitle": "タグ: {name}",
+    "tagArchiveDescription": "「{name}」に関する記事一覧",
+    "categoryArchiveTitle": "カテゴリ: {name}",
+    "categoryArchiveDescription": "「{name}」にまつわるストーリー",
     "empty": "まだ記事がありません。",
     "loadError": "記事を読み込めませんでした。",
     "writtenBy": "執筆",

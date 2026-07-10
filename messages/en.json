@@ -93,6 +93,10 @@
   "journal": {
     "title": "Journal",
     "description": "Stories about coffee and tea",
+    "tagArchiveTitle": "Tag: {name}",
+    "tagArchiveDescription": "Articles tagged “{name}”",
+    "categoryArchiveTitle": "Category: {name}",
+    "categoryArchiveDescription": "Stories about {name}",
     "empty": "No articles yet.",
     "loadError": "Could not load articles.",
     "writtenBy": "Written by",
