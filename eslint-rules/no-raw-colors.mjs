@@ -26,7 +26,7 @@ const TAILWIND_ARBITRARY_COLOR_RE =
 // Prefix-agnostic on purpose: any `-[<number><unit>]` is a raw value that should
 // come from the token scale. Requires a numeric + unit so it does NOT match
 // legitimate escape hatches like grid-cols-[1fr_2fr], w-[calc(...)], top-[var(--x)],
-// bg-[url(...)] or percentage/viewport values (w-[47%], h-[100vh]).
+// arbitrary url() image values, or percentage/viewport values (w-[47%], h-[100vh]).
 const TAILWIND_ARBITRARY_LENGTH_RE =
   /-\[-?(?:\d+|\d*\.\d+)(?:px|rem|em)\]/g;
 
