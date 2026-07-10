@@ -132,7 +132,8 @@
     "description": "Playlists inspired by the sounds of nature",
     "empty": "No playlists yet.",
     "loadError": "Could not load playlists.",
-    "recorded": "Recorded"
+    "recorded": "Recorded",
+    "listen": "Listen"
   },
   "elxeaJournal": {
     "title": "elxea Journal",

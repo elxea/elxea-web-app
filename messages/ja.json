@@ -132,7 +132,8 @@
     "description": "自然の音を感じるプレイリスト",
     "empty": "プレイリストはまだ登録されていません。",
     "loadError": "プレイリストを読み込めませんでした。",
-    "recorded": "録音日"
+    "recorded": "録音日",
+    "listen": "配信で聴く"
   },
   "elxeaJournal": {
     "title": "elxea Journal",
