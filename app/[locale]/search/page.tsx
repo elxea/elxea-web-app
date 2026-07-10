@@ -27,7 +27,13 @@ export default async function SearchPage({
 
   return (
     <div className="section-wide py-20">
-      <SearchForm initialQuery={q || ""} />
+      {/* 変A: 検索フォームを中央寄せ editorial ヘッダーに (Figma 6677:8077) */}
+      <div className="max-w-2xl mx-auto">
+        <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-6 text-center">
+          Search
+        </p>
+        <SearchForm initialQuery={q || ""} />
+      </div>
 
       {q && results && (
         <div className="mt-16">
