@@ -80,12 +80,13 @@ async function JournalGrid() {
                     {themeLabels[j.theme] || j.theme}
                   </span>
                 </div>
-                <div className="space-y-2 text-center">
-                  <h2 className="text-sm font-normal leading-relaxed group-hover:underline underline-offset-4">
+                {/* 変A: カードテキスト 左寄せ (Figma 6761:11127 card) */}
+                <div className="space-y-1">
+                  <h2 className="text-base font-medium leading-relaxed group-hover:underline underline-offset-4">
                     {j.title}
                   </h2>
                   {j.summary && (
-                    <p className="text-[13px] text-muted-foreground line-clamp-2 leading-relaxed">
+                    <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
                       {j.summary}
                     </p>
                   )}
