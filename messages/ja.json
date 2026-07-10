@@ -187,6 +187,7 @@
     "noOrders": "注文履歴はまだありません。",
     "memberOnlyDescription": "この内容は会員限定です。ログインしてすべてのコンテンツをお楽しみください。",
     "subscriptions": "定期便",
+    "currentSubscriptions": "ご契約中の定期便",
     "noSubscriptions": "ご契約中の定期便はありません。",
     "subscriptionActive": "契約中",
     "subscriptionPaused": "一時停止中",
