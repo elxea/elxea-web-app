@@ -125,7 +125,8 @@ export function TastingNoteForm() {
   }, [step]);
 
   return (
-    <div className="relative overflow-hidden">
+    // 変A: editorial カード枠 (Figma 6728:120 の各ステップカード)
+    <div className="relative overflow-hidden border border-border rounded-lg bg-background px-6 py-8 sm:px-8">
       <AnimatePresence mode="wait">
         {step === 0 && (
           <StepWrapper key="welcome" variants={variants}>
