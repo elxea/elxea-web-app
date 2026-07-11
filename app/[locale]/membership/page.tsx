@@ -83,7 +83,7 @@ export default async function MembershipPage() {
               {/* Header */}
               <div className="flex flex-col gap-2">
                 {isCurrent && (
-                  <span className="inline-flex w-fit rounded-full bg-secondary text-secondary-foreground px-3 py-1 text-xs font-medium">
+                  <span className="inline-flex w-fit rounded-full bg-muted text-foreground px-3 py-1 text-xs font-medium">
                     {t("currentPlan")}
                   </span>
                 )}
@@ -121,7 +121,7 @@ export default async function MembershipPage() {
                   </span>
                 </div>
               ) : config.actionable ? (
-                <Button variant="secondary" className="w-full rounded-lg" asChild>
+                <Button variant="secondary" className="w-full rounded-lg bg-muted text-foreground hover:bg-muted/80 active:bg-muted/70" asChild>
                   <Link href="/contact">{t("comingSoon")}</Link>
                 </Button>
               ) : null}
