@@ -64,9 +64,6 @@ export default async function SubscriptionLPPage() {
         />
         <div className="absolute inset-0 bg-overlay" />
         <div className="relative text-center max-w-2xl px-8">
-          <p className="text-[11px] text-overlay-foreground-muted uppercase tracking-[0.25em] mb-6">
-            {t("heroSubtitle")}
-          </p>
           <h1 className="hero-display mb-8 text-overlay-foreground whitespace-pre-line">
             {t("heroHeading")}
           </h1>
