@@ -5,7 +5,7 @@ import { getClient } from "@/sanity/lib/client";
 import { ImageCard } from "@/components/ui/image-card";
 import { EVENTS_QUERY } from "@/sanity/lib/queries";
 import { urlFor } from "@/sanity/lib/image";
-import { previewSeedEnabled, seedEvents } from "@/lib/preview-seed";
+import { previewSeedEnabled, seedEvents, isSeedId } from "@/lib/preview-seed";
 
 export default function EventsPage() {
   const t = useTranslations("common");
@@ -94,16 +94,25 @@ async function EventsList() {
                       day: "numeric",
                     })}`}
                 </p>
-                <h3 className="text-sm font-normal leading-relaxed group-hover:underline underline-offset-4 mb-1.5">
+                <h3 className="text-sm font-medium leading-relaxed group-hover:underline underline-offset-4 mb-1.5">
                   {event.title}
                 </h3>
                 {event.location && (
-                  <p className="text-[13px] text-muted-foreground">
+                  <p className="text-sm text-muted-foreground">
                     {t("locationLabel")}：{event.location}
                   </p>
                 )}
               </>
             );
+
+            // Seed (dummy) events have no real detail route -> render non-linked.
+            if (isSeedId(event._id)) {
+              return (
+                <div key={event._id} className="block cursor-default">
+                  {inner}
+                </div>
+              );
+            }
 
             if (event.externalUrl) {
               return (

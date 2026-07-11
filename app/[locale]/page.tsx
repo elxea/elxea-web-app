@@ -10,7 +10,7 @@ import { getClient } from "@/sanity/lib/client";
 import { FEATURED_ARTICLES_QUERY, EVENTS_QUERY } from "@/sanity/lib/queries";
 import { ArticleCard } from "@/components/journal/article-card";
 import { urlFor } from "@/sanity/lib/image";
-import { previewSeedEnabled } from "@/lib/preview-seed";
+import { previewSeedEnabled, isSeedId } from "@/lib/preview-seed";
 
 /**
  * 変A section header for data-driven blocks (Products / Journal / Events):
@@ -299,46 +299,73 @@ async function UpcomingEvents() {
           viewAllLabel={t("common.viewAll")}
         />
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-12">
-          {upcomingEvents.map((event) => (
-            <Link key={event._id} href={`/events/${event.slug.current}`} className="group block">
-              <div className="aspect-[3/2] bg-muted overflow-hidden mb-4">
-                {event.imageUrl ? (
-                  <Image
-                    src={event.imageUrl}
-                    alt={event.title}
-                    width={400}
-                    height={300}
-                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                  />
-                ) : event.image?.asset ? (
-                  <Image
-                    src={urlFor(event.image).width(400).height(300).url()}
-                    alt={event.title}
-                    width={400}
-                    height={300}
-                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-muted-foreground text-sm">
-                    {event.title}
-                  </div>
+          {upcomingEvents.map((event) => {
+            const seeded = isSeedId(event._id);
+            const inner = (
+              <>
+                {/* EventCard (Figma 6598:155): aspect-3/2 + rounded-md frame */}
+                <div className="aspect-[3/2] bg-muted overflow-hidden rounded-md mb-4">
+                  {event.imageUrl ? (
+                    <Image
+                      src={event.imageUrl}
+                      alt={event.title}
+                      width={400}
+                      height={300}
+                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    />
+                  ) : event.image?.asset ? (
+                    <Image
+                      src={urlFor(event.image).width(400).height(300).url()}
+                      alt={event.title}
+                      width={400}
+                      height={300}
+                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-muted-foreground text-sm">
+                      {event.title}
+                    </div>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground mb-1.5">
+                  {new Date(event.date).toLocaleDateString(locale, {
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                  })}
+                </p>
+                <h3 className="text-sm font-medium leading-relaxed mb-1.5 group-hover:underline underline-offset-4">
+                  {event.title}
+                </h3>
+                {event.location && (
+                  <p className="text-sm text-muted-foreground">
+                    {t("event.locationLabel")}：{event.location}
+                  </p>
                 )}
-              </div>
-              <p className="text-xs text-muted-foreground mb-1.5">
-                {new Date(event.date).toLocaleDateString(locale, {
-                  year: "numeric",
-                  month: "long",
-                  day: "numeric",
-                })}
-              </p>
-              <p className="text-sm mb-1">{event.title}</p>
-              {event.location && (
-                <p className="text-xs text-muted-foreground">{event.location}</p>
-              )}
-            </Link>
-          ))}
+              </>
+            );
+
+            // Seed (dummy) events have no real detail route -> render non-linked.
+            if (seeded) {
+              return (
+                <div key={event._id} className="block cursor-default">
+                  {inner}
+                </div>
+              );
+            }
+
+            return (
+              <Link
+                key={event._id}
+                href={`/events/${event.slug.current}`}
+                className="group block"
+              >
+                {inner}
+              </Link>
+            );
+          })}
         </div>
       </section>
     );
