@@ -17,7 +17,7 @@ export default async function BusinessContactPage() {
   const ct = await getTranslations("contact");
 
   return (
-    <div className="mx-auto max-w-xl px-5 pt-12 pb-20 md:px-6 md:pt-24 md:pb-40">
+    <div className="mx-auto max-w-3xl px-5 pt-12 pb-20 md:px-6 md:pt-24 md:pb-40">
       <div className="flex flex-col gap-12 md:gap-16">
         {/* Top: breadcrumb + title + lead (変A Reading Column / Top) */}
         <div className="flex flex-col gap-5 md:gap-6">

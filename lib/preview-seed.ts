@@ -25,6 +25,22 @@ export function previewSeedEnabled(): boolean {
   );
 }
 
+/**
+ * Prefix stamped on every id produced by the seed helpers below. Real Sanity
+ * documents never use this prefix, so it doubles as a reliable "this card is
+ * dummy preview data" flag.
+ */
+export const SEED_ID_PREFIX = "seed-";
+
+/**
+ * True when an id was produced by the preview seed helpers (dummy data). Cards
+ * backed by a seeded id have no real detail route, so callers should render
+ * them as non-interactive. Always false in production (no seeded ids exist).
+ */
+export function isSeedId(id: string | null | undefined): boolean {
+  return typeof id === "string" && id.startsWith(SEED_ID_PREFIX);
+}
+
 /** Local /public images reused as preview placeholder photography. */
 const PREVIEW_IMAGES = [
   "/hero-day.jpg",

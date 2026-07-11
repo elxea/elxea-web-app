@@ -5,7 +5,7 @@ import { getClient } from "@/sanity/lib/client";
 import { ImageCard } from "@/components/ui/image-card";
 import { FARMERS_QUERY } from "@/sanity/lib/queries";
 import { urlFor } from "@/sanity/lib/image";
-import { withSeedFarmers } from "@/lib/preview-seed";
+import { withSeedFarmers, isSeedId } from "@/lib/preview-seed";
 
 export default function FarmersPage() {
   const t = useTranslations("common");
@@ -55,30 +55,48 @@ async function FarmersList() {
             name: string;
             region?: string;
             country?: string;
-          }) => (
-            <Link
-              key={farmer._id}
-              href={`/farmers/${farmer.slug.current}`}
-              className="group block"
-            >
-              <ImageCard
-                image={farmer.imageUrl ?? (farmer.photo?.asset ? urlFor(farmer.photo).width(600).height(400).url() : undefined)}
-                alt={farmer.photo?.alt || farmer.name}
-                className="mb-5"
-                hover
-              />
-              <div className="space-y-2 text-center">
-                <h3 className="text-sm font-normal leading-relaxed group-hover:underline underline-offset-4">
-                  {farmer.name}
-                </h3>
-                {(farmer.region || farmer.country) && (
-                  <p className="text-[13px] text-muted-foreground">
-                    {[farmer.region, farmer.country].filter(Boolean).join(", ")}
-                  </p>
-                )}
-              </div>
-            </Link>
-          )
+          }) => {
+            const seeded = isSeedId(farmer._id);
+            const inner = (
+              <>
+                <ImageCard
+                  image={farmer.imageUrl ?? (farmer.photo?.asset ? urlFor(farmer.photo).width(600).height(400).url() : undefined)}
+                  alt={farmer.photo?.alt || farmer.name}
+                  className="mb-5"
+                  hover={!seeded}
+                />
+                <div className="space-y-2 text-center">
+                  <h3 className="text-sm font-normal leading-relaxed group-hover:underline underline-offset-4">
+                    {farmer.name}
+                  </h3>
+                  {(farmer.region || farmer.country) && (
+                    <p className="text-[13px] text-muted-foreground">
+                      {[farmer.region, farmer.country].filter(Boolean).join(", ")}
+                    </p>
+                  )}
+                </div>
+              </>
+            );
+
+            // Seed (dummy) farmers have no real detail route -> render non-linked.
+            if (seeded) {
+              return (
+                <div key={farmer._id} className="block cursor-default">
+                  {inner}
+                </div>
+              );
+            }
+
+            return (
+              <Link
+                key={farmer._id}
+                href={`/farmers/${farmer.slug.current}`}
+                className="group block"
+              >
+                {inner}
+              </Link>
+            );
+          }
         )}
       </div>
     );
