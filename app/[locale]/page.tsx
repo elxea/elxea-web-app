@@ -71,7 +71,9 @@ export default function HomePage() {
             <p className="text-[11px] text-overlay-foreground-muted uppercase tracking-[0.25em] mb-8">
               {t("home.tagline")}
             </p>
-            <h1 className="mb-6 text-overlay-foreground">Tea for Creativity.</h1>
+            <h1 className="hero-display mb-6 text-overlay-foreground">
+              Tea for Creativity.
+            </h1>
             <p className="text-overlay-foreground-muted text-sm leading-relaxed mb-10 max-w-md">
               {t("home.hero")}
             </p>
@@ -197,7 +199,7 @@ function FeaturedProductsSkeleton() {
 
 function ArticlesSkeleton() {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-12">
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-12 max-w-[840px] mx-auto">
       {Array.from({ length: 4 }).map((_, i) => (
         <div key={i}>
           <Skeleton className="aspect-[3/2] w-full mb-4" />
@@ -383,7 +385,7 @@ async function FeaturedArticles() {
     }
 
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-12">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-12 max-w-[840px] mx-auto">
         {articles.map(
           (article: {
             _id: string;
