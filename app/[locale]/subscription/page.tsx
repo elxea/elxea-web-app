@@ -51,8 +51,9 @@ export default async function SubscriptionLPPage() {
     <>
       {/* ─── 1. Hero ─── */}
       <section className="relative min-h-[90vh] flex items-center justify-center">
+        {/* 暫定: 専用写真は画像台帳経由で差し替え可 */}
         <ImageWithFallback
-          src="/placeholder-hero-day.jpg"
+          src="/hero-day.jpg"
           fallbackSrc="/placeholder-hero-day.jpg"
           alt=""
           aria-hidden="true"
