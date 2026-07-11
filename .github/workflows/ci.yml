@@ -187,11 +187,19 @@ jobs:
           # exitZeroOnChanges: false — unreviewed visual changes now BLOCK the
           # PR check (previously true = visual diffs never failed).
           exitZeroOnChanges: false
-          # autoAcceptChanges: main is KEPT intentionally: once a change lands on
+          # autoAcceptChanges: `main` is KEPT intentionally: once a change lands on
           # main it becomes the new baseline automatically, so main pushes don't
           # require manual re-accept. The gate that matters is on PR branches,
           # where changes are NOT auto-accepted and must be reviewed.
-          autoAcceptChanges: main
+          #
+          # `design/va-pilot` is added as a ONE-TIME, branch-limited baseline
+          # acceptance for the full-site visual pilot (Setaka-approved intentional
+          # 178-diff rebaseline). It auto-accepts ONLY on that release branch so the
+          # new design becomes the baseline; every OTHER PR branch stays strict
+          # (exitZeroOnChanges: false is untouched, so unreviewed diffs still BLOCK).
+          # SAFE to remove this branch arm after the pilot merges — the glob is a
+          # brace list matched by Chromatic's picomatch globbing.
+          autoAcceptChanges: "{main,design/va-pilot}"
           onlyChanged: true
 
   staging-smoke:

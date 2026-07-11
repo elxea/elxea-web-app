@@ -51,11 +51,17 @@ function SectionHeader({
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("home");
+  // The `%s | elxea` title.template lives in this same route segment's layout
+  // (app/[locale]/layout.tsx). Next.js applies title.template only to CHILD
+  // segments, never the segment where it is defined — so the home page (same
+  // segment) does not inherit the brand suffix automatically. Emit the branded
+  // title explicitly to keep "elxea" in the top page <title>.
+  const brandedTitle = `${t("tagline")} | elxea`;
   return {
-    title: t("tagline"),
+    title: brandedTitle,
     description: t("hero"),
     openGraph: {
-      title: t("tagline"),
+      title: brandedTitle,
       description: t("hero"),
     },
   };
