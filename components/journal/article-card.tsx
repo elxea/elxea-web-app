@@ -1,6 +1,7 @@
 import { Link } from "@/i18n/navigation";
 import { urlFor } from "@/sanity/lib/image";
 import { ImageCard } from "@/components/ui/image-card";
+import { previewSeedEnabled, previewImageForKey } from "@/lib/preview-seed";
 
 type ArticleCardProps = {
   article: {
@@ -22,6 +23,13 @@ type ArticleCardProps = {
 
 export function ArticleCard({ article, locale, memberOnlyLabel }: ArticleCardProps) {
   const image = article.thumbnail ?? article.mainImage;
+  // Preview-only: articles without imagery fall back to a stable local
+  // placeholder photo so cards render at layout density. No effect when unset.
+  const resolvedImage = image?.asset
+    ? urlFor(image).width(600).height(400).url()
+    : previewSeedEnabled()
+      ? previewImageForKey(article._id)
+      : undefined;
 
   return (
     <div className="group">
@@ -30,7 +38,7 @@ export function ArticleCard({ article, locale, memberOnlyLabel }: ArticleCardPro
         className="block"
       >
         <ImageCard
-          image={image?.asset ? urlFor(image).width(600).height(400).url() : undefined}
+          image={resolvedImage}
           alt={image?.alt || article.title}
           className="mb-4"
           hover

@@ -5,6 +5,7 @@ import { getClient } from "@/sanity/lib/client";
 import { ImageCard } from "@/components/ui/image-card";
 import { EVENTS_QUERY } from "@/sanity/lib/queries";
 import { urlFor } from "@/sanity/lib/image";
+import { previewSeedEnabled, seedEvents } from "@/lib/preview-seed";
 
 export default function EventsPage() {
   const t = useTranslations("common");
@@ -30,7 +31,15 @@ async function EventsList() {
 
   try {
     const client = getClient();
-    const events = await client.fetch(EVENTS_QUERY, { language: locale });
+    const fetched = await client.fetch(EVENTS_QUERY, { language: locale });
+
+    // Preview-only: the production dataset has no future events, so the list is
+    // empty. Fall back to the shared seed events (same 3 as the top page) so the
+    // layout can be reviewed. No effect when the flag is unset.
+    const events =
+      (!fetched || fetched.length === 0) && previewSeedEnabled()
+        ? seedEvents()
+        : fetched;
 
     if (!events || events.length === 0) {
       return (
@@ -47,6 +56,7 @@ async function EventsList() {
           (event: {
             _id: string;
             slug: { current: string };
+            imageUrl?: string;
             image?: { asset: object; alt?: string };
             title: string;
             date: string;
@@ -60,7 +70,7 @@ async function EventsList() {
               <>
                 <div className="relative mb-4">
                   <ImageCard
-                    image={event.image?.asset ? urlFor(event.image).width(600).height(400).url() : undefined}
+                    image={event.imageUrl ?? (event.image?.asset ? urlFor(event.image).width(600).height(400).url() : undefined)}
                     alt={event.title}
                     sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                     hover

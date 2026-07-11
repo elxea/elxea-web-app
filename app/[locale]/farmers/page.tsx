@@ -5,6 +5,7 @@ import { getClient } from "@/sanity/lib/client";
 import { ImageCard } from "@/components/ui/image-card";
 import { FARMERS_QUERY } from "@/sanity/lib/queries";
 import { urlFor } from "@/sanity/lib/image";
+import { withSeedFarmers } from "@/lib/preview-seed";
 
 export default function FarmersPage() {
   const t = useTranslations("common");
@@ -29,7 +30,11 @@ async function FarmersList() {
 
   try {
     const client = getClient();
-    const farmers = await client.fetch(FARMERS_QUERY, { language: locale });
+    const fetched = await client.fetch(FARMERS_QUERY, { language: locale });
+
+    // Preview-only: real farmers lack photos and the list is thin. Attach
+    // placeholder imagery and pad to a full grid. No effect when flag unset.
+    const farmers = withSeedFarmers(fetched);
 
     if (!farmers || farmers.length === 0) {
       return (
@@ -45,6 +50,7 @@ async function FarmersList() {
           (farmer: {
             _id: string;
             slug: { current: string };
+            imageUrl?: string;
             photo?: { asset: object; alt?: string };
             name: string;
             region?: string;
@@ -56,7 +62,7 @@ async function FarmersList() {
               className="group block"
             >
               <ImageCard
-                image={farmer.photo?.asset ? urlFor(farmer.photo).width(600).height(400).url() : undefined}
+                image={farmer.imageUrl ?? (farmer.photo?.asset ? urlFor(farmer.photo).width(600).height(400).url() : undefined)}
                 alt={farmer.photo?.alt || farmer.name}
                 className="mb-5"
                 hover

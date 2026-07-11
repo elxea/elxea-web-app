@@ -10,6 +10,7 @@ import { getClient } from "@/sanity/lib/client";
 import { FEATURED_ARTICLES_QUERY, EVENTS_QUERY } from "@/sanity/lib/queries";
 import { ArticleCard } from "@/components/journal/article-card";
 import { urlFor } from "@/sanity/lib/image";
+import { previewSeedEnabled } from "@/lib/preview-seed";
 
 /**
  * 変A section header for data-driven blocks (Products / Journal / Events):
@@ -267,7 +268,7 @@ async function UpcomingEvents() {
   const t = await getTranslations();
 
   try {
-    const seedEnabled = process.env.PREVIEW_SEED_EVENTS === "1";
+    const seedEnabled = previewSeedEnabled();
     const events = seedEnabled
       ? getSeedEvents()
       : await getClient().fetch(EVENTS_QUERY, { language: locale });
