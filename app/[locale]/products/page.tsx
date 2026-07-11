@@ -5,7 +5,7 @@ import { ProductGrid } from "@/components/product/product-grid";
 
 export const metadata: Metadata = {
   title: "Products",
-  description: "Browse our specialty coffee and tea collection.",
+  description: "日本各地の小規模茶農家から厳選した、シングルオリジン茶葉のクラフトティー。",
 };
 
 export default async function ProductsPage() {

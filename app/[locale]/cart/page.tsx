@@ -7,7 +7,7 @@ export default function CartPage() {
   return (
     <div className="section-narrow py-20">
       <h1 className="mb-4">{t("cart")}</h1>
-      <p className="text-muted-foreground text-sm mb-12">Items in your cart</p>
+      <p className="text-muted-foreground text-sm mb-12">カートの中身</p>
       <CartContent />
     </div>
   );

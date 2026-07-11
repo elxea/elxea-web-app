@@ -25,7 +25,7 @@
     "orderSummary": "注文サマリー",
     "quantity": "数量",
     "remove": "削除",
-    "emptyCart": "カートは空です",
+    "emptyCart": "まだカートは空です。気になるお茶を、探しにいきましょう。",
     "soldOut": "売り切れ",
     "subscribe": "定期購入する",
     "language": "言語",
@@ -63,7 +63,7 @@
     "description": "商品説明",
     "relatedProducts": "関連商品",
     "loadError": "商品を読み込めませんでした。",
-    "noProducts": "商品が見つかりませんでした",
+    "noProducts": "ただいまお届けできる商品がありません",
     "purchaseType": "購入方法",
     "oneTimePurchase": "通常購入",
     "subscription": "定期購入",
@@ -85,7 +85,7 @@
     "loginRequiredForFavorite": "お気に入りに追加するにはログインが必要です。"
   },
   "collection": {
-    "empty": "コレクションがありません",
+    "empty": "コレクションはまだありません",
     "loadError": "コレクションを読み込めませんでした。"
   },
   "search": {
