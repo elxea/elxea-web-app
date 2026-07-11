@@ -66,7 +66,7 @@ export default async function SubscriptionLPPage() {
           <p className="text-[11px] text-overlay-foreground-muted uppercase tracking-[0.25em] mb-6">
             {t("heroSubtitle")}
           </p>
-          <h1 className="mb-8 text-overlay-foreground whitespace-pre-line">
+          <h1 className="hero-display mb-8 text-overlay-foreground whitespace-pre-line">
             {t("heroHeading")}
           </h1>
           <Button className="bg-overlay-foreground text-foreground hover:bg-overlay-foreground/90" asChild>

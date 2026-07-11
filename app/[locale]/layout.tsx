@@ -20,7 +20,7 @@ export const metadata: Metadata = {
     default: "elxea",
     template: "%s | elxea",
   },
-  description: "elxea - specialty coffee & tea",
+  description: "elxea - Single-Origin Japanese Tea",
   manifest: "/manifest.json",
   icons: {
     icon: [
@@ -33,7 +33,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     siteName: "elxea",
-    images: [{ url: "/og-image.png", width: 1200, height: 630, alt: "elxea - Specialty Coffee & Tea" }],
+    images: [{ url: "/og-image.png", width: 1200, height: 630, alt: "elxea - Single-Origin Japanese Tea" }],
   },
   twitter: {
     card: "summary_large_image",
