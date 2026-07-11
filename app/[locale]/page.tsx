@@ -211,13 +211,66 @@ function ArticlesSkeleton() {
   );
 }
 
+/**
+ * Preview-only seed for the Upcoming Events section.
+ *
+ * Local preview points at the *production* Sanity dataset, which currently has
+ * no future-dated events, so UpcomingEvents renders null and the section
+ * disappears. To review the page at Figma density WITHOUT writing anything to
+ * the production dataset, set PREVIEW_SEED_EVENTS=1 in the preview process env
+ * only. When the flag is unset the behaviour is byte-identical to before
+ * (normal Sanity fetch), so production deploys are unaffected.
+ *
+ * `imageUrl` points at existing local /public assets (placeholder imagery for
+ * preview; real event photos land via Sanity in production).
+ */
+function getSeedEvents(): Array<{
+  _id: string;
+  slug: { current: string };
+  imageUrl?: string;
+  image?: { asset: object; alt?: string };
+  title: string;
+  date: string;
+  endDate?: string;
+  location?: string;
+}> {
+  return [
+    {
+      _id: "seed-event-1",
+      slug: { current: "seed-event-1" },
+      imageUrl: "/hero-day.jpg",
+      title: "Morning Tea Ceremony",
+      date: "2026-07-25T01:00:00.000Z",
+      location: "elxea Studio, Tokyo",
+    },
+    {
+      _id: "seed-event-2",
+      slug: { current: "seed-event-2" },
+      imageUrl: "/hero-night.jpg",
+      title: "Farmer's Table: Single-Origin Tasting",
+      date: "2026-08-08T09:00:00.000Z",
+      location: "Kyoto Farmhouse",
+    },
+    {
+      _id: "seed-event-3",
+      slug: { current: "seed-event-3" },
+      imageUrl: "/hero-approach.jpg",
+      title: "Creativity & Tea Workshop",
+      date: "2026-08-22T05:30:00.000Z",
+      location: "elxea Gallery, Osaka",
+    },
+  ];
+}
+
 async function UpcomingEvents() {
   const locale = await getLocale();
   const t = await getTranslations();
 
   try {
-    const client = getClient();
-    const events = await client.fetch(EVENTS_QUERY, { language: locale });
+    const seedEnabled = process.env.PREVIEW_SEED_EVENTS === "1";
+    const events = seedEnabled
+      ? getSeedEvents()
+      : await getClient().fetch(EVENTS_QUERY, { language: locale });
 
     if (!events || events.length === 0) {
       return null;
@@ -226,6 +279,7 @@ async function UpcomingEvents() {
     const upcomingEvents = events.slice(0, 3) as Array<{
       _id: string;
       slug: { current: string };
+      imageUrl?: string;
       image?: { asset: object; alt?: string };
       title: string;
       date: string;
@@ -245,7 +299,16 @@ async function UpcomingEvents() {
           {upcomingEvents.map((event) => (
             <Link key={event._id} href={`/events/${event.slug.current}`} className="group block">
               <div className="aspect-[3/2] bg-muted overflow-hidden mb-4">
-                {event.image?.asset ? (
+                {event.imageUrl ? (
+                  <Image
+                    src={event.imageUrl}
+                    alt={event.title}
+                    width={400}
+                    height={300}
+                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                  />
+                ) : event.image?.asset ? (
                   <Image
                     src={urlFor(event.image).width(400).height(300).url()}
                     alt={event.title}
