@@ -89,6 +89,8 @@
     "loadError": "Could not load collections."
   },
   "search": {
+    "placeholder": "Search tea or keywords",
+    "noResults": "No tea matched \"{q}\". Try another keyword.",
     "results": "{count} results",
     "loadError": "Search failed."
   },
@@ -160,6 +162,8 @@
     "articlesByAuthor": "Articles by this author"
   },
   "farmer": {
+    "heading": "Farmers",
+    "lead": "",
     "empty": "No farmer profiles yet.",
     "loadError": "Could not load farmer profiles.",
     "follow": "Follow",
@@ -168,6 +172,7 @@
     "unfollowedMessage": "Unfollowed"
   },
   "event": {
+    "lead": "",
     "empty": "No upcoming events.",
     "loadError": "Could not load events.",
     "detailsLink": "Details & Register →",

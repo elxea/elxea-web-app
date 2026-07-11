@@ -35,13 +35,19 @@ export default async function SearchPage({
         <SearchForm initialQuery={q || ""} />
       </div>
 
-      {q && results && (
+      {q && results && results.totalCount > 0 && (
         <div className="mt-16">
           <p className="text-sm text-muted-foreground mb-8">
             {t("results", { count: results.totalCount })}
           </p>
           <ProductGrid products={results.products} />
         </div>
+      )}
+
+      {q && results && results.totalCount === 0 && (
+        <p className="text-muted-foreground text-sm mt-12">
+          {t("noResults", { q })}
+        </p>
       )}
 
       {q && !results && (

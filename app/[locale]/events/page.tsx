@@ -9,15 +9,19 @@ import { previewSeedEnabled, seedEvents, isSeedId } from "@/lib/preview-seed";
 
 export default function EventsPage() {
   const t = useTranslations("common");
+  const te = useTranslations("event");
 
   return (
     <div className="section-wide">
       {/* 変A: centered editorial header */}
       <div className="text-center mb-12 md:mb-16">
         <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-4">
-          Upcoming
+          Events
         </p>
         <h1>{t("events")}</h1>
+        {te("lead") && (
+          <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl mx-auto mt-6">{te("lead")}</p>
+        )}
       </div>
       <EventsList />
     </div>

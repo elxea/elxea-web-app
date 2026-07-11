@@ -13,7 +13,7 @@ export default function PlaylistsPage() {
     <div className="section-wide py-20">
       <div className="text-center mb-16">
         <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-4">
-          Playlists
+          Sound from Nature
         </p>
         <h1 className="mb-6">{t("title")}</h1>
         <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl mx-auto">{t("description")}</p>

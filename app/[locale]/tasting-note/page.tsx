@@ -17,7 +17,7 @@ export default async function TastingNotePage() {
         {/* 変A: 中央寄せ editorial header (Figma 6728:120) */}
         <div className="text-center mb-10 md:mb-12">
           <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-4">
-            Interactive
+            Tasting Note
           </p>
           <h1 className="text-2xl font-normal">Tasting Note</h1>
         </div>

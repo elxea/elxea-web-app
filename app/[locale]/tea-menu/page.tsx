@@ -14,7 +14,7 @@ export default function TeaMenuPage() {
       {/* 変A: 左寄せ editorial header (Figma 6639:13048) */}
       <div className="mb-12 md:mb-16">
         <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-4">
-          Tea Selection
+          Tea Menu
         </p>
         <h1 className="mb-4">{t("title")}</h1>
         <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl">{t("description")}</p>

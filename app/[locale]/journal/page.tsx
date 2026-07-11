@@ -36,7 +36,7 @@ function JournalHeader() {
     <div className="mb-16">
       <div className="text-center mb-10">
         <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-4">
-          Articles
+          Journal
         </p>
         <h1 className="mb-6">{t("title")}</h1>
         <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl mx-auto">{t("description")}</p>
