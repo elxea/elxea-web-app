@@ -47,8 +47,8 @@
     "loginRequired": "Please log in to continue."
   },
   "home": {
-    "tagline": "Specialty Coffee & Tea",
-    "hero": "Specialty Coffee & Tea",
+    "tagline": "Single-Origin Japanese Tea",
+    "hero": "Single-Origin Japanese Tea",
     "featuredProducts": "Featured Products",
     "latestJournal": "Latest Articles",
     "upcomingEvents": "Upcoming Events",
@@ -96,7 +96,7 @@
   },
   "journal": {
     "title": "Journal",
-    "description": "Stories about coffee and tea",
+    "description": "Stories about tea",
     "tagArchiveTitle": "Tag: {name}",
     "tagArchiveDescription": "Articles tagged “{name}”",
     "categoryArchiveTitle": "Category: {name}",
