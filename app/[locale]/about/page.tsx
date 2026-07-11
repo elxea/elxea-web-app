@@ -33,7 +33,7 @@ export default async function AboutPage() {
             <p className="text-xs uppercase tracking-widest text-overlay-foreground-muted">
               About Us
             </p>
-            <h1 className="text-overlay-foreground">{t("title")}</h1>
+            <h1 className="hero-display text-overlay-foreground">{t("title")}</h1>
             <p className="mx-auto max-w-md text-sm leading-relaxed text-overlay-foreground-muted">
               {t("subtitle")}
             </p>
