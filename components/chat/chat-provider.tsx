@@ -213,18 +213,17 @@ async function fetchShopifyCustomerId(): Promise<string | null> {
 }
 
 /**
- * Fetch the LINE user ID from the Auth.js session API.
- * Returns null if not authenticated via LINE or on error.
+ * Resolve the LINE user ID.
+ *
+ * The Auth.js session endpoint (/api/auth/session) is not mounted in this app
+ * (LINE linkage is handled via /api/line-login and /api/user/line-link), so the
+ * previous fetch always 404'd and returned null while adding a console error on
+ * every page load. We skip the call to the unimplemented endpoint; behaviour is
+ * unchanged (still null) and the console noise is removed. If an Auth.js session
+ * route is added later, restore the fetch here.
  */
 async function fetchLineUserId(): Promise<string | null> {
-  try {
-    const res = await fetch("/api/auth/session");
-    if (!res.ok) return null;
-    const data = await res.json();
-    return data?.user?.lineUserId ?? null;
-  } catch {
-    return null;
-  }
+  return null;
 }
 
 export function ChatProvider({ children }: { children: React.ReactNode }) {
