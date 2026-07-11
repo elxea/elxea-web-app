@@ -18,9 +18,11 @@ export async function generateMetadata({
   params: Promise<{ handle: string }>;
 }): Promise<Metadata> {
   const { handle } = await params;
+  const t = await getTranslations("common");
+  const fallback: Metadata = { title: t("products") };
   try {
     const product = await getProductByHandle(handle);
-    if (!product) return {};
+    if (!product) return fallback;
     return {
       title: product.title,
       description: product.seo.description || product.description?.slice(0, 160),
@@ -31,7 +33,7 @@ export async function generateMetadata({
       },
     };
   } catch {
-    return {};
+    return fallback;
   }
 }
 

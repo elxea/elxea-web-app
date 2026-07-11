@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { Suspense } from "react";
 import { useTranslations } from "next-intl";
 import { getLocale, getTranslations } from "next-intl/server";
@@ -12,6 +13,18 @@ import { CategoryFilter } from "@/components/journal/category-filter";
 import { ImageCard } from "@/components/ui/image-card";
 import { requireAuth } from "@/lib/firebase/auth-guard";
 import { getRecommendedArticles } from "@/lib/recommendations/content-engine";
+
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("journal");
+  return {
+    title: t("title"),
+    description: t("description"),
+    openGraph: {
+      title: t("title"),
+      description: t("description"),
+    },
+  };
+}
 
 export default async function JournalPage({
   searchParams,

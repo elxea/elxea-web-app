@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { Suspense } from "react";
 import Image from "next/image";
 import { useTranslations } from "next-intl";
@@ -46,6 +47,18 @@ function SectionHeader({
       </Button>
     </div>
   );
+}
+
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("home");
+  return {
+    title: t("tagline"),
+    description: t("hero"),
+    openGraph: {
+      title: t("tagline"),
+      description: t("hero"),
+    },
+  };
 }
 
 export default function HomePage() {
