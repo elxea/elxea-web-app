@@ -27,6 +27,9 @@ function ComboboxTrigger({
   return (
     <ComboboxPrimitive.Trigger
       data-slot="combobox-trigger"
+      // Icon-only trigger needs an accessible name (axe button-name).
+      // Consumer-supplied aria-label via {...props} overrides this default.
+      aria-label="Show suggestions"
       className={cn("[&_svg:not([class*='size-'])]:size-4", className)}
       {...props}
     >

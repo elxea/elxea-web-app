@@ -12,7 +12,7 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
   render: () => (
-    <NativeSelect className="w-[180px]">
+    <NativeSelect className="w-[180px]" aria-label="Select a fruit">
       <NativeSelectOption value="">Select a fruit</NativeSelectOption>
       <NativeSelectOption value="apple">Apple</NativeSelectOption>
       <NativeSelectOption value="banana">Banana</NativeSelectOption>
@@ -23,7 +23,7 @@ export const Default: Story = {
 
 export const WithOptGroup: Story = {
   render: () => (
-    <NativeSelect className="w-[200px]">
+    <NativeSelect className="w-[200px]" aria-label="Select an item">
       <NativeSelectOption value="">Select...</NativeSelectOption>
       <NativeSelectOptGroup label="Fruits">
         <NativeSelectOption value="apple">Apple</NativeSelectOption>
@@ -39,7 +39,7 @@ export const WithOptGroup: Story = {
 
 export const Disabled: Story = {
   render: () => (
-    <NativeSelect className="w-[180px]" disabled>
+    <NativeSelect className="w-[180px]" disabled aria-label="Disabled select">
       <NativeSelectOption value="disabled">Disabled</NativeSelectOption>
     </NativeSelect>
   ),

@@ -47,7 +47,7 @@ export const WithMedia: Story = {
         <ItemDescription>Software Engineer</ItemDescription>
       </ItemContent>
       <ItemActions>
-        <Button variant="ghost" size="icon-sm">
+        <Button variant="ghost" size="icon-sm" aria-label="More actions">
           <MoreHorizontal className="size-4" />
         </Button>
       </ItemActions>

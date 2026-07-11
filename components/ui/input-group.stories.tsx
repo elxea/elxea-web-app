@@ -23,7 +23,7 @@ export const Default: Story = {
     <InputGroup className="w-[300px]">
       <InputGroupInput placeholder="Search..." />
       <InputGroupAddon align="inline-end">
-        <InputGroupButton size="icon-xs" variant="ghost">
+        <InputGroupButton size="icon-xs" variant="ghost" aria-label="Search">
           <Search className="size-4" />
         </InputGroupButton>
       </InputGroupAddon>
