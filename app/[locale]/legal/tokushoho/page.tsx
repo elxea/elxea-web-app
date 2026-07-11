@@ -30,10 +30,9 @@ export default async function TokushohoPage() {
         {/* Rows (変A Reading Column / Definition rows) */}
         <dl className="flex flex-col">
           <Row label="販売業者" value="株式会社elxea" />
-          {/* TODO(release-gate): 実値確定待ち */}
-          <Row label="代表者" value="[代表者名]" />
-          <Row label="所在地" value="[所在地住所]" />
-          <Row label="電話番号" value="[電話番号]" />
+          <Row label="代表者" value="温世堅" />
+          <Row label="所在地" value="〒102-0093 東京都千代田区平河町2-5-3 Nagatacho GRID 5F" />
+          <Row label="電話番号" value="070-3993-3294" />
           <Row label="メールアドレス" value="support@elxea.com" />
           <Row label="URL" value="https://elxea.com" />
           <Row label="販売価格" value="各商品ページに記載（税込表示）" />
@@ -63,12 +62,6 @@ export default async function TokushohoPage() {
           />
         </dl>
 
-        {/* Meta (変A Reading Column / Meta) */}
-        <div className="flex flex-col gap-2 border-t border-border pt-6 text-xs text-muted-foreground">
-          <p>
-            ※ [代表者名]、[所在地住所]、[電話番号] は本番公開前に実際の情報に差し替えてください。
-          </p>
-        </div>
       </div>
     </div>
   );
