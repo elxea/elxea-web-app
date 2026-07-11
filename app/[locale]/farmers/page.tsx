@@ -8,7 +8,6 @@ import { urlFor } from "@/sanity/lib/image";
 import { withSeedFarmers, isSeedId } from "@/lib/preview-seed";
 
 export default function FarmersPage() {
-  const t = useTranslations("common");
   const tf = useTranslations("farmer");
 
   return (
