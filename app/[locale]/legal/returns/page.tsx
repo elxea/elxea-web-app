@@ -30,7 +30,7 @@ export default async function ReturnsPage() {
           <Section title="返品について">
             <p>
               当社の商品は食品のため、お客様のご都合による返品・交換はお受けしておりません。
-              ご了承の上、ご注文ください。
+              あらかじめご了承いただけますと幸いです。
             </p>
           </Section>
 

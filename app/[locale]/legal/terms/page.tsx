@@ -94,6 +94,7 @@ export default async function TermsPage() {
           </Section>
 
           <Section title="第9条（準拠法・管轄）">
+            {/* TODO(release-gate): 実値確定待ち */}
             <p>
               本規約の解釈にあたっては日本法を準拠法とし、本規約に関する紛争については、
               [管轄裁判所]を第一審の専属的合意管轄裁判所とします。

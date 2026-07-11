@@ -30,6 +30,7 @@ export default async function TokushohoPage() {
         {/* Rows (変A Reading Column / Definition rows) */}
         <dl className="flex flex-col">
           <Row label="販売業者" value="株式会社elxea" />
+          {/* TODO(release-gate): 実値確定待ち */}
           <Row label="代表者" value="[代表者名]" />
           <Row label="所在地" value="[所在地住所]" />
           <Row label="電話番号" value="[電話番号]" />
