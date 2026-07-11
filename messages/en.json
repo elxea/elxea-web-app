@@ -21,6 +21,8 @@
     "removedFromCart": "Removed from cart",
     "checkout": "Checkout",
     "subtotal": "Subtotal",
+    "total": "Total",
+    "orderSummary": "Order Summary",
     "quantity": "Quantity",
     "remove": "Remove",
     "emptyCart": "Your cart is empty",

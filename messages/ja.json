@@ -21,6 +21,8 @@
     "removedFromCart": "カートから削除しました",
     "checkout": "購入手続きへ",
     "subtotal": "小計",
+    "total": "合計",
+    "orderSummary": "注文サマリー",
     "quantity": "数量",
     "remove": "削除",
     "emptyCart": "カートは空です",
