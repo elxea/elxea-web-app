@@ -4,6 +4,7 @@ import {
   measure,
   isWrapper,
   isUndecorated,
+  extractRoute,
 } from "@/scripts/design-system/figma-ds-instance-rate";
 
 /**
@@ -149,6 +150,31 @@ describe("figma-ds-instance-rate: wrapper 除外ルール", () => {
       total: 3,
       wrapper_excluded: 0,
     });
+  });
+
+  it("route が末尾にある実運用の命名から @/<route> を抽出できる", () => {
+    expect(
+      extractRoute("商品一覧 変A（部品ベース）— PC/SP @/ja/products")
+    ).toBe("@/ja/products");
+  });
+
+  it("先頭 @/<route> も従来どおり抽出できる (後方互換)", () => {
+    expect(extractRoute("@/ja/top hero 検証")).toBe("@/ja/top");
+  });
+
+  it("複数マッチ時は最後のものを採用する", () => {
+    expect(extractRoute("旧 @/ja/old → 新 @/ja/new")).toBe("@/ja/new");
+  });
+
+  it("動的セグメント [slug] を含む route も拾える", () => {
+    expect(extractRoute("記事詳細 @/ja/journal/[slug]")).toBe(
+      "@/ja/journal/[slug]"
+    );
+  });
+
+  it("@/<route> を含まないセクション名は null (母集団対象外)", () => {
+    expect(extractRoute("表紙 Cover")).toBeNull();
+    expect(extractRoute("メール @ mention だけ")).toBeNull();
   });
 
   it("invisible な fill のみ持つ FRAME は無装飾扱い", () => {

@@ -185,6 +185,27 @@ export function measure(node: FigmaNode): {
 }
 
 // ---------------------------------------------------------------------------
+// Route 抽出 (Boss 判断 2026-07-13: Figma 改名ではなくスクリプト側で吸収)
+// ---------------------------------------------------------------------------
+
+/**
+ * セクション名の任意位置にある `@/<route>` パターンを抽出する。
+ * 実運用の命名は route を末尾に持つ (例:
+ *   "商品一覧 変A（部品ベース）— PC/SP @/ja/products")
+ * ため、旧来の startsWith("@") 判定では 0 件になっていた。
+ * 動的セグメント `[slug]` も拾えるよう `[` `]` を文字クラスに含める。
+ * 1 セクション内に複数マッチした場合は最後のものを採用する。
+ * マッチしないセクションは母集団対象外 (null)。
+ */
+const ROUTE_RE = /@\/[A-Za-z0-9\-[\]/]+/g;
+
+export function extractRoute(name: string): string | null {
+  const matches = name.match(ROUTE_RE);
+  if (!matches || matches.length === 0) return null;
+  return matches[matches.length - 1];
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
@@ -221,20 +242,22 @@ async function main() {
   }
   const page = proposalPages[0];
 
-  // 2) ページ直下の @<route> 命名セクションを列挙 (type 不問・name 起点)
-  const routeSections = (page.children ?? []).filter((c) =>
-    c.name.trim().startsWith("@")
-  );
+  // 2) ページ直下から `@/<route>` を名前の任意位置に持つセクションを列挙する。
+  //    route は末尾に置かれる運用 (例 "... — PC/SP @/ja/products") のため、
+  //    name 全体から extractRoute で抽出する (type 不問)。
+  const routeSections = (page.children ?? [])
+    .map((c) => ({ node: c, route: extractRoute(c.name) }))
+    .filter((x): x is { node: FigmaNode; route: string } => x.route !== null);
   if (routeSections.length === 0) {
     console.error(
-      `Error: no "@<route>" named sections found under page "${page.name}" (fail-loud: 母集団ゼロは計測不能として扱う)`
+      `Error: no "@/<route>" named sections found under page "${page.name}" (fail-loud: 母集団ゼロは計測不能として扱う)`
     );
     process.exit(1);
   }
 
   // 3) 各セクションのフル subtree を nodes API で取得 (chunk して URL 長超過を回避)
   const sectionDocs: Record<string, FigmaNode> = {};
-  const ids = routeSections.map((s) => s.id);
+  const ids = routeSections.map((s) => s.node.id);
   const CHUNK = 20;
   for (let i = 0; i < ids.length; i += CHUNK) {
     const chunk = ids.slice(i, i + CHUNK);
@@ -254,11 +277,11 @@ async function main() {
 
   // 4) 計測
   const routes: RouteMeasurement[] = routeSections.map((s) => {
-    const doc = sectionDocs[s.id];
+    const doc = sectionDocs[s.node.id];
     const { instances, total, wrapper_excluded } = measure(doc);
     return {
-      name: s.name.trim(),
-      node_id: s.id,
+      name: s.route,
+      node_id: s.node.id,
       node_type: doc.type,
       instances,
       total,
