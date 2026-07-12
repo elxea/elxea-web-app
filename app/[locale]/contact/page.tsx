@@ -17,38 +17,47 @@ export default async function ContactPage() {
   const bt = await getTranslations("breadcrumb");
 
   return (
-    <div className="section-narrow py-20">
-      <Breadcrumb
-        items={[
-          { label: bt("home"), href: "/" },
-          { label: t("title") },
-        ]}
-      />
-      <div className="mb-16">
-        <h1 className="mb-4">{t("title")}</h1>
-        <p className="text-muted-foreground text-sm leading-relaxed">{t("subtitle")}</p>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-16">
-        <div className="md:col-span-2">
-          <ContactForm />
+    <div className="mx-auto max-w-3xl px-5 pt-12 pb-20 md:px-6 md:pt-24 md:pb-40">
+      <div className="flex flex-col gap-12 md:gap-16">
+        {/* Top: breadcrumb + title + lead (変A Reading Column / Top) */}
+        <div className="flex flex-col gap-5 md:gap-6">
+          <Breadcrumb
+            items={[
+              { label: bt("home"), href: "/" },
+              { label: t("title") },
+            ]}
+          />
+          <div className="flex flex-col gap-3">
+            <h1>{t("title")}</h1>
+            <p className="text-base leading-relaxed text-muted-foreground">
+              {t("subtitle")}
+            </p>
+          </div>
         </div>
 
-        <div className="space-y-8">
-          <div>
-            <h2 className="text-sm font-medium mb-4">{t("emailDirect")}</h2>
+        {/* Form (機能・送信ロジック温存) */}
+        <ContactForm />
+
+        {/* Supplementary contacts (変A Reading Column / Meta) */}
+        <div className="flex flex-col gap-6 border-t border-border pt-8">
+          <div className="flex flex-col gap-2">
+            <h2 className="text-sm font-medium text-foreground">
+              {t("emailDirect")}
+            </h2>
             <a
               href={`mailto:${t("emailAddress")}`}
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors underline underline-offset-4"
+              className="text-sm text-muted-foreground underline underline-offset-4 transition-colors hover:text-foreground"
             >
               {t("emailAddress")}
             </a>
           </div>
-          <p className="text-[13px] text-muted-foreground leading-relaxed">{t("responseTime")}</p>
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            {t("responseTime")}
+          </p>
           <div>
             <Link
               href="/contact/business"
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors underline underline-offset-4"
+              className="text-sm text-muted-foreground underline underline-offset-4 transition-colors hover:text-foreground"
             >
               {t("businessLink")}
             </Link>

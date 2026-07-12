@@ -96,7 +96,7 @@ export function LineLoginButton({
       size="lg"
       className="w-full bg-brand-line text-brand-white hover:bg-brand-line/90 active:bg-brand-line/80"
     >
-      {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- Intentional: <a> with external href required for Universal Links to open LINE app. Must NOT be <Link>. */}
+      {/* Intentional: <a> with external href (authUrl) required for Universal Links to open the LINE app. Must NOT be <Link>. no-html-link-for-pages does not fire here (external href), so no disable directive is needed. */}
       <a href={authUrl} onClick={handleClick}>
         {children}
       </a>

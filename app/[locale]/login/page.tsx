@@ -30,7 +30,7 @@ export default async function LoginPage() {
 
   return (
     <div className="min-h-[70vh] flex items-center justify-center px-4 py-24">
-      <div className="w-full max-w-sm space-y-8">
+      <div className="w-full max-w-sm space-y-6">
         {/* Error banner for failed authentication attempts */}
         <Suspense fallback={null}>
           <AuthErrorBanner />
@@ -41,41 +41,44 @@ export default async function LoginPage() {
           <LinkSuccessBanner />
         </Suspense>
 
-        {/* Heading */}
-        <div className="text-center space-y-4">
-          <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em]">
-            Account
-          </p>
-          <h1 className="text-2xl font-normal">{t("heading")}</h1>
-          <p className="text-sm text-muted-foreground leading-relaxed">
-            {t("description")}
+        {/* Login card */}
+        <div className="rounded-lg border border-border bg-card px-6 py-10 md:px-8 md:py-12 space-y-8">
+          {/* Heading */}
+          <div className="text-center space-y-4">
+            <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em]">
+              Account
+            </p>
+            <h1 className="text-2xl font-normal">{t("heading")}</h1>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              {t("description")}
+            </p>
+          </div>
+
+          {/* LINE Login — primary action */}
+          <LineLoginButton>
+            <LineIcon />
+            {t("lineButton")}
+          </LineLoginButton>
+
+          {/* Divider */}
+          <div className="flex items-center gap-4">
+            <Separator className="flex-1" />
+            <span className="text-xs text-muted-foreground">{t("or")}</span>
+            <Separator className="flex-1" />
+          </div>
+
+          {/* Shopify OAuth — secondary option */}
+          <Button variant="outline" size="lg" className="w-full" asChild>
+            <a href={`/api/auth/login?locale=${locale}`}>
+              {t("shopifyButton")}
+            </a>
+          </Button>
+
+          {/* Footer note */}
+          <p className="text-center text-xs text-muted-foreground leading-relaxed">
+            {t("terms")}
           </p>
         </div>
-
-        {/* LINE Login — primary action */}
-        <LineLoginButton>
-          <LineIcon />
-          {t("lineButton")}
-        </LineLoginButton>
-
-        {/* Divider */}
-        <div className="flex items-center gap-4">
-          <Separator className="flex-1" />
-          <span className="text-xs text-muted-foreground">{t("or")}</span>
-          <Separator className="flex-1" />
-        </div>
-
-        {/* Shopify OAuth — secondary option */}
-        <Button variant="outline" size="lg" className="w-full" asChild>
-          <a href={`/api/auth/login?locale=${locale}`}>
-            {t("shopifyButton")}
-          </a>
-        </Button>
-
-        {/* Footer note */}
-        <p className="text-center text-xs text-muted-foreground leading-relaxed">
-          {t("terms")}
-        </p>
       </div>
     </div>
   );

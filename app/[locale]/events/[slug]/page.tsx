@@ -11,6 +11,7 @@ import { MemberGate } from "@/components/ui/member-gate";
 import { ImageWithFallback } from "@/components/ui/image-with-fallback";
 import { Button } from "@/components/ui/button";
 import { EventRegisterButton } from "@/components/events/event-register-button";
+import { Link } from "@/i18n/navigation";
 
 export async function generateMetadata({
   params,
@@ -69,31 +70,56 @@ export default async function EventPage({
   const hasAccess = !isGated || tierRank[userTier] >= tierRank[requiredTier];
 
   return (
-    <div className="section-narrow py-20">
-      <header className="mb-16">
-        <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-4">
-          Event
-        </p>
-        <h1 className="mb-6">{event.title}</h1>
-        <div className="space-y-3">
-          <p className="text-sm text-muted-foreground">
-            {new Date(event.date).toLocaleDateString(locale, {
-              year: "numeric",
-              month: "long",
-              day: "numeric",
-            })}
-            {event.endDate &&
-              ` — ${new Date(event.endDate).toLocaleDateString(locale, {
+    <div className="section-narrow">
+      {/* 変A: breadcrumb */}
+      <nav className="mb-8 text-xs text-muted-foreground">
+        <Link href="/" className="hover:text-foreground transition-colors">
+          {tCommon("home")}
+        </Link>
+        <span className="mx-1.5">/</span>
+        <Link href="/events" className="hover:text-foreground transition-colors">
+          {tCommon("events")}
+        </Link>
+        <span className="mx-1.5">/</span>
+        <span className="text-foreground">{event.title}</span>
+      </nav>
+
+      <header className="mb-10">
+        <div className="flex items-center gap-3 mb-4">
+          <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em]">
+            Event
+          </p>
+          {isGated && (
+            <span className="text-[10px] uppercase tracking-[0.15em] px-2 py-0.5 rounded-full border border-border text-muted-foreground">
+              {tCommon("memberOnly")}
+            </span>
+          )}
+        </div>
+        <h1 className="mb-8">{event.title}</h1>
+
+        {/* 変A: bordered info table */}
+        <div className="border border-border divide-y divide-border text-sm">
+          <div className="flex items-center justify-between gap-4 px-4 py-3">
+            <span className="shrink-0 text-muted-foreground">{t("dateLabel")}</span>
+            <span className="text-right">
+              {new Date(event.date).toLocaleDateString(locale, {
                 year: "numeric",
                 month: "long",
                 day: "numeric",
-              })}`}
-          </p>
+              })}
+              {event.endDate &&
+                ` — ${new Date(event.endDate).toLocaleDateString(locale, {
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                })}`}
+            </span>
+          </div>
           {event.location && (
-            <p className="text-sm text-muted-foreground">{event.location}</p>
-          )}
-          {isGated && (
-            <p className="text-xs text-muted-foreground">[{tCommon("memberOnly")}]</p>
+            <div className="flex items-center justify-between gap-4 px-4 py-3">
+              <span className="shrink-0 text-muted-foreground">{t("locationLabel")}</span>
+              <span className="text-right">{event.location}</span>
+            </div>
           )}
         </div>
       </header>
@@ -134,22 +160,25 @@ export default async function EventPage({
             />
           </div>
 
-          {event.description && (
-            <div className="prose-custom mb-12">
-              <PortableText value={event.description} />
-            </div>
-          )}
-
-          {event.externalUrl && (
+          {/* 変A: 詳細・申し込みセクション（本文 + 外部リンク outline button） */}
+          {(event.description || event.externalUrl) && (
             <div className="pt-12 border-t border-border">
-              <a
-                href={event.externalUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex text-sm underline underline-offset-4 hover:text-muted-foreground transition-colors"
-              >
-                {t("detailsLink")} →
-              </a>
+              <h2 className="text-lg font-normal mb-6">{t("detailsHeading")}</h2>
+              {event.description && (
+                <div className="prose-custom mb-8">
+                  <PortableText value={event.description} />
+                </div>
+              )}
+              {event.externalUrl && (
+                <a
+                  href={event.externalUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-sm px-5 py-2.5 rounded-full border border-border hover:border-foreground hover:text-foreground transition-colors"
+                >
+                  {t("detailsPageLink")} ↗
+                </a>
+              )}
             </div>
           )}
         </>

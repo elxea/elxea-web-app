@@ -24,9 +24,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "nps must be 0-10" }, { status: 400 });
     }
 
+    // C: Forward X-API-Key so the cx-agent survey endpoint (fail-closed) accepts the request.
+    // The worker rejects unauthenticated calls; this proxy holds the shared secret.
+    const syncApiSecret = process.env.SYNC_API_SECRET;
+    const isProd = process.env.NODE_ENV === "production";
+    if (isProd && !syncApiSecret) {
+      console.error(
+        "[survey] SYNC_API_SECRET not set; cx-agent will reject the request (set in production)",
+      );
+    }
+    const surveyHeaders: Record<string, string> = { "Content-Type": "application/json" };
+    if (syncApiSecret) {
+      surveyHeaders["X-API-Key"] = syncApiSecret;
+    }
+
     const res = await fetch(`${CX_AGENT_BASE_URL}/api/survey`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: surveyHeaders,
       body: JSON.stringify({
         csat,
         would_use_again,

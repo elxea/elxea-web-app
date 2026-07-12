@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { Suspense } from "react";
 import { useTranslations } from "next-intl";
 import { getLocale, getTranslations } from "next-intl/server";
@@ -12,6 +13,18 @@ import { CategoryFilter } from "@/components/journal/category-filter";
 import { ImageCard } from "@/components/ui/image-card";
 import { requireAuth } from "@/lib/firebase/auth-guard";
 import { getRecommendedArticles } from "@/lib/recommendations/content-engine";
+
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("journal");
+  return {
+    title: t("title"),
+    description: t("description"),
+    openGraph: {
+      title: t("title"),
+      description: t("description"),
+    },
+  };
+}
 
 export default async function JournalPage({
   searchParams,
@@ -36,7 +49,7 @@ function JournalHeader() {
     <div className="mb-16">
       <div className="text-center mb-10">
         <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-4">
-          Articles
+          Journal
         </p>
         <h1 className="mb-6">{t("title")}</h1>
         <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl mx-auto">{t("description")}</p>
@@ -47,7 +60,7 @@ function JournalHeader() {
 
 function ArticlesListSkeleton() {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-10">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-14">
       {Array.from({ length: 6 }).map((_, i) => (
         <div key={i} className="animate-pulse">
           <ImageCard className="mb-4" />

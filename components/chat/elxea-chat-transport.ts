@@ -93,21 +93,14 @@ export class ElxeaChatTransport implements ChatTransport<UIMessage> {
       });
     }
 
-    // Workers API にリクエスト
-    // ログイン済みユーザーは shopify_customer_id を送信して
-    // cx-agent 側で identity resolution を行う
-    const shopifyCustomerId = this.getShopifyCustomerId();
-    const lineUserId = this.getLineUserId();
+    // 自サーバ proxy (/api/chat) にリクエスト。
+    // [SEC-B] customer_id はブラウザから送らない。proxy がサーバの認証済みセッションから
+    // verify 済み customer_id を導出し X-API-Key 付きで cx-agent に転送する。
+    // ブラウザ自己申告の customer_id は cx-agent 側で無視される (なりすまし防止)。
     const requestBody: Record<string, string> = {
       message: messageText,
       session_id: sessionId,
     };
-    if (shopifyCustomerId) {
-      requestBody.shopify_customer_id = shopifyCustomerId;
-    }
-    if (lineUserId) {
-      requestBody.line_user_id = lineUserId;
-    }
 
     // Abort previous request if still in-flight
     this.abortController?.abort();

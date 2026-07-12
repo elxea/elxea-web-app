@@ -35,12 +35,17 @@ export default async function SubscriptionsPage() {
 
   if (!customer) {
     return (
-      <div className="max-w-2xl mx-auto px-6 py-16 text-center">
-        <h1 className="text-2xl mb-6">{t("subscriptions")}</h1>
-        <p className="text-muted-foreground mb-8">{t("loginRequired")}</p>
-        <Button variant="outline" asChild>
-          <a href={`/api/auth/login?locale=${locale}`}>{tCommon("login")}</a>
-        </Button>
+      <div className="min-h-[70vh] flex items-center justify-center px-4 py-24">
+        <div className="text-center max-w-sm">
+          <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-4">
+            Subscription
+          </p>
+          <h1 className="text-2xl font-normal mb-4">{t("subscriptions")}</h1>
+          <p className="text-sm text-muted-foreground leading-relaxed mb-8">{t("loginRequired")}</p>
+          <Button variant="outline" asChild>
+            <a href={`/api/auth/login?locale=${locale}`}>{tCommon("login")}</a>
+          </Button>
+        </div>
       </div>
     );
   }
@@ -53,7 +58,7 @@ export default async function SubscriptionsPage() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-6 py-16">
+    <div className="section-narrow py-20">
       {/* Back link */}
       <div className="mb-8">
         <Button variant="link" className="p-0 h-auto text-muted-foreground" asChild>
@@ -61,9 +66,15 @@ export default async function SubscriptionsPage() {
         </Button>
       </div>
 
-      {/* Page heading */}
+      {/* Editorial header */}
       <div className="mb-12">
-        <h1 className="text-2xl mb-2">{t("subscriptions")}</h1>
+        <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-4">
+          Subscription
+        </p>
+        <h1 className="mb-4">{t("subscriptions")}</h1>
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          {t("subscriptionNoteManage")}
+        </p>
       </div>
 
       {/* Subscription list */}
@@ -78,6 +89,9 @@ export default async function SubscriptionsPage() {
         </div>
       ) : (
         <div className="space-y-6">
+          <h2 className="text-lg pb-3 border-b border-border">
+            {t("currentSubscriptions")}
+          </h2>
           {subscriptions.map((sub) => (
             <SubscriptionCard
               key={sub.id}
@@ -87,7 +101,7 @@ export default async function SubscriptionsPage() {
             />
           ))}
           <p className="text-xs text-muted-foreground">
-            {t("subscriptionNoteManage")}
+            {t("subscriptionNote")}
           </p>
         </div>
       )}

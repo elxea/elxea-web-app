@@ -12,24 +12,24 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
   render: () => (
-    <Slider defaultValue={[50]} max={100} step={1} className="w-[60%]" />
+    <Slider defaultValue={[50]} max={100} step={1} aria-label="Example slider" className="w-[60%]" />
   ),
 };
 
 export const Range: Story = {
   render: () => (
-    <Slider defaultValue={[25, 75]} max={100} step={1} className="w-[60%]" />
+    <Slider defaultValue={[25, 75]} max={100} step={1} aria-label="Range slider" className="w-[60%]" />
   ),
 };
 
 export const WithStep: Story = {
   render: () => (
-    <Slider defaultValue={[50]} max={100} step={10} className="w-[60%]" />
+    <Slider defaultValue={[50]} max={100} step={10} aria-label="Stepped slider" className="w-[60%]" />
   ),
 };
 
 export const Disabled: Story = {
   render: () => (
-    <Slider defaultValue={[50]} max={100} step={1} disabled className="w-[60%]" />
+    <Slider defaultValue={[50]} max={100} step={1} disabled aria-label="Disabled slider" className="w-[60%]" />
   ),
 };

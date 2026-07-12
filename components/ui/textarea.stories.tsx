@@ -36,5 +36,6 @@ export const Disabled: Story = {
 export const WithDefaultValue: Story = {
   args: {
     defaultValue: "This textarea has a default value that you can edit.",
+    "aria-label": "Message",
   },
 };

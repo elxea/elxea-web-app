@@ -40,6 +40,12 @@ jobs:
       - name: Type check
         run: pnpm tsc --noEmit
 
+      - name: Validate design tokens
+        # Fails the build (validate-tokens.ts exits 1) when tokens drift from
+        # the Style Dictionary source. Previously defined as a script but never
+        # wired into CI.
+        run: pnpm validate:tokens
+
   unit-tests:
     name: unit-tests
     needs: static-checks
@@ -71,6 +77,35 @@ jobs:
           name: unit-test-results
           path: test-results/
           retention-days: 7
+
+  storybook-tests:
+    name: storybook-tests
+    needs: static-checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run Storybook tests (a11y + interaction)
+        # Stories run as vitest browser tests. Accessibility violations FAIL
+        # because .storybook/preview.ts sets a11y.test: "error".
+        run: pnpm test --project storybook
 
   e2e-tests:
     name: e2e-tests
@@ -149,8 +184,22 @@ jobs:
         uses: chromaui/action@latest
         with:
           projectToken: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
-          exitZeroOnChanges: true
-          autoAcceptChanges: main
+          # exitZeroOnChanges: false — unreviewed visual changes now BLOCK the
+          # PR check (previously true = visual diffs never failed).
+          exitZeroOnChanges: false
+          # autoAcceptChanges: `main` is KEPT intentionally: once a change lands on
+          # main it becomes the new baseline automatically, so main pushes don't
+          # require manual re-accept. The gate that matters is on PR branches,
+          # where changes are NOT auto-accepted and must be reviewed.
+          #
+          # `design/va-pilot` is added as a ONE-TIME, branch-limited baseline
+          # acceptance for the full-site visual pilot (Setaka-approved intentional
+          # 178-diff rebaseline). It auto-accepts ONLY on that release branch so the
+          # new design becomes the baseline; every OTHER PR branch stays strict
+          # (exitZeroOnChanges: false is untouched, so unreviewed diffs still BLOCK).
+          # SAFE to remove this branch arm after the pilot merges — the glob is a
+          # brace list matched by Chromatic's picomatch globbing.
+          autoAcceptChanges: "{main,design/va-pilot}"
           onlyChanged: true
 
   staging-smoke:

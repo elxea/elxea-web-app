@@ -51,8 +51,9 @@ export default async function SubscriptionLPPage() {
     <>
       {/* ─── 1. Hero ─── */}
       <section className="relative min-h-[90vh] flex items-center justify-center">
+        {/* 暫定: 専用写真は画像台帳経由で差し替え可 */}
         <ImageWithFallback
-          src="/placeholder-hero-day.jpg"
+          src="/hero-day.jpg"
           fallbackSrc="/placeholder-hero-day.jpg"
           alt=""
           aria-hidden="true"
@@ -63,10 +64,7 @@ export default async function SubscriptionLPPage() {
         />
         <div className="absolute inset-0 bg-overlay" />
         <div className="relative text-center max-w-2xl px-8">
-          <p className="text-[11px] text-overlay-foreground-muted uppercase tracking-[0.25em] mb-6">
-            {t("heroSubtitle")}
-          </p>
-          <h1 className="mb-8 text-overlay-foreground whitespace-pre-line">
+          <h1 className="hero-display mb-8 text-overlay-foreground whitespace-pre-line">
             {t("heroHeading")}
           </h1>
           <Button className="bg-overlay-foreground text-foreground hover:bg-overlay-foreground/90" asChild>
@@ -103,7 +101,7 @@ export default async function SubscriptionLPPage() {
 
       {/* ─── 3. Single Origin Appeal ─── */}
       <section className="section-narrow">
-        <h2 className="mb-6">{t("originHeading")}</h2>
+        <h2 className="mb-6 text-center">{t("originHeading")}</h2>
 
         {/* Image placeholder */}
         <div className="relative aspect-[16/9] w-full bg-muted mb-8" />
@@ -117,7 +115,7 @@ export default async function SubscriptionLPPage() {
 
       {/* ─── 4. Product Lineup (placeholder) ─── */}
       <section className="section-wide">
-        <h2 className="mb-10">{t("lineupHeading")}</h2>
+        <h2 className="mb-10 text-center">{t("lineupHeading")}</h2>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6">
           {TEA_LINEUP.map((name) => (
@@ -132,7 +130,7 @@ export default async function SubscriptionLPPage() {
 
       {/* ─── 5. Subscription Plan Details ─── */}
       <section className="section-wide">
-        <h2 className="mb-10">{t("planHeading")}</h2>
+        <h2 className="mb-10 text-center">{t("planHeading")}</h2>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
           {/* Image placeholder */}
@@ -173,7 +171,7 @@ export default async function SubscriptionLPPage() {
 
       {/* ─── 6. Tea Bag Material ─── */}
       <section className="section-wide">
-        <h2 className="mb-10">{t("teabagHeading")}</h2>
+        <h2 className="mb-10 text-center">{t("teabagHeading")}</h2>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           <div>
@@ -219,7 +217,7 @@ export default async function SubscriptionLPPage() {
 
       {/* ─── 8. Subscriber-Only Perks ─── */}
       <section className="section-wide">
-        <h2 className="mb-10">{t("perksHeading")}</h2>
+        <h2 className="mb-10 text-center">{t("perksHeading")}</h2>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
           <Card>
@@ -269,7 +267,7 @@ export default async function SubscriptionLPPage() {
 
       {/* ─── 10. FAQ ─── */}
       <section className="section-narrow">
-        <h2 className="mb-10">{t("faqHeading")}</h2>
+        <h2 className="mb-10 text-center">{t("faqHeading")}</h2>
 
         <div className="divide-y divide-border">
           {faqItems.map((item, i) => (

@@ -6,6 +6,11 @@ const meta = {
   title: "UI/Switch",
   component: Switch,
   tags: ["autodocs"],
+  // Standalone switch stories (Checked/Disabled) render without a visible
+  // <Label>, so give the control an accessible name (axe button-name). Invisible.
+  args: {
+    "aria-label": "Example switch",
+  },
 } satisfies Meta<typeof Switch>;
 
 export default meta;

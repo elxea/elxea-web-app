@@ -6,7 +6,7 @@ import elxeaTokens from "./eslint-rules/index.mjs";
 
 const eslintConfig = [
   {
-    ignores: [".next/**", "dist/**", "storybook-static/**", "node_modules/**"],
+    ignores: [".next/**", "dist/**", "storybook-static/**", "node_modules/**", ".phase-*"],
   },
   ...nextCoreWebVitals,
   ...storybook.configs["flat/recommended"],
@@ -31,11 +31,22 @@ const eslintConfig = [
     },
   },
 
-  // Design token enforcement: detect raw color values in components
+  // Design token enforcement: block raw color values AND arbitrary length
+  // values (px/rem/em) in favor of design tokens. Error-level so NEW
+  // violations fail the build (`pnpm lint` runs with --max-warnings 0).
+  // Scope widened to app/** and components/ui/** (previously components/**
+  // minus ui, warn-only, which caught nothing).
+  // Pre-existing violations are grandfathered via eslint-suppressions.json
+  // (generated with `pnpm exec eslint --suppress-all`), which records the
+  // exact file+count so the debt stays visible and new code cannot regress.
   {
-    files: ["components/**/*.tsx", "components/**/*.jsx"],
+    files: [
+      "app/**/*.tsx",
+      "app/**/*.jsx",
+      "components/**/*.tsx",
+      "components/**/*.jsx",
+    ],
     ignores: [
-      "components/ui/**",
       "**/*.stories.tsx",
       "**/*.stories.jsx",
     ],
@@ -43,7 +54,7 @@ const eslintConfig = [
       "elxea-tokens": elxeaTokens,
     },
     rules: {
-      "elxea-tokens/no-raw-colors": "warn",
+      "elxea-tokens/no-raw-colors": ["error", { checkArbitraryValues: true }],
     },
   },
 ];

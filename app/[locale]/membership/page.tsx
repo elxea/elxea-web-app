@@ -56,7 +56,7 @@ export default async function MembershipPage() {
   };
 
   return (
-    <div className="section-narrow py-20">
+    <div className="max-w-6xl mx-auto px-6 py-20">
       <div className="text-center mb-16">
         <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-4">
           Plans
@@ -66,7 +66,7 @@ export default async function MembershipPage() {
       </div>
 
       {/* Plan cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
         {TIERS.map((tier) => {
           const config = tierConfig[tier];
           const isCurrent = tier === currentTier;
@@ -74,70 +74,63 @@ export default async function MembershipPage() {
           return (
             <div
               key={tier}
-              className={`border p-6 flex flex-col ${
+              className={`rounded-xl p-6 flex flex-col gap-5 bg-card ${
                 isCurrent
-                  ? "border-foreground"
-                  : "border-border"
+                  ? "border-2 border-foreground"
+                  : "border border-border"
               }`}
             >
               {/* Header */}
-              <div className="mb-6">
-                <div className="flex items-center justify-between mb-2">
-                  <h2 className="text-lg">{config.name}</h2>
-                  {isCurrent && (
-                    <span className="text-xs text-muted-foreground border border-border px-2 py-0.5">
-                      {t("currentPlan")}
-                    </span>
-                  )}
-                </div>
-                <p className="text-sm text-muted-foreground">
+              <div className="flex flex-col gap-2">
+                {isCurrent && (
+                  <span className="inline-flex w-fit rounded-full bg-muted text-foreground px-3 py-1 text-xs font-medium">
+                    {t("currentPlan")}
+                  </span>
+                )}
+                <h2 className="text-xl font-medium">{config.name}</h2>
+                <p className="text-sm text-muted-foreground leading-relaxed">
                   {config.description}
                 </p>
               </div>
 
-              {/* Features */}
-              <div className="flex-1 mb-6">
-                <p className="text-xs text-muted-foreground uppercase tracking-wider mb-3">
-                  {t("features")}
-                </p>
-                <ul className="space-y-2">
-                  {PLAN_FEATURES.map((feature) => {
-                    const included = feature.tiers.includes(tier);
-                    return (
-                      <li
-                        key={feature.key}
-                        className={`text-sm flex items-start gap-2 ${
-                          included ? "text-foreground" : "text-muted-foreground/40"
-                        }`}
-                      >
-                        <span className="shrink-0 mt-0.5">
-                          {included ? "+" : "-"}
-                        </span>
-                        {t(feature.key)}
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
+              {/* Perks */}
+              <ul className="flex-1 flex flex-col gap-3">
+                {PLAN_FEATURES.map((feature) => {
+                  const included = feature.tiers.includes(tier);
+                  return (
+                    <li
+                      key={feature.key}
+                      className={`text-sm flex items-start gap-2 ${
+                        included ? "text-foreground" : "text-muted-foreground"
+                      }`}
+                    >
+                      <span className="shrink-0 font-medium">
+                        {included ? "＋" : "－"}
+                      </span>
+                      <span className="flex-1">{t(feature.key)}</span>
+                    </li>
+                  );
+                })}
+              </ul>
 
               {/* Action */}
-              <div>
-                {isCurrent ? (
-                  <p className="text-xs text-muted-foreground text-center py-2">
+              {isCurrent ? (
+                <div className="flex justify-center px-4 py-2">
+                  <span className="text-sm font-medium text-muted-foreground">
                     {t("currentPlan")}
-                  </p>
-                ) : config.actionable ? (
-                  <Button variant="outline" className="w-full" asChild>
-                    <Link href="/contact">{t("comingSoon")}</Link>
-                  </Button>
-                ) : null}
-              </div>
+                  </span>
+                </div>
+              ) : config.actionable ? (
+                <Button variant="secondary" className="w-full rounded-lg bg-muted text-foreground hover:bg-muted/80 active:bg-muted/70" asChild>
+                  <Link href="/contact">{t("comingSoon")}</Link>
+                </Button>
+              ) : null}
             </div>
           );
         })}
       </div>
 
-      <p className="text-xs text-muted-foreground text-center">
+      <p className="text-sm text-muted-foreground text-center">
         {t("contactUs")}
       </p>
     </div>

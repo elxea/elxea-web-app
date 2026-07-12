@@ -75,23 +75,8 @@ export default async function ElxeaJournalDetailPage({
 
   return (
     <article className="py-20">
-      {/* ① Hero image — full width */}
-      {journal.mainImage?.asset && (
-        <div className="w-full aspect-[2/1] sm:aspect-[5/2] bg-muted overflow-hidden mb-16">
-          <ImageWithFallback
-            src={urlFor(journal.mainImage).width(1600).height(640).url()}
-            fallbackSrc="/placeholder-hero-day.jpg"
-            alt={journal.mainImage.alt || journal.title}
-            fill
-            sizes="100vw"
-            className="w-full h-full object-cover"
-            priority
-          />
-        </div>
-      )}
-
-      {/* ② Theme badge + Title + Summary */}
-      <header className="max-w-4xl mx-auto px-6 mb-16">
+      {/* ① 変A: Theme badge + Title + Summary をヒーロー画像の上に (Figma 6760:120) */}
+      <header className="section-narrow mb-10">
         <span
           className="inline-block text-[10px] font-medium text-brand-white px-2.5 py-1 uppercase tracking-wider mb-4"
           style={{ backgroundColor: themeColor }}
@@ -105,6 +90,23 @@ export default async function ElxeaJournalDetailPage({
           </p>
         )}
       </header>
+
+      {/* ② 変A: Hero image — タイトル下・本文幅に内包 */}
+      {journal.mainImage?.asset && (
+        <div className="section-narrow mb-16">
+          <div className="w-full aspect-[2/1] sm:aspect-[16/9] bg-muted overflow-hidden">
+            <ImageWithFallback
+              src={urlFor(journal.mainImage).width(1600).height(900).url()}
+              fallbackSrc="/placeholder-hero-day.jpg"
+              alt={journal.mainImage.alt || journal.title}
+              fill
+              sizes="(max-width: 768px) 100vw, 768px"
+              className="w-full h-full object-cover"
+              priority
+            />
+          </div>
+        </div>
+      )}
 
       {/* ③ Body (Portable Text) */}
       {journal.body && (

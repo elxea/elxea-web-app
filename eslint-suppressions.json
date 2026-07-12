@@ -1,0 +1,312 @@
+{
+  "app/[locale]/account/page.tsx": {
+    "elxea-tokens/no-raw-colors": {
+      "count": 2
+    }
+  },
+  "app/[locale]/account/subscriptions/page.tsx": {
+    "elxea-tokens/no-raw-colors": {
+      "count": 2
+    }
+  },
+  "app/[locale]/collections/page.tsx": {
+    "elxea-tokens/no-raw-colors": {
+      "count": 2
+    }
+  },
+  "app/[locale]/elxea-journal/[slug]/page.tsx": {
+    "elxea-tokens/no-raw-colors": {
+      "count": 4
+    }
+  },
+  "app/[locale]/elxea-journal/page.tsx": {
+    "elxea-tokens/no-raw-colors": {
+      "count": 2
+    }
+  },
+  "app/[locale]/events/[slug]/page.tsx": {
+    "elxea-tokens/no-raw-colors": {
+      "count": 2
+    }
+  },
+  "app/[locale]/events/page.tsx": {
+    "elxea-tokens/no-raw-colors": {
+      "count": 2
+    }
+  },
+  "app/[locale]/farmers/[slug]/page.tsx": {
+    "elxea-tokens/no-raw-colors": {
+      "count": 1
+    }
+  },
+  "app/[locale]/farmers/page.tsx": {
+    "elxea-tokens/no-raw-colors": {
+      "count": 2
+    }
+  },
+  "app/[locale]/journal/author/[slug]/page.tsx": {
+    "elxea-tokens/no-raw-colors": {
+      "count": 1
+    }
+  },
+  "app/[locale]/journal/category/[slug]/page.tsx": {
+    "elxea-tokens/no-raw-colors": {
+      "count": 1
+    }
+  },
+  "app/[locale]/journal/page.tsx": {
+    "elxea-tokens/no-raw-colors": {
+      "count": 1
+    }
+  },
+  "app/[locale]/journal/tag/[slug]/page.tsx": {
+    "elxea-tokens/no-raw-colors": {
+      "count": 1
+    }
+  },
+  "app/[locale]/login/line-login-button.tsx": {
+    "elxea-tokens/no-raw-colors": {
+      "count": 1
+    }
+  },
+  "app/[locale]/login/page.tsx": {
+    "elxea-tokens/no-raw-colors": {
+      "count": 1
+    }
+  },
+  "app/[locale]/membership/page.tsx": {
+    "elxea-tokens/no-raw-colors": {
+      "count": 1
+    }
+  },
+  "app/[locale]/page.tsx": {
+    "elxea-tokens/no-raw-colors": {
+      "count": 6
+    }
+  },
+  "app/[locale]/people/[slug]/page.tsx": {
+    "elxea-tokens/no-raw-colors": {
+      "count": 1
+    }
+  },
+  "app/[locale]/playlists/[slug]/page.tsx": {
+    "elxea-tokens/no-raw-colors": {
+      "count": 2
+    }
+  },
+  "app/[locale]/playlists/page.tsx": {
+    "elxea-tokens/no-raw-colors": {
+      "count": 2
+    }
+  },
+  "app/[locale]/products/[handle]/page.tsx": {
+    "elxea-tokens/no-raw-colors": {
+      "count": 2
+    }
+  },
+  "app/[locale]/products/page.tsx": {
+    "elxea-tokens/no-raw-colors": {
+      "count": 1
+    }
+  },
+  "app/[locale]/search/page.tsx": {
+    "elxea-tokens/no-raw-colors": {
+      "count": 1
+    }
+  },
+  "app/[locale]/subscription/page.tsx": {
+    "elxea-tokens/no-raw-colors": {
+      "count": 1
+    }
+  },
+  "app/[locale]/tasting-note/page.tsx": {
+    "elxea-tokens/no-raw-colors": {
+      "count": 1
+    }
+  },
+  "app/[locale]/tea-menu/[slug]/page.tsx": {
+    "elxea-tokens/no-raw-colors": {
+      "count": 2
+    }
+  },
+  "app/[locale]/tea-menu/page.tsx": {
+    "elxea-tokens/no-raw-colors": {
+      "count": 2
+    }
+  },
+  "app/global-error.tsx": {
+    "elxea-tokens/no-raw-colors": {
+      "count": 3
+    }
+  },
+  "components/cart/cart-content.tsx": {
+    "elxea-tokens/no-raw-colors": {
+      "count": 1
+    }
+  },
+  "components/chat/chat-message.tsx": {
+    "elxea-tokens/no-raw-colors": {
+      "count": 1
+    }
+  },
+  "components/layout/header.tsx": {
+    "elxea-tokens/no-raw-colors": {
+      "count": 1
+    }
+  },
+  "components/product/add-to-cart-button.tsx": {
+    "elxea-tokens/no-raw-colors": {
+      "count": 2
+    }
+  },
+  "components/product/product-card.tsx": {
+    "elxea-tokens/no-raw-colors": {
+      "count": 2
+    }
+  },
+  "components/product/product-features.tsx": {
+    "elxea-tokens/no-raw-colors": {
+      "count": 14
+    }
+  },
+  "components/ui/accordion.tsx": {
+    "elxea-tokens/no-raw-colors": {
+      "count": 1
+    }
+  },
+  "components/ui/badge.tsx": {
+    "elxea-tokens/no-raw-colors": {
+      "count": 1
+    }
+  },
+  "components/ui/button.tsx": {
+    "elxea-tokens/no-raw-colors": {
+      "count": 1
+    }
+  },
+  "components/ui/calendar.tsx": {
+    "elxea-tokens/no-raw-colors": {
+      "count": 4
+    }
+  },
+  "components/ui/chart.tsx": {
+    "elxea-tokens/no-raw-colors": {
+      "count": 4
+    }
+  },
+  "components/ui/checkbox.tsx": {
+    "elxea-tokens/no-raw-colors": {
+      "count": 1
+    }
+  },
+  "components/ui/combobox.tsx": {
+    "elxea-tokens/no-raw-colors": {
+      "count": 1
+    }
+  },
+  "components/ui/command.tsx": {
+    "elxea-tokens/no-raw-colors": {
+      "count": 1
+    }
+  },
+  "components/ui/context-menu.tsx": {
+    "elxea-tokens/no-raw-colors": {
+      "count": 2
+    }
+  },
+  "components/ui/drawer.tsx": {
+    "elxea-tokens/no-raw-colors": {
+      "count": 1
+    }
+  },
+  "components/ui/dropdown-menu.tsx": {
+    "elxea-tokens/no-raw-colors": {
+      "count": 2
+    }
+  },
+  "components/ui/input-group.tsx": {
+    "elxea-tokens/no-raw-colors": {
+      "count": 3
+    }
+  },
+  "components/ui/input-otp.tsx": {
+    "elxea-tokens/no-raw-colors": {
+      "count": 1
+    }
+  },
+  "components/ui/input.tsx": {
+    "elxea-tokens/no-raw-colors": {
+      "count": 1
+    }
+  },
+  "components/ui/item.tsx": {
+    "elxea-tokens/no-raw-colors": {
+      "count": 1
+    }
+  },
+  "components/ui/menubar.tsx": {
+    "elxea-tokens/no-raw-colors": {
+      "count": 2
+    }
+  },
+  "components/ui/native-select.tsx": {
+    "elxea-tokens/no-raw-colors": {
+      "count": 1
+    }
+  },
+  "components/ui/navigation-menu.tsx": {
+    "elxea-tokens/no-raw-colors": {
+      "count": 3
+    }
+  },
+  "components/ui/radio-group.tsx": {
+    "elxea-tokens/no-raw-colors": {
+      "count": 1
+    }
+  },
+  "components/ui/scroll-area.tsx": {
+    "elxea-tokens/no-raw-colors": {
+      "count": 1
+    }
+  },
+  "components/ui/select.tsx": {
+    "elxea-tokens/no-raw-colors": {
+      "count": 2
+    }
+  },
+  "components/ui/sidebar.tsx": {
+    "elxea-tokens/no-raw-colors": {
+      "count": 1
+    }
+  },
+  "components/ui/switch.tsx": {
+    "elxea-tokens/no-raw-colors": {
+      "count": 1
+    }
+  },
+  "components/ui/table.tsx": {
+    "elxea-tokens/no-raw-colors": {
+      "count": 2
+    }
+  },
+  "components/ui/tabs.tsx": {
+    "elxea-tokens/no-raw-colors": {
+      "count": 3
+    }
+  },
+  "components/ui/textarea.tsx": {
+    "elxea-tokens/no-raw-colors": {
+      "count": 1
+    }
+  },
+  "components/ui/toggle.tsx": {
+    "elxea-tokens/no-raw-colors": {
+      "count": 1
+    }
+  },
+  "components/ui/tooltip.tsx": {
+    "elxea-tokens/no-raw-colors": {
+      "count": 1
+    }
+  }
+}

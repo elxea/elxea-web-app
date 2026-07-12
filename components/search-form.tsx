@@ -12,6 +12,7 @@ export function SearchForm({ initialQuery }: { initialQuery: string }) {
   const router = useRouter();
   const locale = useLocale();
   const t = useTranslations("common");
+  const ts = useTranslations("search");
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -29,7 +30,7 @@ export function SearchForm({ initialQuery }: { initialQuery: string }) {
         type="text"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder={t("search")}
+        placeholder={ts("placeholder")}
         className="border-0 border-b border-foreground rounded-none bg-transparent py-4 h-auto text-2xl font-light placeholder:text-muted-foreground focus-visible:ring-0"
         autoFocus
       />

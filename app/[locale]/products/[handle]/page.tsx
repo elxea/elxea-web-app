@@ -18,9 +18,11 @@ export async function generateMetadata({
   params: Promise<{ handle: string }>;
 }): Promise<Metadata> {
   const { handle } = await params;
+  const t = await getTranslations("common");
+  const fallback: Metadata = { title: t("products") };
   try {
     const product = await getProductByHandle(handle);
-    if (!product) return {};
+    if (!product) return fallback;
     return {
       title: product.title,
       description: product.seo.description || product.description?.slice(0, 160),
@@ -31,7 +33,7 @@ export async function generateMetadata({
       },
     };
   } catch {
-    return {};
+    return fallback;
   }
 }
 
@@ -42,9 +44,10 @@ export default async function ProductPage({
   params: Promise<{ handle: string; locale: string }>;
   searchParams: Promise<Record<string, string>>;
 }) {
-  const { handle } = await params;
+  const { handle, locale } = await params;
   const currentSearchParams = await searchParams;
   const t = await getTranslations("product");
+  const tc = await getTranslations("common");
 
   let product;
   try {
@@ -69,6 +72,15 @@ export default async function ProductPage({
 
   return (
     <div className="section-wide py-20">
+      <Breadcrumb
+        items={[
+          { label: tc("home"), href: "/" },
+          { label: tc("products"), href: "/products" },
+          { label: product.title },
+        ]}
+        locale={locale}
+      />
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 lg:gap-20">
         {/* Images */}
         <ImageGallery images={product.images} />
@@ -81,21 +93,7 @@ export default async function ProductPage({
             </p>
           )}
 
-          <div className="flex items-start justify-between gap-4">
-            <h1 className="text-2xl font-normal">{product.title}</h1>
-            <FavoriteButton
-              productHandle={product.handle}
-              productTitle={product.title}
-              productImageUrl={product.featuredImage?.url ?? null}
-              addLabel={t("addToFavorites")}
-              removeLabel={t("removeFromFavorites")}
-              addedMessage={t("addedToFavorites")}
-              removedMessage={t("removedFromFavorites")}
-              errorMessage={t("favoriteError")}
-              loginRequiredMessage={t("loginRequiredForFavorite")}
-              className="shrink-0 mt-0.5"
-            />
-          </div>
+          <h1 className="text-2xl font-normal">{product.title}</h1>
 
           {product.sellingPlanGroups.length === 0 && (
             <p className="text-base text-muted-foreground">
@@ -103,6 +101,12 @@ export default async function ProductPage({
                 selectedVariant.price.amount,
                 selectedVariant.price.currencyCode
               )}
+            </p>
+          )}
+
+          {product.description && (
+            <p className="text-[13px] text-muted-foreground leading-loose whitespace-pre-line">
+              {product.description}
             </p>
           )}
 
@@ -134,13 +138,19 @@ export default async function ProductPage({
             />
           )}
 
-          {product.description && (
-            <div className="pt-10 mt-4 border-t border-border">
-              <p className="text-[13px] text-muted-foreground leading-loose whitespace-pre-line">
-                {product.description}
-              </p>
-            </div>
-          )}
+          <FavoriteButton
+            productHandle={product.handle}
+            productTitle={product.title}
+            productImageUrl={product.featuredImage?.url ?? null}
+            addLabel={t("addToFavorites")}
+            removeLabel={t("removeFromFavorites")}
+            addedMessage={t("addedToFavorites")}
+            removedMessage={t("removedFromFavorites")}
+            errorMessage={t("favoriteError")}
+            loginRequiredMessage={t("loginRequiredForFavorite")}
+            variant="text"
+            className="w-full"
+          />
         </div>
       </div>
 

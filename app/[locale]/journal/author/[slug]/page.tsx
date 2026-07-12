@@ -9,7 +9,6 @@ import {
 } from "@/sanity/lib/queries";
 import { urlFor } from "@/sanity/lib/image";
 import { ArticleCard } from "@/components/journal/article-card";
-import { Link } from "@/i18n/navigation";
 
 export async function generateMetadata({
   params,
@@ -56,52 +55,46 @@ export default async function AuthorPage({
 
   return (
     <div className="section-wide">
-      <Link
-        href="/journal"
-        className="text-xs text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors"
-      >
-        {t("title")}
-      </Link>
-
-      {/* Author profile */}
-      <div className="flex items-start gap-6 mt-6 mb-12">
+      {/* 変A: centered editorial author header */}
+      <div className="flex flex-col items-center text-center mb-12 md:mb-16">
         {author.image?.asset && (
           <Image
-            src={urlFor(author.image).width(120).height(120).url()}
+            src={urlFor(author.image).width(160).height(160).url()}
             alt={author.name}
-            width={120}
-            height={120}
-            className="rounded-full size-20 object-cover flex-shrink-0"
+            width={160}
+            height={160}
+            className="rounded-full size-24 object-cover mb-6"
           />
         )}
-        <div className="space-y-1.5">
-          <h1>{author.name}</h1>
-          {author.role && (
-            <p className="text-sm text-muted-foreground">{author.role}</p>
-          )}
-          {author.bio && (
-            <p className="text-sm text-muted-foreground leading-relaxed mt-2">
-              {author.bio}
-            </p>
-          )}
-          {author.website && (
-            <a
-              href={author.website}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground transition-colors"
-            >
-              {author.website.replace(/^https?:\/\//, "")}
-            </a>
-          )}
-        </div>
+        <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-4">
+          Author
+        </p>
+        <h1 className="mb-2">{author.name}</h1>
+        {author.role && (
+          <p className="text-sm text-muted-foreground mb-2">{author.role}</p>
+        )}
+        {author.bio && (
+          <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl">
+            {author.bio}
+          </p>
+        )}
+        {author.website && (
+          <a
+            href={author.website}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground transition-colors mt-3"
+          >
+            {author.website.replace(/^https?:\/\//, "")}
+          </a>
+        )}
       </div>
 
       {/* Articles by this author */}
       {!articles || articles.length === 0 ? (
         <p className="text-muted-foreground text-sm">{t("empty")}</p>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-10">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-14">
           {articles.map(
             (article: {
               _id: string;

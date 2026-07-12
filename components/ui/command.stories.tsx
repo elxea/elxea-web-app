@@ -22,6 +22,26 @@ const meta = {
   title: "UI/Command",
   component: Command,
   tags: ["autodocs"],
+  parameters: {
+    a11y: {
+      // KNOWN ISSUE (story-scoped, rule-scoped): aria-required-children is
+      // disabled ONLY for this story. cmdk emits role="listbox" on CommandList
+      // and role="option" on CommandItem, but its internal [cmdk-list-sizer] /
+      // presentation wrappers break axe's owned-children traversal (upstream
+      // cmdk<>axe incompatibility, not an app-authored bug). Every other axe
+      // rule stays active for this story.
+      // color-contrast is repeated here because per-story a11y.config.rules
+      // replaces (does not merge into) the global array in .storybook/preview.ts.
+      // Tracking Issue (cmdk): https://app.notion.com/p/39a70c9d064c81aa82a4eadbcb15b992
+      // Tracking Issue (color-contrast token): https://app.notion.com/p/39a70c9d064c818cbaceed6d628c4fd5
+      config: {
+        rules: [
+          { id: "color-contrast", enabled: false },
+          { id: "aria-required-children", enabled: false },
+        ],
+      },
+    },
+  },
 } satisfies Meta<typeof Command>;
 
 export default meta;

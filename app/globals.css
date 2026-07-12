@@ -69,12 +69,31 @@ h1, h2, h3, h4, h5, h6 {
   letter-spacing: -0.01em;
 }
 
+/* Headings keep their design line-height. The :lang() body line-height
+ * (1.8 ja / 1.65 en) targets body copy only; without this override it also
+ * inherits onto headings and stretches them (Figma heading line-height is
+ * 1.2–1.3). Scope: h1–h3 (large, visible headings). h4–h6 intentionally keep
+ * the body cadence. Specificity (0,1,1) beats both :lang() (0,1,0) and the
+ * h{n} font shorthand's line-height (0,0,1). */
+:lang(ja) h1, :lang(en) h1 { line-height: 1.2; }
+:lang(ja) h2, :lang(en) h2,
+:lang(ja) h3, :lang(en) h3 { line-height: 1.3; }
+
 h1 { font: var(--typography-style-h1); }
 h2 { font: var(--typography-style-h2); }
 h3 { font: var(--typography-style-h3); }
 h4 { font: var(--typography-style-h4); }
 h5 { font: var(--typography-style-h5); }
 h6 { font: var(--typography-style-h6); }
+
+/* Hero uses the display type token at md+ (Figma PC hero h1 = 44px / lh 1.2).
+ * Must be an unlayered rule: the h{n}{font:} rules above are unlayered and
+ * therefore beat Tailwind utilities (which live in @layer utilities), so a
+ * `md:[font:…]` utility on the element would never win. line-height is set
+ * explicitly so the display token's own lh (1.3) does not override the 1.2. */
+@media (min-width: 768px) {
+  h1.hero-display { font: var(--typography-style-display); line-height: 1.2; }
+}
 
 :root {
   /* Third-party brand colors */

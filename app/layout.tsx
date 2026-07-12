@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "elxea",
-  description: "elxea - specialty coffee & tea",
+  description: "elxea - Single-Origin Japanese Tea",
 };
 
 export default function RootLayout({

@@ -6,9 +6,14 @@ import { cn } from "@/lib/utils"
 import { Separator } from "@/components/ui/separator"
 
 function ItemGroup({ className, ...props }: React.ComponentProps<"div">) {
+  // No hardcoded role="list": ItemGroup is a flexible container whose children
+  // may be ItemHeader / Item / ItemSeparator (not all listitems), and Item is
+  // also used standalone, so role="listitem" cannot be added unconditionally.
+  // A role="list" without role="listitem" children fails axe
+  // aria-required-children. Consumers needing true list semantics can pass
+  // role="list" + role="listitem" explicitly. Invisible (no layout change).
   return (
     <div
-      role="list"
       data-slot="item-group"
       className={cn("group/item-group flex flex-col", className)}
       {...props}

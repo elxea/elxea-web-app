@@ -26,8 +26,9 @@ export function CartContent() {
   }
 
   return (
-    <div>
-      {/* Lines */}
+    <div className="flex flex-col lg:flex-row lg:items-start gap-8 lg:gap-12">
+      {/* Lines — left column */}
+      <div className="flex-1 min-w-0">
       <div className="divide-y divide-border">
         {cart.lines.map((item) => (
           <div key={item.id} className="py-6 flex gap-6">
@@ -139,16 +140,30 @@ export function CartContent() {
           </div>
         ))}
       </div>
+      </div>
 
-      {/* Summary */}
-      <Separator className="mt-6" />
-      <div className="pt-6">
-        <div className="flex justify-between mb-6">
+      {/* Order summary — right column */}
+      <div className="w-full lg:w-[360px] lg:shrink-0">
+      <div className="rounded-lg border border-border bg-card p-6">
+        <h2 className="text-sm font-medium mb-4">{t("orderSummary")}</h2>
+        <div className="flex justify-between mb-3">
           <p className="text-sm">{t("subtotal")}</p>
           <p className="text-sm font-medium">
             {formatPrice(
               cart.cost.subtotalAmount.amount,
               cart.cost.subtotalAmount.currencyCode
+            )}
+          </p>
+        </div>
+
+        <Separator className="my-3" />
+
+        <div className="flex justify-between mb-6">
+          <p className="text-sm">{t("total")}</p>
+          <p className="text-sm font-medium">
+            {formatPrice(
+              cart.cost.totalAmount.amount,
+              cart.cost.totalAmount.currencyCode
             )}
           </p>
         </div>
@@ -174,6 +189,7 @@ export function CartContent() {
             {t("checkout")}
           </a>
         </Button>
+      </div>
       </div>
     </div>
   );

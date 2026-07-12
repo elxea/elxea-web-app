@@ -83,28 +83,31 @@ export default async function FarmerPage({
               {[farmer.region, farmer.country].filter(Boolean).join(", ")}
             </p>
           )}
-          <h1 className="mb-8">{farmer.name}</h1>
+          <h1 className="mb-6">{farmer.name}</h1>
+
+          {/* Bio (変A: 本文を先・アクションを後) */}
+          {farmer.bio && (
+            <div className="mb-8">
+              <PortableText value={farmer.bio} />
+            </div>
+          )}
 
           {/* Follow button */}
-          <div className="mb-12">
-            <FollowButton
-              farmerSlug={slug}
-              farmerName={farmer.name}
-              farmerImageUrl={
-                farmer.photo?.asset
-                  ? urlFor(farmer.photo).width(80).height(80).url()
-                  : null
-              }
-              followLabel={t("follow")}
-              unfollowLabel={t("unfollow")}
-              followedMessage={t("followedMessage")}
-              unfollowedMessage={t("unfollowedMessage")}
-              errorMessage={tCommon("error")}
-              loginRequiredMessage={tCommon("loginRequired")}
-            />
-          </div>
-
-          {farmer.bio && <PortableText value={farmer.bio} />}
+          <FollowButton
+            farmerSlug={slug}
+            farmerName={farmer.name}
+            farmerImageUrl={
+              farmer.photo?.asset
+                ? urlFor(farmer.photo).width(80).height(80).url()
+                : null
+            }
+            followLabel={t("follow")}
+            unfollowLabel={t("unfollow")}
+            followedMessage={t("followedMessage")}
+            unfollowedMessage={t("unfollowedMessage")}
+            errorMessage={tCommon("error")}
+            loginRequiredMessage={tCommon("loginRequired")}
+          />
         </div>
       </div>
 

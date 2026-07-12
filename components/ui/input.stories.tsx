@@ -74,5 +74,6 @@ export const Invalid: Story = {
 export const File: Story = {
   args: {
     type: "file",
+    "aria-label": "Upload file",
   },
 };

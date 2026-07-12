@@ -27,15 +27,27 @@ export default async function SearchPage({
 
   return (
     <div className="section-wide py-20">
-      <SearchForm initialQuery={q || ""} />
+      {/* 変A: 検索フォームを中央寄せ editorial ヘッダーに (Figma 6677:8077) */}
+      <div className="max-w-2xl mx-auto">
+        <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-6 text-center">
+          Search
+        </p>
+        <SearchForm initialQuery={q || ""} />
+      </div>
 
-      {q && results && (
+      {q && results && results.totalCount > 0 && (
         <div className="mt-16">
           <p className="text-sm text-muted-foreground mb-8">
             {t("results", { count: results.totalCount })}
           </p>
           <ProductGrid products={results.products} />
         </div>
+      )}
+
+      {q && results && results.totalCount === 0 && (
+        <p className="text-muted-foreground text-sm mt-12">
+          {t("noResults", { q })}
+        </p>
       )}
 
       {q && !results && (

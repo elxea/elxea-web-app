@@ -8,7 +8,7 @@ export default async function CollectionsPage() {
 
   return (
     <div className="section-wide py-20">
-      <div className="text-center mb-16">
+      <div className="mb-16">
         <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-4">
           Explore
         </p>
@@ -43,8 +43,8 @@ async function CollectionsContent() {
               className="mb-5"
               hover
             />
-            <div className="space-y-2 text-center">
-              <h2 className="text-sm font-normal leading-relaxed group-hover:underline underline-offset-4">
+            <div className="space-y-1">
+              <h2 className="text-base font-medium leading-relaxed group-hover:underline underline-offset-4">
                 {collection.title}
               </h2>
               {collection.description && (

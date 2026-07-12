@@ -83,7 +83,7 @@ export default async function PlaylistDetailPage({
     : undefined;
 
   return (
-    <div className="max-w-5xl mx-auto px-6 py-16">
+    <div className="section-wide py-16">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16">
         {/* Album image */}
         <ImageCard
@@ -96,10 +96,10 @@ export default async function PlaylistDetailPage({
           priority
         />
 
-        {/* Info */}
+        {/* Info — 変A: eyebrow を tracking-[0.25em] に、配信リンクを見出し付き outline pill に */}
         <div>
           {pl.category && (
-            <p className="text-xs text-muted-foreground uppercase tracking-wider mb-2">
+            <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-3">
               {pl.category}
             </p>
           )}
@@ -120,41 +120,48 @@ export default async function PlaylistDetailPage({
           )}
 
           {/* Streaming links */}
-          <div className="flex flex-wrap gap-3 mb-8">
-            {pl.spotifyUrl && (
-              <a
-                href={pl.spotifyUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-block text-xs font-medium border border-foreground px-4 py-2 hover:bg-foreground hover:text-background transition-colors"
-              >
-                Spotify
-              </a>
-            )}
-            {pl.soundcloudUrl && (
-              <a
-                href={pl.soundcloudUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-block text-xs font-medium border border-foreground px-4 py-2 hover:bg-foreground hover:text-background transition-colors"
-              >
-                SoundCloud
-              </a>
-            )}
-            {pl.youtubeUrl && (
-              <a
-                href={pl.youtubeUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-block text-xs font-medium border border-foreground px-4 py-2 hover:bg-foreground hover:text-background transition-colors"
-              >
-                YouTube
-              </a>
-            )}
-          </div>
+          {(pl.spotifyUrl || pl.soundcloudUrl || pl.youtubeUrl) && (
+            <div className="mb-8">
+              <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-4">
+                {t("listen")}
+              </p>
+              <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3">
+                {pl.spotifyUrl && (
+                  <a
+                    href={pl.spotifyUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center justify-between sm:justify-start gap-2 rounded-full border border-border px-5 py-2.5 text-xs font-medium hover:border-foreground hover:bg-foreground hover:text-background transition-colors"
+                  >
+                    Spotify <span aria-hidden>&#8599;</span>
+                  </a>
+                )}
+                {pl.soundcloudUrl && (
+                  <a
+                    href={pl.soundcloudUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center justify-between sm:justify-start gap-2 rounded-full border border-border px-5 py-2.5 text-xs font-medium hover:border-foreground hover:bg-foreground hover:text-background transition-colors"
+                  >
+                    SoundCloud <span aria-hidden>&#8599;</span>
+                  </a>
+                )}
+                {pl.youtubeUrl && (
+                  <a
+                    href={pl.youtubeUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center justify-between sm:justify-start gap-2 rounded-full border border-border px-5 py-2.5 text-xs font-medium hover:border-foreground hover:bg-foreground hover:text-background transition-colors"
+                  >
+                    YouTube <span aria-hidden>&#8599;</span>
+                  </a>
+                )}
+              </div>
+            </div>
+          )}
 
           {pl.dateRecorded && (
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground border-t border-border pt-6">
               {t("recorded")}: {new Date(pl.dateRecorded).toLocaleDateString()}
             </p>
           )}

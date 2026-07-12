@@ -5,6 +5,7 @@ import { getClient } from "@/sanity/lib/client";
 import { JOURNALS_QUERY } from "@/sanity/lib/queries";
 import { urlFor } from "@/sanity/lib/image";
 import { ImageCard } from "@/components/ui/image-card";
+import { previewSeedEnabled, previewImageForKey, withSeedJournals } from "@/lib/preview-seed";
 
 const themeLabels: Record<string, string> = {
   akane: "茜(あかね)",
@@ -25,7 +26,7 @@ export default function ElxeaJournalPage() {
     <div className="section-wide py-20">
       <div className="text-center mb-16">
         <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-4">
-          Journal
+          Newsletter
         </p>
         <h1 className="mb-6">{t("title")}</h1>
         <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl mx-auto">{t("description")}</p>
@@ -41,7 +42,11 @@ async function JournalGrid() {
 
   try {
     const client = getClient();
-    const journals = await client.fetch(JOURNALS_QUERY, { language: locale });
+    const fetched = await client.fetch(JOURNALS_QUERY, { language: locale });
+
+    // Preview-only: the dataset has no tea-menu journals, so inject dummy
+    // entries to review the grid. No effect when flag unset / real data exists.
+    const journals = withSeedJournals(fetched);
 
     if (!journals || journals.length === 0) {
       return <p className="text-muted-foreground text-sm">{t("empty")}</p>;
@@ -60,6 +65,13 @@ async function JournalGrid() {
             thumbnail?: { asset: object; alt?: string };
           }) => {
             const image = j.thumbnail ?? j.mainImage;
+            // Preview-only: fall back to a stable local placeholder photo when
+            // the journal entry has no imagery. No effect when flag unset.
+            const resolvedImage = image?.asset
+              ? urlFor(image).width(600).height(400).url()
+              : previewSeedEnabled()
+                ? previewImageForKey(j._id)
+                : undefined;
             return (
               <Link
                 key={j._id}
@@ -68,7 +80,7 @@ async function JournalGrid() {
               >
                 <div className="relative mb-5">
                   <ImageCard
-                    image={image?.asset ? urlFor(image).width(600).height(400).url() : undefined}
+                    image={resolvedImage}
                     alt={image?.alt || j.title}
                     hover
                   />
@@ -80,12 +92,13 @@ async function JournalGrid() {
                     {themeLabels[j.theme] || j.theme}
                   </span>
                 </div>
-                <div className="space-y-2 text-center">
-                  <h2 className="text-sm font-normal leading-relaxed group-hover:underline underline-offset-4">
+                {/* 変A: カードテキスト 左寄せ (Figma 6761:11127 card) */}
+                <div className="space-y-1">
+                  <h2 className="text-base font-medium leading-relaxed group-hover:underline underline-offset-4">
                     {j.title}
                   </h2>
                   {j.summary && (
-                    <p className="text-[13px] text-muted-foreground line-clamp-2 leading-relaxed">
+                    <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
                       {j.summary}
                     </p>
                   )}

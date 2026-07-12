@@ -21,6 +21,8 @@
     "removedFromCart": "Removed from cart",
     "checkout": "Checkout",
     "subtotal": "Subtotal",
+    "total": "Total",
+    "orderSummary": "Order Summary",
     "quantity": "Quantity",
     "remove": "Remove",
     "emptyCart": "Your cart is empty",
@@ -45,8 +47,8 @@
     "loginRequired": "Please log in to continue."
   },
   "home": {
-    "tagline": "Specialty Coffee & Tea",
-    "hero": "Specialty Coffee & Tea",
+    "tagline": "Single-Origin Japanese Tea",
+    "hero": "Single-Origin Japanese Tea",
     "featuredProducts": "Featured Products",
     "latestJournal": "Latest Articles",
     "upcomingEvents": "Upcoming Events",
@@ -87,12 +89,18 @@
     "loadError": "Could not load collections."
   },
   "search": {
+    "placeholder": "Search tea or keywords",
+    "noResults": "No tea matched \"{q}\". Try another keyword.",
     "results": "{count} results",
     "loadError": "Search failed."
   },
   "journal": {
     "title": "Journal",
-    "description": "Stories about coffee and tea",
+    "description": "Stories about tea",
+    "tagArchiveTitle": "Tag: {name}",
+    "tagArchiveDescription": "Articles tagged “{name}”",
+    "categoryArchiveTitle": "Category: {name}",
+    "categoryArchiveDescription": "Stories about {name}",
     "empty": "No articles yet.",
     "loadError": "Could not load articles.",
     "writtenBy": "Written by",
@@ -111,6 +119,7 @@
     "description": "Our curated selection of specialty teas",
     "empty": "No tea items yet.",
     "loadError": "Could not load tea menu.",
+    "details": "Details",
     "variety": "Variety",
     "origin": "Origin",
     "season": "Season",
@@ -127,7 +136,8 @@
     "description": "Playlists inspired by the sounds of nature",
     "empty": "No playlists yet.",
     "loadError": "Could not load playlists.",
-    "recorded": "Recorded"
+    "recorded": "Recorded",
+    "listen": "Listen"
   },
   "elxeaJournal": {
     "title": "elxea Journal",
@@ -152,6 +162,8 @@
     "articlesByAuthor": "Articles by this author"
   },
   "farmer": {
+    "heading": "Farmers",
+    "lead": "",
     "empty": "No farmer profiles yet.",
     "loadError": "Could not load farmer profiles.",
     "follow": "Follow",
@@ -160,13 +172,18 @@
     "unfollowedMessage": "Unfollowed"
   },
   "event": {
+    "lead": "",
     "empty": "No upcoming events.",
     "loadError": "Could not load events.",
     "detailsLink": "Details & Register →",
     "register": "Register",
     "cancelRegistration": "Cancel Registration",
     "registeredMessage": "You are registered for this event",
-    "cancelledMessage": "Registration cancelled"
+    "cancelledMessage": "Registration cancelled",
+    "dateLabel": "Date",
+    "locationLabel": "Location",
+    "detailsHeading": "Details & Registration",
+    "detailsPageLink": "Open details & registration page"
   },
   "page": {
     "loadError": "Could not load page."
@@ -177,6 +194,7 @@
     "noOrders": "You have no orders yet.",
     "memberOnlyDescription": "This content is for members only. Log in to access the full content.",
     "subscriptions": "Subscriptions",
+    "currentSubscriptions": "Your Subscriptions",
     "noSubscriptions": "You have no active subscriptions.",
     "subscriptionActive": "Active",
     "subscriptionPaused": "Paused",
@@ -444,7 +462,7 @@
     "perk2Title": "Member-only pricing on your favorites.",
     "perk2Body": "Purchase individual packs and value packs of your favorite teas at a special 10% discount.",
     "disclaimerLine1": "* This is a recurring subscription plan.",
-    "disclaimerLine2": "* First-time buyers receive their selected tea set at the special price of ¥1,880 (tax incl.).",
+    "disclaimerLine2": "* First-time buyers receive their selected tea set at the special price of ¥1,480 (tax incl.).",
     "disclaimerLine3": "* Shipping is always free for this plan.",
     "disclaimerLine4": "* From the 2nd delivery, you can switch to a different tea category. If no changes are made, we'll send our seasonal recommendation.",
     "disclaimerLine5": "* No cancellation fees or penalties for skipping deliveries.",

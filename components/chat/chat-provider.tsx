@@ -132,11 +132,10 @@ class MockChatTransport implements ChatTransport<UIMessage> {
 // Provider
 // ---------------------------------------------------------------------------
 
-const CHAT_API_URL = (
-  process.env.NEXT_PUBLIC_CHAT_API_URL ?? "http://localhost:8787/api/chat"
-).trim();
-// Strip trailing /api/chat (with or without trailing slash) to get the origin
-const CHAT_API_BASE = CHAT_API_URL.replace(/\/api\/chat\/?$/, "");
+// [SEC-B] チャット系はすべて自サーバ proxy (同一オリジン) 経由。
+// proxy が X-API-Key + verify 済み customer_id を付けて cx-agent に転送する。
+// 公開 Workers URL をブラウザから直叩きしない (なりすまし防止)。
+const CHAT_PROXY_URL = "/api/chat";
 const IS_MOCK = process.env.NEXT_PUBLIC_CHAT_MOCK === "true";
 
 // ---------------------------------------------------------------------------
@@ -168,15 +167,13 @@ interface HistoryApiResponse {
  */
 async function fetchChatHistory(
   sessionId: string,
-  shopifyCustomerId: string | null,
 ): Promise<HistoryApiResponse | null> {
   try {
+    // [SEC-B] 自サーバ proxy 経由。customer_id はブラウザから送らず、proxy が
+    // サーバの認証済みセッションから verify 済み customer_id を導出して cx-agent に渡す。
     const params = new URLSearchParams({ session_id: sessionId });
-    if (shopifyCustomerId) {
-      params.set("shopify_customer_id", shopifyCustomerId);
-    }
     const res = await fetch(
-      `${CHAT_API_BASE}/api/chat/history?${params.toString()}`,
+      `/api/chat/history?${params.toString()}`,
     );
     if (!res.ok) return null;
     return (await res.json()) as HistoryApiResponse;
@@ -216,18 +213,17 @@ async function fetchShopifyCustomerId(): Promise<string | null> {
 }
 
 /**
- * Fetch the LINE user ID from the Auth.js session API.
- * Returns null if not authenticated via LINE or on error.
+ * Resolve the LINE user ID.
+ *
+ * The Auth.js session endpoint (/api/auth/session) is not mounted in this app
+ * (LINE linkage is handled via /api/line-login and /api/user/line-link), so the
+ * previous fetch always 404'd and returned null while adding a console error on
+ * every page load. We skip the call to the unimplemented endpoint; behaviour is
+ * unchanged (still null) and the console noise is removed. If an Auth.js session
+ * route is added later, restore the fetch here.
  */
 async function fetchLineUserId(): Promise<string | null> {
-  try {
-    const res = await fetch("/api/auth/session");
-    if (!res.ok) return null;
-    const data = await res.json();
-    return data?.user?.lineUserId ?? null;
-  } catch {
-    return null;
-  }
+  return null;
 }
 
 export function ChatProvider({ children }: { children: React.ReactNode }) {
@@ -285,7 +281,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   const transport = useMemo(() => {
     if (IS_MOCK) return new MockChatTransport();
     return new ElxeaChatTransport({
-      api: CHAT_API_URL,
+      api: CHAT_PROXY_URL,
       getSessionId: () => sessionIdRef.current,
       getShopifyCustomerId: () => shopifyCustomerIdRef.current,
       getLineUserId: () => lineUserIdRef.current,
@@ -315,7 +311,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     if (historyLoadedRef.current || !sessionId || IS_MOCK) return;
     historyLoadedRef.current = true;
 
-    fetchChatHistory(sessionId, shopifyCustomerId).then((data) => {
+    fetchChatHistory(sessionId).then((data) => {
       if (!data || data.messages.length === 0) return;
       // Only hydrate history if no messages have been sent yet (race condition guard)
       setMessages((prev) => {
