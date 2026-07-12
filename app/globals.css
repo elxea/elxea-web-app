@@ -31,7 +31,8 @@ html.lenis, html.lenis body {
   }
 }
 
-/* Adobe Fonts (Typekit ID: fwg7gtf) — loaded via CSS <link> in layout.tsx */
+/* Adobe Fonts (Typekit ID: fwg7gtf) — loaded via async JS embed in layout.tsx
+ * (kit is JS-only; the .css endpoint returns HTTP 412, .js returns 200) */
 /* Headings: aktiv-grotesk-extended + dnp-shuei-gothic-gin-std */
 /* Body: aktiv-grotesk + kozuka-gothic-pro */
 /* Secondary: neue-haas-grotesk-text + ryo-gothic-plusn */
