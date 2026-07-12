@@ -91,7 +91,18 @@ export default async function LocaleLayout({
   return (
     <html lang={locale}>
       <head>
-        <link rel="stylesheet" href="https://use.typekit.net/fwg7gtf.css" />
+        {/* Adobe Fonts (Typekit kit fwg7gtf) — loaded via the official async JS
+         * embed. The kit is configured as JS-only: the CSS endpoint
+         * (use.typekit.net/fwg7gtf.css) returns HTTP 412, while the JS endpoint
+         * (use.typekit.net/fwg7gtf.js) serves 200. The loader adds wf-loading →
+         * wf-active/wf-inactive classes on <html> and injects the @font-face CSS. */}
+        <link rel="preconnect" href="https://use.typekit.net" crossOrigin="anonymous" />
+        <link rel="preconnect" href="https://p.typekit.net" crossOrigin="anonymous" />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(d){var config={kitId:'fwg7gtf',scriptTimeout:3000,async:true},h=d.documentElement,t=setTimeout(function(){h.className=h.className.replace(/\\bwf-loading\\b/g,"")+" wf-inactive";},config.scriptTimeout),tk=d.createElement("script"),f=false,s=d.getElementsByTagName("script")[0],a;h.className+=" wf-loading";tk.src='https://use.typekit.net/'+config.kitId+'.js';tk.async=true;tk.onload=tk.onreadystatechange=function(){a=this.readyState;if(f||a&&a!="complete"&&a!="loaded")return;f=true;clearTimeout(t);try{Typekit.load(config)}catch(e){}};s.parentNode.insertBefore(tk,s)})(document);`,
+          }}
+        />
         <link rel="alternate" hrefLang={locale} href={`https://elxea.com/${locale}`} />
         <link rel="alternate" hrefLang={alternateLocale} href={`https://elxea.com/${alternateLocale}`} />
         <link rel="alternate" hrefLang="x-default" href="https://elxea.com/ja" />
