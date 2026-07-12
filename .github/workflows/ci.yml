@@ -194,8 +194,11 @@ jobs:
           #
           # (Audit G5 cleanup 2026-07-13) The one-time `design/va-pilot` baseline
           # arm was removed: the full-site visual pilot has been squash-merged into
-          # main (content verified in main; branch deleted), so the branch-limited
+          # main (content verified identical in main), so the branch-limited
           # auto-accept is dead residue. Only `main` remains.
+          # NOTE: the stale origin/design/va-pilot + origin/fix/typekit-js-embed
+          # branches themselves are safe to delete (both fully in main) but that
+          # remote deletion is pending owner action; tip SHAs are in the PR body.
           autoAcceptChanges: "main"
           onlyChanged: true
 
