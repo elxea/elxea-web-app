@@ -7,9 +7,10 @@ import { urlFor } from "@/sanity/lib/image";
 import { ImageCard } from "@/components/ui/image-card";
 import { previewSeedEnabled, previewImageForKey, withSeedJournals } from "@/lib/preview-seed";
 
+// 短縮ラベル (Figma Journal Theme Badge 6934:143 が正)
 const themeLabels: Record<string, string> = {
-  akane: "茜(あかね)",
-  sui: "翠(すい)",
+  akane: "茜",
+  sui: "翠",
   sohi: "そひ",
 };
 
@@ -84,9 +85,9 @@ async function JournalGrid() {
                     alt={image?.alt || j.title}
                     hover
                   />
-                  {/* Theme badge */}
+                  {/* Theme badge — 丸pill・foreground text (Figma 6934:143 が正) */}
                   <span
-                    className="absolute top-3 left-3 text-[10px] font-medium text-brand-white px-2 py-0.5 rounded-sm uppercase tracking-wider z-10"
+                    className="absolute top-3 left-3 z-10 text-sm font-normal leading-normal text-foreground px-2 py-1 rounded-full tracking-wider"
                     style={{ backgroundColor: themeColors[j.theme] || "var(--color-brand-ash)" }}
                   >
                     {themeLabels[j.theme] || j.theme}

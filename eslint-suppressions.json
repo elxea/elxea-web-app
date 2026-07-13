@@ -16,12 +16,12 @@
   },
   "app/[locale]/elxea-journal/[slug]/page.tsx": {
     "elxea-tokens/no-raw-colors": {
-      "count": 4
+      "count": 3
     }
   },
   "app/[locale]/elxea-journal/page.tsx": {
     "elxea-tokens/no-raw-colors": {
-      "count": 2
+      "count": 1
     }
   },
   "app/[locale]/events/[slug]/page.tsx": {
