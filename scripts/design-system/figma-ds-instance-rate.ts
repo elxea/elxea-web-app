@@ -30,6 +30,7 @@
 
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 
 const FIGMA_API_BASE = "https://api.figma.com";
 const TARGET_PAGE_NAME = "Proposals"; // 部分一致 (figma-page-naming の prefix 許容)
@@ -74,12 +75,25 @@ async function figmaGet<T>(path: string, token: string): Promise<T> {
 // Types (minimal subset)
 // ---------------------------------------------------------------------------
 
+interface FigmaPaint {
+  visible?: boolean; // Figma default true when omitted
+  [k: string]: unknown;
+}
+
+interface FigmaEffect {
+  visible?: boolean; // Figma default true when omitted
+  [k: string]: unknown;
+}
+
 interface FigmaNode {
   id: string;
   name: string;
   type: string;
   componentId?: string;
   children?: FigmaNode[];
+  fills?: FigmaPaint[];
+  strokes?: FigmaPaint[];
+  effects?: FigmaEffect[];
 }
 
 interface FigmaFileShallow {
@@ -99,26 +113,96 @@ interface RouteMeasurement {
   instances: number;
   total: number;
   rate: number;
+  wrapper_excluded: number;
 }
 
 // ---------------------------------------------------------------------------
 // Metric
 // ---------------------------------------------------------------------------
 
-function measure(node: FigmaNode): { instances: number; total: number } {
+/**
+ * 無装飾判定: fill / stroke / effect のいずれも「可視」を持たない。
+ * Figma の paint/effect は visible 省略時 true。空配列 / 全 invisible を無装飾とみなす。
+ * GROUP は自前の fills/strokes/effects を持たない純コンテナのため常に無装飾。
+ */
+function hasVisiblePaint(arr: FigmaPaint[] | FigmaEffect[] | undefined): boolean {
+  if (!arr || arr.length === 0) return false;
+  return arr.some((p) => p.visible !== false);
+}
+
+export function isUndecorated(n: FigmaNode): boolean {
+  return (
+    !hasVisiblePaint(n.fills) &&
+    !hasVisiblePaint(n.strokes) &&
+    !hasVisiblePaint(n.effects)
+  );
+}
+
+function hasDirectInstanceChild(n: FigmaNode): boolean {
+  return (n.children ?? []).some((c) => c.type === "INSTANCE");
+}
+
+/**
+ * wrapper 判定 (監査提案 / Boss 承認済 2026-07-13):
+ * INSTANCE を直下に内包する無装飾 FRAME/GROUP は「レイアウト用の器」であり
+ * 手描き成果物ではないため、素描き母集団 (total = 分母) から除外する。
+ * 除外は total を数えないだけで、子孫 (内包 INSTANCE 等) には通常どおり降下する。
+ * silent 除外にしないため wrapper_excluded として件数を別掲する。
+ */
+export function isWrapper(n: FigmaNode): boolean {
+  return (
+    (n.type === "FRAME" || n.type === "GROUP") &&
+    isUndecorated(n) &&
+    hasDirectInstanceChild(n)
+  );
+}
+
+export function measure(node: FigmaNode): {
+  instances: number;
+  total: number;
+  wrapper_excluded: number;
+} {
   let instances = 0;
   let total = 0;
+  let wrapperExcluded = 0;
   const walk = (n: FigmaNode) => {
     if (n.type === "INSTANCE") {
       instances += 1;
       total += 1;
       return; // インスタンス内部には降下しない (DS 提供物)
     }
+    if (isWrapper(n)) {
+      // 無装飾 wrapper は分母に数えない。件数は別掲し、子には降下する。
+      wrapperExcluded += 1;
+      for (const c of n.children ?? []) walk(c);
+      return;
+    }
     total += 1;
     for (const c of n.children ?? []) walk(c);
   };
   for (const c of node.children ?? []) walk(c);
-  return { instances, total };
+  return { instances, total, wrapper_excluded: wrapperExcluded };
+}
+
+// ---------------------------------------------------------------------------
+// Route 抽出 (Boss 判断 2026-07-13: Figma 改名ではなくスクリプト側で吸収)
+// ---------------------------------------------------------------------------
+
+/**
+ * セクション名の任意位置にある `@/<route>` パターンを抽出する。
+ * 実運用の命名は route を末尾に持つ (例:
+ *   "商品一覧 変A（部品ベース）— PC/SP @/ja/products")
+ * ため、旧来の startsWith("@") 判定では 0 件になっていた。
+ * 動的セグメント `[slug]` も拾えるよう `[` `]` を文字クラスに含める。
+ * 1 セクション内に複数マッチした場合は最後のものを採用する。
+ * マッチしないセクションは母集団対象外 (null)。
+ */
+const ROUTE_RE = /@\/[A-Za-z0-9\-[\]/]+/g;
+
+export function extractRoute(name: string): string | null {
+  const matches = name.match(ROUTE_RE);
+  if (!matches || matches.length === 0) return null;
+  return matches[matches.length - 1];
 }
 
 // ---------------------------------------------------------------------------
@@ -158,20 +242,22 @@ async function main() {
   }
   const page = proposalPages[0];
 
-  // 2) ページ直下の @<route> 命名セクションを列挙 (type 不問・name 起点)
-  const routeSections = (page.children ?? []).filter((c) =>
-    c.name.trim().startsWith("@")
-  );
+  // 2) ページ直下から `@/<route>` を名前の任意位置に持つセクションを列挙する。
+  //    route は末尾に置かれる運用 (例 "... — PC/SP @/ja/products") のため、
+  //    name 全体から extractRoute で抽出する (type 不問)。
+  const routeSections = (page.children ?? [])
+    .map((c) => ({ node: c, route: extractRoute(c.name) }))
+    .filter((x): x is { node: FigmaNode; route: string } => x.route !== null);
   if (routeSections.length === 0) {
     console.error(
-      `Error: no "@<route>" named sections found under page "${page.name}" (fail-loud: 母集団ゼロは計測不能として扱う)`
+      `Error: no "@/<route>" named sections found under page "${page.name}" (fail-loud: 母集団ゼロは計測不能として扱う)`
     );
     process.exit(1);
   }
 
   // 3) 各セクションのフル subtree を nodes API で取得 (chunk して URL 長超過を回避)
   const sectionDocs: Record<string, FigmaNode> = {};
-  const ids = routeSections.map((s) => s.id);
+  const ids = routeSections.map((s) => s.node.id);
   const CHUNK = 20;
   for (let i = 0; i < ids.length; i += CHUNK) {
     const chunk = ids.slice(i, i + CHUNK);
@@ -191,15 +277,16 @@ async function main() {
 
   // 4) 計測
   const routes: RouteMeasurement[] = routeSections.map((s) => {
-    const doc = sectionDocs[s.id];
-    const { instances, total } = measure(doc);
+    const doc = sectionDocs[s.node.id];
+    const { instances, total, wrapper_excluded } = measure(doc);
     return {
-      name: s.name.trim(),
-      node_id: s.id,
+      name: s.route,
+      node_id: s.node.id,
       node_type: doc.type,
       instances,
       total,
       rate: total > 0 ? Math.round((instances / total) * 10000) / 10000 : 0,
+      wrapper_excluded,
     };
   });
   routes.sort((a, b) => a.name.localeCompare(b.name));
@@ -218,6 +305,10 @@ async function main() {
       route_count: routes.length,
       min_rate: Math.min(...routes.map((r) => r.rate)),
       max_rate: Math.max(...routes.map((r) => r.rate)),
+      wrapper_excluded_total: routes.reduce(
+        (acc, r) => acc + r.wrapper_excluded,
+        0
+      ),
     },
   };
 
@@ -227,13 +318,23 @@ async function main() {
   }
   console.log(`DS instance rate — ${report.file_name} / ${page.name}`);
   for (const r of routes) {
+    const wrap = r.wrapper_excluded > 0 ? ` [wrapper-excluded: ${r.wrapper_excluded}]` : "";
     console.log(
-      `  ${r.name}: ${(r.rate * 100).toFixed(1)}% (${r.instances}/${r.total})`
+      `  ${r.name}: ${(r.rate * 100).toFixed(1)}% (${r.instances}/${r.total})${wrap}`
     );
   }
+  console.log(
+    `  wrapper-excluded total: ${report.summary.wrapper_excluded_total}`
+  );
 }
 
-main().catch((err) => {
-  console.error("Fatal error:", err instanceof Error ? err.message : err);
-  process.exit(1);
-});
+// エントリポイントとして起動されたときのみ main() を実行する。
+// (fixture 単体テストが measure 等を import しても main を走らせないため)
+const isEntrypoint =
+  import.meta.url === pathToFileURL(process.argv[1] ?? "").href;
+if (isEntrypoint) {
+  main().catch((err) => {
+    console.error("Fatal error:", err instanceof Error ? err.message : err);
+    process.exit(1);
+  });
+}

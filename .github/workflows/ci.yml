@@ -192,14 +192,14 @@ jobs:
           # require manual re-accept. The gate that matters is on PR branches,
           # where changes are NOT auto-accepted and must be reviewed.
           #
-          # `design/va-pilot` is added as a ONE-TIME, branch-limited baseline
-          # acceptance for the full-site visual pilot (Setaka-approved intentional
-          # 178-diff rebaseline). It auto-accepts ONLY on that release branch so the
-          # new design becomes the baseline; every OTHER PR branch stays strict
-          # (exitZeroOnChanges: false is untouched, so unreviewed diffs still BLOCK).
-          # SAFE to remove this branch arm after the pilot merges — the glob is a
-          # brace list matched by Chromatic's picomatch globbing.
-          autoAcceptChanges: "{main,design/va-pilot}"
+          # (Audit G5 cleanup 2026-07-13) The one-time `design/va-pilot` baseline
+          # arm was removed: the full-site visual pilot has been squash-merged into
+          # main (content verified identical in main), so the branch-limited
+          # auto-accept is dead residue. Only `main` remains.
+          # NOTE: the stale origin/design/va-pilot + origin/fix/typekit-js-embed
+          # branches themselves are safe to delete (both fully in main) but that
+          # remote deletion is pending owner action; tip SHAs are in the PR body.
+          autoAcceptChanges: "main"
           onlyChanged: true
 
   staging-smoke:
