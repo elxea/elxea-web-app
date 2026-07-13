@@ -28,7 +28,7 @@ export default async function ContactPage() {
             ]}
           />
           <div className="flex flex-col gap-3">
-            <h1>{t("title")}</h1>
+            <h1 className="contact-title">{t("title")}</h1>
             <p className="text-base leading-relaxed text-muted-foreground">
               {t("subtitle")}
             </p>

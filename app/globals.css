@@ -104,6 +104,18 @@ h6 { font: var(--typography-style-h6); }
   h1.page-title { font: var(--typography-style-display); line-height: 1.2; }
 }
 
+/* Contact page title — Figma 変A (node 6750:16831) uses a modest reading-column
+ * title at 24px / weight 500, smaller than the base h1 (32px/300). Unlayered so
+ * it beats the h1{font} shorthand and Tailwind utilities (@layer utilities),
+ * same rationale as .hero-display / .page-title above. Page-scoped via the
+ * .contact-title class (contact/page.tsx only) — global h1 unaffected. Values
+ * reuse existing token primitives: 1.5rem = h2 token size, 500 = h4/h5/h6
+ * weight. line-height stays 1.2 from the :lang() h1 override. */
+h1.contact-title {
+  font-size: 1.5rem;
+  font-weight: 500;
+}
+
 :root {
   /* Third-party brand colors */
   --brand-line: #06C755;
