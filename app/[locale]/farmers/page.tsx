@@ -6,6 +6,7 @@ import { ImageCard } from "@/components/ui/image-card";
 import { FARMERS_QUERY } from "@/sanity/lib/queries";
 import { urlFor } from "@/sanity/lib/image";
 import { withSeedFarmers, isSeedId } from "@/lib/preview-seed";
+import { filterOutFictionalFarmers } from "@/lib/fictional-farmers";
 
 export default function FarmersPage() {
   const tf = useTranslations("farmer");
@@ -33,11 +34,22 @@ async function FarmersList() {
 
   try {
     const client = getClient();
-    const fetched = await client.fetch(FARMERS_QUERY, { language: locale });
+    const fetched: Array<{
+      _id: string;
+      name: string;
+      slug: { current: string };
+      photo?: { asset: object; alt?: string };
+      region?: string;
+      country?: string;
+    }> = await client.fetch(FARMERS_QUERY, { language: locale });
+
+    // Hide fictional/seed farmer docs still present in the production dataset
+    // until real producer stories are approved. Code-only; no Sanity mutation.
+    const real = filterOutFictionalFarmers(fetched);
 
     // Preview-only: real farmers lack photos and the list is thin. Attach
     // placeholder imagery and pad to a full grid. No effect when flag unset.
-    const farmers = withSeedFarmers(fetched);
+    const farmers = withSeedFarmers(real);
 
     if (!farmers || farmers.length === 0) {
       return (

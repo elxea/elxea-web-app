@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { isFictionalFarmerSlug } from "@/lib/fictional-farmers";
 
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://elxea.com";
 const locales = ["ja", "en"];
@@ -89,6 +90,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       `*[_type == "farmer" && defined(slug.current)]{ "slug": slug.current, _updatedAt }`
     );
     for (const farmer of farmers) {
+      // Skip fictional/seed farmers hidden until real stories are approved.
+      if (isFictionalFarmerSlug(farmer.slug)) continue;
       for (const locale of locales) {
         entries.push({
           url: `${BASE_URL}/${locale}/farmers/${farmer.slug}`,
