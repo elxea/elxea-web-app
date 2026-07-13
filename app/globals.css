@@ -96,6 +96,14 @@ h6 { font: var(--typography-style-h6); }
   h1.hero-display { font: var(--typography-style-display); line-height: 1.2; }
 }
 
+/* Page-header title — content-index pages (collections / collection detail /
+ * elxea-journal) use the Figma PC page-title size (44px = display token) at md+.
+ * Same unlayered-rule rationale as .hero-display above so it beats the h1{font}
+ * shorthand and Tailwind utilities. Mobile keeps the base h1 (32px). */
+@media (min-width: 768px) {
+  h1.page-title { font: var(--typography-style-display); line-height: 1.2; }
+}
+
 :root {
   /* Third-party brand colors */
   --brand-line: #06C755;
@@ -150,6 +158,11 @@ h6 { font: var(--typography-style-h6); }
 }
 
 @layer base {
+  /* Heading color — Figma headings use graphite (#464748), not the charcoal
+   * body foreground (#5d5e61). Placed in @layer base so page-level color
+   * utilities (e.g. hero `text-overlay-foreground`) still override it. */
+  h1, h2, h3, h4, h5, h6 { color: var(--color-brand-graphite); }
+
   /* Section layout utilities */
   .section-narrow { @apply max-w-3xl mx-auto px-6 py-16; }
   .section-wide   { @apply max-w-7xl mx-auto px-6 py-16; }

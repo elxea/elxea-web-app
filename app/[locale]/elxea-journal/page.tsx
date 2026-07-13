@@ -24,12 +24,12 @@ export default function ElxeaJournalPage() {
   const t = useTranslations("elxeaJournal");
 
   return (
-    <div className="section-wide py-20">
+    <div className="section-wide py-20 md:px-20 md:py-24">
       <div className="text-center mb-16">
         <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-4">
           Newsletter
         </p>
-        <h1 className="mb-6">{t("title")}</h1>
+        <h1 className="page-title mb-6">{t("title")}</h1>
         <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl mx-auto">{t("description")}</p>
       </div>
       <JournalGrid />
