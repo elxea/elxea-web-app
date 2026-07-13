@@ -46,6 +46,14 @@ jobs:
         # wired into CI.
         run: pnpm validate:tokens
 
+      - name: Validate design-map
+        # Fails the build (validate-design-map.ts exits 1) when the Figma node ⇄
+        # code path table (scripts/design-system/design-map.json) has a bad shape
+        # or a code_path that no longer exists on disk. Static-only here (no Figma
+        # token in CI); the --figma node-existence freshness check runs weekly in
+        # ~/.config/admin-pipeline/scripts/drift-audit-design.sh 検査④.
+        run: pnpm validate:design-map
+
   unit-tests:
     name: unit-tests
     needs: static-checks
