@@ -19,6 +19,8 @@
     "build-storybook": "storybook build",
     "chromatic": "chromatic --exit-zero-on-changes",
     "sync:figma-read": "npx tsx scripts/design-system/sync-figma-read.ts",
+    "snapshot:figma": "npx tsx scripts/design-system/figma-snapshot.ts",
+    "diff:figma": "npx tsx scripts/design-system/figma-change-manifest.ts",
     "audit:ds-instance-rate": "npx tsx scripts/design-system/figma-ds-instance-rate.ts",
     "audit:components": "npx tsx scripts/design-system/audit-components.ts",
     "diff:tokens": "npx tsx scripts/design-system/diff-tokens.ts"
