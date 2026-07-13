@@ -49,9 +49,9 @@ export default async function CollectionPage({
   if (!collection) notFound();
 
   return (
-    <div className="section-wide py-20">
+    <div className="section-wide py-20 md:px-20 md:py-24">
       <div className="mb-16">
-        <h1 className="mb-4">{collection.title}</h1>
+        <h1 className="page-title mb-4">{collection.title}</h1>
         {collection.description && (
           <p className="text-muted-foreground text-sm max-w-2xl leading-relaxed">
             {collection.description}

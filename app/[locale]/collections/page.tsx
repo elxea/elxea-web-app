@@ -7,12 +7,12 @@ export default async function CollectionsPage() {
   const t = await getTranslations("common");
 
   return (
-    <div className="section-wide py-20">
+    <div className="section-wide py-20 md:px-20 md:py-24">
       <div className="mb-16">
         <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-4">
           Explore
         </p>
-        <h1>{t("collections")}</h1>
+        <h1 className="page-title">{t("collections")}</h1>
       </div>
       <CollectionsContent />
     </div>
@@ -30,7 +30,7 @@ async function CollectionsContent() {
     }
 
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-14">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-12">
         {collections.map((collection) => (
           <Link
             key={collection.id}

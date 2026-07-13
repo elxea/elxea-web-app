@@ -4,7 +4,7 @@
     "semantic": {
       "$type": "color",
       "$description": "UI semantic colors — derived from elxea Webflow design",
-      "background": { "$value": "oklch(0.863 0.026 102.0)", "$description": "gray-40 (#d5d3c0) — Webflow bg-color" },
+      "background": { "$value": "oklch(0.933 0.012 96.4)", "$description": "gray-20 (#ebe9e0) — cream, Figma page background (VariableID:373:398). Was gray-40 sand #d5d3c0 (legacy Webflow); corrected to Figma fidelity 2026-07-13." },
       "foreground": { "$value": "oklch(0.482 0.005 271.3)", "$description": "gray-100 (#5d5e61) — Webflow text-color" },
       "card": { "$value": "oklch(0.863 0.026 102.0)", "$description": "gray-40 (#d5d3c0) — Webflow card_bg-color" },
       "card-foreground": { "$value": "oklch(0.482 0.005 271.3)" },
