@@ -1,0 +1,99 @@
+name: Deploy Production
+
+# Free-plan Vercel auto-deploy.
+#
+# Why this exists: the elxea-web-app repo lives under a GitHub org, and Vercel's
+# native Git integration for org-owned private repos requires a paid plan. The
+# owner has decided to stay on the Vercel free plan. The free path is the Vercel
+# CLI, which deploys fine on the free tier. So instead of Vercel's Git
+# integration we trigger the official Vercel CLI flow from GitHub Actions on
+# every push to main:
+#   vercel pull  -> vercel build --prod  -> vercel deploy --prebuilt --prod
+#
+# This uses the official Vercel CLI directly (no third-party marketplace action)
+# per Vercel's documented GitHub Actions recipe.
+
+on:
+  push:
+    branches: [main]
+    # Skip deploys for docs-only pushes: if EVERY changed file matches these
+    # globs, the workflow does not run (no point rebuilding/redeploying the app
+    # for a README or Markdown-only change). A push that also touches app code
+    # still deploys normally.
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
+      - "LICENSE"
+
+# Serialize deploys: never let two main pushes deploy concurrently. We do NOT
+# cancel an in-progress deploy (cancel-in-progress: false) — a half-finished
+# `vercel deploy` should be allowed to complete rather than be aborted midway.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  # Match the Vercel project's runtime (nodeVersion 24.x in .vercel/project.json)
+  # so the local `vercel build` compiles under the same major as production and
+  # avoids build-vs-runtime skew.
+  NODE_VERSION: "24"
+  # VERCEL_ORG_ID / VERCEL_PROJECT_ID are NOT secrets — they are the team and
+  # project identifiers from .vercel/project.json (which is git-ignored, so we
+  # pin them here). The Vercel CLI reads these env vars automatically for
+  # pull/build/deploy, removing the need for an interactive `vercel link`.
+  VERCEL_ORG_ID: team_6ut7roUVtRU2EGbPVR9DNTy6
+  VERCEL_PROJECT_ID: prj_sVwjaJwPAKxRcKu3wVejiqGPt5o6
+
+jobs:
+  deploy-production:
+    name: deploy-production
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # The token is provided ONCE here as an env var. The Vercel CLI reads
+    # VERCEL_TOKEN from the environment automatically, so no step passes it as a
+    # `--token=` command-line flag. Env-passing shrinks the exposure surface:
+    # the value never appears in a rendered command line (which can surface in
+    # process listings / step logs) — GitHub also masks it, but not putting it
+    # on argv is defense in depth.
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+    steps:
+      - name: Preflight — require VERCEL_TOKEN secret
+        # Fail loudly (not silently) when the deploy token is missing. Without
+        # this guard, `vercel pull` would fail deep in the run with an opaque
+        # auth error. Here we stop first with an actionable message pointing at
+        # exactly what the owner must do.
+        run: |
+          if [ -z "${VERCEL_TOKEN}" ]; then
+            echo "::error title=VERCEL_TOKEN not set::The 'VERCEL_TOKEN' repository secret is missing, so this deploy cannot authenticate to Vercel."
+            echo "To enable deploys:"
+            echo "  1. Create a PROJECT-SCOPED token at https://vercel.com/account/tokens (scope it to the elxea-web-app project only)"
+            echo "  2. Run: gh secret set VERCEL_TOKEN --repo <owner>/elxea-web-app"
+            echo "Until then this workflow will intentionally fail on every push to main."
+            exit 1
+          fi
+          echo "VERCEL_TOKEN is present. Proceeding."
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      - name: Pull Vercel environment (production)
+        run: vercel pull --yes --environment=production
+
+      - name: Build project artifacts (production)
+        run: vercel build --prod
+
+      - name: Deploy prebuilt artifacts to production
+        run: vercel deploy --prebuilt --prod
