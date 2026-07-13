@@ -10,9 +10,10 @@ import { ImageWithFallback } from "@/components/ui/image-with-fallback";
 import { TeaSpecCard } from "@/components/journal/tea-spec-card";
 import { Link } from "@/i18n/navigation";
 
+// 短縮ラベル (Figma Journal Theme Badge 6934:143 が正)
 const themeLabels: Record<string, string> = {
-  akane: "茜(あかね)",
-  sui: "翠(すい)",
+  akane: "茜",
+  sui: "翠",
   sohi: "そひ",
 };
 
@@ -78,7 +79,7 @@ export default async function ElxeaJournalDetailPage({
       {/* ① 変A: Theme badge + Title + Summary をヒーロー画像の上に (Figma 6760:120) */}
       <header className="section-narrow mb-10">
         <span
-          className="inline-block text-[10px] font-medium text-brand-white px-2.5 py-1 uppercase tracking-wider mb-4"
+          className="inline-block text-sm font-normal leading-normal text-foreground px-2 py-1 rounded-full tracking-wider mb-4"
           style={{ backgroundColor: themeColor }}
         >
           {themeLabel}
