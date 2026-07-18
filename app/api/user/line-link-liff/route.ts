@@ -95,7 +95,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "linking_failed" }, { status: 502 });
     }
 
-    return NextResponse.json({ success: true });
+    // cx-agent の応答から「連携先に注文/定期便があるか」を受け取り、完了画面の過大約束回避に渡す（CX S2）。
+    //   取得できない/未知は false（＝「ご注文・定期便を確認できます」と約束しない安全側コピーにフォールバック）。
+    let hasPurchaseActivity = false;
+    try {
+      const data = (await upstream.json()) as { has_purchase_activity?: boolean };
+      hasPurchaseActivity = data.has_purchase_activity === true;
+    } catch {
+      // 応答が JSON でない/欠落 → 過大約束しない安全側（false）のまま。
+    }
+
+    return NextResponse.json({ success: true, hasPurchaseActivity });
   } catch (err) {
     console.error("[POST /api/user/line-link-liff]", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

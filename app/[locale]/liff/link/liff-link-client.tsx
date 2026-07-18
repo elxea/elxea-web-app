@@ -34,8 +34,12 @@ const COPY = {
     title: "アカウント連携",
     loading: "連携の準備をしています。少々お待ちください。",
     successTitle: "連携が完了しました",
-    successBody:
+    // 連携先に注文/定期便があるとき（CX S2・過大約束にならない）。
+    successBodyWithActivity:
       "ご購入時のアカウントとこのトークを結び付けました。ご注文や定期便の状況を、このままメッセージでご確認いただけます。",
+    // 注文/定期便が無い（またはまだ確認できない）とき: 誰にでも成立する「好みに合わせたご案内」だけを約束する。
+    successBodyNoActivity:
+      "ご購入時のアカウントとこのトークを結び付けました。これからは、あなたの好みに合わせたご案内を、このトークで受け取れるようになります。",
     close: "トークに戻る",
     loginTitle: "ログインが必要です",
     loginBody:
@@ -51,8 +55,10 @@ const COPY = {
     title: "Account linking",
     loading: "Preparing to link your account. Please wait a moment.",
     successTitle: "Linking complete",
-    successBody:
+    successBodyWithActivity:
       "We've connected your account with this chat. You can now check your orders and subscription right here in the chat.",
+    successBodyNoActivity:
+      "We've connected your account with this chat. From now on, you'll receive suggestions tailored to your taste right here.",
     close: "Back to chat",
     loginTitle: "Sign in required",
     loginBody:
@@ -71,6 +77,8 @@ type Locale = keyof typeof COPY;
 export function LiffLinkClient({ locale }: { locale: string }) {
   const t = COPY[(locale as Locale) in COPY ? (locale as Locale) : "ja"];
   const [phase, setPhase] = useState<Phase>("loading");
+  // 連携先に注文/定期便があるか（完了画面コピーの過大約束回避・CX S2）。未確認は false（安全側）。
+  const [hasActivity, setHasActivity] = useState(false);
 
   const run = useCallback(async () => {
     setPhase("loading");
@@ -117,6 +125,11 @@ export function LiffLinkClient({ locale }: { locale: string }) {
       });
 
       if (res.ok) {
+        // 完了画面の文面分岐用に「注文/定期便あり」フラグを受け取る（欠落/非JSON は false = 過大約束しない）。
+        const data = (await res.json().catch(() => ({}))) as {
+          hasPurchaseActivity?: boolean;
+        };
+        setHasActivity(data.hasPurchaseActivity === true);
         setPhase("success");
         return;
       }
@@ -170,7 +183,9 @@ export function LiffLinkClient({ locale }: { locale: string }) {
       {phase === "success" && (
         <div className="space-y-6">
           <h1 className="text-xl font-normal">{t.successTitle}</h1>
-          <p className="text-sm leading-relaxed text-muted-foreground">{t.successBody}</p>
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            {hasActivity ? t.successBodyWithActivity : t.successBodyNoActivity}
+          </p>
           <Button variant="outline" className="w-full" onClick={closeLiff}>
             {t.close}
           </Button>
