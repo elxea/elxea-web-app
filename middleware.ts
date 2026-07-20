@@ -41,6 +41,13 @@ async function checkSitePassword(request: NextRequest): Promise<NextResponse | n
   // Allow access to password page itself
   if (pathname === "/password") return null;
 
+  // Allow LIFF account-linking pages: they are opened inside the LINE in-app
+  // browser (during LINE x Shopify linking), which cannot pass the staging
+  // site-password gate. Scoped to the /liff subtree only, with or without a
+  // locale prefix (e.g. /liff/link, /ja/liff/link). Same intent as the /api
+  // matcher exemption below.
+  if (/^\/(?:(?:ja|en)\/)?liff(?:\/|$)/.test(pathname)) return null;
+
   // Redirect to password page
   const passwordUrl = new URL("/password", request.url);
   return NextResponse.redirect(passwordUrl);
