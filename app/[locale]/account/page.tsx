@@ -11,6 +11,7 @@ import { FavoritesSection } from "@/components/account/favorites-section";
 import { FollowsSection } from "@/components/account/follows-section";
 import { EventsSection } from "@/components/account/events-section";
 import { LineAccountView } from "@/components/account/line-account-view";
+import { LineLinkageEntry } from "@/components/account/line-linkage-entry";
 
 function formatPrice(amount: string, currency: string, locale: string) {
   return new Intl.NumberFormat(locale, {
@@ -171,6 +172,9 @@ export default async function AccountPage() {
           )}
         </div>
       </section>
+
+      {/* LINE 連携エントリ（Web 側導線 / Phase 2）— NEXT_PUBLIC_LIFF_ID 未設定なら非表示 */}
+      <LineLinkageEntry locale={locale} />
 
       {/* Subscriptions summary — link to dedicated page */}
       <section className="mb-12">
