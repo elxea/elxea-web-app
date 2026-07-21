@@ -13,13 +13,80 @@ if (!SESSION_SECRET && typeof process !== "undefined" && process.env.NODE_ENV !=
   );
 }
 
-const ACCOUNT_DOMAIN = "account.elxea.com";
-const AUTHORIZE_URL = `https://${ACCOUNT_DOMAIN}/authentication/oauth/authorize`;
-const TOKEN_URL = `https://${ACCOUNT_DOMAIN}/authentication/oauth/token`;
-const LOGOUT_URL = `https://${ACCOUNT_DOMAIN}/authentication/logout`;
-const CUSTOMER_API_URL = `https://shopify.com/${process.env.SHOPIFY_SHOP_ID}/account/customer/api/2025-04/graphql`;
+// --- Customer Account OAuth エンドポイント（env で向き先を差し替え可能） ---
+//
+// なぜ env 化するか:
+//   テスト環境（Shopify 開発ストア）で Customer Account ログインを実測するには
+//   authorize/token/logout の向き先を開発ストアに向ける必要がある。ドメインが
+//   ハードコードのままだと、テストのつもりの OAuth が本番 account.elxea.com に
+//   飛んでしまう（＝テストが必ず偽陰性 FAIL し、かつ本番非接触に抵触する）。
+//
+// フォールバック（本番非回帰）:
+//   env をどれも設定しなければ、従来どおり account.elxea.com から URL を組み立てる。
+//   Vercel Production には新 env を置かないので Production の挙動は完全に不変。
+//
+// 優先順位（高い順）:
+//   1. SHOPIFY_CUSTOMER_ACCOUNT_{AUTHORIZE,TOKEN,LOGOUT}_URL … 完全な URL を直接指定
+//      （Shopify 管理画面の Customer Account API settings に表示された値をそのまま貼る用の
+//        エスケープハッチ。ストアによって表示形式が異なる場合に備える）
+//   2. SHOPIFY_CUSTOMER_ACCOUNT_DOMAIN … ホスト名のみ指定し従来のパス組み立てを流用
+//      （例: <dev-store>.myshopify.com。通常はこれだけで足りる）
+//   3. 未設定 … account.elxea.com（現行本番）
+//
+// パス形式の根拠（一次情報・shopify.dev）:
+//   Customer Account API の OpenID discovery（https://<shop-domain>/.well-known/openid-configuration）が
+//   authorization_endpoint = https://<shop-domain>/authentication/oauth/authorize
+//   token_endpoint         = https://<shop-domain>/authentication/oauth/token
+//   end_session_endpoint   = https://<shop-domain>/authentication/logout
+//   を返す。つまりパス構造は本番・開発ストア共通で、変わるのはホストだけ。
+//   （issuer だけが https://shopify.com/authentication/<shop-id> という別形式。
+//     これは endpoint URL ではないので URL 組み立てには使わない）
+const DEFAULT_ACCOUNT_DOMAIN = "account.elxea.com";
 
-export { LOGOUT_URL };
+/** 空・空白のみを「未設定」として扱い、scheme と末尾スラッシュを剥がす。 */
+function normalizeDomain(raw: string | undefined): string | null {
+  const trimmed = raw?.trim();
+  if (!trimmed) return null;
+  const host = trimmed.replace(/^https?:\/\//i, "").replace(/\/+$/, "");
+  return host || null;
+}
+
+/** 空・空白のみを「未設定」として扱い、末尾スラッシュを剥がす。 */
+function normalizeUrl(raw: string | undefined): string | null {
+  const trimmed = raw?.trim();
+  if (!trimmed) return null;
+  const url = trimmed.replace(/\/+$/, "");
+  return url || null;
+}
+
+/** Customer Account の認証ドメイン。env 未設定なら現行本番ドメイン。 */
+export function getAccountDomain(): string {
+  return normalizeDomain(process.env.SHOPIFY_CUSTOMER_ACCOUNT_DOMAIN) ?? DEFAULT_ACCOUNT_DOMAIN;
+}
+
+export function getAuthorizeUrl(): string {
+  return (
+    normalizeUrl(process.env.SHOPIFY_CUSTOMER_ACCOUNT_AUTHORIZE_URL) ??
+    `https://${getAccountDomain()}/authentication/oauth/authorize`
+  );
+}
+
+export function getTokenUrl(): string {
+  return (
+    normalizeUrl(process.env.SHOPIFY_CUSTOMER_ACCOUNT_TOKEN_URL) ??
+    `https://${getAccountDomain()}/authentication/oauth/token`
+  );
+}
+
+export function getLogoutUrl(): string {
+  return (
+    normalizeUrl(process.env.SHOPIFY_CUSTOMER_ACCOUNT_LOGOUT_URL) ??
+    `https://${getAccountDomain()}/authentication/logout`
+  );
+}
+
+// データ API（GraphQL）は従来どおり SHOPIFY_SHOP_ID から組み立てる（挙動不変）。
+const CUSTOMER_API_URL = `https://shopify.com/${process.env.SHOPIFY_SHOP_ID}/account/customer/api/2025-04/graphql`;
 
 // --- PKCE helpers ---
 
@@ -72,7 +139,7 @@ export function buildAuthorizeUrl({
   if (prompt) {
     params.set("prompt", prompt);
   }
-  return `${AUTHORIZE_URL}?${params.toString()}`;
+  return `${getAuthorizeUrl()}?${params.toString()}`;
 }
 
 /**
@@ -99,7 +166,7 @@ export function buildLogoutUrl({
   if (idTokenHint) {
     params.set("id_token_hint", idTokenHint);
   }
-  return `${LOGOUT_URL}?${params.toString()}`;
+  return `${getLogoutUrl()}?${params.toString()}`;
 }
 
 // --- Token exchange ---
@@ -125,7 +192,7 @@ export async function exchangeToken(
     code_verifier: codeVerifier,
   });
 
-  const res = await fetch(TOKEN_URL, {
+  const res = await fetch(getTokenUrl(), {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
@@ -148,7 +215,7 @@ export async function refreshAccessToken(refreshToken: string): Promise<TokenRes
     refresh_token: refreshToken,
   });
 
-  const res = await fetch(TOKEN_URL, {
+  const res = await fetch(getTokenUrl(), {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
