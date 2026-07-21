@@ -27,6 +27,8 @@ export interface LiffIdTokenPayload {
   sub: string;
   /** トークンの発行先チャネル ID（= client_id と一致するはず）。 */
   aud: string;
+  /** 発行者。LINE の ID トークンは常に "https://access.line.me"。 */
+  iss?: string;
   /** 有効期限（Unix 秒）。 */
   exp: number;
   /** 表示名（scope による・任意）。 */
@@ -34,6 +36,12 @@ export interface LiffIdTokenPayload {
   /** メール（email scope 承認時のみ・任意）。 */
   email?: string;
 }
+
+/** LINE ID トークンの発行者（iss）固定値（LINE 公式仕様）。 */
+const LINE_TOKEN_ISSUER = "https://access.line.me";
+
+/** exp 検証の時刻ずれ許容（秒）。サーバ時計の微差で正当トークンを弾かないための猶予。 */
+const EXP_CLOCK_SKEW_SEC = 300;
 
 /** 検証結果。ok:true のとき messagingUserId が使える。 */
 export type VerifyResult =
@@ -51,7 +59,9 @@ const LINE_MESSAGING_USER_ID_REGEX = /^U[0-9a-f]{32}$/;
  * fail-closed:
  *   - channelId 未設定 → 検証不能なので必ず失敗（設定漏れで無検証開放しない）。
  *   - idToken 空 → 失敗。
- *   - LINE verify が非 200 / aud 不一致 / sub 形式不正 → 失敗。
+ *   - LINE verify が非 200 / aud 不一致 / iss 不一致 / exp 期限切れ / sub 形式不正 → 失敗。
+ *     （iss / exp は docstring の LINE 仕様を「実チェック」に格上げした多層防御。LINE verify が
+ *      期限切れを弾く前提でも、応答の握りつぶし・時刻ずれ・仕様変更に備え自前でも検証する。）
  *
  * @param idToken  liff.getIDToken() で得た JWT
  * @param channelId  LIFF が属する LINE Login チャネル ID（env LINE_LIFF_CHANNEL_ID）
@@ -98,6 +108,17 @@ export async function verifyLiffIdToken(
   // aud（トークンの宛先チャネル）が期待値と一致することを二重に確認する。
   if (payload.aud !== channelId) {
     return { ok: false, reason: "id_token aud does not match channel id" };
+  }
+
+  // iss（発行者）が LINE であることを確認する（docstring の LINE 仕様を実チェック化・多層防御）。
+  if (payload.iss !== LINE_TOKEN_ISSUER) {
+    return { ok: false, reason: "id_token iss is not LINE" };
+  }
+
+  // exp（有効期限）を自前でも検証する（LINE verify は期限切れを弾くが、握りつぶし・時刻ずれ対策の二重化）。
+  const nowSec = Math.floor(Date.now() / 1000);
+  if (typeof payload.exp !== "number" || payload.exp <= nowSec - EXP_CLOCK_SKEW_SEC) {
+    return { ok: false, reason: "id_token is expired or has no exp" };
   }
 
   const sub = payload.sub;

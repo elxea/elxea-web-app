@@ -5,6 +5,8 @@
  *   - fail-closed: channelId 未設定 / idToken 空 → 失敗
  *   - LINE verify が非 200 → 失敗
  *   - aud（宛先チャネル）不一致 → 失敗（他チャネル向けトークンの流用を弾く）
+ *   - iss（発行者）が LINE でない → 失敗（QA S-2 対応・docstring 要件の実チェック化）
+ *   - exp（有効期限）が過去 → 失敗（LINE verify 前提でも自前でも弾く多層防御）
  *   - sub が Messaging userId 形式でない → 失敗
  *   - すべて満たす → messagingUserId(sub) を返す
  *
@@ -16,6 +18,8 @@ import { verifyLiffIdToken } from "@/lib/line/verify-liff-token";
 const CHANNEL_ID = "2000000001";
 const VALID_SUB = "U0123456789abcdef0123456789abcdef"; // U + 32 hex
 const VALID_TOKEN = "a".repeat(40); // 形式は LINE verify に委ねるので中身は不問
+const LINE_ISS = "https://access.line.me"; // LINE ID トークンの発行者（固定値）
+const FUTURE_EXP = 9999999999; // 期限切れでない遠い未来
 
 function stubFetch(status: number, jsonBody: unknown): typeof fetch {
   return vi.fn(async () => ({
@@ -55,11 +59,29 @@ describe("verifyLiffIdToken", () => {
     expect(res.ok).toBe(false);
   });
 
+  it("iss が LINE でない → 失敗（発行者すり替えを弾く・QA S-2）", async () => {
+    const res = await verifyLiffIdToken(
+      VALID_TOKEN,
+      CHANNEL_ID,
+      stubFetch(200, { sub: VALID_SUB, aud: CHANNEL_ID, iss: "https://evil.example", exp: FUTURE_EXP }),
+    );
+    expect(res.ok).toBe(false);
+  });
+
+  it("exp が過去 → 失敗（期限切れトークンの流用を弾く）", async () => {
+    const res = await verifyLiffIdToken(
+      VALID_TOKEN,
+      CHANNEL_ID,
+      stubFetch(200, { sub: VALID_SUB, aud: CHANNEL_ID, iss: LINE_ISS, exp: 1000000000 }),
+    );
+    expect(res.ok).toBe(false);
+  });
+
   it("sub が Messaging userId 形式でない → 失敗", async () => {
     const res = await verifyLiffIdToken(
       VALID_TOKEN,
       CHANNEL_ID,
-      stubFetch(200, { sub: "not-a-user-id", aud: CHANNEL_ID, exp: 9999999999 }),
+      stubFetch(200, { sub: "not-a-user-id", aud: CHANNEL_ID, iss: LINE_ISS, exp: FUTURE_EXP }),
     );
     expect(res.ok).toBe(false);
   });
@@ -71,7 +93,8 @@ describe("verifyLiffIdToken", () => {
       stubFetch(200, {
         sub: VALID_SUB,
         aud: CHANNEL_ID,
-        exp: 9999999999,
+        iss: LINE_ISS,
+        exp: FUTURE_EXP,
         email: "buyer@example.com",
       }),
     );
@@ -86,7 +109,7 @@ describe("verifyLiffIdToken", () => {
     const res = await verifyLiffIdToken(
       VALID_TOKEN,
       CHANNEL_ID,
-      stubFetch(200, { sub: VALID_SUB, aud: CHANNEL_ID, exp: 9999999999 }),
+      stubFetch(200, { sub: VALID_SUB, aud: CHANNEL_ID, iss: LINE_ISS, exp: FUTURE_EXP }),
     );
     expect(res.ok).toBe(true);
     if (res.ok) expect(res.email).toBe(null);
