@@ -9,6 +9,7 @@ import {
 } from "@/lib/shopify/customer";
 import { sendWelcomeEmail } from "@/lib/email/welcome";
 import { getAdminFirestore } from "@/lib/firebase/admin";
+import { sanitizeReturnTo } from "@/lib/auth/return-to";
 import {
   favoritesCol,
   followsCol,
@@ -147,7 +148,17 @@ export async function GET(request: NextRequest) {
     const redirectUri = `${origin}/api/auth/callback`;
     const tokens = await exchangeToken(code, codeVerifier, redirectUri);
 
-    const response = NextResponse.redirect(`${origin}/${locale}/account`);
+    // Post-login destination. Defaults to /{locale}/account (previous fixed
+    // behaviour); a flow that needs to resume after login (LINE account linking
+    // at /{locale}/link) sets `shop_return_to` when it sends the user to
+    // /api/auth/login?returnTo=...
+    //
+    // `sanitizeReturnTo` only lets same-site relative paths through, so this
+    // cannot be abused as an open redirect even if the cookie is tampered with.
+    const returnTo = sanitizeReturnTo(request.cookies.get("shop_return_to")?.value);
+    const response = NextResponse.redirect(
+      new URL(returnTo ?? `/${locale}/account`, origin),
+    );
 
     const cookieOptions = {
       httpOnly: true,
@@ -203,6 +214,9 @@ export async function GET(request: NextRequest) {
     response.cookies.delete("shop_state");
     response.cookies.delete("shop_nonce");
     response.cookies.delete("shop_locale");
+    // One-shot: the return path is consumed by this redirect and must not leak
+    // into the next login.
+    response.cookies.delete("shop_return_to");
 
     // Phase 1/2: if this user completed Shopify OAuth while already holding a
     // LINE session, merge their LINE-only Firestore data into the Shopify
