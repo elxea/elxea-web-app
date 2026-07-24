@@ -48,6 +48,16 @@ async function checkSitePassword(request: NextRequest): Promise<NextResponse | n
   // matcher exemption below.
   if (/^\/(?:(?:ja|en)\/)?liff(?:\/|$)/.test(pathname)) return null;
 
+  // Allow the LINE 純正 Account Link entry (/{locale}/link): it is opened from a
+  // button inside the LINE in-app browser and cannot pass the staging
+  // site-password gate. The route itself is a pure redirector that enforces its
+  // own Shopify login via requireAuth(), so exempting it from the site password
+  // does not expose anything (no UI, no data — it only 302s). Without this, the
+  // password gate intercepts /ja/link before requireAuth runs and the whole
+  // account-linking round trip (link → login → back to link) never resumes.
+  // Scoped to the /link path only, with or without a locale prefix.
+  if (/^\/(?:(?:ja|en)\/)?link(?:\/|$)/.test(pathname)) return null;
+
   // Redirect to password page
   const passwordUrl = new URL("/password", request.url);
   return NextResponse.redirect(passwordUrl);

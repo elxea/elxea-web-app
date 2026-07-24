@@ -13,10 +13,27 @@ if (!SESSION_SECRET && typeof process !== "undefined" && process.env.NODE_ENV !=
   );
 }
 
-const ACCOUNT_DOMAIN = "account.elxea.com";
-const AUTHORIZE_URL = `https://${ACCOUNT_DOMAIN}/authentication/oauth/authorize`;
-const TOKEN_URL = `https://${ACCOUNT_DOMAIN}/authentication/oauth/token`;
-const LOGOUT_URL = `https://${ACCOUNT_DOMAIN}/authentication/logout`;
+// Shopify Customer Account API OAuth endpoints.
+//
+// These are env-driven so a Preview/staging deployment can point at a test
+// store (e.g. elxea-test2) without touching production. The account domain is
+// store-specific: the production store is served at the `account.elxea.com`
+// vanity domain, while a test store without a vanity domain uses the
+// `https://shopify.com/authentication/<shop_id>/oauth/...` form.
+//
+// Set SHOPIFY_CUSTOMER_ACCOUNT_{AUTHORIZE,TOKEN,LOGOUT}_URL to override. When
+// unset, we fall back to the production `account.elxea.com` endpoints so
+// existing production behaviour is unchanged.
+const DEFAULT_ACCOUNT_DOMAIN = "account.elxea.com";
+const AUTHORIZE_URL =
+  process.env.SHOPIFY_CUSTOMER_ACCOUNT_AUTHORIZE_URL ||
+  `https://${DEFAULT_ACCOUNT_DOMAIN}/authentication/oauth/authorize`;
+const TOKEN_URL =
+  process.env.SHOPIFY_CUSTOMER_ACCOUNT_TOKEN_URL ||
+  `https://${DEFAULT_ACCOUNT_DOMAIN}/authentication/oauth/token`;
+const LOGOUT_URL =
+  process.env.SHOPIFY_CUSTOMER_ACCOUNT_LOGOUT_URL ||
+  `https://${DEFAULT_ACCOUNT_DOMAIN}/authentication/logout`;
 const CUSTOMER_API_URL = `https://shopify.com/${process.env.SHOPIFY_SHOP_ID}/account/customer/api/2025-04/graphql`;
 
 export { LOGOUT_URL };
