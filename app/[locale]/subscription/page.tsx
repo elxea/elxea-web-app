@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/card";
 import { Breadcrumb } from "@/components/seo/breadcrumb";
 import { ImageCard } from "@/components/ui/image-card";
-import { ImageWithFallback } from "@/components/ui/image-with-fallback";
+import { SiteImage } from "@/components/site-image";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("subscriptionLp");
@@ -52,7 +52,8 @@ export default async function SubscriptionLPPage() {
       {/* ─── 1. Hero ─── */}
       <section className="relative min-h-[90vh] flex items-center justify-center">
         {/* 暫定: 専用写真は画像台帳経由で差し替え可 */}
-        <ImageWithFallback
+        <SiteImage
+          slotId="site:subscription:hero-01"
           src="/hero-day.jpg"
           fallbackSrc="/placeholder-hero-day.jpg"
           alt=""
