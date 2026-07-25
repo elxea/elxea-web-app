@@ -20,6 +20,12 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "cdn.sanity.io",
       },
+      {
+        // M33 Phase C: Asset Hub site-slot images (R2 managed public domain).
+        // Mirrors elxea-asset-hub lib/r2.ts R2_PUBLIC_DOMAIN.
+        protocol: "https",
+        hostname: "pub-90a0485599904fee8228ef56bb51c2e6.r2.dev",
+      },
     ],
   },
   // MS10.4: Webflow → Next.js redirects (old site URL structure → new)

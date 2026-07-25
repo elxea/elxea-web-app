@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
-import { ImageWithFallback } from "@/components/ui/image-with-fallback";
+import { SiteImage } from "@/components/site-image";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("about");
@@ -17,7 +17,8 @@ export default async function AboutPage() {
     <>
       {/* Hero (写真ヒーロー温存 / 変A タイポ処理) */}
       <section className="relative flex min-h-[60vh] items-center justify-center">
-        <ImageWithFallback
+        <SiteImage
+          slotId="site:about:hero-01"
           src="/hero-night.jpg"
           fallbackSrc="/placeholder-hero-night.jpg"
           alt=""
@@ -57,7 +58,8 @@ export default async function AboutPage() {
 
           {/* Image break (温存) */}
           <div className="relative aspect-[16/9] w-full overflow-hidden">
-            <ImageWithFallback
+            <SiteImage
+              slotId="site:about:image-break-01"
               src="/hero-day.jpg"
               fallbackSrc="/placeholder-hero-day.jpg"
               alt="elxea tea"
@@ -97,7 +99,8 @@ export default async function AboutPage() {
 
       {/* Bottom image band (温存) */}
       <section className="relative flex min-h-[50vh] items-center justify-center">
-        <ImageWithFallback
+        <SiteImage
+          slotId="site:about:image-break-02"
           src="/hero-approach.jpg"
           fallbackSrc="/placeholder-hero-approach.jpg"
           alt=""
