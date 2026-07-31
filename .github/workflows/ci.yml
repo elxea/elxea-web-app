@@ -54,6 +54,15 @@ jobs:
         # ~/.config/admin-pipeline/scripts/drift-audit-design.sh 検査④.
         run: pnpm validate:design-map
 
+      - name: Validate design-kit
+        # Fails the build (validate-design-kit.ts exits 1) when the generated
+        # design-kit no longer reproduces from code — i.e. someone changed
+        # tokens/*.json, sd.config.mjs, app/globals.css or components/ui/*.tsx
+        # without re-running `pnpm generate:design-kit`. The kit used to be
+        # hand-written and silently drifted; this is what makes drift a build
+        # failure instead of a discovery months later.
+        run: pnpm validate:design-kit
+
   unit-tests:
     name: unit-tests
     needs: static-checks
