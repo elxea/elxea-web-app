@@ -13,6 +13,8 @@
     "build:tokens": "node sd.config.mjs",
     "validate:tokens": "npx tsx scripts/design-system/validate-tokens.ts",
     "validate:design-map": "npx tsx scripts/design-system/validate-design-map.ts",
+    "generate:design-kit": "npx tsx scripts/design-system/generate-design-kit.ts",
+    "validate:design-kit": "npx tsx scripts/design-system/validate-design-kit.ts",
     "sync:notion": "tsx scripts/sync-notion-to-sanity.ts",
     "sync:notion:dry": "tsx scripts/sync-notion-to-sanity.ts --dry-run",
     "storybook": "storybook dev -p 6006",
