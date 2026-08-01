@@ -19,6 +19,10 @@ import type {
   RichTextItemResponse,
 } from "@notionhq/client/build/src/api-endpoints";
 import { createClient, type SanityClient } from "next-sanity";
+import {
+  resolveArticleImages,
+  type ArticleImageSource,
+} from "../lib/notion/article-image";
 import { readFileSync } from "fs";
 import { join } from "path";
 import { createHash } from "crypto";
@@ -113,7 +117,16 @@ interface ContentHubEntry {
   title: string;
   slug: string;
   intro: string;
+  /**
+   * Sanity `mainImage` source. Asset Hub's `🌐 Roji: Hero Image` (url prop) wins,
+   * falling back to the legacy hand-uploaded `Featured Image` (files prop).
+   * See lib/notion/article-image.ts for the precedence rules.
+   */
   headerImageUrl: string;
+  headerImageSource: ArticleImageSource;
+  /** Sanity `thumbnail` source. `🌐 Roji: Thumbnail` → header image. */
+  thumbnailImageUrl: string;
+  thumbnailImageSource: ArticleImageSource;
   metaDescription: string;
   featured: boolean;
   publishedDate: string | null;
@@ -167,15 +180,9 @@ function getRelationIds(page: PageObjectResponse, name: string): string[] {
   return [];
 }
 
-function getFileUrl(page: PageObjectResponse, name: string): string {
-  const prop = page.properties[name];
-  if (prop?.type === "files" && prop.files.length > 0) {
-    const file = prop.files[0];
-    if (file.type === "file") return file.file.url;
-    if (file.type === "external") return file.external.url;
-  }
-  return "";
-}
+// NOTE: the former local `getFileUrl` (Notion files property reader) now lives in
+// lib/notion/article-image.ts as `readFilesProperty`, next to the Asset Hub URL
+// column readers, so the article image precedence has a single tested home.
 
 function getStatus(page: PageObjectResponse, name: string): string {
   const prop = page.properties[name];
@@ -984,12 +991,17 @@ async function sync() {
         continue;
       }
 
+      const images = resolveArticleImages(p);
+
       entries.push({
         notionId: p.id,
         title: getTitle(p),
         slug,
         intro: getText(p, "🌐 Roji: Intro"),
-        headerImageUrl: getFileUrl(p, "Featured Image"),
+        headerImageUrl: images.mainImageUrl,
+        headerImageSource: images.mainImageSource,
+        thumbnailImageUrl: images.thumbnailUrl,
+        thumbnailImageSource: images.thumbnailSource,
         metaDescription: getText(p, "🌐 Roji: Meta Description"),
         featured: getCheckbox(p, "🌐 Roji: Featured"),
         publishedDate: getDate(p, "Published Date"),
@@ -1095,13 +1107,18 @@ async function sync() {
         entry.operationsHubPageIds
       );
 
-      // 3d. Handle header image
+      // 3d. Handle header + thumbnail images.
+      // Sources are resolved in fetchContentHub() via resolveArticleImages():
+      // Asset Hub URL columns first, legacy `Featured Image` as fallback. When
+      // the two resolve to the same url we upload once and share the asset ref
+      // (the historic behaviour where thumbnail mirrored mainImage).
       let mainImage: unknown = undefined;
       let thumbnail: unknown = undefined;
+      const sameImage =
+        entry.thumbnailImageUrl === entry.headerImageUrl;
       if (entry.headerImageUrl) {
         if (DRY_RUN) {
           mainImage = { _dryRun: true, _sourceUrl: entry.headerImageUrl };
-          thumbnail = mainImage;
         } else {
           const assetRef = await uploadImageToSanity(
             sanity,
@@ -1110,6 +1127,21 @@ async function sync() {
           );
           if (assetRef) {
             mainImage = { _type: "image", asset: assetRef, alt: entry.title };
+          }
+        }
+      }
+      if (sameImage) {
+        thumbnail = mainImage;
+      } else if (entry.thumbnailImageUrl) {
+        if (DRY_RUN) {
+          thumbnail = { _dryRun: true, _sourceUrl: entry.thumbnailImageUrl };
+        } else {
+          const assetRef = await uploadImageToSanity(
+            sanity,
+            entry.thumbnailImageUrl,
+            `${entry.slug}-thumbnail`
+          );
+          if (assetRef) {
             thumbnail = { _type: "image", asset: assetRef, alt: entry.title };
           }
         }
@@ -1157,7 +1189,10 @@ async function sync() {
           `    relatedProducts: ${relatedProducts.length > 0 ? relatedProducts.join(", ") : "none"}`
         );
         console.log(
-          `    headerImage: ${entry.headerImageUrl ? "yes" : "none"}`
+          `    headerImage: ${entry.headerImageUrl ? "yes" : "none"} (source: ${entry.headerImageSource})`
+        );
+        console.log(
+          `    thumbnail: ${entry.thumbnailImageUrl ? "yes" : "none"} (source: ${entry.thumbnailImageSource})`
         );
       } else {
         await sanity.createOrReplace(doc);
