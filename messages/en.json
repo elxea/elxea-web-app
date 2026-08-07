@@ -186,7 +186,18 @@
     "detailsPageLink": "Open details & registration page"
   },
   "page": {
-    "loadError": "Could not load page."
+    "loadError": "Could not load page.",
+    "contents": "Contents",
+    "updatedAt": "Last updated {date}",
+    "published": "Published",
+    "updated": "Last updated",
+    "contact": "Contact",
+    "contactValue": "Contact form",
+    "related": {
+      "terms": "Terms of service",
+      "tokushoho": "Legal notice",
+      "contact": "Contact us"
+    }
   },
   "account": {
     "loginRequired": "Please log in to view your account.",

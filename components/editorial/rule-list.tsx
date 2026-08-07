@@ -62,8 +62,11 @@ export type MetaRowProps = {
   children: React.ReactNode;
   /** 罫線。利用規約 S1 (7848:39271) のように罫線を持たない版がある。 */
   divider?: boolean;
-  /** ラベル列幅。default = 140 (7848:39293) / wide = 224 (利用規約 S4 7850:803)。 */
-  labelWidth?: "default" | "wide";
+  /**
+   * ラベル列幅。default = 140 (7848:39293) / medium = 192 (汎用ページ S5 7858:39818) /
+   * wide = 224 (利用規約 S4 7850:803)。
+   */
+  labelWidth?: "default" | "medium" | "wide";
   className?: string;
 };
 
@@ -89,7 +92,11 @@ export function MetaRow({
         className={cn(
           CAPTION,
           "w-30 shrink-0 text-muted-foreground",
-          labelWidth === "wide" ? "md:w-56" : "md:w-35"
+          labelWidth === "wide"
+            ? "md:w-56"
+            : labelWidth === "medium"
+              ? "md:w-48"
+              : "md:w-35"
         )}
       >
         {label}
@@ -484,6 +491,60 @@ export function StackItem({ label, children, className }: StackItemProps) {
       <dt className={cn(CAPTION, "text-muted-foreground")}>{label}</dt>
       <dd className={cn(BODY_SM, "m-0 text-foreground")}>{children}</dd>
     </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* RailRow — レール (col1-3) + 本文 (col4-9) の二段組 (Figma 7857:39732)        */
+/* 汎用ページの型。PC は左に分類 / 章見出しを細く置き、本文は測度 640 に抑える。 */
+/* SP はレールを本文の上へ積む。                                                */
+/* -------------------------------------------------------------------------- */
+
+export type RailRowProps = {
+  /** レール列。分類ラベル・章番号+章名・セクション名など。 */
+  rail?: React.ReactNode;
+  children: React.ReactNode;
+  className?: string;
+};
+
+export function RailRow({ rail, children, className }: RailRowProps) {
+  return (
+    <div data-slot="rail-row" className={cn("lg:grid lg:grid-cols-12 lg:gap-8", className)}>
+      <div className="lg:col-span-3">{rail}</div>
+      <div className="mt-6 lg:col-span-6 lg:col-start-4 lg:mt-0">{children}</div>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* IndexRow — 番号 + 章名 の目次行 (Figma 7857:39745)                          */
+/* 行全体がタップ域 (Figma 実測 53px)。                                         */
+/* -------------------------------------------------------------------------- */
+
+export function IndexRow({
+  step,
+  children,
+  href,
+  className,
+}: {
+  step: React.ReactNode;
+  children: React.ReactNode;
+  href: string;
+  className?: string;
+}) {
+  return (
+    <li data-slot="index-row" className={cn("border-b border-border", className)}>
+      <a
+        href={href}
+        className={cn(
+          BODY_SM,
+          "flex min-h-13 items-center gap-4 text-foreground hover:text-muted-foreground"
+        )}
+      >
+        <span className="w-6 shrink-0 text-muted-foreground">{step}</span>
+        <span className="min-w-0 flex-1">{children}</span>
+      </a>
+    </li>
   );
 }
 

@@ -341,6 +341,8 @@ export const ARTICLES_BY_AUTHOR_QUERY = groq`
 export const PAGE_BY_SLUG_QUERY = groq`
   *[_type == "page" && slug.current == $slug && language == $language][0] {
     _id,
+    _createdAt,
+    _updatedAt,
     title,
     slug,
     body,

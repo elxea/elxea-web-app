@@ -186,7 +186,18 @@
     "detailsPageLink": "詳細・申し込みページを開く"
   },
   "page": {
-    "loadError": "ページを読み込めませんでした。少し時間をおいて、もう一度お試しください。"
+    "loadError": "ページを読み込めませんでした。少し時間をおいて、もう一度お試しください。",
+    "contents": "目次",
+    "updatedAt": "最終更新 {date}",
+    "published": "発行",
+    "updated": "最終更新",
+    "contact": "お問い合わせ",
+    "contactValue": "お問い合わせフォーム",
+    "related": {
+      "terms": "利用規約",
+      "tokushoho": "特定商取引法に基づく表記",
+      "contact": "お問い合わせ"
+    }
   },
   "account": {
     "loginRequired": "マイページを表示するにはログインが必要です。",
