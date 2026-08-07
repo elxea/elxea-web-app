@@ -5,9 +5,15 @@
  * correspondence table that lets automation edit the *correct* source file for a
  * given Figma component (Decision Log 39c70c9d064c81079145f69744e7b8f5, 施策①).
  *
- * SoT policy (案 B): Code is the source of truth; Figma is reference. This map is
- * a lookup index, not a second store of values — so validation is purely
- * existence/shape checking (no value duplication).
+ * SoT policy (2026-08-08, Setaka declaration): Figma is the source of truth for
+ * token/design values; code follows it (tokens/base.json is a copy of Figma,
+ * dist/ is generated output). This supersedes the earlier "案 B = Code is SoT"
+ * policy that used to be stated here.
+ *
+ * That policy does not change what this map does: it is a lookup index (Figma
+ * node -> source file), not a second store of values — so validation stays
+ * purely existence/shape checking, with no value duplication in either
+ * direction.
  *
  * Two modes:
  *   1. static (default)  — schema shape + code_path exists on disk. NO network.

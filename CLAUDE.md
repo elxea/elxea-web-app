@@ -46,15 +46,17 @@ pre-commit install --hook-type pre-commit --hook-type pre-push
 
 > **共通業務フロー**: デザイン提案・制作の共通フロー（2 モード / DS 準拠 / トークン束縛 / 二層チェック / 成果物台帳）は全プロジェクト共通の `design-workflow` skill を正本とする（詳細 = Design Ops Spec）。本節はプロジェクト固有の DS 差分を述べる。
 
-### 原則: SoT は対象テンプレートによって分離
+### 原則: SoTはFigma（全テンプレート共通）
 
-デザインシステムの Source of Truth (SoT) は一律ではなく、テンプレートの優先度に応じて段階的に移行する。
+**デザインシステムのSource of Truth (SoT) はFigma。コードは追従側**（Setaka宣言2026-08-08）。
+
+以前ここには「Critical 2テンプレートだけFigma = SoT、他テンプレートはCode = SoT」という段階移行の表を置いていたが、2026-08-08の宣言で**全テンプレート一律Figma = SoT** に確定したため撤去した。テンプレートごとにSoTが違う状態はもう無い。
 
 | 対象 | SoT | 運用方針 |
 |---|---|---|
-| Critical 2 テンプレート (商品詳細 + 購入フロー) | **Figma = SoT (新 DS)** | dogfood Spec section 3 の方針逆転を適用。Figma の変数・コンポーネントを正規定義とし、コードはそれに追従する |
-| 他テンプレート（凍結期間中） | **Code = SoT (既存 DS)** | 凍結期間中は現行コード定義を維持。変更は最小限 |
-| 段階移行 | 別タスクで策定 | dogfood Phase B 完了後に全テンプレートの Figma=SoT 化を検討 |
+| 全テンプレート | **Figma = SoT** | Figmaの変数・コンポーネントを正規定義とし、コードはそれに追従する。トークン値の写し先は `tokens/base.json`（→「Design Tokenアーキテクチャ」の序列表） |
+
+> **未解決の不整合（着手前に確認すること）**: `scripts/design-system/design-kit.manual.json` の `value_sot` は旧方針のまま「値の正本はコード。Figmaは鏡。数値が食い違ったらコードを採用」と宣言している。これは単なる説明文ではなく**食い違いが起きたときにどちらを採るかの判定モデル**なので、本タスクでは書き換えていない（判定を反転させるとconflictsの扱いが変わるため、Decision Logでの決定が要る）。design-kitを根拠に「コードが正」と結論しないこと。
 
 関連ドキュメント:
 - dogfood Spec: https://www.notion.so/36970c9d064c8166b31ef4be3b60a8c5
