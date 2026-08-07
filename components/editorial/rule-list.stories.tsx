@@ -3,10 +3,14 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import {
   CategoryIndex,
   ChapterBreak,
+  DefinitionRow,
   DisclosureRow,
   LinkRow,
   MetaRow,
+  Note,
   Overline,
+  RateRow,
+  ValueRow,
 } from "./rule-list";
 
 /**
@@ -104,6 +108,75 @@ export const Chapter_Break: Story = {
     <ChapterBreak overline="NO RIGHT ANSWER" title="淹れ方の正解は、置いていません。">
       ここに書いているのは、あくまで目安です。あとは、あなたの好きなように。
     </ChapterBreak>
+  ),
+};
+
+/** Figma 7848:39508 — キッカーを持たない章切り (配送情報)。 */
+export const Chapter_Break_NoOverline: Story = {
+  args: { question: "", summary: "" },
+  render: () => (
+    <ChapterBreak title="お届けを急ぐことより、良い状態で届くことを。">
+      摘まれてからの時間を短く保つため、まとめてではなく、その都度包んで送ります。
+    </ChapterBreak>
+  ),
+};
+
+/** Figma 7848:39261 — 帯の低い目次 (配送情報)。 */
+export const Category_Index_Compact: Story = {
+  args: { question: "", summary: "" },
+  render: () => (
+    <CategoryIndex
+      aria-label="このページの内容"
+      density="compact"
+      items={[
+        { label: "01  送料とお届け日数", href: "#rates" },
+        { label: "02  発送のタイミング", href: "#dispatch" },
+        { label: "03  配送方法とお届け時間帯", href: "#method" },
+        { label: "04  返品・交換", href: "#returns" },
+      ]}
+    />
+  ),
+};
+
+/** Figma 7848:39378 — 地域 / 送料 / お届け目安。箱組みテーブルを使わない。 */
+export const Rate_Rows: Story = {
+  args: { question: "", summary: "" },
+  render: () => (
+    <div className="border-b border-border">
+      <RateRow area="本州・四国・九州" fee="¥770" eta="翌日〜2日" />
+      <RateRow area="北海道" fee="¥1,100" eta="2〜3日" />
+      <RateRow area="沖縄・離島" fee="¥1,650" eta="3〜5日" />
+    </div>
+  ),
+};
+
+/** Figma 7848:39394 — 遷移しない定義行。 */
+export const Definition_Rows: Story = {
+  args: { question: "", summary: "" },
+  render: () => (
+    <dl className="border-b border-border">
+      <DefinitionRow term="通常のご注文">ご注文から2〜4日以内に発送します。</DefinitionRow>
+      <DefinitionRow term="定期便">お届け予定日の3日前に発送します。</DefinitionRow>
+      <DefinitionRow term="年末年始・大型連休">
+        発送をお休みします。前後は数日いただきます。
+      </DefinitionRow>
+    </dl>
+  ),
+};
+
+/** Figma 7848:39497 — 値だけを並べる行 + 注記。 */
+export const Value_Rows: Story = {
+  args: { question: "", summary: "" },
+  render: () => (
+    <div>
+      <Note>ご指定いただける時間帯</Note>
+      <ul className="mt-3 border-b border-border">
+        <ValueRow>午前中</ValueRow>
+        <ValueRow>14:00 – 16:00</ValueRow>
+        <ValueRow>16:00 – 18:00</ValueRow>
+      </ul>
+      <Note className="mt-3">地域によって、ご指定いただけない時間帯があります。</Note>
+    </div>
   ),
 };
 

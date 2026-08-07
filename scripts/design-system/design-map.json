@@ -541,6 +541,27 @@
       "code_path": "components/editorial/rule-list.tsx",
       "kind": "ds-component",
       "notes": "C2 実装。title / desc / 矢印。PC 3 列 / SP は説明文を次行へ。"
+    },
+    {
+      "figma_node_id": "7848:39394",
+      "figma_name": "DefinitionRow — 配送情報 S4 定義行",
+      "code_path": "components/editorial/rule-list.tsx",
+      "kind": "ds-component",
+      "notes": "C2 実装。title / desc。LinkRow と同骨格だが遷移しない。"
+    },
+    {
+      "figma_node_id": "7848:39378",
+      "figma_name": "RateRow — 配送情報 S3 送料行",
+      "code_path": "components/editorial/rule-list.tsx",
+      "kind": "ds-component",
+      "notes": "C2 実装。地域 / 送料 / お届け目安 の 3 列。箱組みテーブル不使用 (Figma 指定)。"
+    },
+    {
+      "figma_node_id": "7848:39497",
+      "figma_name": "ValueRow — 配送情報 S5 時間帯行",
+      "code_path": "components/editorial/rule-list.tsx",
+      "kind": "ds-component",
+      "notes": "C2 実装。値だけを罫線で並べる行。"
     }
   ],
   "unmapped_figma_nodes": [

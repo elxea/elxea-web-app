@@ -84,25 +84,43 @@ export function MetaRow({ label, children, className }: MetaRowProps) {
 
 export type CategoryIndexItem = { label: string; href: string };
 
+/**
+ * roomy = FAQ 7848:530 (帯の高さ 128 / SP 行 64)
+ * compact = 配送情報 7848:39261 (帯の高さ 96 / SP 行 56)
+ */
+export type CategoryIndexDensity = "roomy" | "compact";
+
+const INDEX_PADDING: Record<CategoryIndexDensity, { pc: string; sp: string }> = {
+  roomy: { pc: "md:pt-12 md:pb-14", sp: "pt-8 pb-3" },
+  compact: { pc: "md:py-9", sp: "pt-4 pb-4" },
+};
+
 export function CategoryIndex({
   items,
+  density = "roomy",
   className,
   ...props
-}: { items: CategoryIndexItem[] } & React.ComponentProps<"nav">) {
+}: {
+  items: CategoryIndexItem[];
+  density?: CategoryIndexDensity;
+} & React.ComponentProps<"nav">) {
+  const padding = INDEX_PADDING[density];
   return (
     <nav
       data-slot="category-index"
+      data-density={density}
       className={cn("border-b border-border md:border-t", className)}
       {...props}
     >
-      <ul className="md:grid md:grid-cols-4 md:gap-8 md:pt-12 md:pb-14">
+      <ul className={cn("md:grid md:grid-cols-4 md:gap-8", padding.pc)}>
         {items.map((item) => (
           <li key={item.href} className="border-t border-border md:border-t-0">
             <Link
               href={item.href}
               className={cn(
                 BODY_SM,
-                "block pt-8 pb-3 text-foreground hover:text-muted-foreground md:py-0"
+                "block text-foreground hover:text-muted-foreground md:py-0",
+                padding.sp
               )}
             >
               {item.label}
@@ -191,7 +209,8 @@ export function DisclosureRow({
 /* -------------------------------------------------------------------------- */
 
 export type ChapterBreakProps = {
-  overline: React.ReactNode;
+  /** 英字キッカー。配送情報の章切り (7848:39508) のように無い版もある。 */
+  overline?: React.ReactNode;
   title: React.ReactNode;
   children?: React.ReactNode;
   className?: string;
@@ -203,12 +222,17 @@ export function ChapterBreak({ overline, title, children, className }: ChapterBr
       data-slot="chapter-break"
       className={cn("bg-primary text-primary-foreground", className)}
     >
-      <div className="page-container pt-14 pb-10">
-        <p className={cn(OVERLINE, "text-primary-foreground")}>{overline}</p>
+      {/* キッカーがある版 (FAQ 7848:532) は上余白 56、無い版 (配送情報 7848:39508) は 96。
+          どちらも帯の高さ 192 に収まる Figma 実測どおりの配分。 */}
+      <div className={cn("page-container pb-10", overline ? "pt-14" : "pt-24")}>
+        {overline ? (
+          <p className={cn(OVERLINE, "text-primary-foreground")}>{overline}</p>
+        ) : null}
         <p
           className={cn(
             "[font:var(--typography-style-h3)] [letter-spacing:var(--typography-style-h3-tracking)]",
-            "mt-4 text-primary-foreground"
+            "text-primary-foreground",
+            overline && "mt-4"
           )}
         >
           {title}
@@ -261,5 +285,89 @@ export function LinkRow({ href, title, children, className }: LinkRowProps) {
         </span>
       ) : null}
     </Link>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* DefinitionRow — title / desc の定義行 (Figma 7848:39394 / 7848:39514)        */
+/* LinkRow と同じ骨格だが遷移しないので矢印もリンクも持たない。                  */
+/* -------------------------------------------------------------------------- */
+
+export type DefinitionRowProps = {
+  term: React.ReactNode;
+  children: React.ReactNode;
+  className?: string;
+};
+
+export function DefinitionRow({ term, children, className }: DefinitionRowProps) {
+  return (
+    <div
+      data-slot="definition-row"
+      className={cn(
+        "flex flex-wrap gap-x-4 gap-y-2 border-t border-border pt-6 pb-6",
+        "md:flex-nowrap md:gap-x-13 md:pb-4",
+        className
+      )}
+    >
+      <dt className={cn(H4, "min-w-0 flex-1 text-foreground md:w-75 md:flex-none")}>{term}</dt>
+      <dd className={cn(BODY_SM, "m-0 basis-full text-muted-foreground md:w-160 md:basis-auto")}>
+        {children}
+      </dd>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* RateRow — 地域 / 送料 / お届け目安 の 3 列 (Figma 7848:39378)               */
+/* 箱組みテーブルを使わず罫線のみで組む Figma の指定に従う。                     */
+/* PC: 地域 x0 / 送料 x672 / 目安 x1008  SP: 地域を上、送料と目安を下段へ        */
+/* -------------------------------------------------------------------------- */
+
+export type RateRowProps = {
+  area: React.ReactNode;
+  fee: React.ReactNode;
+  eta: React.ReactNode;
+  className?: string;
+};
+
+export function RateRow({ area, fee, eta, className }: RateRowProps) {
+  return (
+    <div
+      data-slot="rate-row"
+      className={cn(
+        "flex flex-wrap gap-x-4 gap-y-2 border-t border-border pt-4 pb-4",
+        "md:flex-nowrap md:pt-5 md:pb-5",
+        className
+      )}
+    >
+      <span className={cn(H4, "basis-full text-foreground md:w-168 md:basis-auto")}>{area}</span>
+      <span className={cn(BODY_SM, "w-45 shrink-0 text-foreground md:w-84")}>{fee}</span>
+      <span className={cn(BODY_SM, "min-w-0 flex-1 text-muted-foreground")}>{eta}</span>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* ValueRow — 値だけを並べる行 (Figma 7848:39497 お届け時間帯)                  */
+/* -------------------------------------------------------------------------- */
+
+export function ValueRow({ className, ...props }: React.ComponentProps<"li">) {
+  return (
+    <li
+      data-slot="value-row"
+      className={cn(BODY_SM, "border-t border-border pt-3 pb-3 text-foreground", className)}
+      {...props}
+    />
+  );
+}
+
+/** 補足の小さい注記 (Figma 7848:39390 / 7848:39507)。 */
+export function Note({ className, ...props }: React.ComponentProps<"p">) {
+  return (
+    <p
+      data-slot="note"
+      className={cn(CAPTION, "text-muted-foreground", className)}
+      {...props}
+    />
   );
 }

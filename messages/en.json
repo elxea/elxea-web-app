@@ -655,5 +655,116 @@
     "errorMessage": "An error occurred. Please try again.",
     "stepOf": "{current} / {total}",
     "chatCta": "Record your experience →"
+  },
+  "shipping": {
+    "title": "Delivery",
+    "kicker": "DELIVERY",
+    "lead": "What happens between your order and the parcel arriving. If anything is unclear, please contact us.",
+    "facts": {
+      "heading": "At a glance",
+      "rows": [
+        {
+          "label": "Dispatch",
+          "value": "2-4 days from order"
+        },
+        {
+          "label": "Arrival",
+          "value": "1-3 days after dispatch"
+        },
+        {
+          "label": "Carrier",
+          "value": "Yamato Transport"
+        }
+      ]
+    },
+    "index": {
+      "label": "On this page",
+      "rates": "Rates and timings",
+      "dispatch": "When we dispatch",
+      "method": "Method and time slots",
+      "returns": "Returns"
+    },
+    "rates": {
+      "heading": "Rates and timings",
+      "note": "Shipping cost and delivery time vary by region.",
+      "colArea": "Region",
+      "colFee": "Shipping",
+      "colEta": "Estimate",
+      "free": "Orders over 8,000 yen ship free, to any region.",
+      "rows": [
+        {
+          "area": "Honshu, Shikoku, Kyushu",
+          "fee": "770 yen",
+          "eta": "Next day to 2 days"
+        },
+        {
+          "area": "Hokkaido",
+          "fee": "1,100 yen",
+          "eta": "2-3 days"
+        },
+        {
+          "area": "Okinawa and remote islands",
+          "fee": "1,650 yen",
+          "eta": "3-5 days"
+        }
+      ]
+    },
+    "dispatch": {
+      "heading": "When we dispatch",
+      "note": "Dispatch time depends on what you ordered and when.",
+      "rows": [
+        {
+          "term": "Standard orders",
+          "desc": "Dispatched within 2-4 days of your order."
+        },
+        {
+          "term": "Subscriptions",
+          "desc": "Dispatched three days before the scheduled delivery date."
+        },
+        {
+          "term": "Holidays",
+          "desc": "We pause dispatch, and need a few extra days either side."
+        }
+      ]
+    },
+    "method": {
+      "heading": "Method and time slots",
+      "body": "We ship by Yamato Transport takkyubin. The dispatch email carries your tracking number. You can choose the delivery date and time slot at checkout.",
+      "slotsHeading": "Available time slots",
+      "slots": [
+        "Morning",
+        "14:00 - 16:00",
+        "16:00 - 18:00",
+        "18:00 - 20:00",
+        "19:00 - 21:00"
+      ],
+      "slotsNote": "Some slots are unavailable in certain regions."
+    },
+    "chapter": {
+      "title": "Arriving in good condition matters more than arriving fast.",
+      "body": "To keep the time since picking short, we wrap and send each order as it comes rather than in batches."
+    },
+    "returns": {
+      "heading": "Returns and exchanges",
+      "note": "As a food product, we cannot accept returns or exchanges for change of mind.",
+      "rows": [
+        {
+          "term": "Faulty or wrong item",
+          "desc": "Tell us within seven days of arrival. We cover the return postage."
+        },
+        {
+          "term": "How to reach us",
+          "desc": "Use the contact form and include your order number."
+        },
+        {
+          "term": "Once opened",
+          "desc": "We will check the condition and discuss it with you individually."
+        }
+      ]
+    },
+    "links": {
+      "products": "Browse the teas",
+      "contact": "Contact us"
+    }
   }
 }
