@@ -261,8 +261,12 @@ export default async function ArticlePage({
           {hasAccess ? (
             <>
               {/* 本文 — 段落間 24 / H2 前 56 後 20 (Figma の縦リズム) */}
+              {/* 本文の縦リズム: `prose-custom` 自身が持つ段落マージン (実測
+                  74px) は Figma の 24 と食い違うため important 付きで上書きする。
+                  下マージンを 0 に倒し、間隔は隣接セレクタの上マージンだけで
+                  作る (マージン相殺の影響を受けないようにするため)。 */}
               {article.body && (
-                <div className="prose-custom mt-6 [&>*+*]:mt-6 [&_h2]:mt-14 [&_h2]:mb-5">
+                <div className="prose-custom mt-6 [&>*]:mb-0! [&>*+*]:mt-6! [&_h2]:mt-14! [&_h2]:mb-5!">
                   <PortableText value={article.body} />
                 </div>
               )}
