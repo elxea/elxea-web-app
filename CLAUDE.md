@@ -150,6 +150,7 @@ pre-commit install --hook-type pre-commit --hook-type pre-push
 
 | スキル | ファイル | 用途 |
 |--------|---------|------|
+| **dev-workflow** | `.claude/skills/dev-workflow.md` | **実装工程の手順カード（Step 0-8 / 完了定義5点）。実装タスクに着手する前に必ず読む。正本 = roji Dev Ops Spec v1** |
 | design-tokens | `.claude/skills/design-tokens.md` | トークンの編集・ビルド・検証ルール |
 | figma-sync | `.claude/skills/figma-sync.md` | Figma ↔ コード同期手順 |
 | component-catalog | `.claude/skills/component-catalog.md` | コンポーネント管理・追加手順 |
