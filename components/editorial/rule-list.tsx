@@ -466,6 +466,27 @@ export function StepRow({ step, name, children, className }: StepRowProps) {
   );
 }
 
+/* -------------------------------------------------------------------------- */
+/* StackItem — ラベル上 / 値下のスタック (Figma 7857:932)                       */
+/* 特商法の記載事項で使う「罫線ゼロ・群は余白量の差で切る」型。                  */
+/* 項目間 32 (gap-8) / 群間 96 (gap-24) は呼び出し側が持つ。                     */
+/* -------------------------------------------------------------------------- */
+
+export type StackItemProps = {
+  label: React.ReactNode;
+  children: React.ReactNode;
+  className?: string;
+};
+
+export function StackItem({ label, children, className }: StackItemProps) {
+  return (
+    <div data-slot="stack-item" className={cn("flex flex-col gap-2", className)}>
+      <dt className={cn(CAPTION, "text-muted-foreground")}>{label}</dt>
+      <dd className={cn(BODY_SM, "m-0 text-foreground")}>{children}</dd>
+    </div>
+  );
+}
+
 /** 補足の小さい注記 (Figma 7848:39390 / 7848:39507)。 */
 export function Note({ className, ...props }: React.ComponentProps<"p">) {
   return (
