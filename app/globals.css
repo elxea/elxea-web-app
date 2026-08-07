@@ -98,7 +98,9 @@ h6 { font: var(--typography-style-h6); }
 }
 
 /* Page-header title — content-index pages (collections / collection detail /
- * elxea-journal) use the Figma PC page-title size (44px = display token) at md+.
+ * elxea-journal) and the R2 shared list pattern head (ListPageHead — products /
+ * tea-menu / collections / journal) use the Figma PC page-title size
+ * (44px = display token) at md+.
  * Same unlayered-rule rationale as .hero-display above so it beats the h1{font}
  * shorthand and Tailwind utilities. Mobile keeps the base h1 (32px). */
 @media (min-width: 768px) {

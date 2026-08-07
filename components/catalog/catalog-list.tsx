@@ -52,7 +52,14 @@ export function ListPageHead({ overline, title, lead, className }: ListPageHeadP
   return (
     <div data-slot="list-page-head" className={cn("flex flex-col gap-3", className)}>
       <p className={cn(overlineClass, "text-muted-foreground")}>{overline}</p>
-      <h1 className="text-foreground">{title}</h1>
+      {/* R2 共通リストパターンの PageHead 見出しは h1 プリセット (32px) ではなく
+          ページタイトル級。Figma 8061:1787「商品一覧」= w212 h73 で、束ねられた
+          変数は elxea/typography/functional/jp/h1 (52px / lh 1.4)。DS (editorial
+          スケール) の最大は display トークン 44px なので、生 px を足さずに既存の
+          .page-title (md+ で display トークン / lh 1.2) を当てる。同じ R2 パターン
+          配下の詳細ページ (collections/[handle]・elxea-journal) と同一実装になる。
+          SP は base h1 32px のまま (.page-title は md+ のみ)。 */}
+      <h1 className="page-title text-foreground">{title}</h1>
       {lead ? <p className={cn(captionClass, "text-muted-foreground")}>{lead}</p> : null}
     </div>
   );

@@ -16,8 +16,15 @@ import { cn } from "@/lib/utils";
  *   (`--typography-style-*` / `--typography-style-*-tracking`) のみを使う。
  *   Figma の `elxea/typography/editorial/*` と size / weight / lineHeight /
  *   letterSpacing が一致するため、新規トークンは足していない。
- *   既知の差分: overline の lineHeight が Figma 1.4 / トークン 1.5 (12px 換算で
- *   1.2px)。共有トークンを 1 ページ都合で動かさないため踏襲する。
+ *   既知の差分 (overline のみ・出どころは tokens/overrides/cjk.json)。Figma 変数
+ *   `elxea/typography/editorial/en/overline` の実値は 12px / 500 / lineHeight 1.4
+ *   / letterSpacing 12.5% (= .125em = 1.5px)。base トークンは .125em で一致するが、
+ *   ページが :lang(ja) のため dist/tokens-cjk.css の再束縛 (lineHeight 1.75 /
+ *   tracking .15em = 1.8px) が効き、実測は lh +0.35 / tracking +0.3px ずれる。
+ *   キッカーは英字なので本来 CJK 再束縛の対象外だが、overline トークンは本ファイル
+ *   経由で全ページ (signs / products / journal / subscription ほか) に効くため、
+ *   1 ページ都合で共有トークンを動かさず踏襲する。解消は cjk override のスコープ
+ *   見直し (DS 側の別案件) で行う。
  * - 色は semantic token (foreground / muted-foreground / border / primary)。
  * - 寸法は Tailwind spacing scale (= spacing.* トークンと同じ 0.25rem 刻み)。
  *   生 px・生カラーはこのファイルに書かない。

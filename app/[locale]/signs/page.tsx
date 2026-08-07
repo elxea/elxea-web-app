@@ -87,12 +87,17 @@ export default async function SignsPage() {
         <div className="col-span-4 flex flex-col gap-10 md:col-span-8 lg:col-span-4">
           <h2 data-slot="section-title" className="text-foreground">{t("stats.heading")}</h2>
 
-          <Stat value={PLACEHOLDER_STATS.brews} unit={t("stats.brewsUnit")} label={t("stats.brewsLabel")} />
-          <Stat
-            value={PLACEHOLDER_STATS.visitors}
-            unit={t("stats.visitorsUnit")}
-            label={t("stats.visitorsLabel")}
-          />
+          {/* Stat 2 枚。SP 7839:492 は 2 カラム横並び (子 x0 / x187.5・各 w155.5 =
+              内容幅 343 を gap 32 で二等分)、PC 7838:38289 は縦積み gap 40。
+              lg で 1 カラムに戻し gap-10 にすると親 flex と同じ 40px リズムになる。 */}
+          <div className="grid grid-cols-2 items-start gap-8 lg:grid-cols-1 lg:gap-10">
+            <Stat value={PLACEHOLDER_STATS.brews} unit={t("stats.brewsUnit")} label={t("stats.brewsLabel")} />
+            <Stat
+              value={PLACEHOLDER_STATS.visitors}
+              unit={t("stats.visitorsUnit")}
+              label={t("stats.visitorsLabel")}
+            />
+          </div>
 
           {/* 時間帯 7838:38301 */}
           <div className="flex flex-col gap-5">
