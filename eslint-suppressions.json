@@ -104,11 +104,6 @@
       "count": 2
     }
   },
-  "app/[locale]/products/page.tsx": {
-    "elxea-tokens/no-raw-colors": {
-      "count": 1
-    }
-  },
   "app/[locale]/search/page.tsx": {
     "elxea-tokens/no-raw-colors": {
       "count": 1
@@ -125,11 +120,6 @@
     }
   },
   "app/[locale]/tea-menu/[slug]/page.tsx": {
-    "elxea-tokens/no-raw-colors": {
-      "count": 2
-    }
-  },
-  "app/[locale]/tea-menu/page.tsx": {
     "elxea-tokens/no-raw-colors": {
       "count": 2
     }
@@ -155,11 +145,6 @@
     }
   },
   "components/product/add-to-cart-button.tsx": {
-    "elxea-tokens/no-raw-colors": {
-      "count": 2
-    }
-  },
-  "components/product/product-card.tsx": {
     "elxea-tokens/no-raw-colors": {
       "count": 2
     }

@@ -36,7 +36,12 @@ const BODY_SM =
 const H4 =
   "[font:var(--typography-style-h4)] [letter-spacing:var(--typography-style-h4-tracking)]";
 
-export { OVERLINE as overlineClass, BODY_SM as bodySmClass };
+export {
+  OVERLINE as overlineClass,
+  CAPTION as captionClass,
+  BODY_SM as bodySmClass,
+  H4 as h4Class,
+};
 
 /* -------------------------------------------------------------------------- */
 /* Overline — 英字キッカー (Figma 7848:39289 ほか)                              */

@@ -1,5 +1,6 @@
 import { useTranslations } from "next-intl";
 import type { Product } from "@/lib/shopify/types";
+import { CatalogGrid } from "@/components/catalog/catalog-list";
 import { ProductCard } from "./product-card";
 
 export function ProductGrid({ products }: { products: Product[] }) {
@@ -14,10 +15,10 @@ export function ProductGrid({ products }: { products: Product[] }) {
   }
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-14">
+    <CatalogGrid>
       {products.map((product) => (
         <ProductCard key={product.id} product={product} />
       ))}
-    </div>
+    </CatalogGrid>
   );
 }

@@ -82,7 +82,8 @@
     "addedToFavorites": "Added to favorites",
     "removedFromFavorites": "Removed from favorites",
     "favoriteError": "Action failed. Please try again.",
-    "loginRequiredForFavorite": "Please log in to add to favorites."
+    "loginRequiredForFavorite": "Please log in to add to favorites.",
+    "listLead": "Single-origin teas and teaware, from seasonal picks to everyday cups."
   },
   "collection": {
     "empty": "No collections available",
@@ -900,5 +901,14 @@
       "shipping": "Delivery",
       "contact": "Contact us"
     }
+  },
+  "catalog": {
+    "all": "All",
+    "byKind": "Browse by kind",
+    "showMore": "Show {count} more",
+    "sortLabel": "Sort",
+    "sortNewest": "Newest",
+    "sortPriceAsc": "Price: low to high",
+    "sortPriceDesc": "Price: high to low"
   }
 }

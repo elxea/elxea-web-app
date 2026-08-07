@@ -60,6 +60,7 @@ export function VariantSelector({
               return (
                 <Button
                   key={value}
+                  data-slot="variant-option"
                   variant={selected ? "default" : "outline"}
                   size="sm"
                   onClick={() => handleSelect(option.name, value)}

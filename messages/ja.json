@@ -82,7 +82,8 @@
     "addedToFavorites": "お気に入りに追加しました",
     "removedFromFavorites": "お気に入りから削除しました",
     "favoriteError": "操作に失敗しました。もう一度お試しください。",
-    "loginRequiredForFavorite": "お気に入りに追加するにはログインが必要です。"
+    "loginRequiredForFavorite": "お気に入りに追加するにはログインが必要です。",
+    "listLead": "日本各地の茶農家から届いたお茶と茶器。旬のものから日常の一杯まで。"
   },
   "collection": {
     "empty": "コレクションはまだありません",
@@ -907,5 +908,14 @@
       "shipping": "配送についてへ",
       "contact": "お問い合わせへ"
     }
+  },
+  "catalog": {
+    "all": "すべて",
+    "byKind": "種類から探す",
+    "showMore": "さらに {count} 件を表示",
+    "sortLabel": "並び替え",
+    "sortNewest": "新着順",
+    "sortPriceAsc": "価格が安い順",
+    "sortPriceDesc": "価格が高い順"
   }
 }
