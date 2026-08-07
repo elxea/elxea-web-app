@@ -430,34 +430,17 @@
     }
   },
   "spacing": {
-    "$type": "dimension",
-    "$description": "Spacing scale (margin, padding, gap)",
     "0": {
       "$value": "0px"
-    },
-    "px": {
-      "$value": "1px"
-    },
-    "0.5": {
-      "$value": "0.125rem"
     },
     "1": {
       "$value": "0.25rem"
     },
-    "1.5": {
-      "$value": "0.375rem"
-    },
     "2": {
       "$value": "0.5rem"
     },
-    "2.5": {
-      "$value": "0.625rem"
-    },
     "3": {
       "$value": "0.75rem"
-    },
-    "3.5": {
-      "$value": "0.875rem"
     },
     "4": {
       "$value": "1rem"
@@ -536,6 +519,23 @@
     },
     "96": {
       "$value": "24rem"
+    },
+    "$type": "dimension",
+    "$description": "Spacing scale (margin, padding, gap)",
+    "px": {
+      "$value": "1px"
+    },
+    "0.5": {
+      "$value": "0.125rem"
+    },
+    "1.5": {
+      "$value": "0.375rem"
+    },
+    "2.5": {
+      "$value": "0.625rem"
+    },
+    "3.5": {
+      "$value": "0.875rem"
     }
   },
   "shape": {
@@ -568,7 +568,6 @@
       }
     },
     "borderWidth": {
-      "$type": "dimension",
       "0": {
         "$value": "0px"
       },
@@ -583,7 +582,8 @@
       },
       "8": {
         "$value": "8px"
-      }
+      },
+      "$type": "dimension"
     }
   },
   "layout": {
@@ -977,8 +977,6 @@
       }
     },
     "level": {
-      "$type": "number",
-      "$description": "z-index elevation levels",
       "0": {
         "$value": "0",
         "$description": "Flat — base content"
@@ -1002,11 +1000,11 @@
       "5": {
         "$value": "50",
         "$description": "Top — toast, notification"
-      }
+      },
+      "$type": "number",
+      "$description": "z-index elevation levels"
     },
     "zIndex": {
-      "$type": "number",
-      "$description": "Raw z-index values",
       "0": {
         "$value": "0"
       },
@@ -1024,10 +1022,11 @@
       },
       "50": {
         "$value": "50"
-      }
+      },
+      "$type": "number",
+      "$description": "Raw z-index values"
     },
     "opacity": {
-      "$type": "number",
       "0": {
         "$value": "0"
       },
@@ -1072,7 +1071,8 @@
       },
       "100": {
         "$value": "1"
-      }
+      },
+      "$type": "number"
     },
     "focus": {
       "$description": "Focus ring tokens",
@@ -1314,6 +1314,59 @@
         "desktop": {
           "$value": "6rem",
           "$description": "96px — Webflow header-height"
+        }
+      }
+    },
+    "header": {
+      "height": {
+        "$type": "dimension",
+        "mobile": {
+          "$value": "3.75rem",
+          "$description": "60px — Figma Header SP (Module) 7970:42126 実測高"
+        },
+        "desktop": {
+          "$value": "4.25rem",
+          "$description": "68px — Figma Header (Module) 5653:29 実測高 (16 + 36 nav + 16)"
+        }
+      }
+    },
+    "footer": {
+      "padding": {
+        "$type": "dimension",
+        "block": {
+          "$value": "4rem",
+          "$description": "64px — Figma Footer (Module) 5662:49 上下パディング実測"
+        }
+      },
+      "column": {
+        "$type": "dimension",
+        "gap": {
+          "$value": "3rem",
+          "$description": "48px — Figma Footer / Columns 列間 (292px 列 x4 + 48 x3 = 1312)"
+        }
+      }
+    },
+    "logo": {
+      "height": {
+        "$type": "dimension",
+        "sm": {
+          "$value": "1rem",
+          "$description": "16px — Figma Header / Logo 7965:242 実測高"
+        },
+        "md": {
+          "$value": "1.125rem",
+          "$description": "18px — Figma Footer / Brand / Logo 7965:248 実測高"
+        },
+        "lg": {
+          "$value": "1.5rem",
+          "$description": "24px — Figma Logo / Wordmark 7964:242 実測高"
+        }
+      },
+      "aspectRatio": {
+        "$type": "number",
+        "wordmark": {
+          "$value": "4.159",
+          "$description": "99.8087 / 24 — Figma Logo / Wordmark 7964:242 の縦横比"
         }
       }
     },

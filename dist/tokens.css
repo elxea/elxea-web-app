@@ -292,6 +292,14 @@
   --component-dialog-radius-default: 0.5rem;
   --component-nav-height-mobile: 3.5rem;
   --component-nav-height-desktop: 6rem;
+  --component-header-height-mobile: 3.75rem;
+  --component-header-height-desktop: 4.25rem;
+  --component-footer-padding-block: 4rem;
+  --component-footer-column-gap: 3rem;
+  --component-logo-height-sm: 1rem;
+  --component-logo-height-md: 1.125rem;
+  --component-logo-height-lg: 1.5rem;
+  --component-logo-aspectRatio-wordmark: 4.159;
   --component-sidebar-width-collapsed: 4rem;
   --component-sidebar-width-default: 16rem;
   --component-sidebar-width-wide: 20rem;

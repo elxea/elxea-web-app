@@ -210,6 +210,17 @@ h1.contact-title {
   /* Padding-only variant for elements that bring their own width constraint. */
   .page-inset { padding-inline: var(--page-margin); }
 
+  /* Narrow content column (long-form text: legal / FAQ / about 本文).
+   * Width only — vertical rhythm lives in `.section-*` / <Section>, so a block
+   * can change its padding without inventing a new width. Same calc as
+   * .page-container so the outer margin stays OUTSIDE the content column. */
+  .page-container-narrow {
+    width: 100%;
+    max-width: calc(var(--layout-container-md) + var(--page-margin) * 2);
+    margin-inline: auto;
+    padding-inline: var(--page-margin);
+  }
+
   /* Section layout utilities */
   .section-narrow {
     @apply py-16;

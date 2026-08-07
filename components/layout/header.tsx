@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useSyncExternalStore, useCallback } from "react";
-import Image from "next/image";
 import { useTranslations, useLocale } from "next-intl";
 import { Link, usePathname } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
@@ -15,6 +14,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { useCart } from "@/components/cart/cart-context";
 import { AudioToggle } from "@/components/audio/audio-toggle";
+import { Logo } from "./logo";
 import { Menu } from "lucide-react";
 
 function subscribeToCookies(callback: () => void) {
@@ -74,7 +74,10 @@ export function Header({ navItems: externalNavItems }: HeaderProps) {
     <header className="border-b border-border bg-background sticky top-0 z-50">
       {/* Main header */}
       <div className="page-container">
-        <div className="flex items-center justify-between h-16">
+        {/* Figma Header (Module) 5653:29 = 68px (SP 7970:42126 = 60px)。
+            高さは component.header.height.* トークンに束縛する (h-16 直書きは 64px
+            で Figma と 4px ずれていた)。 */}
+        <div className="flex items-center justify-between h-(--component-header-height-mobile) md:h-(--component-header-height-desktop)">
           {/* Mobile menu button */}
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
             <SheetTrigger asChild>
@@ -90,7 +93,7 @@ export function Header({ navItems: externalNavItems }: HeaderProps) {
             <SheetContent side="left" className="w-72">
               <SheetHeader>
                 <SheetTitle>
-                  <Image src="/logo.png" alt="elxea" width={80} height={19} />
+                  <Logo size="sm" />
                 </SheetTitle>
               </SheetHeader>
               <nav className="flex flex-col gap-1 mt-6">
@@ -181,13 +184,7 @@ export function Header({ navItems: externalNavItems }: HeaderProps) {
             href="/"
             className="absolute left-1/2 -translate-x-1/2"
           >
-            <Image
-              src="/logo.png"
-              alt="elxea"
-              width={100}
-              height={24}
-              priority
-            />
+            <Logo size="sm" priority />
           </Link>
 
           {/* Right actions */}
