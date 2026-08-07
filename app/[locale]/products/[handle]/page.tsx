@@ -48,12 +48,33 @@ import { cn } from "@/lib/utils";
  * - 数量 Stepper と SP の sticky 購入バーは既存カート部品に該当が無く未実装
  */
 
+/**
+ * 動的セグメントの handle を Shopify に渡せる素の文字列へ戻す。
+ *
+ * 日本語ハンドル (例「テスト商品a」) は URL 上 percent-encode され、Next.js の
+ * `params.handle` にはレンダリング経路によって **encode 済みのまま**渡ることが
+ * ある。実測 (2026-08-08 Preview) では generateMetadata 側は decode 済みで商品を
+ * 引けるのに、Page 側は encode 済みのまま Shopify に送られて null → notFound()
+ * となり、タイトルだけ正しく本文が 404 になっていた。
+ *
+ * decode 済みの文字列に再度 decodeURIComponent をかけても `%` を含まない限り
+ * 変化しないため冪等。不正な `%` 混じり (decode 不能) は元の値を使う。
+ */
+function decodeHandle(handle: string): string {
+  try {
+    return decodeURIComponent(handle);
+  } catch {
+    return handle;
+  }
+}
+
 export async function generateMetadata({
   params,
 }: {
   params: Promise<{ handle: string }>;
 }): Promise<Metadata> {
-  const { handle } = await params;
+  const { handle: rawHandle } = await params;
+  const handle = decodeHandle(rawHandle);
   const t = await getTranslations("common");
   const fallback: Metadata = { title: t("products") };
   try {
@@ -88,7 +109,8 @@ export default async function ProductPage({
   params: Promise<{ handle: string; locale: string }>;
   searchParams: Promise<Record<string, string>>;
 }) {
-  const { handle, locale } = await params;
+  const { handle: rawHandle, locale } = await params;
+  const handle = decodeHandle(rawHandle);
   const currentSearchParams = await searchParams;
   const t = await getTranslations("product");
   const tc = await getTranslations("common");

@@ -229,8 +229,16 @@ export function Header({ navItems: externalNavItems }: HeaderProps) {
                   showCloseButton={false}
                   className="w-full max-w-full gap-0 overflow-y-auto border-l-0 p-0 sm:max-w-full"
                 >
-                  {/* 1. SP Header (展開時) — p-4 (16px) で h=16+24+16=56 */}
-                  <div className="flex items-center justify-between p-4">
+                  {/*
+                    1. SP Header (展開時)。
+                    Figma 7967:1327 の実測は h=56 だが、通常時の SP ヘッダーは
+                    `--component-header-height-mobile` = 60px。56 のまま組むと
+                    メニュー開閉のたびにロゴが 2px 上下する。Setaka 裁定
+                    (2026-08-08)「通常時 60 が正」に従い展開時も 60 に統一する
+                    (Figma 側の 56 は次回の SoT 更新で 60 に合わせる)。
+                    左右 padding は Figma どおり 16px を維持する。
+                  */}
+                  <div className="flex h-(--component-header-height-mobile) items-center justify-between px-4">
                     <SheetTitle className="flex items-center">
                       <Logo size="sm" />
                       <span className="sr-only">Menu</span>

@@ -36,11 +36,39 @@ function flattenConnection<T>(connection: ShopifyConnection<T>): T[] {
 // Parse metafields array into structured ProductMetafields
 type RawMetafield = { namespace: string; key: string; value: string; type: string } | null;
 
+/**
+ * Shopify の list.* 型 metafield は Storefront API 上、JSON 配列の**文字列**
+ * (`["春摘み","夏摘み"]`) として返る。そのまま描画すると角括弧と引用符が
+ * 画面に出るため、配列として解釈できたときだけ読点で連結して 1 行にする。
+ *
+ * - `[` 始まりでない / JSON として壊れている値は素通し (single_line_text_field 等)
+ * - 要素は文字列化して trim し、空要素は落とす
+ * - 全要素が空なら null (= 値なし) を返し、呼び出し側の「行を出さない」判定に乗せる
+ */
+export function normalizeMetafieldValue(value: string | undefined): string | null {
+  if (value == null) return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (!trimmed.startsWith("[")) return trimmed;
+  try {
+    const parsed: unknown = JSON.parse(trimmed);
+    if (!Array.isArray(parsed)) return trimmed;
+    const joined = parsed
+      .map((item) => (typeof item === "string" ? item : String(item)).trim())
+      .filter(Boolean)
+      .join("、");
+    return joined || null;
+  } catch {
+    return trimmed;
+  }
+}
+
 function parseProductMetafields(raw: RawMetafield[]): ProductMetafields {
   const map = new Map<string, string>();
   for (const mf of raw) {
     if (mf) map.set(`${mf.namespace}.${mf.key}`, mf.value);
   }
+  const read = (key: string) => normalizeMetafieldValue(map.get(key));
 
   const features: ProductFeature[] = [];
   for (let i = 1; i <= 4; i++) {
@@ -57,13 +85,14 @@ function parseProductMetafields(raw: RawMetafield[]): ProductMetafields {
 
   return {
     features,
-    howToEnjoy: map.get("my_fields._how-to-enjoy") || null,
-    menuNumber: map.get("custom.menu_number") || null,
-    teaCategory: map.get("custom._type-of-tea") || null,
-    variety: map.get("custom.variety") || null,
-    season: map.get("custom.season") || null,
-    taste: map.get("custom.taste") || null,
-    aroma: map.get("custom.aroma") || null,
+    howToEnjoy: read("my_fields._how-to-enjoy"),
+    menuNumber: read("custom.menu_number"),
+    teaCategory: read("custom._type-of-tea"),
+    variety: read("custom.variety"),
+    // 摘採。list.single_line_text_field のため JSON 配列文字列で返る。
+    season: read("custom.season"),
+    taste: read("custom.taste"),
+    aroma: read("custom.aroma"),
   };
 }
 
