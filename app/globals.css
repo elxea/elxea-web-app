@@ -193,11 +193,12 @@ h1.contact-title {
    * the same token.
    *
    * The max-width adds the margin on top of the content cap so the outer margin
-   * lives OUTSIDE the content column. With a plain `max-w-7xl` the 1280px cap
-   * would swallow the padding and the content would start 144px in at 1440
+   * lives OUTSIDE the content column. With a plain `max-w-7xl` the cap would
+   * swallow the padding and the content would start 144px in at 1440
    * (measured), i.e. the 64px margin would not bind at all. With the calc the
-   * content column stays exactly container.xl (1280px) and the 64px margin
-   * binds on every viewport up to 1408px.
+   * content column stays exactly container.xl (1312px) and the 64px margin
+   * binds on every viewport up to 1440px — at exactly 1440 the page fills the
+   * viewport and the outer margin is 64px on both sides (Figma SoT).
    * box-sizing is border-box (Tailwind preflight), so max-width covers padding. */
   .page-container {
     width: 100%;

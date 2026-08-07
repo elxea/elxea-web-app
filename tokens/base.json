@@ -655,8 +655,8 @@
         "$description": "1024px — standard"
       },
       "xl": {
-        "$value": "80rem",
-        "$description": "1280px — wide"
+        "$value": "82rem",
+        "$description": "1312px — wide (1440 viewport minus 64px outer margin each side; Figma SoT)"
       },
       "2xl": {
         "$value": "96rem",
