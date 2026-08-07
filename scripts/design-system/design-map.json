@@ -506,6 +506,41 @@
       "code_path": "components/chat/chat-panel.tsx",
       "kind": "ds-component",
       "notes": "C1 R3 で chat-bar.tsx から切り出し。ヘッダー (h=32 = px-4/py-2) + 本文の表示部品で、開閉状態とメッセージ配列は chat-bar.tsx が持つ。Figma は入力行をパネル内に持つがコードは外に常時表示 (メッセージ 0 件でも入力できる要件)。この構造差は未解消。"
+    },
+    {
+      "figma_node_id": "7848:39293",
+      "figma_name": "MetaRow — FAQ S1 右カラム row / 答え",
+      "code_path": "components/editorial/rule-list.tsx",
+      "kind": "ds-component",
+      "notes": "C2 実装。label / value の 2 列メタ行。PC label 幅 140 / SP 120。"
+    },
+    {
+      "figma_node_id": "7848:530",
+      "figma_name": "CategoryIndex — FAQ S2 カテゴリ目次",
+      "code_path": "components/editorial/rule-list.tsx",
+      "kind": "ds-component",
+      "notes": "C2 実装。罫線のみの目次。PC 4 列 (304px x4 + gap 32) / SP 縦 1 列。"
+    },
+    {
+      "figma_node_id": "7848:39430",
+      "figma_name": "DisclosureRow — FAQ S3 開閉行",
+      "code_path": "components/editorial/rule-list.tsx",
+      "kind": "ds-component",
+      "notes": "C2 実装。閉じたまま答えの要点 1 行が読める。native <details> で JS を持たない。"
+    },
+    {
+      "figma_node_id": "7848:532",
+      "figma_name": "ChapterBreak — FAQ S4 章切り",
+      "code_path": "components/editorial/rule-list.tsx",
+      "kind": "ds-component",
+      "notes": "C2 実装。明度反転 (primary) の全幅帯。"
+    },
+    {
+      "figma_node_id": "7849:39321",
+      "figma_name": "LinkRow — FAQ S5 遷移行",
+      "code_path": "components/editorial/rule-list.tsx",
+      "kind": "ds-component",
+      "notes": "C2 実装。title / desc / 矢印。PC 3 列 / SP は説明文を次行へ。"
     }
   ],
   "unmapped_figma_nodes": [

@@ -344,24 +344,130 @@
     "value3Text": "We handle only specialty-grade tea leaves and deliver them in optimal condition."
   },
   "faq": {
-    "title": "Frequently Asked Questions",
-    "subtitle": "If you have any questions, please don't hesitate to contact us.",
-    "q1": "What is the subscription service?",
-    "a1": "Our subscription delivers carefully selected specialty teas monthly or bimonthly. We send seasonal teas directly from farmers to your door.",
-    "q2": "Can I cancel my subscription?",
-    "a2": "Yes, you can cancel anytime. Please manage your subscription from your account page. Cancel at least 3 days before the next delivery date.",
-    "q3": "How much is shipping?",
-    "a3": "Flat rate of ¥550 (tax included) nationwide. Free shipping on orders over ¥5,000. Subscriptions always ship free.",
-    "q4": "How long does delivery take?",
-    "a4": "Orders are typically shipped within 3-5 business days. Delivery takes 1-3 days after shipping (varies by region).",
-    "q5": "What payment methods are accepted?",
-    "a5": "We accept credit cards (Visa, Mastercard, American Express, JCB), Apple Pay, Google Pay, and Shop Pay.",
-    "q6": "Can I return or exchange items?",
-    "a6": "As food products, we cannot accept returns for customer convenience. If you receive a defective product, please contact us within 7 days of delivery for a replacement or refund.",
-    "q7": "Is gift wrapping available?",
-    "a7": "Currently in preparation. Please stay tuned for future updates.",
-    "q8": "Can I change my delivery address or frequency?",
-    "a8": "Yes, you can change your delivery address and frequency (monthly ↔ bimonthly) from your account page. Please make changes at least 3 days before the next delivery date."
+    "title": "Frequently asked questions",
+    "subtitle": "If anything is unclear, please ask.",
+    "kicker": "FAQ",
+    "lead": "The questions we receive most, with the gist of each answer readable without opening it. Open only the ones you want in full.",
+    "reading": {
+      "heading": "READING THIS PAGE",
+      "rows": [
+        {
+          "label": "Answers",
+          "value": "The gist reads in one line, unopened"
+        },
+        {
+          "label": "Not here?",
+          "value": "Use the contact link at the foot of the page"
+        },
+        {
+          "label": "Updated",
+          "value": "5 August 2026"
+        }
+      ]
+    },
+    "index": {
+      "label": "Categories"
+    },
+    "groups": [
+      {
+        "no": "01",
+        "en": "ABOUT TEA",
+        "title": "About tea",
+        "items": [
+          {
+            "q": "How should I brew it?",
+            "summary": "We do not prescribe one way. Only a guideline, printed on the back of the pack.",
+            "body": "Neither water temperature nor steeping time has a right answer here. The back of the pack notes a guideline such as 70C for 90 seconds. Some people run the second infusion hotter; others keep it the same. Brew one cup to the guideline, then move it wherever you like."
+          },
+          {
+            "q": "What does single origin mean?",
+            "summary": "Tea from a single farm, a single cultivar and a single harvest."
+          },
+          {
+            "q": "How long does it keep, and how should I store it?",
+            "summary": "One year unopened, about a month once opened. Keep it cool and dark."
+          }
+        ]
+      },
+      {
+        "no": "02",
+        "en": "ORDER & DELIVERY",
+        "title": "Orders and delivery",
+        "items": [
+          {
+            "q": "How much is shipping?",
+            "summary": "A flat 550 yen nationwide, free on orders over 5,000 yen."
+          },
+          {
+            "q": "How long does delivery take?",
+            "summary": "Two to four days from your order (remote islands excepted)."
+          },
+          {
+            "q": "Can I change or cancel an order?",
+            "summary": "Yes, before it ships. Contact us and we will adjust it."
+          }
+        ]
+      },
+      {
+        "no": "03",
+        "en": "SUBSCRIPTION",
+        "title": "Subscription",
+        "items": [
+          {
+            "q": "Can I choose the delivery interval?",
+            "summary": "Every two, four or eight weeks, and you can change it later."
+          },
+          {
+            "q": "Can I skip or stop?",
+            "summary": "Any time. There is no minimum number of deliveries."
+          },
+          {
+            "q": "Can I see the next tea in advance?",
+            "summary": "We email you five days before dispatch, and you can swap it."
+          }
+        ]
+      },
+      {
+        "no": "04",
+        "en": "ACCOUNT & OTHER",
+        "title": "Account and other",
+        "items": [
+          {
+            "q": "Do I need an account to buy?",
+            "summary": "No, you can order without registering."
+          },
+          {
+            "q": "Can I send it as a gift?",
+            "summary": "Yes, gift wrapping and a message card are available."
+          },
+          {
+            "q": "Who do I contact about press or wholesale?",
+            "summary": "Use the Other category on the contact form."
+          }
+        ]
+      }
+    ],
+    "chapter": {
+      "overline": "NO RIGHT ANSWER",
+      "title": "We do not set a right way to brew.",
+      "body": "What is written here is only a guideline. The rest is yours."
+    },
+    "still": {
+      "overline": "STILL LOOKING",
+      "title": "If you did not find it",
+      "rows": [
+        {
+          "title": "Contact us",
+          "desc": "Send us a note and we will reply within three business days.",
+          "href": "/contact"
+        },
+        {
+          "title": "More about tea",
+          "desc": "Reading on brewing, origins and cultivars.",
+          "href": "/journal"
+        }
+      ]
+    }
   },
   "contact": {
     "title": "Contact Us",
