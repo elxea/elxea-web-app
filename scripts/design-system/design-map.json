@@ -208,10 +208,10 @@
     },
     {
       "figma_node_id": "6936:126",
-      "figma_name": "Input Underline",
-      "code_path": "components/search-form.tsx",
+      "figma_name": "Input Underline (Proposed) — elxea/search",
+      "code_path": "components/search/search-panel.tsx",
       "kind": "ds-component",
-      "notes": "inline (shadcn Input を border-b の下線スタイルに)。SearchForm。"
+      "notes": "C2 R3 で共有部品 InputUnderline に集約 (正本)。components/search-form.tsx には shadcn Input を border-b にしたインライン実装が残っており、次ラウンドで InputUnderline へ移行する (同一 Figma ノードの二重実装を解消するため)。"
     },
     {
       "figma_node_id": "6936:17638",
@@ -583,6 +583,34 @@
       "code_path": "components/editorial/rule-list.tsx",
       "kind": "ds-component",
       "notes": "C2 R2 実装。番号 / ステップ名 / 説明。順序に意味があるので ol の子として使う。"
+    },
+    {
+      "figma_node_id": "7857:39732",
+      "figma_name": "RailRow — 汎用ページ レール+本文の二段組",
+      "code_path": "components/editorial/rule-list.tsx",
+      "kind": "ds-component",
+      "notes": "C2 R3 実装。レール col1-3 (304) + 本文 col4-9 (640)。SP はレールを上へ積む。"
+    },
+    {
+      "figma_node_id": "7857:39745",
+      "figma_name": "IndexRow — 汎用ページ 章目次行",
+      "code_path": "components/editorial/rule-list.tsx",
+      "kind": "ds-component",
+      "notes": "C2 R3 実装。番号 + 章名。行全体がタップ域 53px。"
+    },
+    {
+      "figma_node_id": "7857:932",
+      "figma_name": "StackItem — 特商法 記載事項の項目",
+      "code_path": "components/editorial/rule-list.tsx",
+      "kind": "ds-component",
+      "notes": "C2 R3 実装。ラベル上・値下のスタック。罫線ゼロ、群は余白量差で切る。"
+    },
+    {
+      "figma_node_id": "7967:42151",
+      "figma_name": "SearchPanel — 検索パネル (開時)",
+      "code_path": "components/search/search-panel.tsx",
+      "kind": "ds-component",
+      "notes": "C2 R3 実装。Header 直下に全幅で開く。開閉と scrim は呼び出し側の責務。"
     }
   ],
   "unmapped_figma_nodes": [
@@ -600,6 +628,11 @@
       "figma_node_id": "6859:339",
       "figma_name": "Chat / InputRow (パネル内配置・border-t 付き)",
       "reason": "Figma は入力行をパネル内 (6859:338 / h=64 / inset 12) に置くが、コードは chat-bar.tsx の入力バーをパネル外に常時表示している (メッセージ 0 件でも入力できる要件のため)。どちらを正とするかは UX 判断なので未解消のまま記録する。入力行そのもののコード実装は entries の Chat / InputRow 6858:318 にある。"
+    },
+    {
+      "figma_node_id": "7967:1326",
+      "figma_name": "開閉UI / SP メニュー展開 (全幅・閉じる✕・Nav 56px・検索・アカウント導線)",
+      "reason": "Figma は SP メニューを全幅展開 (375) + ヘッダーに閉じる✕ + Nav 行 56px + 検索入力 + アカウント導線で構成するが、実装は現在 w-72 の左サイドシート。作り替えは header.tsx の SP 構成変更を伴い、未解決の Setaka Q1 (SP ヘッダーのカート配置) と同じ領域を触るため、Q1 の回答後にまとめて対応する。"
     }
   ]
 }
