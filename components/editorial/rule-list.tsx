@@ -60,18 +60,40 @@ export function Overline({ className, ...props }: React.ComponentProps<"p">) {
 export type MetaRowProps = {
   label: React.ReactNode;
   children: React.ReactNode;
+  /** 罫線。利用規約 S1 (7848:39271) のように罫線を持たない版がある。 */
+  divider?: boolean;
+  /** ラベル列幅。default = 140 (7848:39293) / wide = 224 (利用規約 S4 7850:803)。 */
+  labelWidth?: "default" | "wide";
   className?: string;
 };
 
-export function MetaRow({ label, children, className }: MetaRowProps) {
+export function MetaRow({
+  label,
+  children,
+  divider = true,
+  labelWidth = "default",
+  className,
+}: MetaRowProps) {
   return (
     <div
       data-slot="meta-row"
-      className={cn("flex gap-4 border-t border-border pt-3 pb-4", className)}
+      className={cn(
+        "flex gap-4 pt-3 pb-4",
+        divider && "border-t border-border",
+        className
+      )}
     >
       {/* dl の直下は dt/dd (または両者を包む div) でなければならないため、
           ラッパは div のまま中身を dt/dd にする。dd の既定 margin は打ち消す。 */}
-      <dt className={cn(CAPTION, "w-30 shrink-0 text-muted-foreground md:w-35")}>{label}</dt>
+      <dt
+        className={cn(
+          CAPTION,
+          "w-30 shrink-0 text-muted-foreground",
+          labelWidth === "wide" ? "md:w-56" : "md:w-35"
+        )}
+      >
+        {label}
+      </dt>
       <dd className={cn(BODY_SM, "m-0 min-w-0 flex-1 text-foreground")}>{children}</dd>
     </div>
   );
