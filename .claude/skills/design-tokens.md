@@ -84,7 +84,7 @@ pnpm diff:tokens HEAD~3   # vs 3コミット前
 1. `tokens/base.json` を編集
 2. `pnpm validate:tokens` で整合性チェック
 3. `pnpm build:tokens` で CSS 再生成
-4. `pnpm storybook` で視覚確認（Active Components ページ）
+4. `pnpm design-catalog` で視覚確認（elxea Design System カタログの Active Components ページ）
 5. 問題なければ commit
 
 ## CJK オーバーライド変更手順

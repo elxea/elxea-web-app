@@ -64,6 +64,8 @@ type Story = StoryObj<typeof meta>;
 // Only these specific stories are exempted; dark-bg variants stay enforced.
 // Tracked for a 2nd-round Figma+code fix (foreground token + sand bg + opacity utils):
 // https://app.notion.com/p/39c70c9d064c812c86f2ec6b2a255184
+// Re-verified 2026-08-07: re-enabling this rule still fails (12 hero stories fail
+// color-contrast; the dark-bg variants pass and stay enforced). Not stale residue.
 const knownContrastException = {
   a11y: { config: { rules: [{ id: "color-contrast", enabled: false }] } },
 } as const;

@@ -92,6 +92,24 @@ pre-commit install --hook-type pre-commit --hook-type pre-push
 
 > **`tokens/elxea-custom.json` はビルドに入っていない**。`sd.config.mjs` の `source` は `tokens/base.json` と `tokens/overrides/cjk.json` のみで、`elxea-custom.json` は読まれない。したがって同ファイルの値（darkパレット一式・低不透明度shadow等）は**実際の画面に一切効いていない**。参考資料として残っているだけなので、これを正本と扱わないこと。詳細は `scripts/design-system/design-kit.generated.json` の `conflicts[c-01]` / `[c-02]`。
 
+### 確定値ファイルの勘定（対外3本 + ビルド内部入力1本）
+
+デザインの確定値がどのファイルに載っているかを、外から参照してよい3本だけに絞る。「4本目のSoTがある」と読める状態をなくすための勘定表。
+
+| 位置づけ | ファイル | 役割 | 外から参照してよいか |
+|---|---|---|---|
+| 値 | `tokens/base.json`（+ `tokens/overrides/cjk.json`） | トークン値の写し（Figma正本の写し先）。値を知りたいときはここ | ○ |
+| 索引 | `scripts/design-system/design-map.json` | どの値がどこで使われているかの索引 | ○ |
+| 審判 | `scripts/design-system/design-kit.generated.json` | 実装とFigmaの食い違い（conflicts）・既知の穴（known_gaps）の判定結果 | ○ |
+| ビルド内部入力 | `scripts/design-system/design-kit.manual.json` | 上記「審判」を組み立てるための人手注記の入力ファイル。**独立したSoTではない** | ×（generatedを見る） |
+
+`design-kit.manual.json` の扱い（2026-08-07 QA判定 https://app.notion.com/p/3b570c9d064c8195b8b1c7da0ae6525c に準拠）:
+
+- **物理削除しない**。`generate-design-kit.ts` / `validate-design-kit.ts` が必ず読むため、消すと `pnpm validate:design-kit` が即死しCI（`.github/workflows/ci.yml`）が落ちる。改名するなら `MANUAL_PATH` を同時に直す
+- **generated側を手で書き換えない**。generatedはmanualをnon-clobberingマージして再生成されるビルド出力で、再生成結果とのバイト一致が検査される
+- **人手編集は例外時のみ**。conflicts / known_gapsの注記を足す必要が出たときにmanualを編集し、`pnpm generate:design-kit` → `pnpm validate:design-kit` まで通してからコミットする。コード由来の値を人手で上書きするとマージ衝突でビルドが落ちる（それが設計）
+- `value_sot` の判定モデル（食い違い時にコードとFigmaのどちらを採るか）の変更は**この勘定の話に含まれない**。反転させるにはDecision Logでの決定が要る（上記「未解決の不整合」参照）
+
 ### Figma正本ファイルとSoT方針
 
 - **Figma正本ファイルキー = `AWLnI0XF07e8rScuxPYPc7`**（旧 `alDl0i3hZvRlqCxH9Li5Q4` は使用しない）。`scripts/design-system/sync-figma-read.ts` の `DEFAULT_FILE_KEY` および `.claude/skills/figma-sync.md` と一致させる。
@@ -136,11 +154,19 @@ pre-commit install --hook-type pre-commit --hook-type pre-push
 
 各テンプレートは `@theme` トークン + shadcn/ui コンポーネントで構成し、プロパティ（テキスト・画像・色）を差し替えるだけで新 LP を生成できる構造にする。
 
+### コンポーネントカタログの呼び方（対外名称）
+
+- **対外名称 = 「elxea Design System カタログ」**。内部名（script 名 / CI job / パス）は `design-catalog`
+- **roji 固有名は使わない**。このカタログは roji だけのものではなく elxea 全体の共通基盤だから
+- **ツール実体は Storybook のまま**（載せ替えはしない）。「Storybook」は実装手段の名前であって、対外的な呼び名ではない
+- 実行: `pnpm design-catalog`（dev） / `pnpm build:design-catalog`（静的ビルド）。`build-storybook` は Chromatic が既定で探すスクリプト名なので別名として存置している
+- ブランド表記の定義は `.storybook/manager.ts`（`brandTitle`）
+
 ### 導入済みツール
 
 | ツール | 目的 | 状態 |
 |--------|------|------|
-| Storybook | コンポーネントカタログ（`components/ui` の61部品 + トークン可視化。うちstory済58） | ✅ 稼働中 |
+| elxea Design System カタログ（内部名 design-catalog / 実体は Storybook） | コンポーネントカタログ（`components/ui` の61部品 + トークン可視化。うちstory済58） | ✅ 稼働中 |
 | Style Dictionary | `tokens/base.json` → `dist/tokens.css`（`@theme`）自動生成 | ✅ 稼働中 |
 | Chromatic | Visual Regression 自動検知 | ✅ 設定済み |
 | Figma Variable Rebinder | Code → Figma トークン同期プラグイン | ✅ 作成済み |
@@ -168,7 +194,8 @@ pnpm validate:tokens     # トークンの整合性チェック
 pnpm diff:tokens         # トークン変更の差分表示
 pnpm audit:components    # コンポーネント使用状況レポート
 pnpm sync:figma-read     # Figma API でファイル情報読み取り
-pnpm storybook           # Storybook dev server (port 6006)
+pnpm design-catalog      # elxea Design System カタログ dev server (port 6006)
+pnpm build:design-catalog # 同・静的ビルド（`build-storybook` は Chromatic 既定名のため別名で存置）
 pnpm chromatic           # ビジュアルリグレッションテスト
 ```
 
