@@ -3,8 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { useState } from "react";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { InputUnderline } from "@/components/search/search-panel";
 import { trackSearch } from "@/lib/analytics";
 
 export function SearchForm({ initialQuery }: { initialQuery: string }) {
@@ -25,13 +25,16 @@ export function SearchForm({ initialQuery }: { initialQuery: string }) {
   return (
     <form onSubmit={handleSubmit} role="search">
       <Label htmlFor="search-input" className="sr-only">{t("search")}</Label>
-      <Input
+      {/* Figma 6936:126 Input Underline。以前はここに shadcn Input を border-b で
+          上書きしたインライン実装があり、SearchPanel 側と二重になっていた。
+          C2 R4 で共有部品 InputUnderline に統合 (正本は components/search/search-panel.tsx)。
+          type は既存挙動を変えないよう text のまま (部品の既定は search)。 */}
+      <InputUnderline
         id="search-input"
         type="text"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         placeholder={ts("placeholder")}
-        className="border-0 border-b border-foreground rounded-none bg-transparent py-4 h-auto text-2xl font-light placeholder:text-muted-foreground focus-visible:ring-0"
         autoFocus
       />
     </form>

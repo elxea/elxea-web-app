@@ -211,7 +211,7 @@
       "figma_name": "Input Underline (Proposed) — elxea/search",
       "code_path": "components/search/search-panel.tsx",
       "kind": "ds-component",
-      "notes": "C2 R3 で共有部品 InputUnderline に集約 (正本)。components/search-form.tsx には shadcn Input を border-b にしたインライン実装が残っており、次ラウンドで InputUnderline へ移行する (同一 Figma ノードの二重実装を解消するため)。"
+      "notes": "C2 R4 で二重実装を解消済み。正本は components/search/search-panel.tsx の InputUnderline で、components/search-form.tsx はこれを参照する。Figma 実測: 下罫線 2px / pt 8 / pb 16 / 24px 400。"
     },
     {
       "figma_node_id": "6936:17638",
@@ -633,6 +633,11 @@
       "figma_node_id": "7967:1326",
       "figma_name": "開閉UI / SP メニュー展開 (全幅・閉じる✕・Nav 56px・検索・アカウント導線)",
       "reason": "Figma は SP メニューを全幅展開 (375) + ヘッダーに閉じる✕ + Nav 行 56px + 検索入力 + アカウント導線で構成するが、実装は現在 w-72 の左サイドシート。作り替えは header.tsx の SP 構成変更を伴い、未解決の Setaka Q1 (SP ヘッダーのカート配置) と同じ領域を触るため、Q1 の回答後にまとめて対応する。"
+    },
+    {
+      "figma_node_id": "7836:5",
+      "figma_name": "About (R1-A graf / R1-B FAR EAST / R1-C Spirit Tea の3案)",
+      "reason": "3案すべて残置 = 未選抜。さらに同セクション内の注記 7967:42162 が 「レイアウト (R1-A〜C) は方向OKの前提で、先に確定すべきコンテンツ構成のたたき台。この構成の承認後、実コンテンツを固めて R2 でレイアウトを引き直す」と明記しており、現行レイアウトは引き直し予定。Setaka 確認事項が3件 (Statement の一文 / 選ぶ基準の公開粒度 / 写真の要否) 未回答のため実装しない。R2 確定後に着手する。"
     }
   ]
 }
