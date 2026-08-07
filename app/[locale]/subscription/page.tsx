@@ -28,7 +28,7 @@ import { cn } from "@/lib/utils";
  *
  * Figma 実測 (px) → 実装の対応:
  * - Hero        テキスト 600 / 写真 640 (grid 内)   → `lg:grid-cols-12` の 5 / 6
- * - DateRibbon  1312 × 45 の帯                        → `bg-muted` の pill
+ * - DateRibbon  1312 × 49 の帯                        → `bg-muted` の pill
  * - 今月の3種   3列 416 gap32                          → `TripleColumn`
  * - 届くもの    4列 304 gap32                          → `SpecBand`
  * - 12ヶ月      2カラム台帳 (行 h48)                   → `Ledger`
@@ -140,7 +140,9 @@ export default async function SubscriptionLPPage() {
           data-slot="date-ribbon"
           className={cn(
             bodySmClass,
-            "flex min-h-11 items-center rounded-full bg-muted px-8 text-foreground"
+            /* 高さは Figma 実測 49 = padding 12 + body-sm 行ボックス 25.2 + padding 12。
+             * min-h-11 (44) を固定していたため 5px 低かった (C3-2 QA 指摘)。 */
+            "flex items-center rounded-full bg-muted px-8 py-3 text-foreground"
           )}
         >
           {t("firstDeliveryRibbon")}

@@ -27,8 +27,23 @@ async function hashSitePasswordEdge(password: string): Promise<string> {
     .join("");
 }
 
+/**
+ * Vercel Preview デプロイではサイトパスワード gate を掛けない。
+ *
+ * Preview URL は Setaka / エージェントのレビュー用テスト環境で、その URL 自体が
+ * 推測不能な一意文字列 (Vercel が発行) であることが到達制限になっている。ここで
+ * さらにパスワード画面を挟むと、レビューのたびに手動ログインが必要になり
+ * 「オーナーに手動操作を求めない」原則に反する。production (`VERCEL_ENV=production`)
+ * と、ローカルを含むそれ以外の環境では従来どおり SITE_PASSWORD が効く。
+ *
+ * env の追加ではなく Vercel が自動注入する `VERCEL_ENV` だけで判定するので、
+ * ダッシュボード操作なしにコードだけで完結する。
+ */
+const IS_VERCEL_PREVIEW = process.env.VERCEL_ENV === "preview";
+
 async function checkSitePassword(request: NextRequest): Promise<NextResponse | null> {
   if (!SITE_PASSWORD) return null;
+  if (IS_VERCEL_PREVIEW) return null;
 
   const authCookie = request.cookies.get("site_auth")?.value;
   if (authCookie) {

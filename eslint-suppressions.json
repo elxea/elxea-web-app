@@ -139,11 +139,6 @@
       "count": 2
     }
   },
-  "components/product/product-features.tsx": {
-    "elxea-tokens/no-raw-colors": {
-      "count": 14
-    }
-  },
   "components/ui/accordion.tsx": {
     "elxea-tokens/no-raw-colors": {
       "count": 1

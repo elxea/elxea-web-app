@@ -8,7 +8,6 @@ import { ImageGallery } from "@/components/product/image-gallery";
 import { VariantSelector } from "@/components/product/variant-selector";
 import { AddToCartButton } from "@/components/product/add-to-cart-button";
 import { ProductPurchaseOptions } from "@/components/product/product-purchase-options";
-import { ProductFeatures } from "@/components/product/product-features";
 import { FavoriteButton } from "@/components/product/favorite-button";
 import { TasteMap, type TastePoint } from "@/components/product/taste-map";
 import { Breadcrumb } from "@/components/seo/breadcrumb";
@@ -143,13 +142,32 @@ export default async function ProductPage({
     body: td(`brew${n}Body`),
   }));
 
+  /**
+   * フルスペック台帳 — 旧 `ProductFeatures` の「お茶の詳細」を吸収した唯一の SoT。
+   *
+   * 値の出所は 3 種類しかない:
+   *  1. Shopify metafield / product フィールドの実値 (未設定は `—` フォールバック)
+   *  2. 商品によらないブランド共通の定数 (保存 / 賞味期限) — メッセージ定数のまま
+   *  3. Figma 確定版に行はあるが対応する metafield が存在しない項目 — 常に `—`
+   *
+   * 行のラベルは Figma 確定版 (8056:1517) の台帳を維持したうえで、metafield 実値を
+   * 持つ行 (品種 / 産地 / 摘採 / 味わい / 香り / メニュー番号) を先頭側に足している。
+   * 商品固有の値をハードコードした定型文は置かない。
+   */
+  const specDash = td("specVarietyFallback");
   const ledgerRows = [
-    { term: td("specSheet1Term"), value: td("specSheet1Value") },
-    { term: td("specSheet2Term"), value: td("specSheet2Value") },
-    { term: td("specSheet3Term"), value: td("specSheet3Value") },
-    { term: td("specSheet4Term"), value: td("specSheet4Value") },
-    { term: td("specSheet5Term"), value: td("specSheet5Value") },
-    { term: td("specSheet6Term"), value: td("specSheet6Value") },
+    { term: td("specSheet1Term"), value: mf.teaCategory || specDash },
+    { term: t("teaVariety"), value: mf.variety || specDash },
+    { term: td("specOrigin"), value: product.vendor || specDash },
+    { term: td("specHarvest"), value: mf.season || specDash },
+    { term: t("teaTaste"), value: mf.taste || specDash },
+    { term: t("teaAroma"), value: mf.aroma || specDash },
+    { term: t("menuNumber"), value: mf.menuNumber || specDash },
+    { term: td("specSheet2Term"), value: specDash },
+    { term: td("specSheet3Term"), value: specDash },
+    { term: td("specSheet4Term"), value: specDash },
+    { term: td("specSheet5Term"), value: specDash },
+    { term: td("specSheet6Term"), value: specDash },
     { term: td("specSheet7Term"), value: td("specSheet7Value") },
     { term: td("specSheet8Term"), value: td("specSheet8Value") },
   ];
@@ -371,13 +389,6 @@ export default async function ProductPage({
           </SectionBody>
         </PageSection>
       ) : null}
-
-      {/* Operations Hub からの追加コンテンツ */}
-      <Suspense fallback={null}>
-        <div className="page-container">
-          <ProductFeatures metafields={mf} />
-        </div>
-      </Suspense>
     </div>
   );
 }
