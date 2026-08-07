@@ -562,6 +562,27 @@
       "code_path": "components/editorial/rule-list.tsx",
       "kind": "ds-component",
       "notes": "C2 実装。値だけを罫線で並べる行。"
+    },
+    {
+      "figma_node_id": "7857:39698",
+      "figma_name": "PairRow (strong) — 返品ポリシー S3 状況→どうなるか",
+      "code_path": "components/editorial/rule-list.tsx",
+      "kind": "ds-component",
+      "notes": "C2 R2 実装。幅 640 の狭い二段組 (304+32+304)。SP は縦積み。"
+    },
+    {
+      "figma_node_id": "7857:39783",
+      "figma_name": "PairRow (quiet) — 返品ポリシー S6 対象→理由",
+      "code_path": "components/editorial/rule-list.tsx",
+      "kind": "ds-component",
+      "notes": "C2 R2 実装。同じ骨格の弱いトーン版 (左 body-sm / 右 caption)。"
+    },
+    {
+      "figma_node_id": "7857:39713",
+      "figma_name": "StepRow — 返品ポリシー S4 手順行",
+      "code_path": "components/editorial/rule-list.tsx",
+      "kind": "ds-component",
+      "notes": "C2 R2 実装。番号 / ステップ名 / 説明。順序に意味があるので ol の子として使う。"
     }
   ],
   "unmapped_figma_nodes": [

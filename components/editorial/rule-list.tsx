@@ -361,6 +361,89 @@ export function ValueRow({ className, ...props }: React.ComponentProps<"li">) {
   );
 }
 
+/* -------------------------------------------------------------------------- */
+/* PairRow — 幅 640 の狭い二段組 (Figma 7857:39698 / 7857:39783)               */
+/* 左 304 + 溝 32 + 右 304。DefinitionRow (幅 1312) より狭い版で、              */
+/* 「状況 → どうなるか」「対象 → 理由」のように読ませる対で使う。SP は縦積み。   */
+/* -------------------------------------------------------------------------- */
+
+/** strong = 左が見出し級 (7857:39698 h=88) / quiet = 左右とも本文級 (7857:39783 h=60) */
+export type PairRowTone = "strong" | "quiet";
+
+export type PairRowProps = {
+  term: React.ReactNode;
+  children: React.ReactNode;
+  tone?: PairRowTone;
+  className?: string;
+};
+
+export function PairRow({ term, children, tone = "strong", className }: PairRowProps) {
+  return (
+    <div
+      data-slot="pair-row"
+      data-tone={tone}
+      className={cn(
+        "flex flex-wrap gap-x-8 gap-y-2 border-t border-border",
+        tone === "strong" ? "pt-5 pb-6" : "pt-5 pb-5",
+        className
+      )}
+    >
+      <dt
+        className={cn(
+          tone === "strong" ? H4 : BODY_SM,
+          "basis-full text-foreground md:w-76 md:shrink-0 md:basis-auto"
+        )}
+      >
+        {term}
+      </dt>
+      <dd
+        className={cn(
+          tone === "strong" ? BODY_SM : CAPTION,
+          "m-0 basis-full md:w-76 md:basis-auto",
+          tone === "strong" ? "text-foreground" : "text-muted-foreground"
+        )}
+      >
+        {children}
+      </dd>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* StepRow — 番号 / ステップ名 / 説明 の手順行 (Figma 7857:39713)              */
+/* PC: 番号 x0 (列幅 112) / 名前 x112 (列幅 336) / 説明 x448                   */
+/* SP: 番号と名前を同じ行に、説明を次の行へ                                     */
+/* -------------------------------------------------------------------------- */
+
+export type StepRowProps = {
+  /** 01 / 02 のような順番。装飾ではなく順序情報なので読み上げにも残す。 */
+  step: React.ReactNode;
+  name: React.ReactNode;
+  children: React.ReactNode;
+  className?: string;
+};
+
+export function StepRow({ step, name, children, className }: StepRowProps) {
+  return (
+    <li
+      data-slot="step-row"
+      className={cn(
+        "flex flex-wrap items-start gap-x-4 gap-y-2 border-t border-border pt-5 pb-6",
+        "md:flex-nowrap md:gap-x-0",
+        className
+      )}
+    >
+      <span className={cn(BODY_SM, "w-12 shrink-0 text-muted-foreground md:w-28")}>{step}</span>
+      <span className={cn(H4, "min-w-0 flex-1 text-foreground md:w-84 md:flex-none")}>
+        {name}
+      </span>
+      <span className={cn(BODY_SM, "basis-full text-foreground md:w-76 md:basis-auto")}>
+        {children}
+      </span>
+    </li>
+  );
+}
+
 /** 補足の小さい注記 (Figma 7848:39390 / 7848:39507)。 */
 export function Note({ className, ...props }: React.ComponentProps<"p">) {
   return (

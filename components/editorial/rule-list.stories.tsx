@@ -9,7 +9,9 @@ import {
   MetaRow,
   Note,
   Overline,
+  PairRow,
   RateRow,
+  StepRow,
   ValueRow,
 } from "./rule-list";
 
@@ -177,6 +179,54 @@ export const Value_Rows: Story = {
       </ul>
       <Note className="mt-3">地域によって、ご指定いただけない時間帯があります。</Note>
     </div>
+  ),
+};
+
+/** Figma 7857:39698 — 幅 640 の狭い二段組 (左が見出し級)。 */
+export const Pair_Rows_Strong: Story = {
+  args: { question: "", summary: "" },
+  render: () => (
+    <dl className="max-w-160 border-b border-border">
+      <PairRow term="開封していない">
+        お届けから7日以内であれば、交換をお受けします。返送料はお客さま負担です。
+      </PairRow>
+      <PairRow term="開封してしまった">
+        食品衛生上、返品・交換はお受けできません。味や香りのご相談は承ります。
+      </PairRow>
+    </dl>
+  ),
+};
+
+/** Figma 7857:39783 — 同じ骨格の弱いトーン版 (対象 → 理由)。 */
+export const Pair_Rows_Quiet: Story = {
+  args: { question: "", summary: "" },
+  render: () => (
+    <dl className="max-w-160 border-b border-border">
+      <PairRow term="開封・ご使用後の商品" tone="quiet">
+        食品衛生上の理由によります
+      </PairRow>
+      <PairRow term="お届けから8日以上たった商品" tone="quiet">
+        状態の確認ができないためです
+      </PairRow>
+    </dl>
+  ),
+};
+
+/** Figma 7857:39713 — 番号 / ステップ名 / 説明 の手順行。 */
+export const Step_Rows: Story = {
+  args: { question: "", summary: "" },
+  render: () => (
+    <ol className="border-b border-border">
+      <StepRow step="01" name="ご連絡">
+        お問い合わせフォームから、注文番号と状況をお知らせください。
+      </StepRow>
+      <StepRow step="02" name="こちらから返信">
+        1〜2営業日以内に、返送の要否と送り先をお伝えします。
+      </StepRow>
+      <StepRow step="03" name="返金または交換">
+        返金は7〜10日ほど。交換は在庫を確認のうえ発送します。
+      </StepRow>
+    </ol>
   ),
 };
 

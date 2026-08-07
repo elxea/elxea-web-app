@@ -766,5 +766,128 @@
       "products": "Browse the teas",
       "contact": "Contact us"
     }
+  },
+  "returns": {
+    "title": "Returns and exchanges",
+    "kicker": "RETURNS",
+    "breadcrumbParent": "Shopping",
+    "lead": "As food and drink, we cannot accept returns for change of mind. If the fault is ours, however, we cover everything including postage.",
+    "summary": {
+      "heading": "The short version",
+      "rows": [
+        {
+          "label": "Change of mind",
+          "value": "Not accepted"
+        },
+        {
+          "label": "Faulty or wrong",
+          "value": "We cover the full cost"
+        },
+        {
+          "label": "Unopened exchange",
+          "value": "Within 7 days of arrival"
+        }
+      ]
+    },
+    "index": {
+      "label": "On this page",
+      "cases": "Returns for change of mind",
+      "flow": "If it arrived faulty or wrong",
+      "excluded": "What we cannot accept",
+      "contact": "Return address and contact"
+    },
+    "cases": {
+      "heading": "What happens in your case",
+      "note": "Pick the closest one. If none fits, or you are unsure, just get in touch as you are.",
+      "rows": [
+        {
+          "term": "Still unopened",
+          "desc": "We accept an exchange within seven days of arrival. Return postage is yours."
+        },
+        {
+          "term": "Already opened",
+          "desc": "For food safety we cannot take it back, but we are glad to talk about taste and aroma."
+        },
+        {
+          "term": "Damaged or broken",
+          "desc": "That is our fault. Send one photo with your message and we cover everything, postage included."
+        },
+        {
+          "term": "Wrong item arrived",
+          "desc": "That is our fault. Choose between the correct item or a refund."
+        }
+      ]
+    },
+    "flow": {
+      "heading": "From your message to a resolution",
+      "note": "The path from your message to a resolution. You may stop at any stage.",
+      "rows": [
+        {
+          "step": "01",
+          "name": "You tell us",
+          "desc": "Use the contact form with your order number and what happened."
+        },
+        {
+          "step": "02",
+          "name": "We reply",
+          "desc": "Within one to two business days, with whether to return it and where."
+        },
+        {
+          "step": "03",
+          "name": "Refund or exchange",
+          "desc": "Refunds take 7-10 days. Exchanges ship once we confirm stock."
+        }
+      ]
+    },
+    "chapter": {
+      "title": "First, tell us how it was.",
+      "body": "Whether it can be returned comes after. Even the reason it did not suit you is a clue for us."
+    },
+    "excluded": {
+      "heading": "What we cannot accept",
+      "note": "We cannot take back anything matching the below. If you are unsure, contact us first.",
+      "rows": [
+        {
+          "term": "Opened or used items",
+          "desc": "For food safety reasons"
+        },
+        {
+          "term": "Items over 8 days since arrival",
+          "desc": "We cannot verify the condition"
+        },
+        {
+          "term": "Items stored outside room temperature",
+          "desc": "The flavour will have changed"
+        },
+        {
+          "term": "Items sent directly to a recipient",
+          "desc": "We need to hear from the recipient"
+        }
+      ]
+    },
+    "contact": {
+      "heading": "Return address and contact",
+      "note": "Please return only after we have replied, so nothing crosses in the post.",
+      "subheading": "Contact",
+      "rows": [
+        {
+          "label": "Return to",
+          "value": "We tell you after you contact us"
+        },
+        {
+          "label": "Reach us",
+          "value": "Contact form"
+        },
+        {
+          "label": "Hours",
+          "value": "10:00 - 17:00 / weekdays only"
+        }
+      ]
+    },
+    "links": {
+      "products": "Browse the teas",
+      "shipping": "Delivery",
+      "contact": "Contact us"
+    }
   }
 }
