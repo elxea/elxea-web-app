@@ -722,9 +722,11 @@
         }
       ],
       "impact": "コードの layout.grid トークンをそのまま使うと、Figma カンプより左右余白が 16px 狭く、列間が 16px 詰まる。",
-      "resolution": "未決。実装上は globals.css の .section-wide (max-w-7xl mx-auto px-6) が使われており、px-6 = 24px で layout.grid.margin.desktop (64px) とも実測 80px とも一致しない (第 3 の値)。3 者の整合を取る判断が要る。",
+      "resolution": "解消。Figma 側が Foundations 規約 64/32/16 に是正され (Header/Footer マスター 64px / SP 16px)、コード側の layout.grid.margin (desktop 4rem=64px / tablet 2rem=32px / mobile 1rem=16px) と一致した。実装の第 3 の値 (px-6=24px) は app/globals.css の --page-margin (layout.grid.margin.* を参照する responsive custom property) に置換し、三つ巴を解消した。gutter は未使用のため据え置き。",
       "evidence": "git show origin/main:tokens/base.json (layout.grid / layout.container) / git show origin/main:app/globals.css (.section-wide)",
-      "verified_at": "2026-07-31"
+      "verified_at": "2026-08-07",
+      "status": "RESOLVED 2026-08-07",
+      "resolved_by": "app/globals.css の :root --page-margin / .page-inset / .section-* (padding-inline: var(--page-margin))"
     },
     {
       "id": "c-05",
@@ -733,9 +735,11 @@
       "code_value": ".section-narrow = max-w-3xl mx-auto px-6 py-16 / .section-wide = max-w-7xl mx-auto px-6 py-16 / .section-full = w-full py-16 (app/globals.css @layer base)",
       "other_value": "layout.grid.margin.desktop = 64px / layout.container.xl = 1280px",
       "impact": "max-w-7xl (1280px) は container.xl と一致するが Tailwind 既定値を解決しているだけでトークン束縛ではない。px-6 (24px) はどのグリッドトークンとも一致しない。",
-      "resolution": "未決 (c-04 と同根)。",
+      "resolution": "解消。.section-narrow / .section-wide の px-6 (24px) を padding-inline: var(--page-margin) に置換し、--page-margin は var(--layout-grid-margin-{mobile,tablet,desktop}) を解決する。セクション余白が layout.grid トークンに束縛された。max-w-* は従来どおり Tailwind 既定値を使うが container.xl (1280px) と一致する既知の非束縛として残す。",
       "evidence": "git show origin/main:app/globals.css",
-      "verified_at": "2026-07-31"
+      "verified_at": "2026-08-07",
+      "status": "RESOLVED 2026-08-07",
+      "resolved_by": "app/globals.css @layer base の .section-narrow / .section-wide"
     },
     {
       "id": "c-06",
@@ -798,9 +802,11 @@
       "figma_value_a": "Header (Module) 5653:29 — Header / Logo が x=32。Top Bar は 1440 幅で、コンテンツを 32px インセットで置いている。",
       "figma_value_b": "Footer (Module) 5662:49 — Footer / Content が x=80, width=1280。ページ本体と同じ 80px 余白。",
       "impact": "ヘッダーのロゴ左端とページ本文の左端が 48px ずれる。全 43 画面に Header/Footer が各 40 instance 入っているため、ずれは全画面に波及する。",
-      "resolution": "未決。(a) Header を 80px に揃える (b) ヘッダーだけ広めのバー幅を意図とみなし仕様として明記する、のいずれか。Setaka またはデザイン判断。",
+      "resolution": "解消。Figma 側で Header/Footer マスターを 64px に統一。コード側は Header の内側ラッパーが持っていた px-6 (24px) を .page-inset に置換し、Footer (.section-wide) と同じ --page-margin を解決するようにした。ロゴ左端とページ本文左端が同一トークンに束縛される。",
       "evidence": "get_metadata(5653:29) の 5653:32 x=32 / get_metadata(5662:49) の 5662:51 x=80",
-      "verified_at": "2026-07-31"
+      "verified_at": "2026-08-07",
+      "status": "RESOLVED 2026-08-07",
+      "resolved_by": "components/layout/header.tsx の max-w-7xl mx-auto page-inset / app/globals.css .page-inset"
     }
   ],
   "known_gaps": [
