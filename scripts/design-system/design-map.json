@@ -499,6 +499,13 @@
       "code_path": "components/journal/time-marker.tsx",
       "kind": "ds-component",
       "notes": "C1 R2 実装。Figma の Ratio variant (1.3x/2.0x/3.6x) は ratio prop 一本に畳んだ (構造は共通で差分が文字倍率のみのため)。"
+    },
+    {
+      "figma_node_id": "6859:316",
+      "figma_name": "Chat / Panel (開いた状態・デスクトップ)",
+      "code_path": "components/chat/chat-panel.tsx",
+      "kind": "ds-component",
+      "notes": "C1 R3 で chat-bar.tsx から切り出し。ヘッダー (h=32 = px-4/py-2) + 本文の表示部品で、開閉状態とメッセージ配列は chat-bar.tsx が持つ。Figma は入力行をパネル内に持つがコードは外に常時表示 (メッセージ 0 件でも入力できる要件)。この構造差は未解消。"
     }
   ],
   "unmapped_figma_nodes": [
@@ -513,9 +520,9 @@
       "reason": "Figma 上で deprecated (→ 5483:15 に置換済み)。コード側対応不要。Figma 掃除待ち。"
     },
     {
-      "figma_node_id": "6859:316",
-      "figma_name": "Chat / Panel (開いた状態・デスクトップ)",
-      "reason": "デスクトップのチャットパネルに対応する独立コンポーネントがコード側に無い (chat-bar.tsx 内にインライン)。切り出し時に entries へ昇格。"
+      "figma_node_id": "6859:339",
+      "figma_name": "Chat / InputRow (パネル内配置・border-t 付き)",
+      "reason": "Figma は入力行をパネル内 (6859:338 / h=64 / inset 12) に置くが、コードは chat-bar.tsx の入力バーをパネル外に常時表示している (メッセージ 0 件でも入力できる要件のため)。どちらを正とするかは UX 判断なので未解消のまま記録する。入力行そのもののコード実装は entries の Chat / InputRow 6858:318 にある。"
     }
   ]
 }

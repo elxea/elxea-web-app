@@ -9,6 +9,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useChatContext } from "./chat-provider";
 import type { ChatMessageMeta } from "./chat-provider";
 import { ChatMessage } from "./chat-message";
+import { ChatPanel } from "./chat-panel";
 import { ChatLauncher } from "./chat-launcher";
 import { ProductCards } from "./product-card";
 import { QuickReplies } from "./quick-replies";
@@ -55,7 +56,15 @@ function TypingIndicator() {
 // Date separator
 // ---------------------------------------------------------------------------
 
-const DAY_NAMES = ["\u65E5", "\u6708", "\u706B", "\u6C34", "\u6728", "\u91D1", "\u571F"] as const;
+const DAY_NAMES = [
+  "\u65E5",
+  "\u6708",
+  "\u706B",
+  "\u6C34",
+  "\u6728",
+  "\u91D1",
+  "\u571F",
+] as const;
 
 /**
  * Build a human-readable date label:
@@ -83,10 +92,7 @@ function getDateLabel(date: Date): string {
 
 function DateSeparator({ label }: { label: string }) {
   return (
-    <div
-      data-slot="date-separator"
-      className="flex items-center gap-3 py-2"
-    >
+    <div data-slot="date-separator" className="flex items-center gap-3 py-2">
       <div className="flex-1 border-t border-border" />
       <span className="text-xs text-muted-foreground shrink-0">{label}</span>
       <div className="flex-1 border-t border-border" />
@@ -198,8 +204,13 @@ function MessagesList({
   messagesEndRef,
   className,
 }: MessagesListProps) {
-  const { productCards, quickReplies, sendMessage, clearQuickReplies, getMessageTimestamp } =
-    useChatContext();
+  const {
+    productCards,
+    quickReplies,
+    sendMessage,
+    clearQuickReplies,
+    getMessageTimestamp,
+  } = useChatContext();
 
   const handleQuickReply = useCallback(
     (text: string) => {
@@ -222,7 +233,10 @@ function MessagesList({
 
       if (dateStr !== prevDateStr) {
         elements.push(
-          <DateSeparator key={`sep-${dateStr}`} label={getDateLabel(msgDate)} />,
+          <DateSeparator
+            key={`sep-${dateStr}`}
+            label={getDateLabel(msgDate)}
+          />,
         );
         prevDateStr = dateStr;
       }
@@ -356,17 +370,11 @@ function DesktopChatBar() {
       data-slot="chat-bar-desktop"
       className="fixed bottom-0 left-0 right-0 z-40 hidden md:block"
     >
-      {/* Expanded chat panel */}
+      {/* Expanded chat panel — Figma 6859:316 (components/chat/chat-panel.tsx) */}
       {isOpen && messages.length > 0 && (
-        <div
-          data-slot="chat-panel"
-          className={cn(
-            "mx-auto w-full max-w-2xl",
-            "border border-border/40 rounded-t-2xl",
-            "bg-background/80 backdrop-blur-xl",
-            "shadow-lg",
-            "transition-all duration-300",
-          )}
+        <ChatPanel
+          title="elxea assistant"
+          onClose={() => setIsOpen(false)}
           onWheel={(e) => {
             // Prevent scroll from propagating to the page body when
             // hovering over the chat panel — scroll stays inside the
@@ -374,29 +382,13 @@ function DesktopChatBar() {
             e.stopPropagation();
           }}
         >
-          {/* Panel header */}
-          <div className="flex items-center justify-between border-b border-border/40 px-4 py-2">
-            <span className="text-xs font-medium text-muted-foreground tracking-wide">
-              elxea assistant
-            </span>
-            <Button
-              variant="ghost"
-              size="icon-xs"
-              onClick={() => setIsOpen(false)}
-              aria-label="Close chat panel"
-            >
-              <X className="size-3.5" />
-            </Button>
-          </div>
-
-          {/* Messages area */}
           <MessagesList
             messages={messages}
             isStreaming={isStreaming}
             messagesEndRef={messagesEndRef}
             className="max-h-[60vh]"
           />
-        </div>
+        </ChatPanel>
       )}
 
       {/* Input bar (always visible on desktop) */}
@@ -457,7 +449,9 @@ function MobileChatDrawer() {
 
       // Use the computed background color from the body (which uses bg-background)
       // to ensure the gap behind iOS keyboard matches the chat panel color.
-      html.style.backgroundColor = getComputedStyle(document.body).backgroundColor;
+      html.style.backgroundColor = getComputedStyle(
+        document.body,
+      ).backgroundColor;
       document.body.style.overflow = "hidden";
 
       return () => {
