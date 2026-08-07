@@ -56,7 +56,9 @@ export function NoteCard({
     <article
       data-slot="note-card"
       className={cn(
-        "flex flex-col border border-border bg-background p-(--component-card-padding-md)",
+        // 面は muted の塗り (枠線なし) — symbol 7840:39598 の fill は
+        // `--muted`。2026-08-08 に /signs (7835:554) 実装時へ再実測して合わせた。
+        "flex flex-col bg-muted p-(--component-card-padding-md)",
         className,
       )}
       {...props}

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
+import { decodeHandle } from "@/lib/handle";
 import { getProductByHandle, getProducts } from "@/lib/shopify";
 import { formatPrice } from "@/lib/utils";
 import { ImageGallery } from "@/components/product/image-gallery";
@@ -47,26 +48,6 @@ import { cn } from "@/lib/utils";
  * - 読みもの (ArticleCard x3) は Journal データ未配線のため未実装
  * - 数量 Stepper と SP の sticky 購入バーは既存カート部品に該当が無く未実装
  */
-
-/**
- * 動的セグメントの handle を Shopify に渡せる素の文字列へ戻す。
- *
- * 日本語ハンドル (例「テスト商品a」) は URL 上 percent-encode され、Next.js の
- * `params.handle` にはレンダリング経路によって **encode 済みのまま**渡ることが
- * ある。実測 (2026-08-08 Preview) では generateMetadata 側は decode 済みで商品を
- * 引けるのに、Page 側は encode 済みのまま Shopify に送られて null → notFound()
- * となり、タイトルだけ正しく本文が 404 になっていた。
- *
- * decode 済みの文字列に再度 decodeURIComponent をかけても `%` を含まない限り
- * 変化しないため冪等。不正な `%` 混じり (decode 不能) は元の値を使う。
- */
-function decodeHandle(handle: string): string {
-  try {
-    return decodeURIComponent(handle);
-  } catch {
-    return handle;
-  }
-}
 
 export async function generateMetadata({
   params,

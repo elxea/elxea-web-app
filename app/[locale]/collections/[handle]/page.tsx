@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
+import { decodeHandle } from "@/lib/handle";
 import { getCollectionByHandle } from "@/lib/shopify";
 import { ProductGrid } from "@/components/product/product-grid";
 
@@ -9,7 +10,8 @@ export async function generateMetadata({
 }: {
   params: Promise<{ handle: string }>;
 }): Promise<Metadata> {
-  const { handle } = await params;
+  const { handle: rawHandle } = await params;
+  const handle = decodeHandle(rawHandle);
   try {
     const collection = await getCollectionByHandle(handle);
     if (!collection) return {};
@@ -32,7 +34,8 @@ export default async function CollectionPage({
 }: {
   params: Promise<{ handle: string }>;
 }) {
-  const { handle } = await params;
+  const { handle: rawHandle } = await params;
+  const handle = decodeHandle(rawHandle);
   const t = await getTranslations("collection");
 
   let collection;

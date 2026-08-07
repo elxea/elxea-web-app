@@ -1067,5 +1067,55 @@
     "planLead": "月々 1,800円（送料・淹れ方の栞つき / いつでも停止できます）",
     "planCta": "ROJI TEA CLUB に申し込む",
     "planNote": "解約・スキップはマイページからいつでも。"
+  },
+  "signs": {
+    "title": "Signs of Others",
+    "lead": "This week's tally for this place, and a few words with no names attached. Both are given the same weight.",
+    "stats": {
+      "heading": "This week",
+      "brewsUnit": "cups",
+      "brewsLabel": "Cups brewed here this week",
+      "visitorsUnit": "people",
+      "visitorsLabel": "People who came here this week"
+    },
+    "timeOfDay": {
+      "heading": "Time of day",
+      "barLabel": "relative volume",
+      "morning": "Morning 7–10",
+      "noon": "Midday 11–15",
+      "evening": "Evening 16–19",
+      "night": "Night 20–24",
+      "level": {
+        "high": "Busy",
+        "mid": "Steady",
+        "low": "Quiet"
+      }
+    },
+    "notes": {
+      "heading": "A few words",
+      "noReply": "Three reactions only. No replies."
+    },
+    "reactions": {
+      "wakaru": "I get it",
+      "iina": "Nice",
+      "kininaru": "Curious"
+    },
+    "rules": {
+      "heading": "How this place works",
+      "anonymous": {
+        "title": "No names",
+        "body": "Notes and reactions are anonymous. Authorship cannot be traced afterwards."
+      },
+      "noReply": {
+        "title": "No replies",
+        "body": "There is no one-to-one channel. Reactions reach the writer only as a count."
+      },
+      "threeOnly": {
+        "title": "Three reactions",
+        "body": "I get it, Nice, Curious. Choosing words is taken off your hands from the start."
+      }
+    },
+    "shopLink": "See the teas →",
+    "shopNote": "This is the only way into the shop from this page."
   }
 }

@@ -45,7 +45,9 @@ export function ReactionChip({
       className={cn(
         // 高さ: SP 53px → PC 45px (component.reactionChip.height.*)
         "h-(--component-reactionChip-height-sp) sm:h-(--component-reactionChip-height-pc)",
-        "inline-flex items-center justify-center gap-1 rounded-full border px-4 text-sm whitespace-nowrap",
+        // 角丸なし・左右 16 (spacing.4) — symbol 7840:39256 の実測。カタログの
+        // フィルタチップ (ピル型統一) とは別部品なので角丸を合わせない。
+        "inline-flex items-center justify-center gap-1 rounded-none border px-4 text-sm whitespace-nowrap",
         // フォーカスリングはスケール値 (ring-2) を使う。shadcn の button は
         // ring-[3px] だが、生値禁止の lint 規律をこちら側では優先する。
         "transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring/50",

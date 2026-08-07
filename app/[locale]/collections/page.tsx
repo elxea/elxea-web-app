@@ -1,68 +1,87 @@
+import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
-import { Link } from "@/i18n/navigation";
+
 import { getCollections } from "@/lib/shopify";
-import { ImageCard } from "@/components/ui/image-card";
+import { Section } from "@/components/layout/container";
+import { Breadcrumb } from "@/components/seo/breadcrumb";
+import { CatalogCard, CatalogGrid, ListPageHead } from "@/components/catalog/catalog-list";
+
+/**
+ * コレクション一覧 — Figma【R2: 確定版】共通リストパターン
+ * (商品一覧 PC 8061:1781 / SP 8062:2008、お茶メニュー PC 8063:2144 / SP 8063:2372)
+ * の実装。
+ *
+ * SoT の所在 (2026-08-08 実測): EC / Proposals ページ (7567:2) の
+ * section「【要修正】 コレクション一覧」7753:981 は中身が申告テキスト
+ * (7876:4521) だけで、専用のレイアウト案フレームを持たない。一覧系 3 ページ
+ * (商品一覧 / お茶メニュー / コレクション一覧) は R2 で「共通リストパターン」に
+ * 統一する決定なので、コレクション一覧もその確定版に合わせ、部品は
+ * `components/catalog/catalog-list.tsx` を共有する。
+ *
+ * 差分は 3 点だけ:
+ * - 英字キッカーが COLLECTIONS
+ * - カードのキッカーを持たない (コレクションに上位カテゴリが無いため)
+ * - meta 行がコレクション説明の 1 行 (価格・品種の代わり)
+ *
+ * カテゴリ facet が無いので CatalogToolbar / KindIndex / MoreRow は置かない
+ * (Shopify の collections は既定 20 件で 1 画面に収まる)。
+ */
+
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("common");
+  return {
+    title: t("collections"),
+    openGraph: { title: t("collections") },
+  };
+}
 
 export default async function CollectionsPage() {
   const t = await getTranslations("common");
+  const bt = await getTranslations("breadcrumb");
 
   return (
-    <div className="section-wide py-20 md:px-20 md:py-24">
-      <div className="mb-16">
-        <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-4">
-          Explore
-        </p>
-        <h1 className="page-title">{t("collections")}</h1>
-      </div>
+    <Section spacing="none" className="pt-6 pb-16 lg:pb-28">
+      <Breadcrumb items={[{ label: bt("home"), href: "/" }, { label: t("collections") }]} />
+
+      <ListPageHead overline="COLLECTIONS" title={t("collections")} />
+
       <CollectionsContent />
-    </div>
+    </Section>
   );
 }
 
 async function CollectionsContent() {
-  const { getTranslations } = await import("next-intl/server");
+  const t = await getTranslations("collection");
 
+  let collections;
   try {
-    const collections = await getCollections();
-    if (collections.length === 0) {
-      const t = await getTranslations("collection");
-      return <p className="text-muted-foreground text-sm">{t("empty")}</p>;
-    }
-
-    return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-12">
-        {collections.map((collection) => (
-          <Link
-            key={collection.id}
-            href={`/collections/${collection.handle}`}
-            className="group block"
-          >
-            <ImageCard
-              image={collection.image?.url}
-              alt={collection.image?.altText || collection.title}
-              className="mb-5"
-              hover
-            />
-            <div className="space-y-1">
-              <h2 className="text-base font-medium leading-relaxed group-hover:underline underline-offset-4">
-                {collection.title}
-              </h2>
-              {collection.description && (
-                <p className="text-[13px] text-muted-foreground leading-relaxed line-clamp-2">
-                  {collection.description}
-                </p>
-              )}
-            </div>
-          </Link>
-        ))}
-      </div>
-    );
+    collections = await getCollections();
   } catch {
-    const t = await getTranslations("collection");
-    return (
-      <p className="text-muted-foreground text-sm">
-        {t("loadError")}
-      </p>
-    );
+    return <p className="mt-8 text-sm text-muted-foreground lg:mt-12">{t("loadError")}</p>;
   }
+
+  if (collections.length === 0) {
+    return <p className="mt-8 text-sm text-muted-foreground lg:mt-12">{t("empty")}</p>;
+  }
+
+  return (
+    <CatalogGrid className="mt-8 lg:mt-12">
+      {collections.map((collection) => (
+        <CatalogCard
+          key={collection.id}
+          href={`/collections/${collection.handle}`}
+          image={collection.image?.url}
+          imageAlt={collection.image?.altText || collection.title}
+          title={collection.title}
+          /* 一覧クエリ (GET_COLLECTIONS_QUERY) は products を引かないので件数は
+             出せない。meta 行はコレクション説明の 1 行に充てる。 */
+          meta={
+            collection.description ? (
+              <span className="line-clamp-1">{collection.description}</span>
+            ) : undefined
+          }
+        />
+      ))}
+    </CatalogGrid>
+  );
 }

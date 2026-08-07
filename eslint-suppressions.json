@@ -9,11 +9,6 @@
       "count": 2
     }
   },
-  "app/[locale]/collections/page.tsx": {
-    "elxea-tokens/no-raw-colors": {
-      "count": 2
-    }
-  },
   "app/[locale]/elxea-journal/[slug]/page.tsx": {
     "elxea-tokens/no-raw-colors": {
       "count": 3
