@@ -255,6 +255,7 @@
   --component-button-height-md: 2.25rem;
   --component-button-height-lg: 2.5rem;
   --component-button-height-xl: 2.75rem;
+  --component-button-height-service: 2.1875rem;
   --component-button-padding-sm: 0.75rem;
   --component-button-padding-md: 1rem;
   --component-button-padding-lg: 1.5rem;
@@ -300,6 +301,10 @@
   --component-logo-height-md: 1.125rem;
   --component-logo-height-lg: 1.5rem;
   --component-logo-aspectRatio-wordmark: 4.159;
+  --component-reactionChip-height-pc: 2.8125rem;
+  --component-reactionChip-height-sp: 3.3125rem;
+  --component-scaleBar-height-default: 0.1875rem;
+  --component-timeMarker-dial-size-default: 2.75rem;
   --component-sidebar-width-collapsed: 4rem;
   --component-sidebar-width-default: 16rem;
   --component-sidebar-width-wide: 20rem;

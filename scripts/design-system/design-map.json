@@ -443,14 +443,65 @@
       "code_path": "components/ui/input-group.tsx",
       "kind": "shadcn",
       "notes": "name 1:1。"
+    },
+    {
+      "figma_node_id": "6953:124",
+      "figma_name": "BtnService (Module) — playlist service link",
+      "code_path": "components/ui/button.tsx",
+      "kind": "ds-component",
+      "notes": "C1 R2 実装。button の variant=\"service\" + size=\"service\"。実測 102x35 / Label x=20 / Arrow x=70 → px-5 (20) + gap-2 (8) + component.button.height.service (35px)。"
+    },
+    {
+      "figma_node_id": "7970:42142",
+      "figma_name": "Service Overview (Module) — PC 1440",
+      "code_path": "components/marketing/service-overview.tsx",
+      "kind": "module",
+      "notes": "C1 R2 実装。PC/SP は同一ファイルのレスポンシブ分岐 (SP は 7970:42206)。"
+    },
+    {
+      "figma_node_id": "7970:42206",
+      "figma_name": "Service Overview (Module) — SP 375",
+      "code_path": "components/marketing/service-overview.tsx",
+      "kind": "module",
+      "notes": "C1 R2 実装。7970:42142 の SP 断面。1 列積み上げ + 上下余白 64 (PC は 96)。"
+    },
+    {
+      "figma_node_id": "7840:39598",
+      "figma_name": "NoteCard (Proposed) — みんなの気配 匿名ノート",
+      "code_path": "components/community/note-card.tsx",
+      "kind": "ds-component",
+      "notes": "C1 R2 実装 (表示部品のみ。みんなの気配の機能本体は未実装)。リアクションは ReactionChip に委譲。"
+    },
+    {
+      "figma_node_id": "7840:39256",
+      "figma_name": "ReactionChip (Proposed) — みんなの気配 選択式リアクション",
+      "code_path": "components/community/reaction-chip.tsx",
+      "kind": "ds-component",
+      "notes": "C1 R2 実装。トグルボタン (aria-pressed)。高さ PC 45 / SP 53 はどちらも最小タッチ域 44px 充足。"
+    },
+    {
+      "figma_node_id": "7840:39260",
+      "figma_name": "ScaleBar (Proposed) — みんなの気配 相対量バー",
+      "code_path": "components/community/scale-bar.tsx",
+      "kind": "ds-component",
+      "notes": "C1 R2 実装。role=\"meter\" + aria-label 必須。幅は親追従 (Figma 360 はプレビュー幅)。"
+    },
+    {
+      "figma_node_id": "7552:238",
+      "figma_name": "AuthorByline (Proposed) — Journal 本文冒頭著者クレジット",
+      "code_path": "components/journal/author-byline.tsx",
+      "kind": "ds-component",
+      "notes": "C1 R2 実装。記事末尾の AuthorProfile (6853:300 / author-profile.tsx) とは別部品。"
+    },
+    {
+      "figma_node_id": "7552:23574",
+      "figma_name": "TimeMarker (Proposed) — Journal 章見出し=時刻",
+      "code_path": "components/journal/time-marker.tsx",
+      "kind": "ds-component",
+      "notes": "C1 R2 実装。Figma の Ratio variant (1.3x/2.0x/3.6x) は ratio prop 一本に畳んだ (構造は共通で差分が文字倍率のみのため)。"
     }
   ],
   "unmapped_figma_nodes": [
-    {
-      "figma_node_id": "6953:124",
-      "figma_name": "BtnService",
-      "reason": "コード実装なし。components/ui/button.tsx の variant は default/destructive/outline/secondary/ghost/link のみで service variant が存在しない。実装時に entries へ昇格 (freshness を壊さないため entries には入れない)。"
-    },
     {
       "figma_node_id": "6954:124",
       "figma_name": "TeaThumb",
@@ -460,41 +511,6 @@
       "figma_node_id": "5887:49",
       "figma_name": "ArticleCard (deprecated)",
       "reason": "Figma 上で deprecated (→ 5483:15 に置換済み)。コード側対応不要。Figma 掃除待ち。"
-    },
-    {
-      "figma_node_id": "7970:42142",
-      "figma_name": "Service Overview (Module) — PC 1440",
-      "reason": "コード実装なし。汎用 (トップ/About で再利用しうる) → Figma コンポーネント化は済んでいるので実装待ち。C2 以降で実装したら entries へ昇格。"
-    },
-    {
-      "figma_node_id": "7970:42206",
-      "figma_name": "Service Overview (Module) — SP 375",
-      "reason": "同上 (7970:42142 の SP)。実装時は同一ファイルのレスポンシブ分岐にする。"
-    },
-    {
-      "figma_node_id": "7840:39598",
-      "figma_name": "NoteCard (Proposed) — みんなの気配",
-      "reason": "コード実装なし。みんなの気配機能そのものが未実装。機能実装と同時に部品化する。"
-    },
-    {
-      "figma_node_id": "7840:39256",
-      "figma_name": "ReactionChip (Proposed) — みんなの気配",
-      "reason": "コード実装なし。汎用 (選択式チップ) だが現状の使用箇所が みんなの気配 のみ。機能実装時に DS 昇格候補として起票する。"
-    },
-    {
-      "figma_node_id": "7840:39260",
-      "figma_name": "ScaleBar (Proposed) — みんなの気配",
-      "reason": "コード実装なし。一点もの (相対量バー)。実装時は局所部品 + DS 昇格候補。"
-    },
-    {
-      "figma_node_id": "7552:238",
-      "figma_name": "AuthorByline (Proposed) — Journal 本文冒頭著者クレジット",
-      "reason": "コード実装なし。AuthorProfile (6853:300) は記事末尾用で別物。汎用 → C4 Journal で実装予定。"
-    },
-    {
-      "figma_node_id": "7552:23574",
-      "figma_name": "TimeMarker (Proposed) — Journal 章見出し=時刻",
-      "reason": "コード実装なし。一点もの (elxea Journal 固有の章見出し)。C4 で局所部品として実装し DS 昇格を判断。"
     },
     {
       "figma_node_id": "6859:316",

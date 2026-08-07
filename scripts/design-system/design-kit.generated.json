@@ -117,7 +117,7 @@
         "dist/tokens-cjk.css"
       ],
       "name_transform": "sd.config.mjs の name/tailwind-compat が color.semantic.* から semantic を除去する (color.semantic.primary -> --color-primary)。他はパス連結。",
-      "token_count": 310
+      "token_count": 315
     },
     "color": {
       "semantic": {
@@ -1005,7 +1005,8 @@
           "sm": "2rem",
           "md": "2.25rem",
           "lg": "2.5rem",
-          "xl": "2.75rem"
+          "xl": "2.75rem",
+          "service": "2.1875rem"
         },
         "padding": {
           "sm": "0.75rem",
@@ -1115,6 +1116,24 @@
         },
         "aspectRatio": {
           "wordmark": "4.159"
+        }
+      },
+      "reactionChip": {
+        "height": {
+          "pc": "2.8125rem",
+          "sp": "3.3125rem"
+        }
+      },
+      "scaleBar": {
+        "height": {
+          "default": "0.1875rem"
+        }
+      },
+      "timeMarker": {
+        "dial": {
+          "size": {
+            "default": "2.75rem"
+          }
         }
       },
       "sidebar": {
@@ -1441,10 +1460,12 @@
           "outline",
           "secondary",
           "ghost",
-          "link"
+          "link",
+          "service"
         ],
         "size": [
           "default",
+          "service",
           "xs",
           "sm",
           "lg",

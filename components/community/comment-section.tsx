@@ -94,7 +94,10 @@ export function CommentSection({
     async (e: React.FormEvent) => {
       e.preventDefault();
 
-      if (typeof document !== "undefined" && !document.cookie.includes("shop_auth=1")) {
+      if (
+        typeof document !== "undefined" &&
+        !document.cookie.includes("shop_auth=1")
+      ) {
         toast(i18n.loginRequired);
         return;
       }
@@ -135,7 +138,7 @@ export function CommentSection({
         setIsSubmitting(false);
       }
     },
-    [body, targetType, targetId, currentUserId, i18n]
+    [body, targetType, targetId, currentUserId, i18n],
   );
 
   const handleDelete = useCallback(
@@ -159,7 +162,7 @@ export function CommentSection({
         setDeletingId(null);
       }
     },
-    [i18n]
+    [i18n],
   );
 
   const charCount = body.length;
@@ -195,13 +198,14 @@ export function CommentSection({
               "w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm",
               "placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
               "disabled:cursor-not-allowed disabled:opacity-50",
-              isOverLimit && "border-destructive focus-visible:ring-destructive"
+              isOverLimit &&
+                "border-destructive focus-visible:ring-destructive",
             )}
           />
           <span
             className={cn(
               "absolute bottom-2 right-3 text-xs",
-              isOverLimit ? "text-destructive" : "text-muted-foreground"
+              isOverLimit ? "text-destructive" : "text-muted-foreground",
             )}
             aria-live="polite"
           >
@@ -214,7 +218,9 @@ export function CommentSection({
           <Button
             type="submit"
             size="sm"
-            disabled={isSubmitting || !body.trim() || isOverLimit || !isLoggedIn}
+            disabled={
+              isSubmitting || !body.trim() || isOverLimit || !isLoggedIn
+            }
           >
             {isSubmitting ? i18n.submitting : i18n.submit}
           </Button>
@@ -225,7 +231,10 @@ export function CommentSection({
       {isLoadingComments ? (
         <div className="space-y-4">
           {[1, 2].map((i) => (
-            <div key={i} className="animate-pulse space-y-2 py-4 border-b border-border">
+            <div
+              key={i}
+              className="animate-pulse space-y-2 py-4 border-b border-border"
+            >
               <div className="h-3 bg-muted w-1/4" />
               <div className="h-4 bg-muted w-3/4" />
             </div>
@@ -248,11 +257,14 @@ export function CommentSection({
                     </span>
                     {comment.createdAt && (
                       <span className="text-xs text-muted-foreground shrink-0">
-                        {new Date(comment.createdAt).toLocaleDateString(locale, {
-                          year: "numeric",
-                          month: "short",
-                          day: "numeric",
-                        })}
+                        {new Date(comment.createdAt).toLocaleDateString(
+                          locale,
+                          {
+                            year: "numeric",
+                            month: "short",
+                            day: "numeric",
+                          },
+                        )}
                       </span>
                     )}
                   </div>

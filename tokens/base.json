@@ -1125,6 +1125,10 @@
         "xl": {
           "$value": "2.75rem",
           "$description": "h-11 — large CTA"
+        },
+        "service": {
+          "$value": "2.1875rem",
+          "$description": "35px — Figma BtnService (Module) 6953:124 実測高"
         }
       },
       "padding": {
@@ -1367,6 +1371,39 @@
         "wordmark": {
           "$value": "4.159",
           "$description": "99.8087 / 24 — Figma Logo / Wordmark 7964:242 の縦横比"
+        }
+      }
+    },
+    "reactionChip": {
+      "height": {
+        "$type": "dimension",
+        "pc": {
+          "$value": "2.8125rem",
+          "$description": "45px — Figma ReactionChip 7840:39256 Size=pc 実測高"
+        },
+        "sp": {
+          "$value": "3.3125rem",
+          "$description": "53px — Figma ReactionChip 7840:39256 Size=sp 実測高"
+        }
+      }
+    },
+    "scaleBar": {
+      "height": {
+        "$type": "dimension",
+        "default": {
+          "$value": "0.1875rem",
+          "$description": "3px — Figma ScaleBar 7840:39260 実測高"
+        }
+      }
+    },
+    "timeMarker": {
+      "dial": {
+        "size": {
+          "$type": "dimension",
+          "default": {
+            "$value": "2.75rem",
+            "$description": "44px — Figma TimeMarker / Dial (細線円 44px) 7552:23568 実測"
+          }
         }
       }
     },
