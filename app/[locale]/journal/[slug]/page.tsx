@@ -266,7 +266,7 @@ export default async function ArticlePage({
                   下マージンを 0 に倒し、間隔は隣接セレクタの上マージンだけで
                   作る (マージン相殺の影響を受けないようにするため)。 */}
               {article.body && (
-                <div className="prose-custom mt-6 [&>*]:mb-0! [&>*+*]:mt-6! [&_h2]:mt-14! [&_h2]:mb-5!">
+                <div className="prose-custom mt-6 [&>*]:mb-0! [&>*+*]:mt-6! [&_h2]:mt-14! [&_h2]:mb-5! [&_h3]:mt-14! [&_h3]:mb-5!">
                   <PortableText value={article.body} />
                 </div>
               )}
