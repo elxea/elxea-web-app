@@ -1,5 +1,12 @@
 import { defineConfig } from "@playwright/test";
 
+/**
+ * Base URL of the app under test. Overridable so a developer can point the
+ * suite at an already-running dev server on a non-default port
+ * (`E2E_BASE_URL=http://localhost:3100 pnpm test:e2e`).
+ */
+const baseURL = process.env.E2E_BASE_URL ?? "http://localhost:3000";
+
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: true,
@@ -19,13 +26,17 @@ export default defineConfig({
       ]
     : ["**/staging-smoke.spec.ts"],
   use: {
-    baseURL: "http://localhost:3000",
+    baseURL,
     trace: "on-first-retry",
     locale: "ja-JP",
   },
   webServer: {
     command: "pnpm dev",
-    url: "http://localhost:3000",
+    url: baseURL,
     reuseExistingServer: !process.env.CI,
+    // The site-password gate (SITE_PASSWORD in .env.local) 307-redirects every
+    // route to /site-password, which would make the whole suite unrunnable
+    // locally. E2E always runs against an ungated app.
+    env: { SITE_PASSWORD: "" },
   },
 });
