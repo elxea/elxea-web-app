@@ -1,335 +1,285 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { getTranslations } from "next-intl/server";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Breadcrumb } from "@/components/seo/breadcrumb";
+import { getProducts } from "@/lib/shopify";
+import { Link } from "@/i18n/navigation";
 import { ImageCard } from "@/components/ui/image-card";
-import { SiteImage } from "@/components/site-image";
+import { VariantSelector } from "@/components/product/variant-selector";
+import { ProductPurchaseOptions } from "@/components/product/product-purchase-options";
+import { bodySmClass, captionClass, h4Class, overlineClass } from "@/components/editorial/rule-list";
+import {
+  Ledger,
+  OpenFaqList,
+  PageSection,
+  SectionBody,
+  SectionHead,
+  SpecBand,
+  StepCards,
+  TripleColumn,
+} from "@/components/editorial/section-blocks";
+import { cn } from "@/lib/utils";
+
+/**
+ * 定期便LP — Figma【R2: 確定版】(PC 8071:2 / SP 8073:2)。
+ *
+ * 構成案 v1 準拠。**購入導線は最下部 1 箇所だけ**で、CTA も 1 個。
+ * 会員ランク・特典階層の要素は置かない (Figma の確定仕様)。上部の Hero CTA は
+ * 購入ではなく最下部の申し込みブロックへのページ内アンカー。
+ *
+ * Figma 実測 (px) → 実装の対応:
+ * - Hero        テキスト 600 / 写真 640 (grid 内)   → `lg:grid-cols-12` の 5 / 6
+ * - DateRibbon  1312 × 45 の帯                        → `bg-muted` の pill
+ * - 今月の3種   3列 416 gap32                          → `TripleColumn`
+ * - 届くもの    4列 304 gap32                          → `SpecBand`
+ * - 12ヶ月      2カラム台帳 (行 h48)                   → `Ledger`
+ * - FAQ         アコーディオンなし・開いたまま          → `OpenFaqList`
+ * - 申し込み    中央 528 幅・CTA 1 個                   → `max-w-132 mx-auto`
+ */
 
 export async function generateMetadata(): Promise<Metadata> {
-  const t = await getTranslations("subscriptionLp");
-  return {
-    title: t("title"),
-    description: t("description"),
-  };
+  const t = await getTranslations("subscriptionR2");
+  return { title: t("metaTitle"), description: t("metaDescription") };
 }
 
-// ─── Tea lineup sample data (placeholder) ───────────────────────────
-const TEA_LINEUP = [
-  "N\u00B001 \u9999\u99FF",
-  "N\u00B003 \u3079\u306B\u3075\u3046\u304D",
-  "N\u00B002 \u3079\u306B\u3075\u3046\u304D",
-  "\u3084\u3076\u304D\u305F\u306E\u624B\u6458\u307F\u714E\u8336",
-  "\u9999\u99FF\u306E\u548C\u7D05\u8336",
-  "\u9759\u4E03\u4E00\u4E09\u4E8C\u306E\u840E\u51CB\u714E\u8336",
-  "\u3075\u304F\u307F\u3069\u308A\u306E\u840E\u51CB\u91DC\u7092\u308A\u7DD1\u8336\u5165\u308A",
-  "\u3079\u306B\u3075\u3046\u304D\u306E\u548C\u7D05\u8336",
-  "\u307F\u306A\u307F\u3055\u3084\u304B\u306E\u548C\u70CF\u9F8D\u8336",
-  "\u9999\u99FF\u306E\u548C\u70CF\u9F8D\u8336",
-  "\u5927\u4E95\u65E9\u751F\u306E\u624B\u6458\u307F\u714E\u8336",
-  "\u9999\u99FF\u306E\u840E\u51CB\u91DC\u7092\u308A\u7DD1\u8336",
-  "\u3044\u305A\u307F\u306E\u548C\u7D05\u8336",
-  "\u307F\u306A\u307F\u3055\u3084\u304B\u306E\u840E\u51CB\u91DC\u7092\u308A\u7DD1\u8336",
-] as const;
+const PLAN_ANCHOR = "plan";
 
 export default async function SubscriptionLPPage() {
-  const t = await getTranslations("subscriptionLp");
-  const bt = await getTranslations("breadcrumb");
+  const t = await getTranslations("subscriptionR2");
 
-  const faqItems = Array.from({ length: 10 }, (_, i) => ({
-    q: t(`faqQ${i + 1}`),
-    a: t(`faqA${i + 1}`),
+  // 定期便商品 (sellingPlanGroups を持つ最初の 1 件) を実バックエンドから引く。
+  let subscriptionProduct: Awaited<ReturnType<typeof getProducts>>["products"][number] | null =
+    null;
+  let detail: Awaited<ReturnType<typeof import("@/lib/shopify").getProductByHandle>> = null;
+  try {
+    const { getProductByHandle } = await import("@/lib/shopify");
+    const res = await getProducts({ first: 20 });
+    const candidate = res.products.find((p) => p.tags?.includes("subscription")) ?? null;
+    subscriptionProduct = candidate;
+    if (candidate) {
+      const full = await getProductByHandle(candidate.handle);
+      detail = full && full.sellingPlanGroups.length > 0 ? full : null;
+    }
+  } catch {
+    subscriptionProduct = null;
+    detail = null;
+  }
+
+  const boxItems = [1, 2, 3].map((n) => ({
+    title: t(`box${n}Title`),
+    body: t(`box${n}Body`),
   }));
 
+  const includedItems = [1, 2, 3, 4].map((n) => ({
+    term: t(`included${n}Term`),
+    value: t(`included${n}Value`),
+  }));
+
+  const steps = [1, 2, 3, 4].map((n) => ({
+    step: `0${n}`,
+    name: t(`step${n}Name`),
+    body: t(`step${n}Body`),
+  }));
+
+  const monthRows = Array.from({ length: 12 }, (_, i) => ({
+    term: t(`month${i + 1}Term`),
+    value: t(`month${i + 1}Value`),
+  }));
+
+  const priceItems = [1, 2, 3, 4].map((n) => ({
+    term: t(`price${n}Term`),
+    value: t(`price${n}Value`),
+  }));
+
+  const voiceItems = [1, 2, 3].map((n) => ({
+    title: t(`voice${n}Title`),
+    body: t(`voice${n}Body`),
+  }));
+
+  const faqItems = [1, 2, 3, 4, 5].map((n) => ({
+    q: t(`faqQ${n}`),
+    a: t(`faqA${n}`),
+  }));
+
+  const selectedVariant = detail?.variants[0] ?? null;
+
   return (
-    <>
-      {/* ─── 1. Hero ─── */}
-      <section className="relative min-h-[90vh] flex items-center justify-center">
-        {/* 暫定: 専用写真は画像台帳経由で差し替え可 */}
-        <SiteImage
-          slotId="site:subscription:hero-01"
-          src="/hero-day.jpg"
-          fallbackSrc="/placeholder-hero-day.jpg"
-          alt=""
-          aria-hidden="true"
-          fill
-          priority
-          className="object-cover"
-          sizes="100vw"
-        />
-        <div className="absolute inset-0 bg-overlay" />
-        <div className="relative text-center max-w-2xl px-8">
-          <h1 className="hero-display mb-8 text-overlay-foreground whitespace-pre-line">
-            {t("heroHeading")}
-          </h1>
-          <Button className="bg-overlay-foreground text-foreground hover:bg-overlay-foreground/90" asChild>
-            <a href="#">{t("heroCta")}</a>
-          </Button>
-        </div>
-      </section>
-
-      {/* ─── 2. Brand Introduction ─── */}
-      <section className="section-narrow py-20">
-        <Breadcrumb
-          items={[
-            { label: bt("home"), href: "/" },
-            { label: t("title") },
-          ]}
-        />
-        <div className="mb-12">
-          <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-4">
-            About
-          </p>
-          <h2 className="mb-6">{t("brandHeading")}</h2>
-          <p className="text-sm text-muted-foreground leading-relaxed">
-            {t("brandBody")}
-          </p>
-        </div>
-
-        {/* Image grid (placeholder) */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <ImageCard key={i} />
-          ))}
-        </div>
-      </section>
-
-      {/* ─── 3. Single Origin Appeal ─── */}
-      <section className="section-narrow">
-        <h2 className="mb-6 text-center">{t("originHeading")}</h2>
-
-        {/* Image placeholder */}
-        <div className="relative aspect-[16/9] w-full bg-muted mb-8" />
-
-        <div className="space-y-6 text-sm text-muted-foreground leading-relaxed">
-          <p>{t("originBody1")}</p>
-          <p>{t("originBody2")}</p>
-          <p>{t("originBody3")}</p>
-        </div>
-      </section>
-
-      {/* ─── 4. Product Lineup (placeholder) ─── */}
-      <section className="section-wide">
-        <h2 className="mb-10 text-center">{t("lineupHeading")}</h2>
-
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6">
-          {TEA_LINEUP.map((name) => (
-            <div key={name}>
-              <ImageCard className="mb-4" />
-              <p className="text-xs text-muted-foreground mb-1">Single</p>
-              <p className="text-sm">{name}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ─── 5. Subscription Plan Details ─── */}
-      <section className="section-wide">
-        <h2 className="mb-10 text-center">{t("planHeading")}</h2>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
-          {/* Image placeholder */}
-          <ImageCard />
-
-          <Card>
-            <CardHeader>
-              <CardTitle>{t("planName")}</CardTitle>
-              <CardDescription>{t("planFirstPrice")}</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div>
-                <span className="text-3xl font-light">{t("planPrice")}</span>
-                <span className="text-sm text-muted-foreground ml-2">
-                  {t("planPriceSuffix")}
-                </span>
-                <span className="text-sm text-muted-foreground ml-2">
-                  {t("planFreeShipping")}
-                </span>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {t("planNote")}
-              </p>
-
-              <ul className="space-y-3 text-sm text-muted-foreground">
-                <li>{t("planBenefit1")}</li>
-                <li>{t("planBenefit2")}</li>
-                <li>{t("planBenefit3")}</li>
-              </ul>
-
-              <Button className="w-full" asChild>
-                <a href="#">{t("heroCta")}</a>
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      </section>
-
-      {/* ─── 6. Tea Bag Material ─── */}
-      <section className="section-wide">
-        <h2 className="mb-10 text-center">{t("teabagHeading")}</h2>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <div>
-            <ImageCard className="mb-4" />
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              {t("teabagBody")}
+    <div data-slot="subscription-lp">
+      {/* S1 Hero (Figma 8071:117) */}
+      <PageSection data-slot="lp-hero" className="lg:py-20">
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-12 lg:items-center lg:gap-8">
+          <div className="lg:col-span-5">
+            <p className={cn(overlineClass, "text-muted-foreground")}>{t("heroOverline")}</p>
+            <h1 className="mt-5 lg:mt-6">{t("heroTitle")}</h1>
+            <p className={cn(bodySmClass, "mt-5 max-w-120 text-muted-foreground lg:mt-8")}>
+              {t("heroLead")}
             </p>
+            <a
+              href={`#${PLAN_ANCHOR}`}
+              className={cn(
+                bodySmClass,
+                "mt-6 inline-flex h-11 items-center rounded-full border border-border px-8",
+                "text-foreground transition-colors hover:bg-muted lg:mt-10"
+              )}
+            >
+              {t("heroCta")}
+            </a>
           </div>
-          <div>
-            <ImageCard className="mb-4" />
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              {t("teabagBody")}
-            </p>
-            <p className="text-xs text-muted-foreground mt-2">
-              {t("teabagNote")}
-            </p>
+          <div className="lg:col-span-6 lg:col-start-7">
+            <ImageCard
+              image={subscriptionProduct?.featuredImage?.url}
+              alt={t("heroTitle")}
+              aspectRatio="4/3"
+            />
           </div>
         </div>
-      </section>
+      </PageSection>
 
-      {/* ─── 7. Three Features ─── */}
-      <section className="section-wide">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <FeatureCard
-            number="01"
-            title={t("feature1Title")}
-            description={t("feature1Body")}
-            note={t("feature1Note")}
-          />
-          <FeatureCard
-            number="02"
-            title={t("feature2Title")}
-            description={t("feature2Body")}
-            note={t("feature2Note")}
-          />
-          <FeatureCard
-            number="03"
-            title={t("feature3Title")}
-            description={t("feature3Body")}
-          />
-        </div>
-      </section>
-
-      {/* ─── 8. Subscriber-Only Perks ─── */}
-      <section className="section-wide">
-        <h2 className="mb-10 text-center">{t("perksHeading")}</h2>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
-          <Card>
-            <CardHeader>
-              <ImageCard className="-mx-6 -mt-6 rounded-t-xl rounded-b-none" />
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <CardTitle>{t("perk1Title")}</CardTitle>
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                {t("perk1Body")}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {t("perk1Note")}
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <ImageCard className="-mx-6 -mt-6 rounded-t-xl rounded-b-none" />
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <CardTitle>{t("perk2Title")}</CardTitle>
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                {t("perk2Body")}
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="text-xs text-muted-foreground space-y-1">
-          <p>{t("disclaimerLine1")}</p>
-          <p>{t("disclaimerLine2")}</p>
-          <p>{t("disclaimerLine3")}</p>
-          <p>{t("disclaimerLine4")}</p>
-          <p>{t("disclaimerLine5")}</p>
-        </div>
-      </section>
-
-      {/* ─── 9. CTA ─── */}
-      <section className="section-narrow text-center">
-        <h2 className="mb-8">{t("ctaHeading")}</h2>
-        <Button asChild>
-          <a href="#">{t("heroCta")}</a>
-        </Button>
-      </section>
-
-      {/* ─── 10. FAQ ─── */}
-      <section className="section-narrow">
-        <h2 className="mb-10 text-center">{t("faqHeading")}</h2>
-
-        <div className="divide-y divide-border">
-          {faqItems.map((item, i) => (
-            <details key={i} className="group py-6">
-              <summary className="flex items-center justify-between cursor-pointer list-none">
-                <span className="text-sm text-foreground font-medium pr-4">
-                  {item.q}
-                </span>
-                <span
-                  className="text-muted-foreground text-lg shrink-0 group-open:rotate-45 transition-transform duration-200"
-                  aria-hidden="true"
-                >
-                  +
-                </span>
-              </summary>
-              <p className="text-sm text-muted-foreground leading-relaxed mt-4 pr-8">
-                {item.a}
-              </p>
-            </details>
-          ))}
-        </div>
-      </section>
-
-      {/* ─── 11. Final CTA ─── */}
-      <section className="section-narrow text-center">
-        <h2 className="mb-8">{t("ctaHeading")}</h2>
-        <Button asChild>
-          <a href="#">{t("heroCta")}</a>
-        </Button>
-      </section>
-    </>
-  );
-}
-
-function FeatureCard({
-  number,
-  title,
-  description,
-  note,
-}: {
-  number: string;
-  title: string;
-  description: string;
-  note?: string;
-}) {
-  return (
-    <Card>
-      <CardHeader>
-        {/* Illustration placeholder */}
-        <ImageCard className="-mx-6 -mt-6 rounded-t-xl rounded-b-none" />
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <p className="text-xs text-muted-foreground">{number}</p>
-        <CardTitle className="text-base">{title}</CardTitle>
-        <p className="text-sm text-muted-foreground leading-relaxed">
-          {description}
+      {/* S2 初回お届け確定 (Figma 8071:125) */}
+      <PageSection>
+        <p
+          data-slot="date-ribbon"
+          className={cn(
+            bodySmClass,
+            "flex min-h-11 items-center rounded-full bg-muted px-8 text-foreground"
+          )}
+        >
+          {t("firstDeliveryRibbon")}
         </p>
-        {note ? (
-          <p className="text-xs text-muted-foreground">{note}</p>
-        ) : null}
-      </CardContent>
-    </Card>
+        <SectionBody className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:gap-8">
+          {[0, 1, 2].map((i) => (
+            <ImageCard
+              key={i}
+              alt={t("firstDeliveryRibbon")}
+              aspectRatio="3/2"
+            />
+          ))}
+        </SectionBody>
+      </PageSection>
+
+      {/* 今月の3種 (Figma 8071:132) */}
+      <PageSection>
+        <SectionHead overline={t("boxOverline")} title={t("boxTitle")} />
+        <SectionBody>
+          <TripleColumn items={boxItems} />
+        </SectionBody>
+      </PageSection>
+
+      {/* 届くもの一式 (Figma 8071:149) */}
+      <PageSection>
+        <SpecBand items={includedItems} />
+      </PageSection>
+
+      {/* HowItWorks 4step (Figma 8071:164) */}
+      <PageSection>
+        <StepCards items={steps} className="lg:grid-cols-4" />
+      </PageSection>
+
+      {/* S3 語り (Figma 8071:181) — ボタンは置かない */}
+      <PageSection>
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-12 lg:gap-8">
+          <div className="lg:col-span-5">
+            <ImageCard alt={t("storyOverline")} aspectRatio="1/1" />
+          </div>
+          <div className="lg:col-span-6 lg:col-start-7 lg:self-center">
+            <span aria-hidden="true" className="block h-px w-32 bg-border" />
+            <p className={cn(captionClass, "mt-5 text-muted-foreground lg:mt-6")}>
+              {t("storyOverline")}
+            </p>
+            <p className={cn(bodySmClass, "mt-5 text-foreground lg:mt-10")}>{t("storyBody")}</p>
+          </div>
+        </div>
+      </PageSection>
+
+      {/* 12ヶ月のリズム (Figma 8072:117) */}
+      <PageSection>
+        <SectionHead overline={t("monthsOverline")} />
+        <SectionBody>
+          <Ledger rows={monthRows} />
+        </SectionBody>
+      </PageSection>
+
+      {/* S4 次月のお届け (Figma 8071:454) */}
+      <PageSection>
+        <h2>{t("nextMonthTitle")}</h2>
+        <SectionBody className="grid grid-cols-1 gap-8 lg:grid-cols-12 lg:gap-8">
+          <div className="lg:col-span-5">
+            <ImageCard alt={t("nextMonthTitle")} aspectRatio="13/9" />
+          </div>
+          <div className="lg:col-span-5 lg:col-start-7">
+            <span
+              data-slot="month-chip"
+              className={cn(
+                captionClass,
+                "inline-flex h-9 items-center rounded-full bg-muted px-4 text-foreground"
+              )}
+            >
+              {t("nextMonthChip")}
+            </span>
+            <p className={cn(bodySmClass, "mt-5 text-muted-foreground lg:mt-6")}>
+              {t("nextMonthBody")}
+            </p>
+          </div>
+        </SectionBody>
+      </PageSection>
+
+      {/* 料金と含まれるもの (Figma 8071:462) */}
+      <PageSection>
+        <SpecBand items={priceItems} />
+      </PageSection>
+
+      {/* つくり手の声 (Figma 8071:477) */}
+      <PageSection>
+        <SectionHead overline={t("voicesOverline")} title={t("voicesTitle")} />
+        <SectionBody>
+          <TripleColumn items={voiceItems} />
+        </SectionBody>
+      </PageSection>
+
+      {/* よくある質問 (Figma 8071:494) */}
+      <PageSection>
+        <SectionHead overline={t("faqOverline")} />
+        <SectionBody>
+          <OpenFaqList items={faqItems} />
+        </SectionBody>
+      </PageSection>
+
+      {/* プラン選択 + 購入導線 — 最下部のみ / CTA 1 個 (Figma 8071:514) */}
+      <PageSection id={PLAN_ANCHOR} className="scroll-mt-24 bg-muted">
+        <div className="mx-auto max-w-132 text-center">
+          <p className={cn(h4Class, "text-foreground")}>{t("planLead")}</p>
+
+          {detail && selectedVariant ? (
+            <div className="mt-8 flex flex-col gap-6 text-left">
+              <Suspense fallback={null}>
+                <VariantSelector options={detail.options} variants={detail.variants} />
+              </Suspense>
+              <ProductPurchaseOptions
+                merchandiseId={selectedVariant.id}
+                availableForSale={selectedVariant.availableForSale}
+                sellingPlanGroups={detail.sellingPlanGroups}
+                sellingPlanAllocations={selectedVariant.sellingPlanAllocations}
+                productName={detail.title}
+                price={selectedVariant.price.amount}
+                currencyCode={selectedVariant.price.currencyCode}
+                subscriptionOnly
+              />
+            </div>
+          ) : (
+            <Link
+              href="/products"
+              className={cn(
+                bodySmClass,
+                "mt-8 inline-flex h-11 items-center rounded-full border border-border px-8",
+                "text-foreground transition-colors hover:bg-background"
+              )}
+            >
+              {t("planCta")}
+            </Link>
+          )}
+
+          <p className={cn(captionClass, "mt-6 text-muted-foreground")}>{t("planNote")}</p>
+        </div>
+      </PageSection>
+    </div>
   );
 }

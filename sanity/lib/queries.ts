@@ -172,6 +172,16 @@ export const EVENT_BY_SLUG_QUERY = groq`
   }
 `;
 
+// カテゴリ表示名 (チップ・絞り込みラベルの正本)。
+// slug.current が teaMenu.category の値と対応する。
+export const CATEGORY_LABELS_QUERY = groq`
+  *[_type == "category"] {
+    "slug": slug.current,
+    title,
+    displayName
+  }
+`;
+
 // Tea Menu
 export const TEA_MENUS_QUERY = groq`
   *[_type == "teaMenu" && language == $language] | order(productNumber asc) {

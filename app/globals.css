@@ -130,6 +130,18 @@ h1.contact-title {
   letter-spacing: var(--typography-style-h4-tracking);
 }
 
+/* R2 セクション見出し (商品詳細 8056:1575 / 定期便LP 8071:134 ほか) は h3
+ * プリセット (20px / 400) を使う。見出しレベルは文書構造上 h2 が正しいので、
+ * 要素は h2 のまま体裁だけ h3 に揃える。Unlayered な理由・`:lang()` 前置の
+ * 理由は上の catalog-card-title と同じ。値は h3 トークン経由で生 px は書かない。 */
+:lang(ja) h2[data-slot="section-title"],
+:lang(en) h2[data-slot="section-title"],
+:lang(ja) h3[data-slot="section-title"],
+:lang(en) h3[data-slot="section-title"] {
+  font: var(--typography-style-h3);
+  letter-spacing: var(--typography-style-h3-tracking);
+}
+
 :root {
   /* Third-party brand colors */
   --brand-line: #06C755;

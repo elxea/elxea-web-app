@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { getLocale, getTranslations } from "next-intl/server";
 
 import { getClient } from "@/sanity/lib/client";
-import { TEA_MENUS_QUERY } from "@/sanity/lib/queries";
+import { CATEGORY_LABELS_QUERY, TEA_MENUS_QUERY } from "@/sanity/lib/queries";
 import { urlFor } from "@/sanity/lib/image";
 import { Breadcrumb } from "@/components/seo/breadcrumb";
 import { Section } from "@/components/layout/container";
@@ -50,6 +50,9 @@ type TeaMenuItem = {
   color?: string;
 };
 
+/** カテゴリ表示名 (Sanity `category` ドキュメント)。中身は CMS の役割。 */
+type CategoryLabel = { slug?: string; title?: string; displayName?: string };
+
 type SearchParams = { category?: string; sort?: string; show?: string };
 
 export default async function TeaMenuPage({
@@ -78,9 +81,12 @@ async function TeaMenuList({ params }: { params: SearchParams }) {
   const tl = await getTranslations("catalog");
 
   let items: TeaMenuItem[];
+  let categoryLabels: CategoryLabel[] = [];
   try {
     const client = getClient();
     items = (await client.fetch(TEA_MENUS_QUERY, { language: locale })) ?? [];
+    // 表示名は CMS 側の正本を引く。取得に失敗しても一覧は出す (生値で退避)。
+    categoryLabels = (await client.fetch(CATEGORY_LABELS_QUERY).catch(() => [])) ?? [];
   } catch {
     return <p className="mt-8 text-sm text-muted-foreground lg:mt-12">{t("loadError")}</p>;
   }
@@ -90,10 +96,16 @@ async function TeaMenuList({ params }: { params: SearchParams }) {
   }
 
   // チップは実データの category から組む (Figma の固定文言は焼かない)。
+  // ラベルは Sanity `category.displayName` を正本にする (Boss 裁定 2026-08-08:
+  // 見た目 = コード / 中身 = CMS)。表示名が無いカテゴリは生値のまま出す。
   const categories = [...new Set(items.map((item) => item.category).filter(Boolean))];
+  const labelOf = (value: string) => {
+    const match = categoryLabels.find((c) => c.slug === value || c.title === value);
+    return match?.displayName || value;
+  };
   const chips = [
     { value: "all", label: tl("all") },
-    ...categories.map((c) => ({ value: c, label: c })),
+    ...categories.map((c) => ({ value: c, label: labelOf(c) })),
   ];
 
   const activeCategory =
@@ -115,7 +127,7 @@ async function TeaMenuList({ params }: { params: SearchParams }) {
   };
 
   const kindEntries = categories.map((category) => ({
-    label: category,
+    label: labelOf(category),
     count: items.filter((item) => item.category === category).length,
     href: `/tea-menu?category=${encodeURIComponent(category)}`,
   }));
@@ -139,7 +151,7 @@ async function TeaMenuList({ params }: { params: SearchParams }) {
             }
             imageAlt={item.photo?.alt || item.displayName}
             imageStyle={item.color ? { backgroundColor: item.color } : undefined}
-            overline={item.category}
+            overline={labelOf(item.category)}
             title={item.displayName}
             meta={`${item.variety} · ${item.origin}`}
           />

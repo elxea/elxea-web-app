@@ -99,17 +99,7 @@
       "count": 2
     }
   },
-  "app/[locale]/products/[handle]/page.tsx": {
-    "elxea-tokens/no-raw-colors": {
-      "count": 2
-    }
-  },
   "app/[locale]/search/page.tsx": {
-    "elxea-tokens/no-raw-colors": {
-      "count": 1
-    }
-  },
-  "app/[locale]/subscription/page.tsx": {
     "elxea-tokens/no-raw-colors": {
       "count": 1
     }

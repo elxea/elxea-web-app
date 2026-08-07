@@ -2,7 +2,7 @@
   "$schema_note": "Figma node ⇄ code path 対応表。経済化施策① (Decision Log 39c70c9d064c81079145f69744e7b8f5)。自動化が Figma コンポーネントに対して正しいソースファイルを編集できるようにする lookup index。値の二重管理はしない。SoT=Figma (トークン・デザイン値の正本は Figma。コードは追従側で tokens/base.json が Figma の写し、dist/ は生成物 / Setaka 宣言 2026-08-08。旧「案 B = SoT=Code, Figma=参照」を置換)。本ファイルはどちらの向きにも値を持たない lookup index なので、この方針転換で役割は変わらない。検証は scripts/design-system/validate-design-map.ts (schema + code_path 実在 + --figma で node 実在)。",
   "figma_file_key": "AWLnI0XF07e8rScuxPYPc7",
   "figma_components_page": "5246:3",
-  "updated_at": "2026-08-07T15:12:48Z",
+  "updated_at": "2026-08-07T16:19:06Z",
   "conventions": {
     "entry": "{ figma_node_id, figma_name, code_path, kind, notes }。code_path はリポジトリルート相対。inline 定義部品は「定義/描画を含むファイル」を code_path とする (編集対象がそのファイルのため)。",
     "kind": "ds-component = elxea 固有の DS 部品 / module = Header/Footer 等の大型合成モジュール / shadcn = shadcn/ui プリミティブ。",
@@ -653,6 +653,90 @@
       "code_path": "components/catalog/catalog-list.tsx",
       "kind": "ds-component",
       "notes": "共通リストパターン R2 の MoreRow。高さ 48 のピル。お茶メニュー 8063:2182 も同一。"
+    },
+    {
+      "figma_node_id": "8056:1517",
+      "figma_name": "【R2: 確定版】商品詳細 — PC 1440",
+      "code_path": "app/[locale]/products/[handle]/page.tsx",
+      "kind": "module",
+      "notes": "R2 確定版 PDP。B案トップビュー + 味×香りマトリクス + 章切り構成。SP は 8057:1700。"
+    },
+    {
+      "figma_node_id": "8057:1700",
+      "figma_name": "【R2: 確定版】商品詳細 — SP 375",
+      "code_path": "app/[locale]/products/[handle]/page.tsx",
+      "kind": "module",
+      "notes": "同 PDP の SP。ギャラリーは全幅、購入ブロックはインライン。"
+    },
+    {
+      "figma_node_id": "8056:1558",
+      "figma_name": "スペック帯 (4カラム定義リスト)",
+      "code_path": "components/editorial/section-blocks.tsx",
+      "kind": "ds-component",
+      "notes": "SpecBand。定期便LP 8071:149 / 8071:462 も同一。SP は 2列 (8057:1740)。"
+    },
+    {
+      "figma_node_id": "8056:1577",
+      "figma_name": "味の記憶 3カラム",
+      "code_path": "components/editorial/section-blocks.tsx",
+      "kind": "ds-component",
+      "notes": "TripleColumn。定期便LP 8071:136 / 8071:481 も同一。"
+    },
+    {
+      "figma_node_id": "8056:1670",
+      "figma_name": "フルスペック 台帳 2カラム",
+      "code_path": "components/editorial/section-blocks.tsx",
+      "kind": "ds-component",
+      "notes": "Ledger。定期便LP 12ヶ月 8072:119 も同一。SP は 1カラム (8057:1804)。"
+    },
+    {
+      "figma_node_id": "8056:1717",
+      "figma_name": "よくある質問 (アコーディオンなし)",
+      "code_path": "components/editorial/section-blocks.tsx",
+      "kind": "ds-component",
+      "notes": "OpenFaqList。定期便LP 8071:496 も同一。全行開いたまま。"
+    },
+    {
+      "figma_node_id": "8056:1594",
+      "figma_name": "淹れ方 3ステップ",
+      "code_path": "components/editorial/section-blocks.tsx",
+      "kind": "ds-component",
+      "notes": "StepCards。定期便LP HowItWorks 8071:164 は 4 列版。"
+    },
+    {
+      "figma_node_id": "8056:1574",
+      "figma_name": "セクション見出し (キッカー + 日本語見出し)",
+      "code_path": "components/editorial/section-blocks.tsx",
+      "kind": "ds-component",
+      "notes": "SectionHead / SectionBody / SectionNote。両ページ共通。"
+    },
+    {
+      "figma_node_id": "8056:1639",
+      "figma_name": "味×香りマトリクス",
+      "code_path": "components/product/taste-map.tsx",
+      "kind": "ds-component",
+      "notes": "TasteMap。点は比率で持つ。SP は 8058:1803。スコアバーには置き換えない。"
+    },
+    {
+      "figma_node_id": "8071:2",
+      "figma_name": "【R2: 確定版】定期便LP — PC 1440",
+      "code_path": "app/[locale]/subscription/page.tsx",
+      "kind": "module",
+      "notes": "購入導線は最下部 1 箇所・CTA 1 個・会員ランク要素なし。SP は 8073:2。"
+    },
+    {
+      "figma_node_id": "8073:2",
+      "figma_name": "【R2: 確定版】定期便LP — SP 375",
+      "code_path": "app/[locale]/subscription/page.tsx",
+      "kind": "module",
+      "notes": "同 LP の SP。"
+    },
+    {
+      "figma_node_id": "8071:514",
+      "figma_name": "プラン選択 + 購入導線 (最下部)",
+      "code_path": "app/[locale]/subscription/page.tsx",
+      "kind": "module",
+      "notes": "VariantSelector + PlanOption + CTA 1 個。ページ内アンカー #plan。"
     }
   ],
   "unmapped_figma_nodes": [
