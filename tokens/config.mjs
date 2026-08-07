@@ -127,11 +127,11 @@ StyleDictionary.registerFormat({
 
     // CJK-specific typography overrides
     // Heading fonts: same as base (aktiv-grotesk-extended, dnp-shuei-gothic-gin-std)
-    // Body fonts: same as base (aktiv-grotesk, kozuka-gothic-pro)
+    // Body fonts: same as base (aktiv-grotesk, dnp-shuei-gothic-gin-std)
     // CJK needs wider line-height for readability
 
     const headingFamily = "aktiv-grotesk-extended, dnp-shuei-gothic-gin-std, sans-serif";
-    const bodyFamily = "aktiv-grotesk, kozuka-gothic-pro, sans-serif";
+    const bodyFamily = "aktiv-grotesk, dnp-shuei-gothic-gin-std, sans-serif";
     const monoFamily = "'SF Mono', Menlo, monospace";
 
     const cjkStyles = [

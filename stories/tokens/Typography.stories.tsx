@@ -9,7 +9,7 @@ const typographyScale = [
     lineHeight: "2.5rem / 40px",
     weight: 700,
     font: "var(--typography-family-heading)",
-    fontLabel: "termina / ryo-gothic-plusn",
+    fontLabel: "aktiv-grotesk-extended / dnp-shuei-gothic-gin-std",
   },
   {
     tag: "h2",
@@ -18,7 +18,7 @@ const typographyScale = [
     lineHeight: "2.25rem / 36px",
     weight: 700,
     font: "var(--typography-family-heading)",
-    fontLabel: "termina / ryo-gothic-plusn",
+    fontLabel: "aktiv-grotesk-extended / dnp-shuei-gothic-gin-std",
   },
   {
     tag: "h3",
@@ -27,7 +27,7 @@ const typographyScale = [
     lineHeight: "2rem / 32px",
     weight: 600,
     font: "var(--typography-family-heading)",
-    fontLabel: "termina / ryo-gothic-plusn",
+    fontLabel: "aktiv-grotesk-extended / dnp-shuei-gothic-gin-std",
   },
   {
     tag: "h4",
@@ -36,7 +36,7 @@ const typographyScale = [
     lineHeight: "1.75rem / 28px",
     weight: 600,
     font: "var(--typography-family-heading)",
-    fontLabel: "termina / ryo-gothic-plusn",
+    fontLabel: "aktiv-grotesk-extended / dnp-shuei-gothic-gin-std",
   },
   {
     tag: "h5",
@@ -45,7 +45,7 @@ const typographyScale = [
     lineHeight: "1.75rem / 28px",
     weight: 600,
     font: "var(--typography-family-heading)",
-    fontLabel: "termina / ryo-gothic-plusn",
+    fontLabel: "aktiv-grotesk-extended / dnp-shuei-gothic-gin-std",
   },
   {
     tag: "h6",
@@ -54,7 +54,7 @@ const typographyScale = [
     lineHeight: "1.5rem / 24px",
     weight: 600,
     font: "var(--typography-family-heading)",
-    fontLabel: "termina / ryo-gothic-plusn",
+    fontLabel: "aktiv-grotesk-extended / dnp-shuei-gothic-gin-std",
   },
   {
     tag: "p",
@@ -63,7 +63,7 @@ const typographyScale = [
     lineHeight: "1.5rem / 24px",
     weight: 400,
     font: "var(--typography-family-sans)",
-    fontLabel: "neue-haas-grotesk-text / kozuka-gothic-pro",
+    fontLabel: "aktiv-grotesk / dnp-shuei-gothic-gin-std",
   },
   {
     tag: "p",
@@ -72,7 +72,7 @@ const typographyScale = [
     lineHeight: "1.75rem / 28px",
     weight: 400,
     font: "var(--typography-family-sans)",
-    fontLabel: "neue-haas-grotesk-text / kozuka-gothic-pro",
+    fontLabel: "aktiv-grotesk / dnp-shuei-gothic-gin-std",
     className: "text-lg",
   },
   {
@@ -82,7 +82,7 @@ const typographyScale = [
     lineHeight: "1.25rem / 20px",
     weight: 400,
     font: "var(--typography-family-sans)",
-    fontLabel: "neue-haas-grotesk-text / kozuka-gothic-pro",
+    fontLabel: "aktiv-grotesk / dnp-shuei-gothic-gin-std",
   },
   {
     tag: "p",
@@ -91,7 +91,7 @@ const typographyScale = [
     lineHeight: "1rem / 16px",
     weight: 400,
     font: "var(--typography-family-sans)",
-    fontLabel: "neue-haas-grotesk-text / kozuka-gothic-pro",
+    fontLabel: "aktiv-grotesk / dnp-shuei-gothic-gin-std",
     className: "text-xs",
   },
 ];

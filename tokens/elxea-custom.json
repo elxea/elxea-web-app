@@ -103,9 +103,8 @@
 
     "family": {
       "$type": "fontFamily",
-      "sans":      { "$value": "aktiv-grotesk, kozuka-gothic-pro, sans-serif", "$description": "Body (EN: aktiv-grotesk, JP: kozuka-gothic-pro)" },
+      "sans":      { "$value": "aktiv-grotesk, dnp-shuei-gothic-gin-std, sans-serif", "$description": "Body (EN: aktiv-grotesk, JP: dnp-shuei-gothic-gin-std / 秀英角ゴシック銀)" },
       "heading":   { "$value": "aktiv-grotesk-extended, dnp-shuei-gothic-gin-std, sans-serif", "$description": "Headings (EN: aktiv-grotesk-extended, JP: dnp-shuei-gothic-gin)" },
-      "secondary": { "$value": "neue-haas-grotesk-text, ryo-gothic-plusn, sans-serif" },
       "special":   { "$value": "dnp-shuei-ymincho-std, Georgia, serif", "$description": "JP mincho for editorial / Neo Classic moments" },
       "mono":      { "$value": "SF Mono, Menlo, monospace" }
     },
