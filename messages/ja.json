@@ -148,12 +148,27 @@
     "relatedArticle": "関連記事"
   },
   "playlist": {
-    "title": "Sound from Nature",
+    "artistsHead": "この日に選んだ、その音の人たち",
+    "artistsNote": "紹介文と写真は、各アーティストのプロフィールから引いています。",
+    "curatedBy": "選盤",
     "description": "湯気の向こうに流れる、自然の音。お茶の時間に寄り添う音楽を。",
     "empty": "プレイリストを準備しています。もう少しお待ちください。",
+    "featured": "特集",
+    "heading": "プレイリスト",
+    "lead": "茶の時間に流す音楽。淹れるあいだ、待つあいだ、飲むあいだ。",
+    "listen": "配信で聴く",
     "loadError": "プレイリストを読み込めませんでした。時間をおいて、もう一度お試しください。",
+    "minutes": "MIN",
+    "minutesShort": "分",
+    "otherHead": "ほかの月のプレイリスト",
+    "popular": "よく聴かれている",
     "recorded": "録音日",
-    "listen": "配信で聴く"
+    "scenes": "シーン",
+    "teasHead": "この時間に合わせるお茶",
+    "teasNote": "合わせ方の提案です。好みに合わせて選んでください。",
+    "title": "Sound from Nature",
+    "tracks": "TRACKS",
+    "tracksHead": "収録曲をたどる"
   },
   "elxeaJournal": {
     "title": "elxea Journal",

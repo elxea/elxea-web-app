@@ -247,12 +247,31 @@ export const PLAYLIST_BY_SLUG_QUERY = groq`
     albumImage,
     description,
     body,
+    curatorQuote,
+    curatorQuoteBy,
+    artists[]->{_id, name, slug, image, role, bio},
+    tracks[]{title, note, minutes},
+    dataBand[]{label, value},
+    pairedTeas,
     spotifyUrl,
     soundcloudUrl,
     youtubeUrl,
     dateRecorded,
     featured,
     colors
+  }
+`;
+
+// ほかの月のプレイリスト (Figma 8089:4605)。表示中の 1 件は除く。
+export const OTHER_PLAYLISTS_QUERY = groq`
+  *[_type == "playlist" && slug.current != $slug] | order(dateRecorded desc) [0...3] {
+    _id,
+    title,
+    slug,
+    category,
+    albumImage,
+    dateRecorded,
+    artist->{name}
   }
 `;
 

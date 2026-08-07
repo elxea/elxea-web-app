@@ -38,6 +38,12 @@ type ArticleCardProps = {
   locale: string;
   memberOnlyLabel: string;
   className?: string;
+  /**
+   * 詳細ページと絞り込みリンクの基点。既定は `/journal` なのでジャーナルは
+   * 従来どおり。プレイリスト一覧 (Figma 8085:4327 も同じ ArticleCard を使う)
+   * からは `/playlists` を渡して同じカードを共有する。
+   */
+  hrefBase?: string;
 };
 
 export function ArticleCard({
@@ -45,6 +51,7 @@ export function ArticleCard({
   locale,
   memberOnlyLabel,
   className,
+  hrefBase = "/journal",
 }: ArticleCardProps) {
   const image = article.thumbnail ?? article.mainImage;
   // Preview-only: articles without imagery fall back to a stable local
@@ -57,19 +64,19 @@ export function ArticleCard({
 
   return (
     <div data-slot="article-card" className={cn("group flex flex-col gap-4", className)}>
-      <Link href={`/journal/${article.slug.current}`} className="block">
+      <Link href={`${hrefBase}/${article.slug.current}`} className="block">
         <ImageCard image={resolvedImage} alt={image?.alt || article.title} hover />
       </Link>
       <div className="space-y-1.5">
         {article.category && (
           <Link
-            href={`/journal?category=${article.category.slug.current}`}
+            href={`${hrefBase}?category=${article.category.slug.current}`}
             className={cn(captionClass, "block text-muted-foreground hover:text-foreground")}
           >
             {article.category.title}
           </Link>
         )}
-        <Link href={`/journal/${article.slug.current}`} className="block">
+        <Link href={`${hrefBase}/${article.slug.current}`} className="block">
           <h2
             data-slot="article-card-title"
             className={cn(bodySmClass, "text-foreground underline-offset-4 group-hover:underline")}

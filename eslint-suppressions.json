@@ -69,16 +69,6 @@
       "count": 1
     }
   },
-  "app/[locale]/playlists/[slug]/page.tsx": {
-    "elxea-tokens/no-raw-colors": {
-      "count": 2
-    }
-  },
-  "app/[locale]/playlists/page.tsx": {
-    "elxea-tokens/no-raw-colors": {
-      "count": 2
-    }
-  },
   "app/[locale]/search/page.tsx": {
     "elxea-tokens/no-raw-colors": {
       "count": 1

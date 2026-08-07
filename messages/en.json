@@ -148,12 +148,27 @@
     "relatedArticle": "Related Article"
   },
   "playlist": {
-    "title": "Sound from Nature",
+    "artistsHead": "The artists on this playlist",
+    "artistsNote": "Photos and descriptions come from each artist's profile.",
+    "curatedBy": "Curated by",
     "description": "Playlists inspired by the sounds of nature",
     "empty": "No playlists yet.",
+    "featured": "Featured",
+    "heading": "Playlists",
+    "lead": "Music for tea time — while you brew, while you wait, while you drink.",
+    "listen": "Listen",
     "loadError": "Could not load playlists.",
+    "minutes": "MIN",
+    "minutesShort": "min",
+    "otherHead": "Other playlists",
+    "popular": "Most played",
     "recorded": "Recorded",
-    "listen": "Listen"
+    "scenes": "Scenes",
+    "teasHead": "Teas for this playlist",
+    "teasNote": "A suggestion, not a rule — choose what you like.",
+    "title": "Sound from Nature",
+    "tracks": "TRACKS",
+    "tracksHead": "Track by track"
   },
   "elxeaJournal": {
     "title": "elxea Journal",
