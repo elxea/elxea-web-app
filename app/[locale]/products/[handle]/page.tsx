@@ -123,11 +123,23 @@ export default async function ProductPage({
     related = [];
   }
 
+  /**
+   * スペック帯 — Figma 確定版 8056:1558「スペック帯 (4カラム定義リスト)」の
+   * ラベル 品種 / 産地 / 摘採 / 仕上げ が正。4 列固定なので値が無い列も
+   * ラベルを残し `—` にフォールバックする (台帳と違い列を落とすと崩れるため)。
+   *
+   * 「仕上げ」は Figma のサンプル値が「浅蒸し／中火の火入れ」= 蒸し度・火入れの
+   * 加工仕様であり、茶種 (`teaCategory` = Shopify `custom._type-of-tea`, 実データ
+   * 「緑茶」) とは別物。従来は teaCategory を当てていたため (a) ラベルと意味が
+   * 食い違い (b) フルスペック台帳の「茶種」行と同値の二重表示になっていた。
+   * 加工仕様に対応する metafield は `lib/shopify/index.ts` のマップに存在しない
+   * ため、実データが増えるまで `—` フォールバック固定とする。
+   */
   const specItems = [
     { term: t("teaVariety"), value: mf.variety || td("specVarietyFallback") },
     { term: td("specOrigin"), value: product.vendor || td("specOriginFallback") },
     { term: td("specHarvest"), value: mf.season || td("specHarvestFallback") },
-    { term: td("specFinish"), value: mf.teaCategory || td("specFinishFallback") },
+    { term: td("specFinish"), value: td("specFinishFallback") },
   ];
 
   const tasteItems = [
@@ -145,29 +157,31 @@ export default async function ProductPage({
   /**
    * フルスペック台帳 — 旧 `ProductFeatures` の「お茶の詳細」を吸収した唯一の SoT。
    *
-   * 値の出所は 3 種類しかない:
-   *  1. Shopify metafield / product フィールドの実値 (未設定は `—` フォールバック)
-   *  2. 商品によらないブランド共通の定数 (保存 / 賞味期限) — メッセージ定数のまま
-   *  3. Figma 確定版に行はあるが対応する metafield が存在しない項目 — 常に `—`
+   * Setaka 裁定 (2026-08-08)「データのある行だけ表示」に従い、値の出所を 2 種類に
+   * 絞る:
+   *  1. Shopify metafield / product フィールドの実値 — **値が無い行は出さない**
+   *  2. 商品によらないブランド共通の定数 (保存 / 賞味期限) — 常時表示
    *
-   * 行のラベルは Figma 確定版 (8056:1517) の台帳を維持したうえで、metafield 実値を
-   * 持つ行 (品種 / 産地 / 摘採 / 味わい / 香り / メニュー番号) を先頭側に足している。
-   * 商品固有の値をハードコードした定型文は置かない。
+   * 従来あった「Figma に行はあるが対応 metafield が存在しない」項目
+   * (栽培 / 標高 / 土壌 / 火入れ / 粉砕) は常に `—` にしかならないため行定義ごと
+   * 削除した。商品固有の値をハードコードした定型文は置かない。
    */
-  const specDash = td("specVarietyFallback");
   const ledgerRows = [
-    { term: td("specSheet1Term"), value: mf.teaCategory || specDash },
-    { term: t("teaVariety"), value: mf.variety || specDash },
-    { term: td("specOrigin"), value: product.vendor || specDash },
-    { term: td("specHarvest"), value: mf.season || specDash },
-    { term: t("teaTaste"), value: mf.taste || specDash },
-    { term: t("teaAroma"), value: mf.aroma || specDash },
-    { term: t("menuNumber"), value: mf.menuNumber || specDash },
-    { term: td("specSheet2Term"), value: specDash },
-    { term: td("specSheet3Term"), value: specDash },
-    { term: td("specSheet4Term"), value: specDash },
-    { term: td("specSheet5Term"), value: specDash },
-    { term: td("specSheet6Term"), value: specDash },
+    ...(
+      [
+        { term: td("specSheet1Term"), value: mf.teaCategory },
+        { term: t("teaVariety"), value: mf.variety },
+        { term: td("specOrigin"), value: product.vendor },
+        { term: td("specHarvest"), value: mf.season },
+        { term: t("teaTaste"), value: mf.taste },
+        { term: t("teaAroma"), value: mf.aroma },
+        { term: t("menuNumber"), value: mf.menuNumber },
+      ] as const
+    )
+      .filter((row): row is { term: string; value: string } =>
+        Boolean(row.value && row.value.trim())
+      )
+      .map((row) => ({ term: row.term, value: row.value })),
     { term: td("specSheet7Term"), value: td("specSheet7Value") },
     { term: td("specSheet8Term"), value: td("specSheet8Value") },
   ];

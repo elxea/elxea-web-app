@@ -6,16 +6,31 @@ import { Link, usePathname } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
+  SheetClose,
   SheetContent,
-  SheetHeader,
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { Separator } from "@/components/ui/separator";
 import { useCart } from "@/components/cart/cart-context";
+import { cn } from "@/lib/utils";
 import { AudioToggle } from "@/components/audio/audio-toggle";
 import { Logo } from "./logo";
-import { Menu } from "lucide-react";
+import { ChevronRight, Menu, X } from "lucide-react";
+
+/**
+ * SP メニュー展開 UI のトークン束縛 — Figma SoT「開閉UI / R1: SPメニュー展開 — SP 375」
+ * (file AWLnI0XF07e8rScuxPYPc7 / node 7967:1326)。生 px は書かず、すべて
+ * `--typography-style-*` / spacing utility / brand color token 経由で表現する。
+ */
+// Nav 行ラベル: Figma 20px → h3 プリセット (1.25rem / 400)
+const SP_NAV_LABEL =
+  "[font:var(--typography-style-h3)] [letter-spacing:var(--typography-style-h3-tracking)]";
+// 検索 (Input Underline) ラベル: Figma 24px → h2 プリセット (1.5rem / 400)
+const SP_SEARCH_LABEL =
+  "[font:var(--typography-style-h2)] [letter-spacing:var(--typography-style-h2-tracking)]";
+// アカウント導線: Figma 14px → body-sm プリセット (0.875rem / 400)
+const SP_ACCOUNT_LABEL =
+  "[font:var(--typography-style-body-sm)] [letter-spacing:var(--typography-style-body-sm-tracking)]";
 
 function subscribeToCookies(callback: () => void) {
   // Re-check cookies on storage/visibilitychange events
@@ -88,11 +103,11 @@ export function Header({ navItems: externalNavItems }: HeaderProps) {
         従来コードはロゴ中央 + nav 下段の 2 段 IA で、ロゴ左端実測 722px と
         Figma 64px が乖離していた。本改修で 1 段 IA に是正する。
 
-        意図的な差分 (要 Setaka 確認): SP のカートリンク。Figma SP はロゴ +
-        MenuTrigger のみだが、`e2e/mobile.spec.ts` の
-        "cart link is always visible on mobile" が既存のプロダクト判断として
-        SP 常時表示を要求しているため残す。並び順のみ Figma に合わせ
+        意図的な差分 (Setaka 裁定 2026-08-08「SP ヘッダーのカートは常時表示」で確定):
+        SP のカートリンク。Figma SP (7970:42126) はロゴ + MenuTrigger のみだが、
+        カートは SP でも常時表示する。並び順のみ Figma に合わせ
         (ロゴ左 / MenuTrigger 右端)、カートはその直前に置く。
+        回帰テストは `e2e/mobile.spec.ts` の "cart link is always visible on mobile"。
       */}
       <div className="page-container">
         <div className="flex items-center h-(--component-header-height-mobile) md:h-(--component-header-height-desktop)">
@@ -193,89 +208,107 @@ export function Header({ navItems: externalNavItems }: HeaderProps) {
                     <Menu className="size-5" />
                   </Button>
                 </SheetTrigger>
-                <SheetContent side="left" className="w-72">
-                  <SheetHeader>
-                    <SheetTitle>
+                {/*
+                  SP メニュー展開 — Figma SoT「開閉UI / R1: SPメニュー展開 — SP 375」
+                  (7967:1326)。画面全幅のオーバーレイで 4 ブロック構成:
+                    1. SP Header (展開時) 7967:1327  h=56 / p-16 / Logo 左・✕ 右端
+                    2. Nav (展開メニュー)   7967:1336  px-16 py-24 / 行 py-16 + 罫線 stone
+                    3. 検索 (Input Underline) 7967:42098 px-16 py-24 / 下線 2px
+                    4. アカウント導線      7967:42101 px-16 pt-24 pb-32 / gap-24
+
+                  Figma との意図的な差分:
+                  - AudioToggle: Figma フレームに無いが SP からの唯一の導線のため
+                    アカウント導線の末尾に残す (機能欠落を避ける)。
+                  - Nav 項目: Figma は 6 件 (About を含む) のサンプルだが、実装は
+                    ルートが実在する navItems を SoT とする (IA は別判断)。
+                  - 「タップで閉じる: …」注記は Figma 上の仕様注記であり UI コピーでは
+                    ない。閉じる手段 (外側タップ / ✕ / Esc) は Radix Dialog が担保する。
+                */}
+                <SheetContent
+                  side="right"
+                  showCloseButton={false}
+                  className="w-full max-w-full gap-0 overflow-y-auto border-l-0 p-0 sm:max-w-full"
+                >
+                  {/* 1. SP Header (展開時) — p-4 (16px) で h=16+24+16=56 */}
+                  <div className="flex items-center justify-between p-4">
+                    <SheetTitle className="flex items-center">
                       <Logo size="sm" />
+                      <span className="sr-only">Menu</span>
                     </SheetTitle>
-                  </SheetHeader>
-                  <nav className="flex flex-col gap-1 mt-6">
-                    {navItems.map((item) => (
-                      <Button
-                        key={item.href}
-                        variant="ghost"
-                        className={`justify-start ${
-                          pathname.startsWith(item.href)
-                            ? "text-foreground font-medium"
-                            : "text-muted-foreground"
-                        }`}
-                        asChild
-                      >
-                        <Link
-                          href={item.href}
-                          onClick={() => setMobileOpen(false)}
-                        >
-                          {item.label}
-                        </Link>
-                      </Button>
-                    ))}
-                    <Separator className="my-2" />
-                    <div className="px-4 py-2 sm:hidden">
-                      <AudioToggle className="items-start" />
-                    </div>
-                    <Separator className="my-2 sm:hidden" />
-                    <Button
-                      variant="ghost"
-                      className="justify-start text-muted-foreground sm:hidden"
-                      asChild
+                    <SheetClose
+                      aria-label="Close"
+                      className="text-brand-graphite transition-opacity hover:opacity-70 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-hidden"
                     >
-                      <Link href="/search" onClick={() => setMobileOpen(false)}>
-                        {t("search")}
+                      <X className="size-6" />
+                    </SheetClose>
+                  </div>
+
+                  {/* 2. Nav (展開メニュー) */}
+                  <nav className="flex flex-col px-4 py-6">
+                    {navItems.map((item) => (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        onClick={() => setMobileOpen(false)}
+                        className={cn(
+                          "flex items-center justify-between border-b border-brand-stone py-4 text-brand-graphite",
+                          SP_NAV_LABEL,
+                          pathname.startsWith(item.href) && "font-medium",
+                        )}
+                      >
+                        <span>{item.label}</span>
+                        <ChevronRight className="size-4 shrink-0" />
                       </Link>
-                    </Button>
+                    ))}
+                  </nav>
+
+                  {/* 3. 検索 (Input Underline) — 下線 2px / ラベル中央 */}
+                  <div className="px-4 py-6">
+                    <Link
+                      href="/search"
+                      onClick={() => setMobileOpen(false)}
+                      className={cn(
+                        "flex w-full flex-col items-center border-b-2 border-border pt-2 pb-4 text-center text-muted-foreground",
+                        SP_SEARCH_LABEL,
+                      )}
+                    >
+                      {t("search")}
+                    </Link>
+                  </div>
+
+                  {/* 4. アカウント導線 */}
+                  <div
+                    className={cn(
+                      "flex flex-wrap items-center gap-6 px-4 pt-6 pb-8 text-brand-graphite",
+                      SP_ACCOUNT_LABEL,
+                    )}
+                  >
                     {isLoggedIn ? (
                       <>
-                        <Button
-                          variant="ghost"
-                          className="justify-start text-muted-foreground sm:hidden"
-                          asChild
-                        >
-                          <Link
-                            href="/account"
-                            onClick={() => setMobileOpen(false)}
-                          >
-                            {t("account")}
-                          </Link>
-                        </Button>
-                        {/* P5-fix: Logout link accessible to all logged-in users including LINE-only */}
-                        <Button
-                          variant="ghost"
-                          className="justify-start text-muted-foreground sm:hidden"
-                          asChild
-                        >
-                          <a
-                            href={`/api/auth/logout?locale=${locale}`}
-                            onClick={() => setMobileOpen(false)}
-                          >
-                            {t("logout")}
-                          </a>
-                        </Button>
-                      </>
-                    ) : (
-                      <Button
-                        variant="ghost"
-                        className="justify-start text-muted-foreground sm:hidden"
-                        asChild
-                      >
                         <Link
-                          href="/login"
+                          href="/account"
                           onClick={() => setMobileOpen(false)}
                         >
-                          {t("login")}
+                          {t("account")}
                         </Link>
-                      </Button>
+                        {/* P5-fix: Logout link accessible to all logged-in users including LINE-only */}
+                        <a
+                          href={`/api/auth/logout?locale=${locale}`}
+                          onClick={() => setMobileOpen(false)}
+                        >
+                          {t("logout")}
+                        </a>
+                      </>
+                    ) : (
+                      <Link href="/login" onClick={() => setMobileOpen(false)}>
+                        {t("login")}
+                      </Link>
                     )}
-                  </nav>
+                    <Link href="/cart" onClick={() => setMobileOpen(false)}>
+                      {t("cart")} ({cartCount})
+                    </Link>
+                    <AudioToggle />
+                  </div>
                 </SheetContent>
               </Sheet>
             </div>

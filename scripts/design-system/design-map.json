@@ -737,6 +737,13 @@
       "code_path": "app/[locale]/subscription/page.tsx",
       "kind": "module",
       "notes": "VariantSelector + PlanOption + CTA 1 個。ページ内アンカー #plan。"
+    },
+    {
+      "figma_node_id": "7967:1326",
+      "figma_name": "開閉UI / R1: SPメニュー展開 — SP 375",
+      "code_path": "components/layout/header.tsx",
+      "kind": "module",
+      "notes": "SP ハンバーガー展開時の全幅オーバーレイ (Sheet)。ヘッダー56 / Nav行56 / 検索(下線2px) / アカウント導線の4ブロック。AudioToggle は Figma 非掲載だが機能維持のため末尾に残す (意図的差分)。"
     }
   ],
   "unmapped_figma_nodes": [
