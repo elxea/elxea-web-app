@@ -40,7 +40,7 @@ import { cn } from "@/lib/utils";
  * - lead              明朝 (秀英横太明朝 = typography.family.special)
  * - 写真の裁ち落とし  PC 720 (= 640 + 40 x2) / SP 全幅    → `-mx-4 lg:-mx-10`
  *                     アスペクト SP 3/2 (375x250) / PC 5/3 (720x432)
- * - H2                前 56 / 後 20                      → `mt-14 mb-5`
+ * - H2/H3            前 56 / 後 20                      → `mt-14` + 直後要素 `mt-5`
  * - 商品カード        thumb PC 160 / SP 96 + gap 24/16
  * - 関連記事          行 h72 / thumb 56 / gap 16
  * - NextRead          pill h48 中央
@@ -264,9 +264,14 @@ export default async function ArticlePage({
               {/* 本文の縦リズム: `prose-custom` 自身が持つ段落マージン (実測
                   74px) は Figma の 24 と食い違うため important 付きで上書きする。
                   下マージンを 0 に倒し、間隔は隣接セレクタの上マージンだけで
-                  作る (マージン相殺の影響を受けないようにするため)。 */}
+                  作る (マージン相殺の影響を受けないようにするため)。
+                  節見出しの「後 20」も同じ原則で見出し側の mb ではなく直後要素の
+                  mt で作る (mb 20 と段落 mt 24 が相殺すると大きい 24 が勝ち、
+                  実レンダリングが Figma 実測 20 とずれるため)。
+                  `.prose-custom h2 + *` は型セレクタを含み `.prose-custom > * + *`
+                  より詳細度が高いので、隣接段落の mt-6 を確実に上書きする。 */}
               {article.body && (
-                <div className="prose-custom mt-6 [&>*]:mb-0! [&>*+*]:mt-6! [&_h2]:mt-14! [&_h2]:mb-5! [&_h3]:mt-14! [&_h3]:mb-5!">
+                <div className="prose-custom mt-6 [&>*]:mb-0! [&>*+*]:mt-6! [&_h2]:mt-14! [&_h2]:mb-0! [&_h3]:mt-14! [&_h3]:mb-0! [&_h2+*]:mt-5! [&_h3+*]:mt-5!">
                   <PortableText value={article.body} />
                 </div>
               )}
