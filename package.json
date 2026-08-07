@@ -7,6 +7,8 @@
     "build": "node sd.config.mjs && next build",
     "start": "next start",
     "lint": "eslint . --max-warnings 0",
+    "typecheck:clean": "node -e \"const fs=require('node:fs');for(const p of ['.next/types','.next/dev/types'])fs.rmSync(p,{recursive:true,force:true});fs.rmSync('tsconfig.tsbuildinfo',{force:true})\"",
+    "typecheck": "pnpm typecheck:clean && next typegen && tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",

@@ -4,16 +4,37 @@ elxea EC サイト（Next.js ヘッドレスコマース）のプロジェクト
 
 エージェント定義（責務・権限・Devlog・制約）は `elxea-developer/CLAUDE.md` を参照。
 
-## Git ルール（厳守）
-- 開発作業は developer ブランチで行う
-- main への直接 push は禁止
-- developer → main のマージは CI 全 PASS 後のみ
-- コミットメッセージは conventional commits に従う（feat:, fix:, ci:, test:, docs:, chore:）
+## Gitルール（厳守）
+
+- **作業はmainから切った短命トピックブランチで行う**（`feat/*` / `fix/*` / `chore/*` / `design/*` / `docs/*`）。作業前に必ず `git checkout main && git pull` してから切る
+- **長命ブランチに居座らない**。1タスク = 1ブランチで、マージされたら捨てる。`developer` ブランチは歴史的遺物であり現行の作業先ではない（2026-08-07時点でmainの履歴に含まれていない）
+- mainへの直接pushは禁止。マージはPR経由でCI全PASS後のみ
+- **push前に `pnpm lint` / `pnpm typecheck` / `pnpm test` が通ること**。これはpre-commitのpre-pushフックで機械強制される（下記「ローカル品質ゲート」）
+- コミットメッセージはconventional commitsに従う（feat:, fix:, ci:, test:, docs:, chore:）
+
+### ローカル品質ゲート（pre-push・必須）
+
+本リポはGitHub / Vercel無料プランのためbranch protection（required status checks）を張れない。壊れたコードがmainに入るのを止める唯一の機械強制がローカルのpre-pushフックなので、**clone直後に必ず入れる**。
+
+```bash
+pre-commit install --hook-type pre-commit --hook-type pre-push
+```
+
+- pre-commit stage: gitleaks / shellcheck / 空白・改行・JSON・YAML整合（高速）
+- **pre-push stage: `pnpm lint` + `pnpm typecheck` + `pnpm test`（これが落ちるとpushできない）**
+- 定義は `.pre-commit-config.yaml`。手動実行は `pre-commit run --hook-stage pre-push -a`
+- `--no-verify` での回避は禁止
+
+### 使い捨てスクリプトの置き場
+
+計測・スクショ採取などの一回きりの `.mjs` / `.ts` は**リポジトリ直下に置かない**。`scripts/scratch/`（gitignore対象・ESLint対象外）に置く。直下に散らかすと、次のブランチ切替時に「消していいのか分からない未追跡ファイル」として残り、作業ツリーが動かせなくなる（2026-08-07に実際に13本が滞留した）。
 
 ## アーキテクチャ
 
-- Runtime: Next.js 15 + React 19 + TypeScript（App Router）
-- Styling: Tailwind CSS v4.2 + shadcn/ui（new-york）+ Radix UI + CVA
+実測値（2026-08-07 / `node_modules` の実バージョン）。バージョンを書き換えるときは推測せず実測すること。
+
+- Runtime: Next.js 16.2.1 + React 19.2.4 + TypeScript 5.9.3（App Router）
+- Styling: Tailwind CSS v4.2.1 + shadcn/ui（new-york）+ Radix UI + CVA
 - CMS: Sanity.io（コンテンツ）+ Notion（タスク・運用）
 - EC: Shopify Storefront API（ヘッドレス）
 - Auth/DB: Firebase（Firestore + Auth）
@@ -39,29 +60,41 @@ elxea EC サイト（Next.js ヘッドレスコマース）のプロジェクト
 - dogfood Spec: https://www.notion.so/36970c9d064c8166b31ef4be3b60a8c5
 - Decision Log: https://www.notion.so/36970c9d064c818ab8e9f9a16b37e2a1
 
-### Design Token アーキテクチャ
+### Design Tokenアーキテクチャ
 
-**Tailwind v4 `@theme`（`app/globals.css`）が唯一のトークン定義場所。**
+**トークンの正本はFigma。コードはそれに追従する**（Setaka宣言2026-08-08）。値がどこから来てどこへ流れるかを、上流から順に固定する。
 
-3層モデル（W3C Design Tokens 標準準拠）:
+| 序列 | 実体 | 役割 | 編集してよいか |
+|---|---|---|---|
+| 1. 正本 | Figma Variables（ファイルキー `AWLnI0XF07e8rScuxPYPc7`） | トークン値の唯一の正解 | Figma上で編集する |
+| 2. 写し | `tokens/base.json`（+ `tokens/overrides/cjk.json`） | Figma値をコードへ写したW3C DTCG形式のソース | Figmaに合わせて編集する。**コード側でトークンを足す/変えるならここ** |
+| 3. 生成物 | `dist/tokens.css` / `dist/tokens-cjk.css` | Style Dictionaryの出力。`@theme { ... }` / `:lang(ja) { ... }` | **手で編集しない**（gitignore対象・`pnpm build:tokens` で毎回再生成される） |
+| 4. 消費 | `app/globals.css` | 3を `@import` して読み込むだけ。`@theme` ブロック自体はここには無い | トークン定義は書かない |
+
+流れ: **Figma → `tokens/base.json` → `pnpm build:tokens`（`sd.config.mjs`）→ `dist/tokens.css` → `app/globals.css` が `@import`**。
+`pnpm build` は `node sd.config.mjs && next build` なので、ビルドすれば必ず再生成される。
+
+3層モデル（W3C Design Tokens標準準拠）:
 
 | 層 | 例 | 定義場所 |
 |---|---|---|
-| Core（生の値） | `oklch(0.205 0 0)` | `@theme` 内の CSS 変数 |
-| Semantic（用途別） | `--color-primary`, `--color-muted` | `@theme` 内の CSS 変数 |
-| Component（適用値） | CVA variants 内の Tailwind クラス | 各 `components/ui/*.tsx` |
+| Core（生の値） | `oklch(0.205 0 0)` | `tokens/base.json` → 生成された `@theme` 内のCSS変数 |
+| Semantic（用途別） | `--color-primary`, `--color-muted` | 同上（`color.semantic.*` は生成時に `semantic` が落ちて `--color-*` になる） |
+| Component（適用値） | CVA variants内のTailwindクラス | 各 `components/ui/*.tsx` |
 
 ルール:
-- **生の値（HEX/OKLCH/px）をコンポーネント内に直書き禁止** → 必ず `@theme` トークン経由
-- **`bg-[#xxx]` 等の arbitrary value は原則禁止** → トークンが足りなければ `@theme` に追加してから使う
-- 色は OKLCH カラースペースで統一（知覚的均一性）
-- フォントは `--font-sans`（本文）/ `--font-heading`（見出し）の2系統。追加する場合は `@theme` に定義
+- **生の値（HEX/OKLCH/px）をコンポーネント内に直書き禁止** → 必ずトークン経由。ESLint `elxea-tokens/no-raw-colors` がerrorで機械強制（既存違反は `eslint-suppressions.json` で凍結・新規は通らない）
+- **`bg-[#xxx]` 等のarbitrary valueは原則禁止** → トークンが足りなければ `tokens/base.json` に追加 → `pnpm build:tokens` してから使う
+- 色はOKLCHカラースペースで統一（知覚的均一性）
+- フォントは `--typography-family-sans`（本文）/ `--typography-family-heading`（見出し）/ `--typography-family-secondary` / `--typography-family-mono` / `--typography-family-special`。**`--font-sans` / `--font-heading` という変数は存在しない**（過去のCLAUDE.md記述の誤り。2026-08-07訂正）
 
-### Figma 正本ファイルと SoT 方針（案 B）
+> **`tokens/elxea-custom.json` はビルドに入っていない**。`sd.config.mjs` の `source` は `tokens/base.json` と `tokens/overrides/cjk.json` のみで、`elxea-custom.json` は読まれない。したがって同ファイルの値（darkパレット一式・低不透明度shadow等）は**実際の画面に一切効いていない**。参考資料として残っているだけなので、これを正本と扱わないこと。詳細は `scripts/design-system/design-kit.generated.json` の `conflicts[c-01]` / `[c-02]`。
 
-- **Figma 正本ファイルキー = `AWLnI0XF07e8rScuxPYPc7`**（旧 `alDl0i3hZvRlqCxH9Li5Q4` は使用しない）。`scripts/design-system/sync-figma-read.ts` の `DEFAULT_FILE_KEY` および `.claude/skills/figma-sync.md` と一致させる。
-- **SoT 方針（案 B）**: トークン値の正本は Code（`tokens/elxea-custom.json` + `base.json` / `globals.css` の `@theme`）。Figma は参照用であり、値の二重管理はしない。
-- **Code Connect は現状不採用**: Figma Organization プラン必須のため、当面は採用しない（コード→Figma の同期は Variable Rebinder プラグインで運用）。
+### Figma正本ファイルとSoT方針
+
+- **Figma正本ファイルキー = `AWLnI0XF07e8rScuxPYPc7`**（旧 `alDl0i3hZvRlqCxH9Li5Q4` は使用しない）。`scripts/design-system/sync-figma-read.ts` の `DEFAULT_FILE_KEY` および `.claude/skills/figma-sync.md` と一致させる。
+- **SoT方針**: トークン値の正本は **Figma**。コードは追従側（`tokens/base.json` が写し、`dist/` が生成物）。過去にここへ記載していた「案B＝Codeが正本」は2026-08-08のSetaka宣言で反転済み。
+- **Code Connectは現状不採用**: Figma Organizationプラン必須のため、当面は採用しない（コード→Figmaの同期はVariable Rebinderプラグインで運用）。
 
 ### コンポーネントシステム: shadcn/ui
 
@@ -82,7 +115,9 @@ elxea EC サイト（Next.js ヘッドレスコマース）のプロジェクト
 ### Tailwind 規律
 
 - ユーティリティクラスは **1要素あたり最大10-12個**。超える場合はコンポーネント抽出
-- `@apply` は非推奨 → 明示的な CSS プロパティまたはコンポーネント化で対応
+- **`@apply` は原則禁止（例外あり）** — コンポーネント（`.tsx`）やページ単位のスタイルを `@apply` で組まない。明示的なCSSプロパティまたはCVA variantsで対応する。
+  **唯一の例外は `app/globals.css` の `@layer base` に置く全域デフォルト**。要素セレクタ（`button` / `a` / `[data-slot="button"]`）やレイアウトユーティリティ（`.section-narrow` / `.section-wide` / `.section-full`）のように「全ページ共通の素の挙動」を定義する箇所に限り許可する。2026-08-07実測で該当は8箇所、すべて `app/globals.css` の `@layer base` 内。
+  例外を増やす場合は `app/globals.css` の `@layer base` 内に置き、それ以外のファイルには書かない
 - 条件付きスタイリングは `cn()` + CVA variants で管理（インライン三項演算子の乱用禁止）
 - セマンティックなトークン名を使用: `text-primary`, `bg-muted`（`text-gray-500` 等の数値スケール直接指定より優先）
 
@@ -103,8 +138,8 @@ elxea EC サイト（Next.js ヘッドレスコマース）のプロジェクト
 
 | ツール | 目的 | 状態 |
 |--------|------|------|
-| Storybook | コンポーネントカタログ（59コンポーネント + トークン可視化） | ✅ 稼働中 |
-| Style Dictionary | tokens/base.json → CSS変数 自動生成 | ✅ 稼働中 |
+| Storybook | コンポーネントカタログ（`components/ui` の61部品 + トークン可視化。うちstory済58） | ✅ 稼働中 |
+| Style Dictionary | `tokens/base.json` → `dist/tokens.css`（`@theme`）自動生成 | ✅ 稼働中 |
 | Chromatic | Visual Regression 自動検知 | ✅ 設定済み |
 | Figma Variable Rebinder | Code → Figma トークン同期プラグイン | ✅ 作成済み |
 | Figma Variable Exporter | Figma → Code トークン書き出しプラグイン | ✅ 作成済み |
@@ -121,7 +156,11 @@ elxea EC サイト（Next.js ヘッドレスコマース）のプロジェクト
 ### デザインシステム管理コマンド
 
 ```bash
-pnpm build:tokens        # トークンビルド（base.json → CSS変数）
+pnpm lint                # ESLint（--max-warnings 0）
+pnpm typecheck           # 型チェック（stale .next/types をクリア → next typegen → tsc --noEmit）
+pnpm test                # unit test（vitest run）
+pnpm build               # トークン再生成 + 本番ビルド
+pnpm build:tokens        # トークンビルド（base.json → dist/tokens.css）
 pnpm validate:tokens     # トークンの整合性チェック
 pnpm diff:tokens         # トークン変更の差分表示
 pnpm audit:components    # コンポーネント使用状況レポート
@@ -149,7 +188,7 @@ pnpm chromatic           # ビジュアルリグレッションテスト
 
    | 項目 | 承認済み仕様 | 出典 / 備考 |
    |---|---|---|
-   | フォント | **コードが正**（`--font-sans` / `--font-heading`） | `app/globals.css` `@theme`。Figma 側フォントとの差分は仕様 |
+   | フォント | **コードが正**（`--typography-family-sans` / `--typography-family-heading` / `-secondary` / `-mono` / `-special`） | 実体は `tokens/base.json` → `dist/tokens.css` の `@theme`。Adobe Fonts kit `fwg7gtf` を `layout.tsx` のJS embedで読み込む。Figma側フォントとの差分は仕様 |
    | ProductGrid 列数 | **3 列が正** | 承認済みレイアウト仕様 |
    | 写真ヒーロー | **コード実装が正** | 承認済みヒーロー構成 |
 
@@ -253,7 +292,9 @@ pnpm chromatic           # ビジュアルリグレッションテスト
 - パターンマッチだけでなく「未変換ファイルの洗い出し」も行う（例：移行作業なら、移行対象の全ファイルをリストアップし、各ファイルが変換済みか確認する）
 
 ### 3. ビルド通過を完了の必須条件にする
-- `pnpm build`（またはプロジェクトのビルドコマンド）が成功しない限り「完了」と報告しない
+- `pnpm build` が成功しない限り「完了」と報告しない
+- **型チェックは必ず `pnpm typecheck` 経由で行う**（`tsc --noEmit` を直接叩かない）。`tsconfig.json` の `include` に `.next/types/**/*.ts` が入っているため、ブランチ切替後などに残った古い `.next/types` が「実在しないルートの型エラー」を幽霊として出す。`pnpm typecheck` は `.next/types` / `.next/dev/types` / `tsconfig.tsbuildinfo` を消してから `next typegen` で型を作り直すので、この幽霊が原理的に出ない
+- 完了前に通すべき4本: `pnpm lint` / `pnpm typecheck` / `pnpm test` / `pnpm build`（前3本はpre-pushフックでも機械強制される）
 
 ### 4. 「完全に」「すべて」「一つも残さず」は最高警戒レベル
 - この種の指示を受けたら、部分対応ではなく全量対応

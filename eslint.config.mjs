@@ -6,7 +6,15 @@ import elxeaTokens from "./eslint-rules/index.mjs";
 
 const eslintConfig = [
   {
-    ignores: [".next/**", "dist/**", "storybook-static/**", "node_modules/**", ".phase-*"],
+    ignores: [
+      ".next/**",
+      "dist/**",
+      "storybook-static/**",
+      "node_modules/**",
+      ".phase-*",
+      // 使い捨てスクリプト置き場 (gitignore 対象・.gitignore と対で維持する)
+      "scripts/scratch/**",
+    ],
   },
   ...nextCoreWebVitals,
   ...storybook.configs["flat/recommended"],

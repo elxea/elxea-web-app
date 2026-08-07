@@ -63,6 +63,10 @@ public/audio/
 gtm-tag-name.md
 shopify-app-settings.md
 
+# 使い捨てスクリプト置き場 (計測・スクショ採取などの一回きりの .mjs)
+# リポジトリ直下に散らかさず必ずここへ置く。コミットしない。
+scripts/scratch/
+
 # backups
 backup-before-cleanup/
 
