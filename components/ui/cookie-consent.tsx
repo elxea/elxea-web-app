@@ -42,7 +42,7 @@ export function CookieConsent() {
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 w-full max-w-full border-t border-border bg-background">
-      <div className="w-full max-w-7xl mx-auto px-6 py-4 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+      <div className="page-container py-4 flex flex-col sm:flex-row items-start sm:items-center gap-4">
         <p className="text-sm text-muted-foreground flex-1 min-w-0 break-words">
           {t("message")}{" "}
           <Link

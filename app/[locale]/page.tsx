@@ -86,7 +86,7 @@ export default function HomePage() {
           sizes="100vw"
         />
         <div className="absolute inset-0 bg-overlay" />
-        <div className="relative w-full max-w-7xl mx-auto px-6 md:px-8">
+        <div className="relative page-container">
           <div className="max-w-xl text-left">
             <p className="text-[11px] text-overlay-foreground-muted uppercase tracking-[0.25em] mb-8">
               {t("home.tagline")}
@@ -313,7 +313,7 @@ async function UpcomingEvents() {
     }>;
 
     return (
-      <section className="max-w-7xl mx-auto px-6 py-24">
+      <section className="page-container py-24">
         <SectionHeader
           eyebrow="Upcoming"
           title={t("home.upcomingEvents")}

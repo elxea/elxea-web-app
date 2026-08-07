@@ -73,7 +73,7 @@ export function Header({ navItems: externalNavItems }: HeaderProps) {
   return (
     <header className="border-b border-border bg-background sticky top-0 z-50">
       {/* Main header */}
-      <div className="max-w-7xl mx-auto px-6">
+      <div className="page-container">
         <div className="flex items-center justify-between h-16">
           {/* Mobile menu button */}
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>

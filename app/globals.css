@@ -33,49 +33,50 @@ html.lenis, html.lenis body {
 
 /* Adobe Fonts (Typekit ID: fwg7gtf) — loaded via async JS embed in layout.tsx
  * (kit is JS-only; the .css endpoint returns HTTP 412, .js returns 200) */
-/* Headings: aktiv-grotesk-extended + dnp-shuei-gothic-gin-std */
-/* Body: aktiv-grotesk + kozuka-gothic-pro */
-/* Secondary: neue-haas-grotesk-text + ryo-gothic-plusn */
-/* Special: dnp-shuei-ymincho-std */
+/* Headings: aktiv-grotesk-extended + dnp-shuei-gothic-gin-std (秀英角ゴシック銀) */
+/* Body:     aktiv-grotesk + dnp-shuei-gothic-gin-std (秀英角ゴシック銀) */
+/* Mono:     SF Mono / Menlo */
+/* Special:  dnp-shuei-ymincho-std (定義のみ・style プリセット未参照 — conflicts[c-03]) */
+/* The `secondary` role (neue-haas-grotesk-text / ryo-gothic-plusn) was retired
+ * 2026-08-07; the kit itself (fwg7gtf) is unchanged. */
 /* Design tokens generated from tokens/ via Style Dictionary (pnpm build:tokens) */
 
+/* Weight / size / line-height / family / tracking all come from the `body`
+ * style preset. dist/tokens-cjk.css re-binds --typography-style-body and
+ * --typography-style-body-tracking under :lang(ja), so the Japanese cadence
+ * (lh 1.8 / tracking 0.04em) applies without a second rule here.
+ * Until 2026-08-07 this was two hand-written :lang() blocks (en 0.01em/1.65,
+ * ja 0.04em/1.8) whose English values disagreed with the Figma-authored token
+ * preset (0.05em/1.75). The tokens are the Figma copy, so they win. */
 body {
-  font-family: var(--typography-family-sans);
-  font-size: 1rem;
+  font: var(--typography-style-body);
+  letter-spacing: var(--typography-style-body-tracking);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-}
-
-/* Japanese: tighter letter-spacing, taller line-height for readability */
-:lang(ja) {
-  letter-spacing: 0.04em;
-  line-height: 1.8;
-}
-
-/* English: standard letter-spacing, slightly tighter line-height */
-:lang(en) {
-  letter-spacing: 0.01em;
-  line-height: 1.65;
 }
 
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--typography-family-heading);
 }
 
-:lang(ja) h1, :lang(ja) h2, :lang(ja) h3, :lang(ja) h4, :lang(ja) h5, :lang(ja) h6 {
-  letter-spacing: 0.02em;
-}
+/* Headings track per level — the old blanket -0.01em (en) / 0.02em (ja) rule
+ * flattened six distinct Figma values into one. */
+h1 { letter-spacing: var(--typography-style-h1-tracking); }
+h2 { letter-spacing: var(--typography-style-h2-tracking); }
+h3 { letter-spacing: var(--typography-style-h3-tracking); }
+h4 { letter-spacing: var(--typography-style-h4-tracking); }
+h5 { letter-spacing: var(--typography-style-h5-tracking); }
+h6 { letter-spacing: var(--typography-style-h6-tracking); }
 
-:lang(en) h1, :lang(en) h2, :lang(en) h3, :lang(en) h4, :lang(en) h5, :lang(en) h6 {
-  letter-spacing: -0.01em;
-}
-
-/* Headings keep their design line-height. The :lang() body line-height
- * (1.8 ja / 1.65 en) targets body copy only; without this override it also
- * inherits onto headings and stretches them (Figma heading line-height is
- * 1.2–1.3). Scope: h1–h3 (large, visible headings). h4–h6 intentionally keep
- * the body cadence. Specificity (0,1,1) beats both :lang() (0,1,0) and the
- * h{n} font shorthand's line-height (0,0,1). */
+/* Headings keep their own line-height, overriding the h{n} token presets.
+ * Scope: h1–h3 (large, visible headings); h4–h6 intentionally keep the preset
+ * cadence. Specificity (0,1,1) beats the h{n} font shorthand's line-height
+ * (0,0,1) below.
+ * NOTE: this block used to also guard against the hand-written :lang() body
+ * line-height inheriting onto headings. Those :lang() rules are gone as of
+ * 2026-08-07 (body now takes its leading from the token preset), but these
+ * heading values are kept deliberately — they are set from Figma, not from the
+ * presets, so do not fold them back in without a Figma change. */
 :lang(ja) h1, :lang(en) h1 { line-height: 1.2; }
 :lang(ja) h2, :lang(en) h2,
 :lang(ja) h3, :lang(en) h3 { line-height: 1.3; }
@@ -119,13 +120,13 @@ h1.contact-title {
 :root {
   /* Third-party brand colors */
   --brand-line: #06C755;
-  
+
   /* Overlay colors for hero sections with background images */
   --overlay: oklch(0 0 0 / 0.15);
   --overlay-foreground: oklch(0.98 0.01 60);
   --overlay-foreground-muted: oklch(0.75 0.01 60);
   --overlay-border: oklch(1 0.02 60 / 0.4);
-  
+
   --sidebar: hsl(0 0% 98%);
   --sidebar-foreground: hsl(240 5.3% 26.1%);
   --sidebar-primary: hsl(240 5.9% 10%);
@@ -175,10 +176,57 @@ h1.contact-title {
    * utilities (e.g. hero `text-overlay-foreground`) still override it. */
   h1, h2, h3, h4, h5, h6 { color: var(--color-brand-graphite); }
 
+  /* Outer page margin — bound to layout.grid.margin tokens (Figma Foundations
+   * 規約 64 / 32 / 16). Do NOT hardcode px here: the value must stay a copy of
+   * tokens/base.json layout.grid.margin.* (which mirrors Figma).
+   * mobile 1rem (16px) → tablet 2rem (32px) → desktop 4rem (64px). */
+  :root { --page-margin: var(--layout-grid-margin-mobile); }
+  @media (min-width: 48rem) {
+    :root { --page-margin: var(--layout-grid-margin-tablet); }
+  }
+  @media (min-width: 64rem) {
+    :root { --page-margin: var(--layout-grid-margin-desktop); }
+  }
+
+  /* Page container. Single source for every full-width chrome (Header / Footer /
+   * sections) so the logo's left edge and body content's left edge resolve to
+   * the same token.
+   *
+   * The max-width adds the margin on top of the content cap so the outer margin
+   * lives OUTSIDE the content column. With a plain `max-w-7xl` the 1280px cap
+   * would swallow the padding and the content would start 144px in at 1440
+   * (measured), i.e. the 64px margin would not bind at all. With the calc the
+   * content column stays exactly container.xl (1280px) and the 64px margin
+   * binds on every viewport up to 1408px.
+   * box-sizing is border-box (Tailwind preflight), so max-width covers padding. */
+  .page-container {
+    width: 100%;
+    max-width: calc(var(--layout-container-xl) + var(--page-margin) * 2);
+    margin-inline: auto;
+    padding-inline: var(--page-margin);
+  }
+
+  /* Padding-only variant for elements that bring their own width constraint. */
+  .page-inset { padding-inline: var(--page-margin); }
+
   /* Section layout utilities */
-  .section-narrow { @apply max-w-3xl mx-auto px-6 py-16; }
-  .section-wide   { @apply max-w-7xl mx-auto px-6 py-16; }
-  .section-full   { @apply w-full py-16; }
+  .section-narrow {
+    @apply py-16;
+    width: 100%;
+    max-width: calc(var(--layout-container-md) + var(--page-margin) * 2);
+    margin-inline: auto;
+    padding-inline: var(--page-margin);
+  }
+  /* Not `@apply page-container` — in Tailwind v4 `@apply` only resolves
+   * utilities, not sibling custom classes, so the properties are spelled out. */
+  .section-wide {
+    @apply py-16;
+    width: 100%;
+    max-width: calc(var(--layout-container-xl) + var(--page-margin) * 2);
+    margin-inline: auto;
+    padding-inline: var(--page-margin);
+  }
+  .section-full { @apply w-full py-16; }
 
   /* Tap feedback for all interactive elements */
   button,
