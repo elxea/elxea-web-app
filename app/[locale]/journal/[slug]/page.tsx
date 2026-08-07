@@ -185,7 +185,12 @@ export default async function ArticlePage({
           <header className="mt-6">
             <p className={cn(overlineClass, "text-muted-foreground")}>JOURNAL</p>
             <div className="mt-4 flex items-start justify-between gap-4">
-              <h1 className="text-foreground">{article.title}</h1>
+              {/* ページ主見出しは一覧・詳細で統一 (Setaka 裁定 2026-08-08):
+                  44px display トークン = `.page-title`。Figma 記事詳細の
+                  functional 52px 束縛は Figma 側を追従修正中のため、
+                  実装は DS 最大の display (44px / lh 1.2) を正とする。
+                  SP は base h1 32px のまま (.page-title は md+ のみ)。 */}
+              <h1 className="page-title text-foreground">{article.title}</h1>
               <BookmarkButton
                 articleSlug={slug}
                 articleTitle={article.title}

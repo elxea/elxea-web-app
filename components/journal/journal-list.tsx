@@ -225,3 +225,175 @@ function RailRowLink({ label, href }: RailLink) {
     </Link>
   );
 }
+
+/* -------------------------------------------------------------------------- */
+/* TagMap — タグページ下部の「ジャーナルのタグ」(Figma 8082:4004 / 8082:4088)   */
+/* -------------------------------------------------------------------------- */
+
+export type TagMapEntry = { label: string; count: number; href: string };
+
+/**
+ * Figma 実測 (px) → 実装:
+ * - 前ブロックとの間隔  PC 112 + 32 = 144 (`lg:mt-36`) / SP 32 (`mt-8`)
+ * - 区切り罫            1px 全幅 (`border-t border-border`)
+ * - 罫 → 見出し         64 (`pt-16`)
+ * - 見出し              h27 = h3 プリセット 20px (`data-slot="journal-section-title"`)
+ * - 見出し → 列         PC 40 (`lg:mt-10`) / SP 24 (`mt-6`)
+ * - 列                  PC 3 列 416 / gap-x 32 (`lg:grid-cols-3 lg:gap-x-8`) / SP 1 列
+ * - 行                  h57 = padding-y 16 + body-sm 行高 25 (`py-4`)、数は右端
+ */
+export function TagMap({
+  title,
+  entries,
+  className,
+}: {
+  title: string;
+  entries: TagMapEntry[];
+  className?: string;
+}) {
+  if (entries.length === 0) return null;
+
+  return (
+    <section
+      data-slot="tag-map"
+      className={cn("mt-8 border-t border-border pt-16 lg:mt-36", className)}
+    >
+      <h2 data-slot="section-title" className="text-foreground">
+        {title}
+      </h2>
+      <ul className="mt-6 lg:mt-10 lg:grid lg:grid-cols-3 lg:gap-x-8">
+        {entries.map((entry) => (
+          <li key={entry.href}>
+            <Link
+              href={entry.href}
+              className={cn(
+                bodySmClass,
+                "flex items-center justify-between gap-4 py-4 text-foreground",
+                "underline-offset-4 hover:underline"
+              )}
+            >
+              <span>{entry.label}</span>
+              <span className={cn(captionClass, "shrink-0 text-muted-foreground")}>
+                {entry.count}
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* StackPageHead — カテゴリ索引の見出し (Figma 8083:4077 / 8083:4223)           */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Figma 実測 (px) → 実装:
+ * - TitleCol 幅 832 (`lg:max-w-208`) / リード幅 640 (`lg:max-w-160`)
+ * - 行間 12 (`gap-3`)
+ * - MetaCol は PC 右端で 2 行 (行間 6 = `gap-1.5`)、SP は本文下に 1 行で連結
+ * - 主見出しは 44px display (`.page-title`)。Figma の 32px 束縛は
+ *   「ページ主見出しは一覧・詳細とも 44px」の裁定 (2026-08-08) で追従修正中。
+ */
+export function StackPageHead({
+  overline,
+  title,
+  lead,
+  meta = [],
+  className,
+}: {
+  overline: string;
+  title: string;
+  lead?: string;
+  meta?: string[];
+  className?: string;
+}) {
+  return (
+    <div
+      data-slot="stack-page-head"
+      className={cn(
+        "flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between lg:gap-8",
+        className
+      )}
+    >
+      <div className="flex flex-col gap-3 lg:max-w-208">
+        <p className={cn(overlineClass, "text-muted-foreground")}>{overline}</p>
+        <h1 className="page-title text-foreground">{title}</h1>
+        {lead ? (
+          <p className={cn(captionClass, "text-muted-foreground lg:max-w-160")}>{lead}</p>
+        ) : null}
+        {meta.length > 0 ? (
+          <p className={cn(captionClass, "text-muted-foreground lg:hidden")}>
+            {meta.join(" ・ ")}
+          </p>
+        ) : null}
+      </div>
+      {meta.length > 0 ? (
+        <div
+          className={cn(
+            captionClass,
+            "hidden shrink-0 flex-col gap-1.5 text-muted-foreground lg:flex lg:text-right"
+          )}
+        >
+          {meta.map((line) => (
+            <span key={line}>{line}</span>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* CategoryShelf — カテゴリ索引の 1 棚 (Figma 8083:4085 / 8083:4228)            */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Figma 実測 (px) → 実装:
+ * - 棚の上余白        64 (`pt-16`)
+ * - ShelfHead         h44。見出し h24 = h4 プリセット 16px、本数は右端 caption
+ * - head → カード     PC 40 (`lg:mt-10`) / SP 24 (`mt-6`)
+ * - カード            PC 3 枚 416 / gap-x 32 / SP 1 枚 全幅
+ * - カード → もっと見る PC 40 / SP 24、リンクはタップ域 44 (`h-11`)
+ */
+export function CategoryShelf({
+  title,
+  count,
+  moreHref,
+  moreLabel,
+  children,
+  className,
+}: {
+  title: string;
+  count: string;
+  moreHref: string;
+  moreLabel: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <section data-slot="category-shelf" className={cn("pt-16", className)}>
+      {/* ShelfHead は Figma で h44 の枠 (見出しの行高 24 + 下の余白 20)。
+          枠ごと再現するため min-h-11 を当て、見出しは枠の上端に置く。 */}
+      <div className="flex min-h-11 items-baseline justify-between gap-4">
+        <h2 data-slot="shelf-title" className="text-foreground">
+          {title}
+        </h2>
+        <span className={cn(captionClass, "shrink-0 text-muted-foreground")}>{count}</span>
+      </div>
+      <div className="mt-6 grid grid-cols-1 gap-x-8 lg:mt-10 lg:grid-cols-3">{children}</div>
+      <div className="mt-6 lg:mt-10">
+        <Link
+          href={moreHref}
+          className={cn(
+            captionClass,
+            "inline-flex h-11 items-center text-foreground underline-offset-4 hover:underline"
+          )}
+        >
+          {moreLabel}
+        </Link>
+      </div>
+    </section>
+  );
+}

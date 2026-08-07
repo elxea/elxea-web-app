@@ -13,6 +13,9 @@ import { FavoriteButton } from "@/components/product/favorite-button";
 import { TasteMap, type TastePoint } from "@/components/product/taste-map";
 import { Breadcrumb } from "@/components/seo/breadcrumb";
 import { CatalogCard, CatalogGrid } from "@/components/catalog/catalog-list";
+import { ArticleCard } from "@/components/journal/article-card";
+import { getClient } from "@/sanity/lib/client";
+import { ARTICLES_BY_PRODUCT_QUERY } from "@/sanity/lib/queries";
 import { ChapterBreak, bodySmClass, captionClass, overlineClass } from "@/components/editorial/rule-list";
 import {
   Ledger,
@@ -125,6 +128,30 @@ export default async function ProductPage({
   } catch {
     related = [];
   }
+
+  /**
+   * 読みもの — Figma 確定版 PDP の ArticleCard x3。
+   *
+   * 引き当て方式 (2026-08-08 決定): **Sanity 記事の `relatedProducts`
+   * (Shopify ハンドルの配列) を唯一の根拠にする**。既に schema にあり
+   * (sanity/schemas/article.ts)、記事詳細の「この記事に出てきた茶葉」でも
+   * 同じフィールドを使っているので、1 本の紐付けが記事→商品・商品→記事の
+   * 両方向に効く。Shopify metafield 側に記事 slug を持つ案は、編集導線が
+   * Sanity と Shopify 管理画面に割れるうえ metafield 定義の追加が要るため採らない。
+   * データ未整備 (どの記事も relatedProducts 未設定) のときは空配列になり、
+   * セクションごと出さない。
+   */
+  let readingArticles: Parameters<typeof ArticleCard>[0]["article"][] = [];
+  try {
+    readingArticles = await getClient().fetch(ARTICLES_BY_PRODUCT_QUERY, {
+      language: locale,
+      productHandle: handle,
+      limit: 3,
+    });
+  } catch {
+    readingArticles = [];
+  }
+  readingArticles = readingArticles ?? [];
 
   /**
    * スペック帯 — Figma 確定版 8056:1558「スペック帯 (4カラム定義リスト)」の
@@ -399,6 +426,30 @@ export default async function ProductPage({
                     p.priceRange.minVariantPrice.currencyCode
                   )}
                   /* Figma は SP 2 枚 / PC 3 枚 (8057:1790 / 8056:1613)。 */
+                  className={i === 2 ? "hidden lg:flex" : undefined}
+                />
+              ))}
+            </CatalogGrid>
+          </SectionBody>
+        </PageSection>
+      ) : null}
+
+      {/* 読みもの (Figma 確定版 PDP の ArticleCard x3)。
+          引き当ては Sanity 記事の relatedProducts (Shopify ハンドルの配列) を
+          唯一の根拠にする。編集者が記事側で紐付けを完結でき、Shopify metafield を
+          増やさずに済むため。データ未整備のうちは何も出さない (空枠は出さない)。 */}
+      {readingArticles.length > 0 ? (
+        <PageSection>
+          <SectionHead overline={td("readingOverline")} title={td("readingTitle")} />
+          <SectionBody>
+            <CatalogGrid>
+              {readingArticles.map((article, i) => (
+                <ArticleCard
+                  key={article._id}
+                  article={article}
+                  locale={locale}
+                  memberOnlyLabel={tc("memberOnly")}
+                  /* 関連商品と同じく Figma は SP 2 枚 / PC 3 枚。 */
                   className={i === 2 ? "hidden lg:flex" : undefined}
                 />
               ))}

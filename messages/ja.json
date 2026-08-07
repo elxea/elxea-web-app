@@ -119,7 +119,16 @@
     "categories": "カテゴリ",
     "teaInArticle": "この記事に出てきた茶葉",
     "toProduct": "商品ページへ →",
-    "moreInCategory": "「{name}」の記事をもっと読む"
+    "moreInCategory": "「{name}」の記事をもっと読む",
+    "allArticles": "すべての記事",
+    "tagHeading": "# {name}",
+    "tagMapTitle": "ジャーナルのタグ",
+    "categoryStackTitle": "カテゴリで読む",
+    "categoryStackDescription": "タブで切り替えずに、すべてのカテゴリを縦にたどって読めるページです。気になった棚で足を止めて、そのまま読みはじめてください。",
+    "categoryStackMeta": "{count} カテゴリ ・ 全 {total} 本",
+    "lastUpdated": "最終更新 {date}",
+    "articleCount": "{count}本",
+    "shelfMore": "{name}を、もっと見る →"
   },
   "teaMenu": {
     "title": "お茶メニュー",
@@ -988,7 +997,9 @@
     "alsoTitle": "近い茶葉",
     "note1": "— ご注文から2〜4営業日で発送します",
     "note2": "— 開封後は密閉して冷暗所へ。1か月を目安に",
-    "note3": "— のし・ギフト包装は承っていません"
+    "note3": "— のし・ギフト包装は承っていません",
+    "readingOverline": "JOURNAL",
+    "readingTitle": "読みもの"
   },
   "subscriptionR2": {
     "metaTitle": "ROJI TEA CLUB — 定期便",

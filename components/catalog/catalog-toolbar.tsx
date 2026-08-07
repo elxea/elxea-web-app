@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { usePathname, useRouter } from "@/i18n/navigation";
+import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { useSearchParams } from "next/navigation";
 
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
@@ -25,7 +25,14 @@ import { cn } from "@/lib/utils";
  * 閉じ込めない。
  */
 
-export type CatalogChip = { value: string; label: string };
+/**
+ * `href` を持つ chip は「別ページへ移動するチップ」として `<Link>` で描画する
+ * (ジャーナルのタグ / カテゴリページ。Figma 8082:3870 / 8083:4205 の「一覧R2と
+ * 同一チップ列」)。`href` が無い chip は従来どおり同一ページ内の `?category=`
+ * 絞り込みボタンとして描画する。関数ではなく文字列を渡す形にしているのは、
+ * Server Component から Client Component へ関数を渡せないため。
+ */
+export type CatalogChip = { value: string; label: string; href?: string };
 
 export type CatalogToolbarProps = {
   chips: CatalogChip[];
@@ -78,6 +85,28 @@ export function CatalogToolbar({
       >
         {chips.map((chip) => {
           const selected = chip.value === current;
+          const chipClass = cn(
+            bodySmClass,
+            "flex h-11 shrink-0 items-center rounded-full px-3 py-3 whitespace-nowrap lg:px-4 lg:py-2",
+            selected
+              ? "bg-primary text-primary-foreground"
+              : "border border-border text-foreground hover:bg-muted"
+          );
+
+          if (chip.href) {
+            return (
+              <Link
+                key={chip.value}
+                href={chip.href}
+                data-slot="catalog-chip"
+                aria-current={selected ? "page" : undefined}
+                className={chipClass}
+              >
+                {chip.label}
+              </Link>
+            );
+          }
+
           return (
             <button
               key={chip.value}
@@ -87,13 +116,7 @@ export function CatalogToolbar({
               onClick={() =>
                 router.push(hrefWith("category", chip.value === chips[0]?.value ? undefined : chip.value))
               }
-              className={cn(
-                bodySmClass,
-                "flex h-11 shrink-0 items-center rounded-full px-3 py-3 whitespace-nowrap lg:px-4 lg:py-2",
-                selected
-                  ? "bg-primary text-primary-foreground"
-                  : "border border-border text-foreground hover:bg-muted"
-              )}
+              className={chipClass}
             >
               {chip.label}
             </button>

@@ -301,6 +301,44 @@ export const TAG_BY_SLUG_QUERY = groq`
   }
 `;
 
+// タグ一覧 + 記事本数 (Figma 8082:4004 TagMap)。記事 0 本のタグは出さない。
+export const TAGS_WITH_COUNTS_QUERY = groq`
+  *[_type == "tag"] {
+    _id,
+    title,
+    slug,
+    "count": count(*[_type == "article" && language == $language && ^._id in tags[]._ref])
+  }[count > 0] | order(count desc, title asc)
+`;
+
+// カテゴリ一覧 + 記事本数 (Figma 8083:4088 ShelfHead「12本」/ 8083:4083 集計)。
+export const CATEGORIES_WITH_COUNTS_QUERY = groq`
+  *[_type == "category"] | order(title asc) {
+    _id,
+    title,
+    slug,
+    "count": count(*[_type == "article" && language == $language && category._ref == ^._id])
+  }
+`;
+
+// 商品詳細「読みもの」(Figma 8056 系 PDP)。引き当ては Sanity 記事側の
+// relatedProducts (Shopify ハンドルの配列) を唯一の根拠にする。
+export const ARTICLES_BY_PRODUCT_QUERY = groq`
+  *[_type == "article" && language == $language && $productHandle in relatedProducts]
+    | order(publishedAt desc) [0...$limit] {
+    _id,
+    title,
+    slug,
+    excerpt,
+    thumbnail,
+    mainImage,
+    publishedAt,
+    memberOnly,
+    category->{title, slug},
+    author->{name, slug, image}
+  }
+`;
+
 export const ARTICLES_BY_TAG_QUERY = groq`
   *[_type == "article" && language == $language && $tagSlug in tags[]->slug.current] | order(publishedAt desc) [$start...$end] {
     _id,

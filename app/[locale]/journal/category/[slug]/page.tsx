@@ -1,15 +1,54 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getLocale, getTranslations } from "next-intl/server";
-import { getClient } from "@/sanity/lib/client";
-import { CATEGORIES_QUERY, ARTICLES_BY_CATEGORY_QUERY } from "@/sanity/lib/queries";
-import { ArticleCard } from "@/components/journal/article-card";
-import { Link } from "@/i18n/navigation";
 
-type Category = {
+import { getClient } from "@/sanity/lib/client";
+import {
+  ARTICLES_BY_CATEGORY_QUERY,
+  CATEGORIES_WITH_COUNTS_QUERY,
+} from "@/sanity/lib/queries";
+import { Breadcrumb } from "@/components/seo/breadcrumb";
+import { Section } from "@/components/layout/container";
+import { CatalogToolbar } from "@/components/catalog/catalog-toolbar";
+import { ListPageHead, MoreRow } from "@/components/catalog/catalog-list";
+import { ArticleCard } from "@/components/journal/article-card";
+import { ArticleRail, JournalGrid, JournalLayout } from "@/components/journal/journal-list";
+
+/**
+ * ジャーナル:カテゴリ (単一) — Figma【R2: 確定版】の「統一ナビ (一覧R2と同一
+ * チップ列)」パターン。確定版に単一カテゴリの専用フレームは無く、カテゴリ索引
+ * (8083:4073) の「◯◯を、もっと見る →」の降り先として必要なため、同じ確定版の
+ * タグページ (8082:3855) と同一骨格で実装している (チップ列がカテゴリになる
+ * だけの差)。タグページとの違いは下部のタグマップを置かないこと。
+ */
+
+/** Figma の記事グリッドは 2 列 x 3 段 = 6 件 (8082:3883 と同じ)。 */
+const PAGE_SIZE = 6;
+
+/** サイドバー「人気の記事」の件数 (Figma 8082:3893 は 5 行)。 */
+const RAIL_SIZE = 5;
+
+type SearchParams = { sort?: string; show?: string };
+
+type ArticleItem = {
+  _id: string;
+  slug: { current: string };
+  title: string;
+  excerpt?: string;
+  thumbnail?: { asset: object; alt?: string };
+  mainImage?: { asset: object; alt?: string };
+  publishedAt?: string;
+  memberOnly?: boolean;
+  category?: { title: string; slug: { current: string } };
+  tags?: { _id: string; title: string; slug: { current: string } }[];
+  author?: { name: string; image?: { asset: object } };
+};
+
+type CategoryItem = {
   _id: string;
   title: string;
   slug: { current: string };
+  count: number;
 };
 
 export async function generateMetadata({
@@ -19,13 +58,16 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   try {
-    const client = getClient();
-    const categories: Category[] = await client.fetch(CATEGORIES_QUERY);
-    const category = categories?.find((c) => c.slug.current === slug);
+    const locale = await getLocale();
+    const categories: CategoryItem[] = await getClient().fetch(CATEGORIES_WITH_COUNTS_QUERY, {
+      language: locale,
+    });
+    const category = categories?.find((c) => c.slug?.current === slug);
     if (!category) return {};
+    const t = await getTranslations("journal");
     return {
-      title: category.title,
-      description: `Articles in "${category.title}"`,
+      title: t("categoryArchiveTitle", { name: category.title }),
+      description: t("categoryArchiveDescription", { name: category.title }),
     };
   } catch {
     return {};
@@ -34,78 +76,143 @@ export async function generateMetadata({
 
 export default async function CategoryPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<SearchParams>;
 }) {
   const { slug } = await params;
+  const query = await searchParams;
   const locale = await getLocale();
   const t = await getTranslations("journal");
+  const bt = await getTranslations("breadcrumb");
   const tCommon = await getTranslations("common");
+  const tl = await getTranslations("catalog");
 
   const client = getClient();
 
-  const [categories, articles] = await Promise.all([
-    client.fetch(CATEGORIES_QUERY) as Promise<Category[]>,
-    client.fetch(ARTICLES_BY_CATEGORY_QUERY, {
-      language: locale,
-      categorySlug: slug,
-      start: 0,
-      end: 30,
-    }),
-  ]);
+  let rawCategories: CategoryItem[] = [];
+  let articles: ArticleItem[] = [];
+  try {
+    [rawCategories, articles] = await Promise.all([
+      client.fetch(CATEGORIES_WITH_COUNTS_QUERY, { language: locale }),
+      client.fetch(ARTICLES_BY_CATEGORY_QUERY, {
+        language: locale,
+        categorySlug: slug,
+        start: 0,
+        end: 60,
+      }),
+    ]);
+  } catch {
+    notFound();
+  }
 
-  const category = categories?.find((c) => c.slug.current === slug);
+  const seen = new Set<string>();
+  const categories = (rawCategories ?? []).filter((cat) => {
+    const key = cat.slug?.current;
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  const category = categories.find((c) => c.slug.current === slug);
   if (!category) notFound();
 
-  return (
-    <div className="section-wide">
-      {/* 変A: centered editorial archive header */}
-      <div className="text-center mb-12 md:mb-16">
-        <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-4">
-          Category
-        </p>
-        <h1 className="mb-4">{t("categoryArchiveTitle", { name: category.title })}</h1>
-        <p className="text-sm text-muted-foreground leading-relaxed">
-          {t("categoryArchiveDescription", { name: category.title })}
-        </p>
-        <div className="flex justify-center mt-8">
-          <Link
-            href="/journal"
-            className="text-xs px-3 py-1.5 rounded-full border border-border text-muted-foreground hover:text-foreground hover:border-foreground transition-colors"
-          >
-            {tCommon("viewAll")}
-          </Link>
-        </div>
-      </div>
+  const list = articles ?? [];
+  const sort = query.sort === "oldest" ? "oldest" : "newest";
+  const ordered = sort === "oldest" ? [...list].reverse() : list;
 
-      {!articles || articles.length === 0 ? (
-        <p className="text-muted-foreground text-sm">{t("empty")}</p>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-14">
-          {articles.map(
-            (article: {
-              _id: string;
-              slug: { current: string };
-              title: string;
-              excerpt?: string;
-              thumbnail?: { asset: object; alt?: string };
-              mainImage?: { asset: object; alt?: string };
-              publishedAt?: string;
-              memberOnly?: boolean;
-              category?: { title: string; slug: { current: string } };
-              tags?: { _id: string; title: string; slug: { current: string } }[];
-              author?: { name: string; image?: { asset: object } };
-            }) => (
+  const show = Math.max(PAGE_SIZE, Number(query.show) || PAGE_SIZE);
+  const visible = ordered.slice(0, show);
+  const remaining = ordered.length - visible.length;
+
+  const hrefWith = (extra: Record<string, string>) => {
+    const usp = new URLSearchParams();
+    if (sort !== "newest") usp.set("sort", sort);
+    for (const [k, v] of Object.entries(extra)) usp.set(k, v);
+    const qs = usp.toString();
+    return qs ? `/journal/category/${slug}?${qs}` : `/journal/category/${slug}`;
+  };
+
+  const chips = [
+    { value: "__all__", label: tl("all"), href: "/journal/category" },
+    ...categories
+      .filter((c) => c.count > 0)
+      .map((c) => ({
+        value: c.slug.current,
+        label: c.title,
+        href: `/journal/category/${c.slug.current}`,
+      })),
+  ];
+
+  const railPopular = list
+    .slice(0, RAIL_SIZE)
+    .map((a) => ({ label: a.title, href: `/journal/${a.slug.current}` }));
+
+  const railCategories = categories
+    .filter((c) => c.count > 0)
+    .map((c) => ({ label: c.title, href: `/journal/category/${c.slug.current}` }));
+
+  return (
+    <Section spacing="none" className="pt-6 pb-16 lg:pb-28">
+      <Breadcrumb
+        items={[
+          { label: bt("home"), href: "/" },
+          { label: t("title"), href: "/journal" },
+          { label: t("categories"), href: "/journal/category" },
+          { label: category.title },
+        ]}
+      />
+
+      <ListPageHead
+        overline="CATEGORY"
+        title={category.title}
+        lead={t("categoryArchiveDescription", { name: category.title })}
+      />
+
+      <CatalogToolbar
+        className="mt-8 lg:mt-12"
+        chips={chips}
+        activeChip={slug}
+        activeSort={sort}
+        sortLabel={tl("sortLabel")}
+        sortOptions={[
+          { value: "newest", label: tl("sortNewest") },
+          { value: "oldest", label: tl("sortOldest") },
+        ]}
+      />
+
+      <JournalLayout className="mt-8 lg:mt-12">
+        {visible.length === 0 ? (
+          <p className="order-1 text-sm text-muted-foreground">{t("empty")}</p>
+        ) : (
+          <JournalGrid>
+            {visible.map((article) => (
               <ArticleCard
                 key={article._id}
                 article={article}
                 locale={locale}
                 memberOnlyLabel={tCommon("memberOnly")}
               />
-            )
-          )}
-        </div>
-      )}
-    </div>
+            ))}
+          </JournalGrid>
+        )}
+
+        {remaining > 0 ? (
+          <MoreRow
+            className="order-2 mt-8 lg:col-span-2 lg:mt-12"
+            href={hrefWith({ show: String(show + PAGE_SIZE) })}
+            label={tl("showMore", { count: Math.min(remaining, PAGE_SIZE) })}
+          />
+        ) : null}
+
+        <ArticleRail
+          popularTitle={t("popular")}
+          popular={railPopular}
+          categoryTitle={t("categories")}
+          categories={railCategories}
+        />
+      </JournalLayout>
+    </Section>
   );
 }

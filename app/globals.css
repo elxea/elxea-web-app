@@ -154,6 +154,16 @@ h1.contact-title {
   letter-spacing: var(--typography-style-h3-tracking);
 }
 
+/* R2 ジャーナル:カテゴリ の棚見出し (8083:4087 / 8083:4230) は 16px / 行高 24 =
+ * h4 プリセット。棚は 1 カテゴリ = 1 セクションなので要素は文書構造上 h2 のまま
+ * 体裁だけ h4 に揃える。Unlayered な理由・`:lang()` 前置の理由は上の
+ * catalog-card-title と同じ。値は h4 トークン経由で生 px は書かない。 */
+:lang(ja) h2[data-slot="shelf-title"],
+:lang(en) h2[data-slot="shelf-title"] {
+  font: var(--typography-style-h4);
+  letter-spacing: var(--typography-style-h4-tracking);
+}
+
 :root {
   /* Third-party brand colors */
   --brand-line: #06C755;
