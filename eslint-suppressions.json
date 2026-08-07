@@ -49,11 +49,6 @@
       "count": 1
     }
   },
-  "app/[locale]/journal/page.tsx": {
-    "elxea-tokens/no-raw-colors": {
-      "count": 1
-    }
-  },
   "app/[locale]/journal/tag/[slug]/page.tsx": {
     "elxea-tokens/no-raw-colors": {
       "count": 1

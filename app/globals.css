@@ -130,6 +130,16 @@ h1.contact-title {
   letter-spacing: var(--typography-style-h4-tracking);
 }
 
+/* R2 ジャーナル一覧の ArticleCard (8073:45001) は見出し行高 21 = body-sm
+ * (14px / 1.5) プリセット。要素は文書構造上 h2 のまま体裁だけ body-sm に
+ * 揃える。Unlayered な理由・`:lang()` 前置の理由は上の catalog-card-title と
+ * 同じ。値は body-sm トークン経由で生 px は書かない。 */
+:lang(ja) h2[data-slot="article-card-title"],
+:lang(en) h2[data-slot="article-card-title"] {
+  font: var(--typography-style-body-sm);
+  letter-spacing: var(--typography-style-body-sm-tracking);
+}
+
 /* R2 セクション見出し (商品詳細 8056:1575 / 定期便LP 8071:134 ほか) は h3
  * プリセット (20px / 400) を使う。見出しレベルは文書構造上 h2 が正しいので、
  * 要素は h2 のまま体裁だけ h3 に揃える。Unlayered な理由・`:lang()` 前置の

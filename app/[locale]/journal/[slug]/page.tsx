@@ -2,19 +2,66 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 import { getLocale, getTranslations } from "next-intl/server";
+
 import { getClient } from "@/sanity/lib/client";
 import { ARTICLE_BY_SLUG_QUERY, RELATED_ARTICLES_QUERY } from "@/sanity/lib/queries";
 import { urlFor } from "@/sanity/lib/image";
-import { PortableText } from "@/components/sanity/portable-text";
-import { getMembershipTier } from "@/lib/shopify/auth";
+import { getProductByHandle } from "@/lib/shopify";
 import type { MembershipTier } from "@/lib/shopify/customer";
+import { getMembershipTier } from "@/lib/shopify/auth";
+import { Link } from "@/i18n/navigation";
+import { Section } from "@/components/layout/container";
+import { Breadcrumb } from "@/components/seo/breadcrumb";
+import { PortableText } from "@/components/sanity/portable-text";
+import { ImageCard } from "@/components/ui/image-card";
 import { MemberGate } from "@/components/ui/member-gate";
+import {
+  bodySmClass,
+  captionClass,
+  overlineClass,
+} from "@/components/editorial/rule-list";
+import { AuthorByline } from "@/components/journal/author-byline";
 import { AuthorProfile } from "@/components/journal/author-profile";
 import { BookmarkButton } from "@/components/journal/bookmark-button";
-import { RelatedArticles } from "@/components/journal/related-articles";
-import { CommentSection } from "@/components/community/comment-section";
 import { ArticleReadTracker } from "@/components/journal/article-read-tracker";
-import { Link } from "@/i18n/navigation";
+import { ReadingProgress } from "@/components/journal/reading-progress";
+import { CommentSection } from "@/components/community/comment-section";
+import { cn } from "@/lib/utils";
+
+/**
+ * ジャーナル記事詳細 — Figma【R2: 確定版】実分量 + 記事末尾の関連リンク
+ * (PC 8074:44849 / SP 8074:44999) の実装。
+ *
+ * Figma 実測 (px) → 実装:
+ * - ReadingProgress   高さ 2 の追従バー (fill = 現在地) → `h-0.5` + sticky
+ * - 本文カラム        PC 640 中央 (x400 / 1440)          → `mx-auto max-w-160`
+ * - 縦リズム          24 一定                            → `mt-6`
+ * - Head              JOURNAL → +16 見出し → +16 著者クレジット
+ * - lead              明朝 (秀英横太明朝 = typography.family.special)
+ * - 写真の裁ち落とし  PC 720 (= 640 + 40 x2) / SP 全幅    → `-mx-4 lg:-mx-10`
+ *                     アスペクト SP 3/2 (375x250) / PC 5/3 (720x432)
+ * - H2                前 56 / 後 20                      → `mt-14 mb-5`
+ * - 商品カード        thumb PC 160 / SP 96 + gap 24/16
+ * - 関連記事          行 h72 / thumb 56 / gap 16
+ * - NextRead          pill h48 中央
+ */
+
+type ArticleAuthor = {
+  name: string;
+  slug?: { current: string };
+  image?: { asset: object };
+  role?: string;
+  bio?: string;
+  website?: string;
+};
+
+type RelatedArticle = {
+  _id: string;
+  title: string;
+  slug: { current: string };
+  thumbnail?: { asset: object };
+  mainImage?: { asset: object };
+};
 
 export async function generateMetadata({
   params,
@@ -34,11 +81,7 @@ export async function generateMetadata({
     return {
       title,
       description,
-      openGraph: {
-        title,
-        description,
-        images: image ? [{ url: image }] : [],
-      },
+      openGraph: { title, description, images: image ? [{ url: image }] : [] },
     };
   } catch {
     return {};
@@ -55,33 +98,34 @@ export default async function ArticlePage({
   const t = await getTranslations("journal");
   const tCommon = await getTranslations("common");
   const tComment = await getTranslations("comment");
+  const bt = await getTranslations("breadcrumb");
 
   let article;
   try {
     const client = getClient();
-    article = await client.fetch(ARTICLE_BY_SLUG_QUERY, {
-      slug,
-      language: locale,
-    });
+    article = await client.fetch(ARTICLE_BY_SLUG_QUERY, { slug, language: locale });
   } catch {
     return (
-      <div className="section-narrow">
-        <p className="text-muted-foreground">{t("loadError")}</p>
-      </div>
+      <Section spacing="none" className="pt-6 pb-16 lg:pb-28">
+        <div className="mx-auto w-full max-w-160">
+          <p className="text-sm text-muted-foreground">{t("loadError")}</p>
+        </div>
+      </Section>
     );
   }
 
   if (!article) notFound();
 
-  // Membership tier gating
-  const requiredTier: MembershipTier = article.requiredTier ?? (article.memberOnly ? "standard" : "none");
+  // 会員ティアによる本文ゲート
+  const requiredTier: MembershipTier =
+    article.requiredTier ?? (article.memberOnly ? "standard" : "none");
   const isGated = requiredTier !== "none";
-  const userTier = isGated ? await getMembershipTier() : "none" as MembershipTier;
+  const userTier = isGated ? await getMembershipTier() : ("none" as MembershipTier);
   const tierRank: Record<MembershipTier, number> = { none: 0, standard: 1, premium: 2 };
   const hasAccess = !isGated || tierRank[userTier] >= tierRank[requiredTier];
 
-  // Fetch related articles (parallel with rendering setup)
-  let relatedArticles: unknown[] = [];
+  // 記事末尾の関連記事 (Figma は 3 行)
+  let relatedArticles: RelatedArticle[] = [];
   if (hasAccess && article.category?._id) {
     try {
       const client = getClient();
@@ -89,196 +133,275 @@ export default async function ArticlePage({
         language: locale,
         currentId: article._id,
         categoryId: article.category._id,
-        tagIds: article.tags?.map((t: { _id: string }) => t._id) ?? [],
+        tagIds: article.tags?.map((tag: { _id: string }) => tag._id) ?? [],
       });
     } catch {
-      // silently fail — related articles are non-critical
+      // 関連記事は本文の必須要素ではないので黙って落とす
     }
   }
 
-  return (
-    <article className="section-narrow">
-      {/* Behavior tracking — fires page_view on mount, article_read on 30s or 80% scroll */}
-      <ArticleReadTracker
-        articleSlug={slug}
-        category={article.category?.slug?.current}
-      />
-
-      {/* Header */}
-      <header className="mb-12">
-        {article.category && (
-          <Link
-            href={`/journal/category/${article.category.slug.current}`}
-            className="text-xs text-muted-foreground uppercase tracking-wider mb-4 block hover:text-foreground transition-colors"
-          >
-            {article.category.title}
-          </Link>
-        )}
-        <div className="flex items-start justify-between gap-4 mb-4">
-          <h1>{article.title}</h1>
-          <BookmarkButton
-            articleSlug={slug}
-            articleTitle={article.title}
-            articleImageUrl={
-              article.mainImage?.asset
-                ? urlFor(article.mainImage).width(200).url()
-                : null
+  // 「この記事に出てきた茶葉」— Sanity の relatedProducts (Shopify ハンドル) を
+  // 引き当てる。商品連動のある記事だけに出る枠 (Figma 8074:44880)。
+  const handles: string[] = Array.isArray(article.relatedProducts)
+    ? article.relatedProducts.filter((h: unknown): h is string => typeof h === "string")
+    : [];
+  const relatedProducts = hasAccess
+    ? (
+        await Promise.all(
+          handles.slice(0, 3).map(async (handle) => {
+            try {
+              return await getProductByHandle(handle);
+            } catch {
+              return null;
             }
-            addLabel={t("addToBookmarks")}
-            removeLabel={t("removeFromBookmarks")}
-            addedMessage={t("addedToBookmarks")}
-            removedMessage={t("removedFromBookmarks")}
-            errorMessage={t("bookmarkError")}
-            loginRequiredMessage={t("loginRequiredForBookmark")}
-            className="shrink-0 mt-1"
+          })
+        )
+      ).filter((p): p is NonNullable<typeof p> => Boolean(p))
+    : [];
+
+  const author = article.author as ArticleAuthor | undefined;
+  const authorAvatar = author?.image?.asset
+    ? urlFor(author.image).width(64).height(64).url()
+    : undefined;
+
+  return (
+    <>
+      <ReadingProgress />
+
+      <Section spacing="none" className="pt-6 pb-16 lg:pb-28">
+        <article className="mx-auto w-full max-w-160">
+          {/* 行動計測 — マウントで page_view、30 秒 or 80% スクロールで article_read */}
+          <ArticleReadTracker articleSlug={slug} category={article.category?.slug?.current} />
+
+          <Breadcrumb
+            items={[
+              { label: bt("home"), href: "/" },
+              { label: t("title"), href: "/journal" },
+              { label: article.category?.title ?? article.title },
+            ]}
           />
-        </div>
-        {article.excerpt && (
-          <p className="text-muted-foreground text-sm leading-relaxed">{article.excerpt}</p>
-        )}
-        <div className="flex items-center gap-4 mt-6 text-xs text-muted-foreground">
-          {article.author && (
-            <Link
-              href={`/journal/author/${article.author.slug?.current ?? ""}`}
-              className="hover:text-foreground transition-colors"
-            >
-              {article.author.name}
-            </Link>
-          )}
-          {article.publishedAt && (
-            <time>{new Date(article.publishedAt).toLocaleDateString(locale)}</time>
-          )}
-          {isGated && (
-            <span className="text-muted-foreground">[{tCommon("memberOnly")}]</span>
-          )}
-        </div>
 
-        {/* Tags */}
-        {article.tags && article.tags.length > 0 && (
-          <div className="flex flex-wrap gap-2 mt-4">
-            {article.tags.map((tag: { _id: string; title: string; slug: { current: string } }) => (
-              <Link
-                key={tag._id}
-                href={`/journal/tag/${tag.slug.current}`}
-                className="text-xs text-muted-foreground border border-border px-2 py-0.5 rounded hover:text-foreground hover:border-foreground transition-colors"
-              >
-                {tag.title}
-              </Link>
-            ))}
-          </div>
-        )}
-      </header>
-
-      {/* Main image */}
-      {article.mainImage?.asset && (
-        <div className="mb-12">
-          <Image
-            src={urlFor(article.mainImage).width(1200).url()}
-            alt={article.mainImage.alt || article.title}
-            width={1200}
-            height={675}
-            sizes="(max-width: 768px) 100vw, 768px"
-            className="w-full rounded-md"
-            priority
-          />
-        </div>
-      )}
-
-      {/* Body — gated by membership tier */}
-      {hasAccess ? (
-        <>
-          {article.body && (
-            <div className="prose-custom">
-              <PortableText value={article.body} />
+          {/* Head — キッカー / 見出し / 著者クレジット */}
+          <header className="mt-6">
+            <p className={cn(overlineClass, "text-muted-foreground")}>JOURNAL</p>
+            <div className="mt-4 flex items-start justify-between gap-4">
+              <h1 className="text-foreground">{article.title}</h1>
+              <BookmarkButton
+                articleSlug={slug}
+                articleTitle={article.title}
+                articleImageUrl={
+                  article.mainImage?.asset ? urlFor(article.mainImage).width(200).url() : null
+                }
+                addLabel={t("addToBookmarks")}
+                removeLabel={t("removeFromBookmarks")}
+                addedMessage={t("addedToBookmarks")}
+                removedMessage={t("removedFromBookmarks")}
+                errorMessage={t("bookmarkError")}
+                loginRequiredMessage={t("loginRequiredForBookmark")}
+                className="mt-1 shrink-0"
+              />
             </div>
-          )}
-
-          {/* Audio/Video */}
-          {article.audioVideoUrl && (
-            <div className="mt-8 border border-border rounded-lg p-4">
-              <p className="text-xs text-muted-foreground uppercase tracking-wider mb-2">
-                {t("media")}
-              </p>
-              <a
-                href={article.audioVideoUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm underline underline-offset-2 hover:text-muted-foreground transition-colors"
-              >
-                {article.audioVideoUrl}
-              </a>
-            </div>
-          )}
-
-          {/* Article-level CTA */}
-          {article.cta?.title && (
-            <div className="mt-12 border border-border rounded-lg overflow-hidden">
-              {article.cta.image?.asset && (
-                <Image
-                  src={urlFor(article.cta.image).width(800).height(400).url()}
-                  alt={article.cta.title}
-                  width={800}
-                  height={400}
-                  sizes="(max-width: 768px) 100vw, 768px"
-                  className="w-full object-cover rounded-md"
-                />
-              )}
-              <div className="p-6">
-                <p className="text-sm font-medium mb-3">{article.cta.title}</p>
-                {article.cta.url && (
-                  <a
-                    href={article.cta.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-block text-xs font-medium border border-foreground px-4 py-2 hover:bg-foreground hover:text-background transition-colors"
-                  >
-                    {t("ctaButton")}
-                  </a>
+            {author ? (
+              <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
+                {author.slug?.current ? (
+                  <Link href={`/journal/author/${author.slug.current}`}>
+                    <AuthorByline name={author.name} role={author.role} avatarUrl={authorAvatar} />
+                  </Link>
+                ) : (
+                  <AuthorByline name={author.name} role={author.role} avatarUrl={authorAvatar} />
+                )}
+                {article.publishedAt && (
+                  <time className={cn(captionClass, "text-muted-foreground")}>
+                    {new Date(article.publishedAt).toLocaleDateString(locale)}
+                  </time>
+                )}
+                {isGated && (
+                  <span className={cn(captionClass, "text-muted-foreground")}>
+                    [{tCommon("memberOnly")}]
+                  </span>
                 )}
               </div>
+            ) : null}
+          </header>
+
+          {/* lead — 明朝 (Figma 8074:44859)。font ショートハンドを先に、family を
+              後に当てるためインライン style で順序を固定する (どちらもトークン参照)。 */}
+          {article.excerpt && (
+            <p
+              className="mt-6 text-foreground"
+              style={{
+                font: "var(--typography-style-body-lg)",
+                fontFamily: "var(--typography-family-special)",
+              }}
+            >
+              {article.excerpt}
+            </p>
+          )}
+
+          {/* 冒頭写真 — 本文カラムから両側 40px はみ出す (SP は全幅) */}
+          {article.mainImage?.asset && (
+            <div className="mt-6 -mx-4 lg:-mx-10">
+              <ImageCard
+                className="[--bleed-ar:3/2] lg:[--bleed-ar:5/3] rounded-none lg:rounded-md"
+                style={{ aspectRatio: "var(--bleed-ar)" }}
+              >
+                <Image
+                  src={urlFor(article.mainImage).width(1440).url()}
+                  alt={article.mainImage.alt || article.title}
+                  width={1440}
+                  height={864}
+                  sizes="(max-width: 1024px) 100vw, 720px"
+                  className="h-full w-full object-cover"
+                  priority
+                />
+              </ImageCard>
             </div>
           )}
 
-          {/* Author profile */}
-          {article.author && (
-            <AuthorProfile
-              author={article.author}
-              writtenByLabel={t("writtenBy")}
-            />
+          {hasAccess ? (
+            <>
+              {/* 本文 — 段落間 24 / H2 前 56 後 20 (Figma の縦リズム) */}
+              {article.body && (
+                <div className="prose-custom mt-6 [&>*+*]:mt-6 [&_h2]:mt-14 [&_h2]:mb-5">
+                  <PortableText value={article.body} />
+                </div>
+              )}
+
+              {/* 動画・音声 */}
+              {article.audioVideoUrl && (
+                <div className="mt-6 rounded-lg border border-border p-4">
+                  <p className={cn(overlineClass, "text-muted-foreground")}>{t("media")}</p>
+                  <a
+                    href={article.audioVideoUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={cn(bodySmClass, "mt-2 block underline underline-offset-2")}
+                  >
+                    {article.audioVideoUrl}
+                  </a>
+                </div>
+              )}
+
+              {/* この記事に出てきた茶葉 (商品連動のある記事のみ) */}
+              {relatedProducts.length > 0 && (
+                <section className="mt-6">
+                  <p className={cn(captionClass, "text-muted-foreground")}>{t("teaInArticle")}</p>
+                  <ul className="mt-4 space-y-4">
+                    {relatedProducts.map((product) => (
+                      <li key={product.id} className="flex gap-4 lg:gap-6">
+                        <div className="w-24 shrink-0 lg:w-40">
+                          <ImageCard
+                            image={product.featuredImage?.url}
+                            alt={product.featuredImage?.altText ?? product.title}
+                            style={{ aspectRatio: "1/1" }}
+                          />
+                        </div>
+                        <div className="flex flex-col justify-center gap-2">
+                          <p className="text-foreground">{product.title}</p>
+                          {product.productType ? (
+                            <p className={cn(captionClass, "hidden text-muted-foreground lg:block")}>
+                              {product.productType}
+                            </p>
+                          ) : null}
+                          <Link
+                            href={`/products/${product.handle}`}
+                            className={cn(
+                              bodySmClass,
+                              "flex h-12 items-center text-foreground underline-offset-4 hover:underline"
+                            )}
+                          >
+                            {t("toProduct")}
+                          </Link>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              )}
+
+              {/* 著者プロフィール */}
+              {author && <AuthorProfile author={author} writtenByLabel={t("writtenBy")} />}
+
+              {/* 関連記事 — 記事末尾カード型 (行 72 / サムネ 56) */}
+              {relatedArticles.length > 0 && (
+                <section className="mt-6">
+                  <p className={cn(captionClass, "text-muted-foreground")}>
+                    {t("relatedArticles")}
+                  </p>
+                  <ul className="mt-2">
+                    {relatedArticles.slice(0, 3).map((related) => {
+                      const image = related.thumbnail ?? related.mainImage;
+                      return (
+                        <li key={related._id}>
+                          <Link
+                            href={`/journal/${related.slug.current}`}
+                            className="flex h-18 items-center gap-4"
+                          >
+                            <div className="size-14 shrink-0">
+                              <ImageCard
+                                image={image?.asset ? urlFor(image).width(112).height(112).url() : undefined}
+                                alt={related.title}
+                                style={{ aspectRatio: "1/1" }}
+                              />
+                            </div>
+                            <span
+                              className={cn(
+                                bodySmClass,
+                                "text-foreground underline-offset-4 hover:underline"
+                              )}
+                            >
+                              {related.title}
+                            </span>
+                          </Link>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </section>
+              )}
+
+              {/* NextRead — 行き止まりを作らない (カテゴリ回遊) */}
+              {article.category?.slug?.current && (
+                <div className="mt-6 flex justify-center">
+                  <Link
+                    href={`/journal?category=${article.category.slug.current}`}
+                    className={cn(
+                      bodySmClass,
+                      "flex h-12 items-center rounded-full border border-border px-4 text-foreground transition-colors hover:bg-muted"
+                    )}
+                  >
+                    {t("moreInCategory", { name: article.category.title })}
+                  </Link>
+                </div>
+              )}
+
+              {/* コメント */}
+              <CommentSection
+                targetType="article"
+                targetId={slug}
+                locale={locale}
+                i18n={{
+                  title: tComment("title"),
+                  placeholder: tComment("placeholder"),
+                  submit: tComment("submit"),
+                  submitting: tComment("submitting"),
+                  loginRequired: tComment("loginRequired"),
+                  postedMessage: tComment("postedMessage"),
+                  deletedMessage: tComment("deletedMessage"),
+                  errorPosting: tComment("errorPosting"),
+                  errorDeleting: tComment("errorDeleting"),
+                  noComments: tComment("noComments"),
+                  delete: tComment("delete"),
+                  characterCount: tComment("characterCount"),
+                  moderation: tComment("moderation"),
+                }}
+              />
+            </>
+          ) : (
+            <MemberGate requiredTier={requiredTier} />
           )}
-
-          {/* Related articles */}
-          <RelatedArticles
-            articles={relatedArticles as Parameters<typeof RelatedArticles>[0]["articles"]}
-            heading={t("relatedArticles")}
-            locale={locale}
-          />
-
-          {/* Comment section */}
-          <CommentSection
-            targetType="article"
-            targetId={slug}
-            locale={locale}
-            i18n={{
-              title: tComment("title"),
-              placeholder: tComment("placeholder"),
-              submit: tComment("submit"),
-              submitting: tComment("submitting"),
-              loginRequired: tComment("loginRequired"),
-              postedMessage: tComment("postedMessage"),
-              deletedMessage: tComment("deletedMessage"),
-              errorPosting: tComment("errorPosting"),
-              errorDeleting: tComment("errorDeleting"),
-              noComments: tComment("noComments"),
-              delete: tComment("delete"),
-              characterCount: tComment("characterCount"),
-              moderation: tComment("moderation"),
-            }}
-          />
-        </>
-      ) : (
-        <MemberGate requiredTier={requiredTier} />
-      )}
-    </article>
+        </article>
+      </Section>
+    </>
   );
 }

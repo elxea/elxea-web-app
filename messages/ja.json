@@ -113,7 +113,13 @@
     "addedToBookmarks": "ブックマークに追加しました",
     "removedFromBookmarks": "ブックマークから削除しました",
     "bookmarkError": "操作に失敗しました。もう一度お試しください。",
-    "loginRequiredForBookmark": "ブックマークに追加するにはログインが必要です。"
+    "loginRequiredForBookmark": "ブックマークに追加するにはログインが必要です。",
+    "featured": "特集",
+    "popular": "人気の記事",
+    "categories": "カテゴリ",
+    "teaInArticle": "この記事に出てきた茶葉",
+    "toProduct": "商品ページへ →",
+    "moreInCategory": "「{name}」の記事をもっと読む"
   },
   "teaMenu": {
     "title": "お茶メニュー",
@@ -916,7 +922,9 @@
     "sortLabel": "並び替え",
     "sortNewest": "新着順",
     "sortPriceAsc": "価格が安い順",
-    "sortPriceDesc": "価格が高い順"
+    "sortPriceDesc": "価格が高い順",
+    "sortRecommended": "おすすめ順",
+    "sortOldest": "古い順"
   },
   "productDetail": {
     "specOrigin": "産地",

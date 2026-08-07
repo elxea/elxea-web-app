@@ -113,7 +113,13 @@
     "addedToBookmarks": "Added to bookmarks",
     "removedFromBookmarks": "Removed from bookmarks",
     "bookmarkError": "Action failed. Please try again.",
-    "loginRequiredForBookmark": "Please log in to add to bookmarks."
+    "loginRequiredForBookmark": "Please log in to add to bookmarks.",
+    "featured": "Featured",
+    "popular": "Popular",
+    "categories": "Categories",
+    "teaInArticle": "Tea in this story",
+    "toProduct": "View product →",
+    "moreInCategory": "Read more in \"{name}\""
   },
   "teaMenu": {
     "title": "Tea Menu",
@@ -909,7 +915,9 @@
     "sortLabel": "Sort",
     "sortNewest": "Newest",
     "sortPriceAsc": "Price: low to high",
-    "sortPriceDesc": "Price: high to low"
+    "sortPriceDesc": "Price: high to low",
+    "sortRecommended": "Recommended",
+    "sortOldest": "Oldest first"
   },
   "productDetail": {
     "specOrigin": "産地",
