@@ -27,33 +27,10 @@ declare global {
  *     Everything else — the Next.js app
  */
 
+import { isShopifyPath } from './routing';
+
 export interface Env {
   SHOPIFY_ORIGIN: string;
-}
-
-/** Paths that Shopify must handle — proxy to Shopify origin */
-const SHOPIFY_PATH_PREFIXES = [
-  '/checkouts/',
-  '/checkouts',
-  '/cart/add',
-  '/cart/update',
-  '/cart/change',
-  '/cart/clear',
-  '/cart.js',
-  '/cart.json',
-  '/services/',
-  '/.well-known/shopify/',
-  '/payments/',
-  '/wallets/',
-  // Shopify CDN paths — only allow specific subdirectories needed by checkout
-  '/cdn/shopifycloud/',
-  '/cdn/s/',
-];
-
-function isShopifyPath(pathname: string): boolean {
-  return SHOPIFY_PATH_PREFIXES.some(
-    (prefix) => pathname === prefix || pathname.startsWith(prefix)
-  );
 }
 
 const worker = {
