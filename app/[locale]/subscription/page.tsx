@@ -17,6 +17,7 @@ import {
   StepCards,
   TripleColumn,
 } from "@/components/editorial/section-blocks";
+import { placeholderValue } from "@/lib/placeholders";
 import { cn } from "@/lib/utils";
 
 /**
@@ -34,6 +35,12 @@ import { cn } from "@/lib/utils";
  * - 12ヶ月      2カラム台帳 (行 h48)                   → `Ledger`
  * - FAQ         アコーディオンなし・開いたまま          → `OpenFaqList`
  * - 申し込み    中央 528 幅・CTA 1 個                   → `max-w-132 mx-auto`
+ *
+ * ！公開前に実値の確認が必要 — 初回お届け日と月額はまだ事業側の確定待ち。
+ * 値は `lib/placeholders.ts` のレジストリに集約して `PLACEHOLDER_MARKER` を付けている
+ * (messages/*.json 側は `{firstDelivery}` / `{monthlyPrice}` の差し込み口だけを持つ)。
+ * マーカーが残ったまま production 相当でビルド / テストすると機械的に落ちる。
+ * 差し替え台帳は `docs/placeholders.md`。
  */
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -42,6 +49,10 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 const PLAN_ANCHOR = "plan";
+
+/** 事業側の確定待ちの仮当て値 (差し替え手順は lib/placeholders.ts)。 */
+const FIRST_DELIVERY = placeholderValue("subscription.firstDeliveryDate");
+const MONTHLY_PRICE = placeholderValue("subscription.monthlyPrice");
 
 export default async function SubscriptionLPPage() {
   const t = await getTranslations("subscriptionR2");
@@ -85,9 +96,13 @@ export default async function SubscriptionLPPage() {
     value: t(`month${i + 1}Value`),
   }));
 
+  // 初回お届け日 / 月額は仮当て値。文言は messages 側、値は placeholders 側が持つ。
+  const firstDeliveryRibbon = t("firstDeliveryRibbon", { firstDelivery: FIRST_DELIVERY });
+
   const priceItems = [1, 2, 3, 4].map((n) => ({
     term: t(`price${n}Term`),
-    value: t(`price${n}Value`),
+    // {monthlyPrice} を使うのは price1Value だけ。未使用の値を渡しても無害。
+    value: t(`price${n}Value`, { monthlyPrice: MONTHLY_PRICE }),
   }));
 
   const voiceItems = [1, 2, 3].map((n) => ({
@@ -145,13 +160,13 @@ export default async function SubscriptionLPPage() {
             "flex items-center rounded-full bg-muted px-8 py-3 text-foreground"
           )}
         >
-          {t("firstDeliveryRibbon")}
+          {firstDeliveryRibbon}
         </p>
         <SectionBody className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:gap-8">
           {[0, 1, 2].map((i) => (
             <ImageCard
               key={i}
-              alt={t("firstDeliveryRibbon")}
+              alt={firstDeliveryRibbon}
               aspectRatio="3/2"
             />
           ))}
@@ -248,7 +263,9 @@ export default async function SubscriptionLPPage() {
       {/* プラン選択 + 購入導線 — 最下部のみ / CTA 1 個 (Figma 8071:514) */}
       <PageSection id={PLAN_ANCHOR} className="scroll-mt-24 bg-muted">
         <div className="mx-auto max-w-132 text-center">
-          <p className={cn(h4Class, "text-foreground")}>{t("planLead")}</p>
+          <p className={cn(h4Class, "text-foreground")}>
+            {t("planLead", { monthlyPrice: MONTHLY_PRICE })}
+          </p>
 
           {detail && selectedVariant ? (
             <div className="mt-8 flex flex-col gap-6 text-left">

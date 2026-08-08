@@ -4,6 +4,7 @@ import { getTranslations } from "next-intl/server";
 
 import { Breadcrumb } from "@/components/seo/breadcrumb";
 import { Section } from "@/components/layout/container";
+import { placeholderValue } from "@/lib/placeholders";
 import {
   ChapterBreak,
   MetaRow,
@@ -24,23 +25,29 @@ import {
  * 規約と同じく法的文書のため、英訳は実装側で創作しない (日本語正文のみ)。
  *
  * ！重要 — 公開前に実値の確認が必要
- * Figma の凍結版は法定表記の一部がプレースホルダのまま:
- *   所在地「〒000-0000 東京都◯◯区◯◯ 0-0-0」/ 電話「00-0000-0000」/
- *   運営統括責任者「株式会社elxea 代表取締役」(氏名なし)
- * 特商法 第11条の表示義務を満たさないため、**この値のまま公開してはならない**。
- * 実装は凍結デザインに忠実に置いたうえで、下の PLACEHOLDER 定数に印を付けている。
- * また利用規約 S4 (7850:799) は所在地・メールに別の実値を載せており不一致がある。
- * どちらを正とするかは事業側の確認事項 (BLOCKER として申し送り済み)。
+ * 法定表記の一部 (所在地 / 電話番号 / 運営統括責任者氏名 / 問い合わせメール) は
+ * まだ事業側の確定を待っている。特商法 第11条の表示義務を満たさないため、
+ * **この値のまま公開してはならない**。
+ *
+ * 仮値は本ファイルに直書きせず `lib/placeholders.ts` のレジストリに集約し、
+ * `PLACEHOLDER_MARKER` を付けている。マーカーが残ったまま production 相当の
+ * 環境でビルド / テストすると機械的に落ちる (詳細は lib/placeholders.ts)。
+ * 差し替え台帳は `docs/placeholders.md`。
+ *
+ * また利用規約 S4 (7850:799) は所在地に別の値を載せており不一致がある。
+ * どちらを正とするかは事業側の確認事項 (台帳の Open items に記載)。
  */
 
-/** 公開前に実値へ差し替えが必要な項目。true の値は法的に不十分。 */
-const PLACEHOLDER = true;
+const OPERATIONS_MANAGER = placeholderValue("tokushoho.operationsManager");
+const ADDRESS = placeholderValue("tokushoho.address");
+const PHONE = placeholderValue("tokushoho.phone");
+const EMAIL = placeholderValue("tokushoho.email");
 
-const SELLER: { label: string; value: string; placeholder?: boolean }[] = [
+const SELLER: { label: string; value: string }[] = [
   { label: "販売業者", value: "株式会社elxea" },
-  { label: "運営統括責任者", value: "株式会社elxea 代表取締役", placeholder: PLACEHOLDER },
-  { label: "所在地", value: "〒000-0000 東京都◯◯区◯◯ 0-0-0", placeholder: PLACEHOLDER },
-  { label: "連絡先", value: "hello@roji.jp ／ 00-0000-0000", placeholder: PLACEHOLDER },
+  { label: "運営統括責任者", value: OPERATIONS_MANAGER },
+  { label: "所在地", value: ADDRESS },
+  { label: "連絡先", value: `${EMAIL} ／ ${PHONE}` },
 ];
 
 const GROUPS: { id: string; heading: string; items: { label: string; value: string }[] }[] = [
@@ -117,8 +124,8 @@ const RELATED = [
 
 const DESK = [
   { label: "受付時間", value: "平日 11:00–17:00（土日祝を除く）" },
-  { label: "メール", value: "hello@roji.jp", placeholder: PLACEHOLDER },
-  { label: "電話", value: "00-0000-0000", placeholder: PLACEHOLDER },
+  { label: "メール", value: EMAIL },
+  { label: "電話", value: PHONE },
 ];
 
 export async function generateMetadata(): Promise<Metadata> {
