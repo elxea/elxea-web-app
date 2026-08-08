@@ -2,7 +2,7 @@
   "$schema_note": "Figma node ⇄ code path 対応表。経済化施策① (Decision Log 39c70c9d064c81079145f69744e7b8f5)。自動化が Figma コンポーネントに対して正しいソースファイルを編集できるようにする lookup index。値の二重管理はしない。SoT=Figma (トークン・デザイン値の正本は Figma。コードは追従側で tokens/base.json が Figma の写し、dist/ は生成物 / Setaka 宣言 2026-08-08。旧「案 B = SoT=Code, Figma=参照」を置換)。本ファイルはどちらの向きにも値を持たない lookup index なので、この方針転換で役割は変わらない。検証は scripts/design-system/validate-design-map.ts (schema + code_path 実在 + --figma で node 実在)。",
   "figma_file_key": "AWLnI0XF07e8rScuxPYPc7",
   "figma_components_page": "5246:3",
-  "updated_at": "2026-08-08T13:40:00Z",
+  "updated_at": "2026-08-08T14:20:00Z",
   "conventions": {
     "entry": "{ figma_node_id, figma_name, code_path, kind, notes }。code_path はリポジトリルート相対。inline 定義部品は「定義/描画を含むファイル」を code_path とする (編集対象がそのファイルのため)。",
     "kind": "ds-component = elxea 固有の DS 部品 / module = Header/Footer 等の大型合成モジュール / shadcn = shadcn/ui プリミティブ。",
@@ -940,6 +940,62 @@
       "code_path": "components/auth/auth-card.tsx",
       "kind": "ds-component",
       "notes": "AuthCardMark。64px の success 円 + 白抜きチェック (Figma のテキスト ✓ は lucide Check に置換)。SP は 6750:15886。"
+    },
+    {
+      "figma_node_id": "8095:731",
+      "figma_name": "マイページ (トップ) / R2: 確定版",
+      "code_path": "app/[locale]/account/page.tsx",
+      "kind": "module",
+      "notes": "【R2: 確定版】マイページの section。PC 8095:733 / SP 8095:792。7 ブロック (TitleBlock / GreetingBand / これから / 続き / これまで / お支払い方法 / OpsBand) を組む。部品は components/account/account-parts.tsx。"
+    },
+    {
+      "figma_node_id": "8095:735",
+      "figma_name": "TitleRow + AccountIdentityLine",
+      "code_path": "components/account/account-parts.tsx",
+      "kind": "ds-component",
+      "notes": "AccountTitleBlock。主見出し (.page-title = PC 44 / SP 32) + 「…としてログイン中」+ PC のみ「設定・契約 →」。SP は 1 ブロックに統合 (8095:796)。PC の IdentityLine は 8095:738。C6-2 新規。"
+    },
+    {
+      "figma_node_id": "8095:740",
+      "figma_name": "GreetingBand",
+      "code_path": "components/account/account-parts.tsx",
+      "kind": "ds-component",
+      "notes": "AccountGreetingBand。面 (card) つきの挨拶帯。SP は 8095:799 (リードが 12px に落ちる)。C6-2 新規。"
+    },
+    {
+      "figma_node_id": "8095:753",
+      "figma_name": "SectionHeader (マイページ)",
+      "code_path": "components/account/account-parts.tsx",
+      "kind": "ds-component",
+      "notes": "AccountSectionHeader。節見出し (h4 スケール) + 右の 12px 導線。SP は 8095:812。体裁は globals.css の h2[data-slot=shelf-title] を再利用。C6-2 新規。"
+    },
+    {
+      "figma_node_id": "8095:757",
+      "figma_name": "RecordCard",
+      "code_path": "components/account/account-parts.tsx",
+      "kind": "ds-component",
+      "notes": "AccountRecordCard。写真なしカード (日付 / 見出し / 補足)。PC は 3 行縦積み・SP (8095:816) は左右 2 列を lg:contents で切り替える。C6-2 新規。"
+    },
+    {
+      "figma_node_id": "8095:777",
+      "figma_name": "ExpCard",
+      "code_path": "components/account/account-parts.tsx",
+      "kind": "ds-component",
+      "notes": "AccountExpCard。写真つきカード (PC 160x120 / SP 8095:840 は 96x72)。C6-2 新規。"
+    },
+    {
+      "figma_node_id": "8144:1252",
+      "figma_name": "PaymentMethodCard",
+      "code_path": "components/account/account-parts.tsx",
+      "kind": "ds-component",
+      "notes": "AccountPaymentMethodCard。ご登録のカードの表示のみ (変更 UI は持たない)。SP は 8145:1252。C6-2 新規。"
+    },
+    {
+      "figma_node_id": "8095:787",
+      "figma_name": "AccountOpsBand",
+      "code_path": "components/account/account-parts.tsx",
+      "kind": "ds-component",
+      "notes": "AccountOpsBand + AccountCta。末尾の案内帯。SP は 8095:850 (縦積み)。CTA は高さ 49 / radius-sm で DS Button と寸法体系が違うため専用部品。C6-2 新規。"
     }
   ],
   "unmapped_figma_nodes": [

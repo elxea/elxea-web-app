@@ -1,9 +1,4 @@
 {
-  "app/[locale]/account/page.tsx": {
-    "elxea-tokens/no-raw-colors": {
-      "count": 2
-    }
-  },
   "app/[locale]/account/subscriptions/page.tsx": {
     "elxea-tokens/no-raw-colors": {
       "count": 2

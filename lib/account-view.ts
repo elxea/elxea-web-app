@@ -167,7 +167,7 @@ export function buildUpcoming({
 /** 「続き」= お気に入り (記事を先、次に商品)。写真が無いものは placeholder に落ちる。 */
 export function buildContinueItems(favorites: AccountFavoriteInput[]): AccountMediaItem[] {
   const items: AccountMediaItem[] = favorites
-    .map((f, i) => {
+    .map((f, i): AccountMediaItem | null => {
       const type = str(f.type);
       const targetId = str(f.targetId);
       const title = str(f.title);
@@ -199,7 +199,7 @@ export function buildPast(customer: AccountCustomerInput): AccountRecord[] {
   const orders = customer.orders?.edges ?? [];
 
   return orders
-    .map((edge, i) => {
+    .map((edge, i): AccountRecord | null => {
       const node = edge?.node;
       if (!node) return null;
       const name = str(node.name);
