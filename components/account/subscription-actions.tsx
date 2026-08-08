@@ -217,10 +217,12 @@ export function SubscriptionActions({
                 <Button
                   key={option.labelKey}
                   /* 確定版の chips は 5 個すべて塗りなし (ghost)。いま契約している
-                     頻度をどう示すかは確定版に指定が無いので、DS の控えめな塗り
-                     (secondary) + `aria-pressed` で示す (押せないだけだと画面上で
-                     どれが現在値か分からず、頻度変更の主目的が果たせない)。 */
-                  variant={isCurrent ? "secondary" : "ghost"}
+                     頻度をどう示すかは確定版に指定が無いので、塗り (primary) +
+                     `aria-pressed` で示す (押せないだけだと画面上でどれが現在値か
+                     分からず、頻度変更の主目的が果たせない)。DS の控えめな塗り
+                     `secondary` は二重定義で実行時に金色に解決するため使わない
+                     (是正は DS トークン整合タスク 3b670c9d-064c-8166 側)。 */
+                  variant={isCurrent ? "default" : "ghost"}
                   aria-pressed={isCurrent}
                   disabled={isPending || isCurrent}
                   onClick={() => handleFrequencyChange(option)}

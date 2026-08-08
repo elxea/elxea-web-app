@@ -154,9 +154,15 @@ export function SubscriptionList({ children }: { children: React.ReactNode }) {
  * 持っている。生カラー禁止なので 3 状態すべて DS `Badge` に寄せ、色は semantic
  * token だけで区別する。
  * - active    … `success` (肯定の意図は Figma の緑と同じ。文字は success-foreground
- *                で AA 合格域)
+ *                で AA 合格域 = 実測 5.2:1)
  * - paused    … `outline` (薄い面 + 濃い文字 + 罫線。Figma の薄い chip に最も近い)
- * - cancelled … `secondary` (Figma 6888:11790 の実体そのまま)
+ * - cancelled … `muted` (いちばん静かな面 = 終わっているもの)
+ *
+ * Figma の解約済み (6888:11790) は DS `Badge variant=secondary` の実体だが、
+ * `secondary` は**コード側で二重定義されていて実行時に金色 (#ffc200 / base.json 由来)
+ * に解決する**ため使わない (getComputedStyle で確認済み)。是正は DS トークン整合
+ * タスク 3b670c9d-064c-8166 側で、ここではトークンを触らない。代わりに意図が
+ * いちばん近い `muted` を当てている。
  */
 export function SubscriptionStatusBadge({
   kind,
@@ -182,7 +188,7 @@ export function SubscriptionStatusBadge({
       <Badge
         data-slot="subscription-status-badge"
         data-status="cancelled"
-        variant="secondary"
+        className="bg-muted text-muted-foreground"
       >
         {children}
       </Badge>
@@ -286,7 +292,10 @@ export function SubscriptionLineRow({
       className="flex items-center justify-between gap-3"
     >
       <div className="flex min-w-0 items-center gap-3">
-        <div className="relative size-11 shrink-0 overflow-hidden rounded-sm lg:size-12">
+        <div
+          data-slot="subscription-line-thumb"
+          className="relative size-11 shrink-0 overflow-hidden rounded-sm lg:size-12"
+        >
           {imageUrl ? (
             <Image
               src={imageUrl}

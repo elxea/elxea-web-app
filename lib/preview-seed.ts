@@ -833,9 +833,15 @@ export function seedEventDetail(slug: string): SeedEventDetail | null {
  * - 画面側は見本のとき `preview` を立てて Server Action を 1 度も呼ばない。
  *   見本から実契約への mutation が飛ぶ経路は作らない
  * - 実セッションがあるときは呼ばれない (実データが優先)
+ *
+ * `PREVIEW_SEED_SUBSCRIPTIONS_EMPTY=1` を足すと**空配列**を返す。確定版の
+ * 「契約 0 件の表示」(EmptyCard 6720:9378) はログイン済みで契約が 0 件のときだけ
+ * 出る状態で、セッション無しでは到達できないため、計測用にこの入口を用意している
+ * (空配列は truthy なのでログイン誘導ではなく 0 件表示に落ちる)。
  */
 export function seedSubscriptionContracts(): SubscriptionContract[] | null {
   if (!previewSeedEnabled()) return null;
+  if (process.env.PREVIEW_SEED_SUBSCRIPTIONS_EMPTY === "1") return [];
 
   const line = (
     key: string,
