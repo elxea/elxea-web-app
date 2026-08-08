@@ -11,6 +11,9 @@
  *   3. skipNextBillingCycle は subscriptionBillingCycleSkip へ
  *      billingCycleInput: { contractId, selector: { index } } の 1 引数だけを送る。
  *      旧実装の subscriptionContractId / billingCycleIndex はスキーマに存在しない。
+ *   4. 契約 ID を取る 4 つの mutation (pause / activate / cancel / skip) は
+ *      **すべて同じ GID 形式検証を持つ**。形式不正なら Shopify へ 1 度も
+ *      リクエストを出さずに同じ失敗を返す（skip だけが守られている非対称を作らない）。
  *
  * fetch はスタブして outbound リクエストの本体を観測する（外部送信はしない）。
  * Ref: https://shopify.dev/docs/api/customer/latest/mutations/subscriptionBillingCycleSkip
@@ -21,6 +24,9 @@ import {
   verifySubscriptionContractOwnership,
   resolveNextBillingCycleIndex,
   skipNextBillingCycle,
+  pauseSubscription,
+  activateSubscription,
+  cancelSubscription,
   isSubscriptionContractGid,
 } from "@/lib/shopify/customer";
 
@@ -358,5 +364,105 @@ describe("skipNextBillingCycle", () => {
 
     expect(result.success).toBe(false);
     expect(result.error).toBe("Cycle already skipped");
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* GID 形式検証の対称性 — pause / activate / cancel / skip                     */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * なぜ 4 つ揃えるのか: contractId は Server Action の引数、すなわち信頼できない
+ * HTTP ボディ由来。Customer Account API は「契約が呼び出し元のものか」は見るが
+ * 「id の形が SubscriptionContract か」は見ないので、`gid://shopify/Customer/1` や
+ * 生の `1111` を渡すとそのまま Shopify へ転送され、返ってきたエラー文の違いが
+ * 「どの id が存在するか」を探るオラクルになりうる。形式で弾けば **リクエスト自体を
+ * 出さない**ので、その経路が塞がる。
+ *
+ * 以前は skip だけがこの検証を持っていた（停止・再開・解約は素通し）。ここでは
+ * 4 つが同じ入力に対して同じ結果を返すことをテストで固定して、非対称の再発を防ぐ。
+ */
+const CONTRACT_MUTATIONS = [
+  ["pauseSubscription", pauseSubscription],
+  ["activateSubscription", activateSubscription],
+  ["cancelSubscription", cancelSubscription],
+  ["skipNextBillingCycle", skipNextBillingCycle],
+] as const;
+
+/** 形式として不正な contractId — どれも Shopify へ届いてはいけない。 */
+const MALFORMED_CONTRACT_IDS = [
+  "1111", // 生の数値 id
+  "gid://shopify/Customer/1111", // 別リソース種別
+  "gid://shopify/SubscriptionContract/abc", // 数値サフィックスでない
+  "gid://shopify/SubscriptionContract/", // サフィックス欠落
+  "gid://shopify/SubscriptionContract/1111 ", // 末尾空白
+  " gid://shopify/SubscriptionContract/1111", // 先頭空白
+  "gid://shopify/SubscriptionContract/1111/x", // 余分なセグメント
+  "", // 空文字
+] as const;
+
+describe("契約 ID を取る mutation の GID 形式検証 (対称性)", () => {
+  for (const [name, mutate] of CONTRACT_MUTATIONS) {
+    for (const badId of MALFORMED_CONTRACT_IDS) {
+      it(`${name} は ${JSON.stringify(badId)} を Shopify に送らない`, async () => {
+        stubFetch({ body: { data: {} } });
+
+        const result = await mutate(TOKEN, badId);
+
+        expect(result).toEqual({
+          success: false,
+          error: "Invalid subscription contract ID",
+        });
+        expect(fetchMock).not.toHaveBeenCalled();
+      });
+    }
+  }
+
+  it("4 つの失敗メッセージが完全に一致する (どの操作かを漏らさない)", async () => {
+    const errors: (string | undefined)[] = [];
+    for (const [, mutate] of CONTRACT_MUTATIONS) {
+      stubFetch({ body: { data: {} } });
+      errors.push((await mutate(TOKEN, "1111")).error);
+      vi.unstubAllGlobals();
+    }
+
+    expect(new Set(errors).size).toBe(1);
+  });
+
+  it("形式が正しい GID なら従来どおり mutation へ進む", async () => {
+    for (const [name, mutate] of CONTRACT_MUTATIONS) {
+      // skip は先に cycle 解決を 1 回挟むので 2 応答ぶん積む。
+      stubFetch(
+        {
+          body: {
+            data: {
+              customer: {
+                subscriptionContract: {
+                  id: CONTRACT_GID,
+                  upcomingBillingCycles: {
+                    edges: [
+                      {
+                        node: {
+                          cycleIndex: 1,
+                          skipped: false,
+                          billingAttemptExpectedDate: null,
+                        },
+                      },
+                    ],
+                  },
+                },
+              },
+            },
+          },
+        },
+        { body: { data: { ok: { userErrors: [] } } } }
+      );
+
+      const result = await mutate(TOKEN, CONTRACT_GID);
+
+      expect(result.success, `${name} should reach Shopify for a valid GID`).toBe(true);
+      expect(fetchMock).toHaveBeenCalled();
+      vi.unstubAllGlobals();
+    }
   });
 });

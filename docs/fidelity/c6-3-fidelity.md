@@ -23,9 +23,45 @@
   - 契約0件: `SITE_PASSWORD= PREVIEW_SEED=1 PREVIEW_SEED_SUBSCRIPTIONS_EMPTY=1 next start -p 3167`
     → `scripts/scratch/measure-c63-empty.mjs`
   - 計測スクリプトは `scripts/scratch/` (gitignore対象・使い捨て)
-- 計測日時: 2026-08-09 00:1x–00:4x JST (`origin/feat/c1-ds-foundation` @ `1d7a591` 起点)
+- 計測日時:
+  - 初回2026-08-09 00:1x–00:4x JST (`origin/feat/c1-ds-foundation` @ `1d7a591` 起点)
+  - **R (再計測) 2026-08-09 02:4x JST** (`origin/feat/c1-ds-foundation` @ `2e276bb` 起点 / C6-3R)
+- 色の実測方法 (Rで変更): **canvas `getImageData` の実ピクセル値**で読む。Chromiumの
+  `getComputedStyle` は色を `oklch()` / `lab()` 文字列で返すため、文字列をそのまま
+  「実装値」として載せると嘘の値になる (初回計測の注5 / 注14がこれで誤っていた。
+  下記「Rでの訂正」参照)。ハーネスはCSS色文字列を1x1 canvasに `fillStyle` で
+  流し込み、`getImageData` が返すsRGBバイト列をhex化している。
 - 判定: `[OK]` 一致 (Δ≤2px) / `[仕様]` 意図的な差分 (出典あり) / `[DS案件]` DSトークン整合
   タスク `3b670c9d-064c-8166` に集約済みの既知差分 (本タスクでは直さない)
+
+## R (C6-3R) での訂正 — 初回の原因説明が事実と食い違っていた3件
+
+初回の対比表には、実測し直すと**成り立たない原因説明**が入っていた。事実と、
+訂正後の原因を分けて書く。
+
+| # | 初回の記述 | 実測した事実 | 訂正後の原因 |
+|---|---|---|---|
+| 訂正1 | 注5「罫線色はFigma #888675に対しコードの `border` トークンが**別値に解決する**既知差分」。実装値を `lab(39.88 0.07 -1.89)` と記載 | `--color-border` をcanvas実測すると **#858581** (= `brand-ash`)。`lab(39.88 0.07 -1.89)` は **#5d5e61 = `foreground`** で、`border` トークンの値ではない。つまり初回は「トークンが別値」ではなく**罫線が本文色で描かれていた**ものを測っていた | **実装側の欠落**だった。Tailwind v4の `border` は**太さだけ**で、色クラスが無いと `currentColor` に落ちる (v3のgray-200既定は撤去)。`SubscriptionCardFrame` / `SubscriptionPanel` / `SubscriptionEmptyCard` が `border` のみだったため罫線が `foreground` #5d5e61になっていた。Rで `border-border` を明示して修正。残る差は #858581 vs Figma #888675 (CIE L\* 55.39 vs 55.65でほぼ同値・色味だけolive寄り) で、これが本来の [DS案件] |
+| 訂正2 | 注14「destructiveが #ae4751 (Figma) ではなく **#b9525c相当に解決する既知ドリフト**。C6-1Rで修正予定のため触らない」 | `--color-destructive` をcanvas実測すると **#ae4751** = Figmaと一致。`tokens/base.json` は `oklch(0.537 0.135 17)` で、コミット `d91ae04`「fix(tokens): destructiveをFigma実在値 #ae4751へ戻す」により **すでに是正済み** (初回計測の起点 `1d7a591` では旧値 #b9525cだった) | ドリフトは**残っていない**。「C6-1Rで修正予定」という前提が古く、§7「解約する」と§9「エラー文」は [DS案件] ではなく **[OK]**。Rで判定を差し替えた |
+| 訂正3 | 注16「SPの内容幅が**358 (Figma 350) で、かつ確定版のchip文言が長いため**3行に折り返す」 | chipの文言・個数・順序はFigmaと一致 (文言は長くない)。内容幅はFigmaより**広い** (358 > 350) ので、これが原因なら行数は減るはずで論理が逆。実測した折り返しの根拠は**パネルの内側幅274** (SP): 実装のパネルはカードの**中に**開くので `358 − 2(カード枠) − 40(カードpadding) − 2(パネル枠) − 40(パネルpadding) = 274`。Figmaの「定期便の操作」節はページ直下に置いた注記フレームなので内側幅310 | 原因は**入れ子の深さ**。274では1行目に3個目 (`61.28+8+158.06+8+61.28 = 296.62`) が入らず2/2/1 の3行になる。Figmaの310なら `289 ≤ 310` で3個入り2行。chip自体の寸法差 (+1.3〜5px) は副因 |
+
+初回の未検証な断定も洗い直した (結果は初回どおり):
+
+| 項目 | 初回の断定 | 実測 | 判定 |
+|---|---|---|---|
+| 注8 | `secondary` は二重定義で実行時に金色に解決する | `--color-secondary` = **#ffc202** (`dist/tokens.css` は `tokens/base.json` の金を採用。`tokens/elxea-custom.json` のsand #d5d3c0は勝っていない) | 断定どおり [正] |
+| 注17 | 確定版のchipsは5個すべて塗りなしで、現在値の示し方が**無い** | Figma `6719:14708` の5 instanceを `get_design_context` で確認。塗り指定はどれにも無く、文字色は全て `foreground` | 断定どおり [正] |
+| 注11 | Figmaの縦積みは `flex-wrap` を再現できなかった描画結果 | ACTIVEカード `6717:14573` はcode由来instance (子idが `0:11` 系・レイヤ名がTailwindクラス名) で、その中の `SubscriptionActions (flex-wrap gap-2)` が縦積み。nativeカード `6718:14902` は1ボタンなので縦積みか否かの情報を持たない | 断定どおり [正]。ただし根拠は「code由来instanceだから」でありFigmaに横並びの実例は無い → 確認事項Q2は残す |
+
+## R (C6-3R) で変えた実装
+
+| # | 変更 | 対象 | 理由 |
+|---|---|---|---|
+| 1 | 行の列溝 `gap-3` を外し、商品情報カラムを「行幅 − thumb − 12 − 価格幅」にした | `components/account/subscription-parts.tsx` `SubscriptionLineRow` | 確定版の行の分割は溝ゼロ (§5「商品情報カラム」参照)。旧実装は溝12を余分に持っていたためSPの商品情報が **197.7** (Figma 207より9.3狭い) になり、Figmaでは1行の「和紅茶ティーバッグ（12個入）」が**2行に折り返していた** |
+| 2 | 罫線に `border-border` を明示 | 同 `SubscriptionCardFrame` / `SubscriptionPanel` / `SubscriptionEmptyCard` | 訂正1。DS側 (`Badge variant=outline` 等) と同じ書き方に揃えた |
+| 3 | `pauseSubscription` / `activateSubscription` / `cancelSubscription` にGID形式検証を追加 (skipと対称化) | `lib/shopify/customer.ts` | §13「GID形式検証」参照 |
+
+新規のDS部品は作っていない (1は既存部品のクラス修正、2はDSトークンへの束縛、3はサーバ側の検証追加)。
 
 ## 計測データについて (重要)
 
@@ -82,8 +118,10 @@ PC +32 / SP +8広い」だけで、内部の余白・比率は下表のとおり
 | overline | 行高 | 17 (lh 1.4) | 21 (lh 1.75) | [DS案件] 注2 |
 | overline→h1 | PC溝 | 12 | 12 (`mt-3`) | [OK] |
 | overline→h1 | SP溝 | 8 | 8 (`mt-2`) | [OK] |
-| h1「定期便」 | PC字送り | 32 / 300 / lh 1.2 (h38) | 44 / 300 / lh 1.2 (h52.8) | [仕様] 注3 |
-| h1「定期便」 | SP字送り | 24 / lh 1.3 (h31 / w72) | 32 / lh 1.2 (h38.4) | [仕様] 注3 |
+| h1「定期便」 | **PC文字サイズ** | **32** | **44** (`.page-title`) | **[仕様] 注3** |
+| h1「定期便」 | **SP文字サイズ** | **24** | **32** (`.page-title`) | **[仕様] 注3** |
+| h1「定期便」 | PC字送り (太さ / 行間 / 実高) | 300 / lh 1.2 / h38 | 300 / lh 1.2 / h52.8 (実測) | [仕様] 注3 |
+| h1「定期便」 | SP字送り (太さ / 行間 / 実高) | lh 1.3 / h31 (w72) | lh 1.2 / h38.39 (実測) | [仕様] 注3 |
 | h1→lead | PC溝 | 12 | 12 (`mt-3`) | [OK] |
 | h1→lead | SP溝 | 8 | 8 (`mt-2`) | [OK] |
 | lead | PC字送り | 16 / 1.75 (h28) | 16px / lh 28.8 | [OK] |
