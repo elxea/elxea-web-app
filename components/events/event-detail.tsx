@@ -253,7 +253,10 @@ function EventDetailsLink({
       variant="outline"
       size="cta"
       data-slot="event-details-link"
-      className="w-full self-start px-5 md:w-auto"
+      // `border-border` を明示するのは、shadcn の outline variant が幅だけ指定で
+      // 色は currentColor になり、Figma の罫線 (border #888675) より濃く出るため
+      // (実測: 未指定だと foreground #5d5e61 で描かれる)。
+      className="w-full self-start border-border px-5 md:w-auto"
       asChild
     >
       <a href={href} target="_blank" rel="noopener noreferrer">

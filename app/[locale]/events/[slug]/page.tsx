@@ -209,7 +209,14 @@ export default async function EventPage({
                 <EventBody>
                   <EventBodyHeading>{t("detailsHeading")}</EventBodyHeading>
                   {event.description && (
-                    <div className="prose-custom">
+                    // Figma 6661:13492 / 6664:8170 の本文は 16px。共有の
+                    // PortableText は段落を `text-sm` + `mb-4` で描くので、
+                    // **このページ枠の中だけ** 16px に上げ、最後の段落の下
+                    // マージンを落として節の gap 16 を Figma どおりにする
+                    // (共有部品側を変えると journal / farmers / playlists に
+                    // 波及するため触らない。記事本文の縦リズムは C4-1 で
+                    // 確定した DS 側の leading をそのまま使う)。
+                    <div className="prose-custom [&_p]:text-base [&>*:last-child]:mb-0">
                       <PortableText value={event.description} />
                     </div>
                   )}
@@ -223,10 +230,13 @@ export default async function EventPage({
             : <MemberGate requiredTier={requiredTier} />}
         </EventDetailStack>
 
-        {/* SP 追従 CTA 6664:13496。高さ 0 の目印なので Figma の実寸を歪めない */}
-        <div id="event-page-end" aria-hidden="true" className="h-0" />
+        {/*
+          SP 追従 CTA 6664:13496。ページに spacer を敷かないので Figma の実寸を
+          歪めない。本来の登録カードが見えている間 (CTA の二重表示) と、共通
+          フッターが見えている間 (最下部の表記に重なる) は出さない。
+        */}
         <EventStickyRegisterBar
-          hideWhenVisibleIds={["event-registration", "event-page-end"]}
+          hideWhenVisibleSelectors={["#event-registration", "footer"]}
         />
       </EventRegistrationProvider>
     </EventDetailPage>

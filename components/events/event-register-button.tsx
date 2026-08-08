@@ -233,25 +233,26 @@ export function EventRegisterButton({ className }: { className?: string }) {
  * SP の追従登録バー (Figma Sticky Register Bar 6664:13496)。
  *
  * Figma は SP フレームの最下部に別枠として置いてある = 画面下に固定される追従
- * CTA。`hideWhenVisibleIds` に渡した要素 (ページ内の登録カード / ページ末尾の
- * 目印) が視界に入っている間は出さない。ページ側に spacer を敷かないので、
- * Figma の実寸 (節間 gap / 下余白) を歪めない。
+ * CTA。`hideWhenVisibleSelectors` に渡した要素が視界に入っている間は出さない。
+ * ページ側は `#event-registration` (本来の登録カード = CTA が二重に見えるのを
+ * 防ぐ) と `footer` (フッターに重なって最下部の表記を隠すのを防ぐ) を渡す。
+ * ページ側に spacer を敷かないので Figma の実寸 (節間 gap / 下余白) を歪めない。
  */
 export function EventStickyRegisterBar({
-  hideWhenVisibleIds,
+  hideWhenVisibleSelectors,
 }: {
-  hideWhenVisibleIds: string[];
+  hideWhenVisibleSelectors: string[];
 }) {
   const [visible, setVisible] = useState(false);
   // 配列 prop は毎レンダーで別参照になるので、監視対象の同一性は文字列で見る
   // (登録状態が変わるたびに observer を張り直さないため)。
-  const idsKey = hideWhenVisibleIds.join(",");
+  const selectorKey = hideWhenVisibleSelectors.join(",");
 
   useEffect(() => {
-    const targets = idsKey
+    const targets = selectorKey
       .split(",")
-      .map((id) => document.getElementById(id))
-      .filter((el): el is HTMLElement => el !== null);
+      .map((selector) => document.querySelector(selector))
+      .filter((el): el is HTMLElement => el instanceof HTMLElement);
 
     if (targets.length === 0) return;
 
@@ -267,7 +268,7 @@ export function EventStickyRegisterBar({
     for (const target of targets) observer.observe(target);
 
     return () => observer.disconnect();
-  }, [idsKey]);
+  }, [selectorKey]);
 
   if (!visible) return null;
 
