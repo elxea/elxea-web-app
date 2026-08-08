@@ -19,11 +19,6 @@
       "count": 1
     }
   },
-  "app/[locale]/page.tsx": {
-    "elxea-tokens/no-raw-colors": {
-      "count": 6
-    }
-  },
   "app/[locale]/people/[slug]/page.tsx": {
     "elxea-tokens/no-raw-colors": {
       "count": 1

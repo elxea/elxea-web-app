@@ -57,10 +57,19 @@ const H5 =
  */
 const H3 =
   "[font:var(--typography-style-h3)] [letter-spacing:var(--typography-style-h3-tracking)]";
+/**
+ * `typography.style.body` — 16px / 400 / tracking .05em。読み物の地の文。
+ * Figma `elxea/typography/editorial/jp/body` (16 / lh 1.75 / ls 5) に対応。
+ * トップ R2 の一報リストの行タイトル (8110:2506 ほか h28 = 16 x 1.75) や
+ * 静かな導線リンク (8109:46618 h24) がこのスケール。
+ */
+const BODY =
+  "[font:var(--typography-style-body)] [letter-spacing:var(--typography-style-body-tracking)]";
 
 export {
   OVERLINE as overlineClass,
   CAPTION as captionClass,
+  BODY as bodyClass,
   BODY_SM as bodySmClass,
   H4 as h4Class,
   H5 as h5Class,

@@ -186,6 +186,21 @@ export const EVENTS_QUERY = groq`
   }
 `;
 
+/**
+ * トップ【R2: 確定版】の「つくり手が見える (VOICES)」節 (Figma 8110:2542)。
+ * 一言 (quote) が入っている農家だけを 3 件。未入力の農家は節に出さないので、
+ * 該当 0 件なら節ごと出ない (空枠を出さない方針)。
+ */
+export const TOP_FARMER_VOICES_QUERY = groq`
+  *[_type == "farmer" && language == $language && defined(quote)] | order(name asc) [0...3] {
+    _id,
+    name,
+    slug,
+    region,
+    quote
+  }
+`;
+
 export const EVENT_BY_SLUG_QUERY = groq`
   *[_type == "event" && slug.current == $slug && language == $language][0] {
     _id,

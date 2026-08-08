@@ -176,6 +176,31 @@ h1.auth-card-title[data-emphasis="strong"] {
   letter-spacing: var(--typography-style-h3-tracking);
 }
 
+/* トップ【R2: 確定版】の節見出し (Figma 8109:46599「茶葉」/ 8109:46571
+ * 「行為から、茶葉を探す」/ 8109:46594「正解を、押し付けない。」・実測 h38) は
+ * `elxea/typography/editorial/jp/h1` = 32px / Light / lh 1.2。ページ主見出し
+ * (44px display = `.page-title` / `.hero-display`) の 1 段下で、商品詳細 R2 の
+ * `section-title` (20px) より 1 段上。見出しレベルは文書構造上 h2 が正しいので
+ * 要素は h2 のまま体裁だけ h1 トークンに揃える。Unlayered な理由・`:lang()`
+ * 前置の理由は上の catalog-card-title と同じ。lh は Figma の 1.2 を明示する
+ * (`:lang(ja) h2 { line-height: 1.3 }` を上書き。詳細度 (0,2,1) > (0,1,1))。 */
+:lang(ja) h2[data-slot="top-section-title"],
+:lang(en) h2[data-slot="top-section-title"] {
+  font: var(--typography-style-h1);
+  letter-spacing: var(--typography-style-h1-tracking);
+  line-height: 1.2;
+}
+
+/* トップ【R2: 確定版】導線ブロックのタイル見出し (Figma 0:10「お茶」ほか・
+ * 実測 h36 = 24 x 1.5) は h2 プリセット (24px / 400)。タイルは節の下位なので
+ * 要素は h3 のまま体裁だけ h2 に揃える。Unlayered な理由・`:lang()` 前置の
+ * 理由は上の catalog-card-title と同じ。値は h2 トークン経由で生 px は書かない。 */
+:lang(ja) h3[data-slot="service-guide-tile-title"],
+:lang(en) h3[data-slot="service-guide-tile-title"] {
+  font: var(--typography-style-h2);
+  letter-spacing: var(--typography-style-h2-tracking);
+}
+
 /* elxea Journal 記事詳細【R2: 確定版】の本文内 節見出し (Figma 8110:46910) は
  * `elxea/typography/editorial/jp/h1` = 32px / Light / lh 1.2 / tracking .02em。
  * 記事本文の H2 は Sanity の blockContent 由来で data-slot を持てないため、

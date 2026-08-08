@@ -972,3 +972,88 @@ export function seedTeaMenuDetail(slug: string): SeedTeaMenuDetail | null {
     },
   };
 }
+
+// ---------------------------------------------------------------------------
+// Top page — 一報リスト (SEASONAL / JOURNAL) と VOICES
+// ---------------------------------------------------------------------------
+
+export type SeedNotice = {
+  _id: string;
+  title: string;
+  slug: { current: string };
+  publishedAt?: string;
+};
+
+/** Figma 8110:2505-2513 (SEASONAL) の見本行。 */
+const SEED_NOTICES: ReadonlyArray<{ title: string; publishedAt: string }> = [
+  { title: "新茶のしまい方 — 一番茶を秋まで", publishedAt: "2026-08-04T15:00:00.000Z" },
+  { title: "夏の水出し、はじめました", publishedAt: "2026-07-19T15:00:00.000Z" },
+  { title: "八女・新茶の入荷を開始しました", publishedAt: "2026-06-30T15:00:00.000Z" },
+];
+
+/** Figma 8109:46607-46615 (JOURNAL) の見本行。 */
+const SEED_JOURNAL_ROWS: ReadonlyArray<{ title: string; publishedAt: string }> = [
+  { title: "茶葉の保存は、難しく考えない", publishedAt: "2026-07-27T15:00:00.000Z" },
+  { title: "水出しという選択肢", publishedAt: "2026-07-13T15:00:00.000Z" },
+  { title: "産地を訪ねる — 八女", publishedAt: "2026-06-29T15:00:00.000Z" },
+];
+
+/**
+ * トップの一報リストの見本行。`kind` で SEASONAL / JOURNAL を切り替える。
+ * 詳細ルートを持たない dummy なので `_id` は seed 接頭辞つき (呼び側が
+ * `isSeedId` で判定して一覧へ通す)。
+ */
+export function seedTopNotices(kind: "notice" | "journal" = "notice"): SeedNotice[] {
+  const rows = kind === "journal" ? SEED_JOURNAL_ROWS : SEED_NOTICES;
+  const prefix = kind === "journal" ? "journal-row" : "notice";
+  return rows.map((row, i) => ({
+    _id: `${SEED_ID_PREFIX}${prefix}-${i}`,
+    title: row.title,
+    slug: { current: `${prefix}-${i}` },
+    publishedAt: row.publishedAt,
+  }));
+}
+
+export type SeedFarmerVoice = {
+  _id: string;
+  name: string;
+  slug: { current: string };
+  region?: string;
+  quote: string;
+};
+
+/** Figma 8110:2549-2558 (VOICES) の見本 3 件。 */
+const SEED_FARMER_VOICES: ReadonlyArray<{
+  name: string;
+  region: string;
+  quote: string;
+}> = [
+  {
+    name: "中村",
+    region: "嬉野・釜炒り",
+    quote:
+      "同じ畑でも、摘む日が3日ちがえば別の茶になります。その差を隠さずに送りたいと思っています。",
+  },
+  {
+    name: "川畑",
+    region: "知覧・浅蒸し",
+    quote: "霧が晴れるまで摘まない。待った分だけ、湯を下げたときの甘みが出ます。",
+  },
+  {
+    name: "大石",
+    region: "川根・中蒸し",
+    quote:
+      "渋みは悪者ではありません。食事のあとに飲むなら、むしろ輪郭があるほうがいい。",
+  },
+];
+
+/** トップ VOICES の見本 3 件。詳細ルートは無いので `_id` は seed 接頭辞つき。 */
+export function seedFarmerVoices(): SeedFarmerVoice[] {
+  return SEED_FARMER_VOICES.map((voice, i) => ({
+    _id: `${SEED_ID_PREFIX}farmer-voice-${i}`,
+    name: voice.name,
+    slug: { current: `farmer-voice-${i}` },
+    region: voice.region,
+    quote: voice.quote,
+  }));
+}

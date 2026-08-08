@@ -2,7 +2,7 @@
   "$schema_note": "Figma node ⇄ code path 対応表。経済化施策① (Decision Log 39c70c9d064c81079145f69744e7b8f5)。自動化が Figma コンポーネントに対して正しいソースファイルを編集できるようにする lookup index。値の二重管理はしない。SoT=Figma (トークン・デザイン値の正本は Figma。コードは追従側で tokens/base.json が Figma の写し、dist/ は生成物 / Setaka 宣言 2026-08-08。旧「案 B = SoT=Code, Figma=参照」を置換)。本ファイルはどちらの向きにも値を持たない lookup index なので、この方針転換で役割は変わらない。検証は scripts/design-system/validate-design-map.ts (schema + code_path 実在 + --figma で node 実在)。",
   "figma_file_key": "AWLnI0XF07e8rScuxPYPc7",
   "figma_components_page": "5246:3",
-  "updated_at": "2026-08-09T00:10:00Z",
+  "updated_at": "2026-08-08T17:04:29Z",
   "conventions": {
     "entry": "{ figma_node_id, figma_name, code_path, kind, notes }。code_path はリポジトリルート相対。inline 定義部品は「定義/描画を含むファイル」を code_path とする (編集対象がそのファイルのため)。",
     "kind": "ds-component = elxea 固有の DS 部品 / module = Header/Footer 等の大型合成モジュール / shadcn = shadcn/ui プリミティブ。",
@@ -1115,6 +1115,69 @@
       "code_path": "app/[locale]/tea-menu/[slug]/page.tsx",
       "kind": "module",
       "notes": "お茶メニュー詳細。この画面も R2 確定版フレームが存在しない (Structure List 行 36b70c9d064c8159915bca38ddc7965d の ステータス：Design=Not started)。構造の正本は商品詳細【R2: 確定版】PC 8056:1517 / SP 8057:1700 の節骨格 (components/editorial/section-blocks.tsx = PageSection / SectionHead / SectionBody / SpecBand)。本ノードは内容モデル (お茶の詳細 4 項目 6654:13244 / 淹れ方ガイド 3 項目 6654:13259 / 購入 / 関連記事 6654:13272) と見本文言の由来として登録。主見出しは 44px display の全体裁定。データが無い節・行は出さない (変A はスペック 4 行を常時表示していたが是正)。C9-1 新規。"
+    },
+    {
+      "figma_node_id": "8109:46558",
+      "figma_name": "【R2: 確定版】トップ (必須5本 + 追加4 / 導線ブロック最下部) — PC 1440",
+      "code_path": "app/[locale]/page.tsx",
+      "kind": "module",
+      "notes": "トップ /ja。節の並びと データ配線はページ側。骨格部品は top-blocks.tsx。"
+    },
+    {
+      "figma_node_id": "8109:46620",
+      "figma_name": "【R2: 確定版】トップ (必須5本 + 追加4 / 導線ブロック最下部) — SP 375",
+      "code_path": "app/[locale]/page.tsx",
+      "kind": "module",
+      "notes": "同 PC 8109:46558 の SP 版。実装は同一ファイル (レスポンシブ)。"
+    },
+    {
+      "figma_node_id": "8109:46560",
+      "figma_name": "Hero (グリッド内・非対称2カラム)",
+      "code_path": "components/marketing/top-blocks.tsx",
+      "kind": "ds-component",
+      "notes": "TopHero。PC 左 text 416 + IMG 864 / SP は写真が全幅で先頭。"
+    },
+    {
+      "figma_node_id": "8109:46597",
+      "figma_name": "節見出し (キッカー + 32px 見出し)",
+      "code_path": "components/marketing/top-blocks.tsx",
+      "kind": "ds-component",
+      "notes": "TopSectionHead。体裁は globals.css の h2[data-slot=\"top-section-title\"] (h1 トークン 32px)。"
+    },
+    {
+      "figma_node_id": "8110:2503",
+      "figma_name": "新着・季節の一報 (SEASONAL) — 一報リスト",
+      "code_path": "components/marketing/top-blocks.tsx",
+      "kind": "ds-component",
+      "notes": "FeedList。ジャーナル 8109:46605 / イベント 8110:2516 も同じ行型を共有。"
+    },
+    {
+      "figma_node_id": "8109:46572",
+      "figma_name": "茶を探す (カテゴリ) タイル行",
+      "code_path": "components/marketing/top-blocks.tsx",
+      "kind": "ds-component",
+      "notes": "ActionTileGrid / ActionTile。写真 416x300 + ラベルのみ。PC 3列 x 2段。"
+    },
+    {
+      "figma_node_id": "8109:46592",
+      "figma_name": "About / 章切り (Aesop明度反転)",
+      "code_path": "components/marketing/top-blocks.tsx",
+      "kind": "ds-component",
+      "notes": "ChapterStatement。bg=primary / 見出し=primary-foreground / 補助=brand sand。"
+    },
+    {
+      "figma_node_id": "8109:46616",
+      "figma_name": "導線ブロック (茶/ジャーナル/イベント/roji/About) — 最下部",
+      "code_path": "components/marketing/top-blocks.tsx",
+      "kind": "ds-component",
+      "notes": "ServiceGuideBlock。bg=brand sand。4 タイル + About 行。"
+    },
+    {
+      "figma_node_id": "8109:46617",
+      "figma_name": "購入導線 (静か・最下部)",
+      "code_path": "components/marketing/top-blocks.tsx",
+      "kind": "ds-component",
+      "notes": "QuietLinkRow。中央 1 本のリンク行 (タップ域 44)。"
     }
   ],
   "unmapped_figma_nodes": [
