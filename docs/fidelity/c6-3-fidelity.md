@@ -22,6 +22,9 @@
     → `scripts/scratch/measure-c63.mjs`
   - 契約0件: `SITE_PASSWORD= PREVIEW_SEED=1 PREVIEW_SEED_SUBSCRIPTIONS_EMPTY=1 next start -p 3167`
     → `scripts/scratch/measure-c63-empty.mjs`
+  - R (再計測) は同じ手順でポートを変え (3175 / 3177)、色を canvas 実測に切り替えた
+    → `scripts/scratch/measure-c63r.mjs` / `measure-c63r-empty.mjs` /
+    `measure-c63r-prefix.mjs` (旧実装の行の溝だけを DOM で戻して比較するもの)
   - 計測スクリプトは `scripts/scratch/` (gitignore対象・使い捨て)
 - 計測日時:
   - 初回2026-08-09 00:1x–00:4x JST (`origin/feat/c1-ds-foundation` @ `1d7a591` 起点)
