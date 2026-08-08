@@ -9,40 +9,43 @@
         "$description": "gray-20 (#ebe9e0) — cream, Figma page background (VariableID:373:398). Was gray-40 sand #d5d3c0 (legacy Webflow); corrected to Figma fidelity 2026-07-13."
       },
       "foreground": {
-        "$value": "oklch(0.482 0.005 271.3)",
-        "$description": "gray-100 (#5d5e61) — Webflow text-color"
+        "$value": "oklch(0.397 0.002 247.9)",
+        "$description": "graphite (#464748) — Figma Variable `foreground` の実値 (get_variable_defs 2026-08-09 / node 8109:46558)。Figma が正本なのでコードを合わせた (旧値 oklch(0.482 0.005 271.3) = charcoal #5d5e61 は Webflow text-color 由来で Figma に存在しない値)。暗くなる方向なので明るい面に載る文字はすべて対比が上がる: background 5.330 → 7.655 / card 5.832 → 8.376 / muted 5.330 → 6.759。secondary 面 (4.004 → 6.167) と success 面 (3.630 → 5.213) は WCAG AA 未達から達成に転じる。Figma でも foreground と primary はどちらも #464748 で同値。DS トークン整合タスクで是正。"
       },
       "card": {
         "$value": "oklch(0.963 0.008 98.9)",
         "$description": "#f4f3ed — Figma Variable `card` の実値 (get_variable_defs 2026-08-08 / node 6684:8698)。Figma が正本なのでコードを合わせた (旧値 oklch(0.863 0.026 102.0) = #d5d3c0 は Webflow 由来の gray-40 で、Figma より 3 段暗く、面が背景より暗くなって意図が反転していた)。旧値では foreground (#5d5e61) とのコントラストが 4.29:1 で WCAG AA 未達 (新値 5.83:1 で達成)。C5-1 で是正。"
       },
       "card-foreground": {
-        "$value": "oklch(0.482 0.005 271.3)"
+        "$value": "oklch(0.397 0.002 247.9)",
+        "$description": "graphite (#464748) — `foreground` と同値。Figma は面ごとに文字色変数を分けず `foreground` 1 変数で、カード内の値も #464748 (c7-1 忠実度表の実測)。card 面との対比 5.832 → 8.376。"
       },
       "popover": {
         "$value": "oklch(0.933 0.012 96.4)",
         "$description": "gray-20 (#ebe9e0) — light popover surface"
       },
       "popover-foreground": {
-        "$value": "oklch(0.482 0.005 271.3)"
+        "$value": "oklch(0.397 0.002 247.9)",
+        "$description": "graphite (#464748) — `foreground` と同値 (card-foreground と同じ理由)。"
       },
       "primary": {
         "$value": "oklch(0.397 0.002 247.9)",
         "$description": "gray-120 (#464748) — Webflow text-color_hover"
       },
       "primary-foreground": {
-        "$value": "oklch(1 0 0)"
+        "$value": "oklch(0.979 0.005 95.5)",
+        "$description": "#f9f8f4 — Figma Variable `primary-foreground` の実値 (get_variable_defs 2026-08-09 / node 8109:46558)。Figma が正本なのでコードを合わせた (旧値 oklch(1 0 0) = 純白は Figma に存在しない)。primary 面 (#464748) との対比は 9.311 → 8.762 で低下するが WCAG AA (4.5:1) は達成。"
       },
       "secondary": {
-        "$value": "oklch(0.846 0.173 85.6)",
-        "$description": "Gold (#ffc200) — Webflow secondary-color"
+        "$value": "oklch(0.863 0.026 102.0)",
+        "$description": "sand (#d5d3c0) — Figma Variable `secondary` の実値 (c6-3 / c7-1 忠実度表の実測、node 8109:46558 の `sand` と同値)。Figma が正本なのでコードを合わせた (旧値 oklch(0.846 0.173 85.6) = Gold #ffc200 は Webflow secondary-color 由来で、Figma で secondary を指定した要素が実行時に金色に解決していた)。`tokens/elxea-custom.json` はビルド対象外なので二重定義ではなく、実効定義はこの 1 つだけ。secondary-foreground (#464748) との対比 5.751 → 6.167。"
       },
       "secondary-foreground": {
         "$value": "oklch(0.397 0.002 247.9)"
       },
       "muted": {
-        "$value": "oklch(0.933 0.012 96.4)",
-        "$description": "gray-20 (#ebe9e0) — muted surface"
+        "$value": "oklch(0.892 0.018 99.8)",
+        "$description": "#dedccf — Figma Variable `muted` の実値 (get_variable_defs 2026-08-09 / node 8109:46558)。Figma が正本なのでコードを合わせた (旧値 oklch(0.933 0.012 96.4) は `background` と完全同値で、写真プレースホルダ枠や muted 面が地に溶けて不可視 1.00:1 だった)。background との差は 1.133:1 / ΔL* 4.7 で面の区別がつく。muted-foreground との対比 5.875 → 5.187 (AA 達成) / foreground との対比 5.330 → 6.759。注意: 罫線 `border` (#888675) を muted 面の内側に引くと 2.668:1 で 3:1 を下回るので、両側が muted になる罫線は作らない。"
       },
       "muted-foreground": {
         "$value": "oklch(0.460 0.006 106.6)",
@@ -63,16 +66,16 @@
         "$value": "oklch(1 0 0)"
       },
       "border": {
-        "$value": "oklch(0.615 0.006 106.6)",
-        "$description": "gray-80 (#858581) — Webflow border-line"
+        "$value": "oklch(0.617 0.025 101.7)",
+        "$description": "#888675 — Figma Variable `border` の実値 (get_variable_defs 2026-08-09 / node 8109:46558)。Figma が正本なのでコードを合わせた (旧値 oklch(0.615 0.006 106.6) = gray-80 #858581 は Webflow border-line 由来で、明度は同じだが彩度が足りず黄緑寄りの色味が出ていなかった)。background との対比 3.045 → 3.022 / card との対比 3.332 → 3.306 で、いずれも UI 部品の 3:1 を維持。"
       },
       "input": {
-        "$value": "oklch(0.615 0.006 106.6)",
-        "$description": "gray-80 (#858581) — matches border"
+        "$value": "oklch(0.617 0.025 101.7)",
+        "$description": "#888675 — `border` と同値 (輪郭ロールは Figma でも `border` 1 変数)。border だけ動かすと同じ役割の色が 2 種に割れるため一緒に移した。"
       },
       "ring": {
-        "$value": "oklch(0.615 0.006 106.6)",
-        "$description": "gray-80 (#858581)"
+        "$value": "oklch(0.617 0.025 101.7)",
+        "$description": "#888675 — `border` と同値 (旧値も border と同値だった不変条件を維持)。background との対比 3.022 でフォーカス表示の 3:1 を満たす。"
       },
       "success": {
         "$value": "oklch(0.807 0.050 178.3)",
@@ -1094,7 +1097,8 @@
       "ringColor": {
         "$type": "color",
         "default": {
-          "$value": "oklch(0.615 0.006 106.6)"
+          "$value": "oklch(0.617 0.025 101.7)",
+          "$description": "= color.semantic.ring (#888675)。border / input / ring と同値を保つ (旧値 #858581 と同様に semantic 側と揃える)。DS トークン整合タスクで是正。"
         },
         "primary": {
           "$value": "oklch(0.397 0.002 247.9)"
@@ -1166,7 +1170,8 @@
       "radius": {
         "$type": "dimension",
         "default": {
-          "$value": "0.375rem"
+          "$value": "0.5rem",
+          "$description": "8px — Figma Buttons の `radius-lg` (= 8) に合わせた (旧値 0.375rem = 6px は shadcn 既定の `rounded-md` で、c6-1 §5 注6 の Δ2px 差分の出どころ)。`components/ui/button.tsx` の `rounded-lg` と対応する。"
         }
       },
       "iconGap": {
