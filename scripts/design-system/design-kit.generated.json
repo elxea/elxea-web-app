@@ -191,7 +191,7 @@
         "destructive": {
           "value": "oklch(0.537 0.135 17)",
           "css_var": "--color-destructive",
-          "hex_note": "#b9525c tea-red"
+          "hex_note": "#ae4751 tea-red (Figma Variable destructive の実値。C6-1R で #b9525c のドリフトから是正)"
         },
         "destructive-foreground": {
           "value": "oklch(1 0 0)",

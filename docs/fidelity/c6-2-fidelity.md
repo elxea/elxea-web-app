@@ -398,7 +398,9 @@ in-flight分が `net::ERR_ABORTED` になる)。マイページ固有のURL / AP
 注21 (C6-1Rで訂正): 旧記述は「137 entries」だったが実測は**141**。本レーンの
 コミット `8e076d2` の前後で `scripts/design-system/design-map.json` の `entries`
 は **133 → 141** (差分 = 8件。「8件追加」の部分は正しい)。総数の137は誤記。
-参考: 現在のブランチ先端では **148 entries** (C7-1が7件追加済み)。
+参考: C6-1Rのrebase時点 (`feat/c1-ds-foundation` = `50c48d7`) では **156 entries**
+(C7-1が7件・C6-3が8件追加済み)。この総数は後続レーンが足すたびに増えるので、
+**数字を引用するときは必ず実行してその場で測る**こと。
 検証コマンド: `pnpm validate:design-map` の最終行 `OK: design-map valid — N entries checked`。
 
 `eslint-suppressions.json` から `app/[locale]/account/page.tsx` の

@@ -9,8 +9,12 @@ const alertVariants = cva(
     variants: {
       variant: {
         default: "bg-card text-card-foreground",
+        // 本文の不透明度を落とさない (`text-destructive/90` を使わない): 面 `card`
+        // #f4f3ed に対し /90 の合成色 #b55861 は 4.162:1 で WCAG AA (4.5:1) に届かず、
+        // 100% なら 4.944:1 で合格する。shadcn 既定の /90 はトーンを弱めるためだけの
+        // 装飾で意味を持たない不透明度なので外す (C6-1R)。
         destructive:
-          "bg-card text-destructive *:data-[slot=alert-description]:text-destructive/90 [&>svg]:text-current",
+          "bg-card text-destructive *:data-[slot=alert-description]:text-destructive [&>svg]:text-current",
       },
     },
     defaultVariants: {

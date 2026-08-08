@@ -982,7 +982,7 @@
             "hex_note": "#ffc200 gold"
           },
           "destructive": {
-            "hex_note": "#b9525c tea-red"
+            "hex_note": "#ae4751 tea-red (Figma Variable destructive の実値。C6-1R で #b9525c のドリフトから是正)"
           },
           "border": {
             "hex_note": "#858581 ash / gray-80"
