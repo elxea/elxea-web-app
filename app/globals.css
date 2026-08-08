@@ -180,6 +180,16 @@ h1.contact-title {
   letter-spacing: var(--typography-style-h4-tracking);
 }
 
+/* R2 カート 確定版の注文サマリー見出し (Figma 6684:164 / 6686:14229) は
+ * 14px / 500 / lh 1.5 = h5 プリセット。パネル 1 枚 = 1 セクションなので要素は
+ * 文書構造上 h2 のまま体裁だけ h5 に揃える。Unlayered な理由・`:lang()` 前置の
+ * 理由は上の catalog-card-title と同じ。値は h5 トークン経由で生 px は書かない。 */
+:lang(ja) h2[data-slot="summary-title"],
+:lang(en) h2[data-slot="summary-title"] {
+  font: var(--typography-style-h5);
+  letter-spacing: var(--typography-style-h5-tracking);
+}
+
 :root {
   /* Third-party brand colors */
   --brand-line: #06C755;

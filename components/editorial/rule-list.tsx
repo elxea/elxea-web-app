@@ -43,6 +43,13 @@ const BODY_SM =
 const H4 =
   "[font:var(--typography-style-h4)] [letter-spacing:var(--typography-style-h4-tracking)]";
 /**
+ * `typography.style.h5` — 14px / 500 / tracking .02em。h4 の 1 段下。
+ * Figma `elxea/typography/editorial/jp/h5` に対応 (カート SP のタイトル /
+ * 注文サマリーの見出しなど、小さいブロック見出し)。
+ */
+const H5 =
+  "[font:var(--typography-style-h5)] [letter-spacing:var(--typography-style-h5-tracking)]";
+/**
  * `typography.style.h3` — 20px / 400 / tracking .05em。節見出しと同スケール。
  * 見出し要素 (h2/h3) には `globals.css` の `[data-slot="section-title"]` 規則が
  * 当たるので、こちらは「見出しではないが h3 スケールで組む」テキスト
@@ -56,6 +63,7 @@ export {
   CAPTION as captionClass,
   BODY_SM as bodySmClass,
   H4 as h4Class,
+  H5 as h5Class,
   H3 as h3Class,
 };
 
