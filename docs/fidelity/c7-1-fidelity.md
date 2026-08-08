@@ -273,6 +273,29 @@ Figma正本どおり2本を実装した。
 
 ---
 
+### 9-2. Vercel Previewでの再計測 (rebase後)
+
+Preview: `https://elxea-web-jst4ec2xb-setaka1103s-projects.vercel.app`
+(見本データを描くため **このdeploy限定**で `PREVIEW_SEED=1` を渡している。
+プロジェクトの環境変数は変更していない)
+
+| 項目 | 結果 |
+|---|---|
+| `/ja/events` | 200 |
+| `/ja/events/seed-event-1` (PC / SP) | 200 / 200 |
+| **Preview実測vs local prod実測** | **数値差分0件** (§1-7の全項目を突き合わせ) |
+| console `error` / `warning` / `pageerror` | **0件** |
+| `requestfailed` | 71件 = RSC prefetch中断69 + Sentry送信2 (localと同じ内訳) |
+| 一覧 → 詳細 | Previewでもクリック遷移成立 (`h1=新茶テイスティング会 2026`) |
+| 追従バー | SPで登録カード通過後に表示 / PCは `display:none` |
+
+見本フラグを渡さない素のPreview (`elxea-web-33q345ce5-…`) では
+`/ja/events/seed-event-1` が **not-foundを描く**ことも確認した。
+`seedEventDetail()` がフラグ未設定で `null` を返す設計どおりで、
+productionに見本が漏れないことの裏取りになっている。
+
+---
+
 ## 10. DS側に追加したもの (既存画面への波及なし・実測根拠つき)
 
 | 追加物 | Figma実測の出どころ | 既存画面への波及 (実測) |
