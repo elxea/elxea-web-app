@@ -373,10 +373,24 @@ canvas実測そのものが正しく動いている裏取りになっている�
 | `error` | **0** | — |
 | `warning` | **0** | — |
 | `pageerror` | **0** | — |
-| `requestfailed` | 135 | RSC prefetchの中断 (`?_rsc=…` / `net::ERR_ABORTED`) 131 + Sentry ingest (ローカル未到達) 4 |
+| `requestfailed` | 117〜135 (実行ごとに変動) | RSC prefetchの中断 (`?_rsc=…` / `net::ERR_ABORTED`) + Sentry ingest (ローカル未到達) 4 |
 
 `requestfailed` はページのエラーではない (Next.jsが遷移時に投機的prefetchを
-キャンセルするため必ず出る。C7-1レーンと同じ内訳)。**ページ由来のエラーは0件**。
+キャンセルするため必ず出る。件数はprefetchのタイミング依存で毎回変わる。
+C7-1レーンと同じ内訳)。**ページ由来のエラーは0件**。
+
+### rebase後の再計測 (本表の数値がrebase後も有効であることの裏取り)
+
+`origin/feat/c1-ds-foundation` (6618941 = C6-1Rの `destructive` トークン是正) の上に
+rebaseしたあと、同じハーネスで**全4パターンを再計測して差分を機械比較した**:
+
+- 計測値の差分 **0件** (`farmers_pc` / `farmers_sp` / `tea_pc` / `tea_sp` の全キーを
+  フラット化して突き合わせ。出力 `/tmp/c91-measure2.json` vs `/tmp/c91-measure3.json`)
+- statusは4パターンすべて **200**
+- `error` / `warning` / `pageerror` は再計測でも **0件**
+
+C6-1Rが触ったのは `semantic.destructive` と `elevation.focus.ringColor.destructive` のみで、
+本レーンの2画面は `destructive` を1箇所も使わないため影響が出ないことと整合する。
 
 ---
 
