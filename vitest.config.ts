@@ -23,6 +23,14 @@ export default defineConfig({
           exclude: ['e2e/**', 'node_modules/**'],
           environment: 'node',
           globals: true,
+          // Vitest 4 leaves NODE_ENV as 'development' here, so modules that
+          // fail fast on missing production secrets unless NODE_ENV === 'test'
+          // (e.g. lib/shopify/customer.ts guarding SESSION_SECRET) could not be
+          // imported by a unit test at all. Declare the test environment
+          // explicitly so those guards take their intended test path.
+          env: {
+            NODE_ENV: 'test',
+          },
         },
         resolve: {
           alias: {
