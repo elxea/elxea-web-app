@@ -19,6 +19,7 @@
  */
 
 import type { AccountView } from "@/lib/account-view";
+import type { SubscriptionContract } from "@/lib/shopify/customer";
 import type { Cart } from "@/lib/shopify/types";
 
 /** True when preview seeding is enabled via either the unified or legacy flag. */
