@@ -17,7 +17,7 @@
     節の地色は加えて要素そのものの実ピクセルでも二重確認している。
 - 計測日時: 2026-08-09 02:0x JST (origin/feat/c1-ds-foundation `0c68a59` へ rebase 後に再計測・差分なし)
 - 判定: `[OK]` 一致 / `[仕様]` 意図的な差分 (理由付き) / `[DS案件]` DSトークン整合タスク
-  (3b670c9d-064c-8166) に集約済みの既知差分 / `[要判断]` Setaka判断待ち
+  (https://app.notion.com/p/3b670c9d064c81668becdbb97c74b510) に集約済みの既知差分 / `[要判断]` Setaka判断待ち
 
 ---
 
@@ -250,6 +250,61 @@ Figma `8110:2503` / `8109:46605` / `8110:2516` は同一骨格。共有部品 `F
 
 ---
 
+## 13. Vercel Preview での裏取り (実データ)
+
+Preview: https://elxea-web-ov40uy9m3-setaka1103s-projects.vercel.app (2026-08-09 JST・commit 4f88401)
+
+`PREVIEW_SEED` は Vercel に設定していないので、Preview は **本番 Sanity / Shopify の実データ**で
+描かれる。同じハーネス (`scripts/c81-measure.mjs`) を Preview に対して実行し、local の
+seed 計測と突き合わせた。
+
+| 項目 | 結果 | 判定 |
+|---|---|---|
+| `/ja` HTTP status | 200 (PC / SP 両ビューポート) | [OK] |
+| ブラウザコンソール `error` | **PC 0 件 / SP 0 件** | [OK] |
+| `pageerror` (未捕捉例外) | PC 0 件 / SP 0 件 | [OK] |
+| 横スクロール | document 幅 = viewport 幅 (1440 / 375) | [OK] |
+| 色 (実ピクセル) | 地色 #ebe9e0 / 章切り #464748 / 導線ブロック #d5d3c0 / 見出し #464748 | [OK] local と全一致 |
+| グリッド | 商品 PC `304px x4` gap32 / SP 1列 343 で 2 枚表示 | [OK] local と全一致 |
+| 節の余白 | PC / SP とも local 計測と全一致 | [OK] |
+
+### 「データが無い節は出さない」の実データ検証
+
+Preview では実データの都合で一部の節が出ない。これは設計どおりで、**空枠が出ていない**ことの
+実機確認になった。
+
+| 節 | Preview での挙動 | 理由 |
+|---|---|---|
+| 新着・季節の一報 | 3 行表示 | 実記事あり |
+| 茶 (EC) | 4 点表示 (SP 2 点) | 実商品あり |
+| 茶を探す (カテゴリ) | **1 タイル**表示 | 実 Shopify コレクションが 1 件のみ |
+| ジャーナル | 3 行表示 | 実特集記事あり |
+| イベント | **節ごと非表示** | 本番 Sanity に未来日のイベントが 0 件 |
+| roji 定期便 | 表示 (静的文言) | データ非依存 |
+| つくり手の声 (VOICES) | **節ごと非表示** | `quote` が入った農家が 0 件 |
+| About 章切り / 導線ブロック / 購入導線 | 表示 | データ非依存 |
+
+Figma 密度 (カテゴリ 6 タイル / イベント 3 行 / VOICES 3 列) での寸法検証は、local の
+`PREVIEW_SEED=1` ビルドで実施した (本文 §1-§11 の実測値)。Preview は「実データでの
+非表示挙動とコンソール健全性」の裏取りに使っている。
+
+### 導線先の到達性 (Preview 実測)
+
+| リンク元 | 遷移先 | status |
+|---|---|---|
+| Hero CTA / 購入導線 / 導線ブロック TEA | `/ja/products` | 200 |
+| 一報リスト・ジャーナル行 / 導線ブロック JOURNAL | `/ja/journal` | 200 |
+| イベント行 / 導線ブロック EVENT | `/ja/events` | 200 |
+| 導線ブロック ROJI | `/ja/subscription` | 200 |
+| 導線ブロック About 行 | `/ja/about` | 200 |
+| カテゴリタイル | `/ja/collections` (+ `/collections/[handle]`) | 200 |
+| VOICES 名前 | `/ja/farmers` (+ `/farmers/[slug]`) | 200 |
+
+トップから導線を張っていないが実在する画面 (参考・§注23): `/ja/playlists` 200 / `/ja/signs` 200 /
+`/ja/tea-menu` 200。R2 確定版に該当節・該当タイルが無いためリンクしていない。
+
+---
+
 ## 注
 
 1. **お茶カルテ診断の節は出していない** — Figma `8110:2514`「3つの質問で、あなたの一杯を。
@@ -265,7 +320,7 @@ Figma `8110:2503` / `8109:46605` / `8110:2516` は同一骨格。共有部品 `F
    共有トークンを1ページ都合で動かさない方針を踏襲。DS案件に集約。
 5. **CTA高さ49 → 48** — spacing scale (0.25rem刻み) に束縛するため48。生pxは使わない。
 6. **罫線色 #888675 → #858581** — `--color-border` の実値差。DSトークン整合タスク
-   3b670c9d-064c-8166に集約済み。本タスクでは触らない。
+   https://app.notion.com/p/3b670c9d064c81668becdbb97c74b510 に集約済み。本タスクでは触らない。
 7. **SP主見出し** — SPはbase h1 (32px) を全ページで使う (`.hero-display` はmd+ のみ)。
    Figma SPは28px相当1行だが、32pxでは2行になる。SPのスケール統一を優先。
 8. **キッカー / captionのline-height・字間** — `elxea/typography/editorial/en/overline` は
@@ -305,6 +360,10 @@ Figma `8110:2503` / `8109:46605` / `8110:2516` は同一骨格。共有部品 `F
     実装は他のタイルと同じ24 (spacing 6) に揃えた。
 22. **静かな導線のタップ域24 → 44** — WCAG 2.5.5 / 2.5.8の最小タップ域44を満たす。
     文字サイズ・色・位置はFigmaどおり。
+23. **プレイリスト / みんなの気配への導線は張っていない** — R2 確定版 (`8109:46558` /
+    `8109:46620`) に該当する節が無く、導線ブロックも 4 タイル固定 (茶 / ジャーナル / イベント /
+    roji)。ルート自体は実在し 200 を返すので、導線を足すかは Figma 改訂側の判断。
+    勝手にタイルや節を増やすと忠実度が崩れるため足していない。**Setaka 判断待ち**。
 
 ---
 
@@ -313,5 +372,8 @@ Figma `8110:2503` / `8109:46605` / `8110:2516` は同一骨格。共有部品 `F
 - Figma PC: https://www.figma.com/design/AWLnI0XF07e8rScuxPYPc7/?node-id=8109-46558
 - Figma SP: https://www.figma.com/design/AWLnI0XF07e8rScuxPYPc7/?node-id=8109-46620
 - Notion Structure DB「トップ」行: https://app.notion.com/33270c9d064c81c48d19de307d9a1156
-- DSトークン整合タスク: https://app.notion.com/p/3b670c9d064c8166 (foreground / 罫線色 / 字間 /
+- DSトークン整合タスク: https://app.notion.com/p/3b670c9d064c81668becdbb97c74b510 (foreground / 罫線色 / 字間 /
   primary-foreground / muted==backgroundを集約)
+- Vercel Preview (実データ裏取り): https://elxea-web-ov40uy9m3-setaka1103s-projects.vercel.app/ja
+  (2026-08-09 JST / commit 4f88401)
+- 計測ハーネス: `scripts/c81-measure.mjs`
