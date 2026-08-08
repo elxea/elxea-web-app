@@ -198,7 +198,18 @@
     "follow": "Follow",
     "unfollow": "Unfollow",
     "followedMessage": "Now following this farmer",
-    "unfollowedMessage": "Unfollowed"
+    "unfollowedMessage": "Unfollowed",
+    "kickerDefault": "PEOPLE",
+    "interviewerLabel": "Interviewer",
+    "workKicker": "THE WORK",
+    "interviewKicker": "INTERVIEW",
+    "interviewHead": "In conversation",
+    "questionPrefix": "Q",
+    "profileKicker": "PROFILE",
+    "fieldKicker": "THE FIELD",
+    "teasKicker": "TEAS BY THIS PERSON",
+    "otherKicker": "OTHER PEOPLE",
+    "otherHead": "The people behind roji"
   },
   "event": {
     "lead": "",

@@ -198,7 +198,18 @@
     "follow": "フォローする",
     "unfollow": "フォロー解除",
     "followedMessage": "農家をフォローしました",
-    "unfollowedMessage": "フォローを解除しました"
+    "unfollowedMessage": "フォローを解除しました",
+    "kickerDefault": "PEOPLE",
+    "interviewerLabel": "聞き手",
+    "workKicker": "THE WORK",
+    "interviewKicker": "INTERVIEW",
+    "interviewHead": "聞く",
+    "questionPrefix": "Q",
+    "profileKicker": "PROFILE",
+    "fieldKicker": "THE FIELD",
+    "teasKicker": "TEAS BY THIS PERSON",
+    "otherKicker": "OTHER PEOPLE",
+    "otherHead": "roji に関わる人たち"
   },
   "event": {
     "lead": "お茶を淹れる、味わう、語らう。elxea がひらく、お茶を囲む時間へ。",

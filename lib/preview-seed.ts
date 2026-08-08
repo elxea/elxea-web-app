@@ -167,6 +167,170 @@ export function withSeedFarmers<T extends SeedFarmer>(
 }
 
 // ---------------------------------------------------------------------------
+// Farmer detail (R2 確定版 — Figma 8079:3748 / 8079:3966)
+// ---------------------------------------------------------------------------
+
+/**
+ * 農家詳細の確定版は 9 節構成だが、production dataset の farmer ドキュメントは
+ * まだ R2 のフィールド (work / interview / profileBand / fieldBand /
+ * fieldSeasons …) を持たない。素のままではほぼ全節が「データ無し = 非表示」に
+ * なり、レイアウトのレビューも Figma との実測対比もできない。
+ *
+ * そこで **プレビュー時のみ** 未入力フィールドを Figma 確定版の見本文言で
+ * 埋める。フラグが無いときは入力をそのまま返すので production は無影響
+ * (Sanity への書き戻しも一切しない)。
+ *
+ * 埋めるのは「未入力のフィールドだけ」。実データが入っている項目は上書きしない
+ * ので、編集側が本文を入れていくにつれて見本は自動的に減っていく。
+ */
+export type SeedFarmerDetail = {
+  kicker?: string;
+  role?: string;
+  meta?: string;
+  stats?: { value: string; label: string }[];
+  interviewer?: { name: string; role?: string; image?: { asset: object; alt?: string } };
+  quote?: string;
+  quoteBy?: string;
+  workHead?: string;
+  work?: { name: string; description?: string; photo?: { asset: object; alt?: string } }[];
+  interview?: { question: string; answer: string }[];
+  profileBand?: { label: string; value: string }[];
+  fieldBand?: { label: string; value: string }[];
+  fieldHead?: string;
+  fieldSeasons?: {
+    name: string;
+    description?: string;
+    photo?: { asset: object; alt?: string };
+  }[];
+  teasHead?: string;
+};
+
+/** Figma 確定版 (8079:3748) の見本文言。プレビュー専用の見本であり正本ではない。 */
+const SEED_FARMER_DETAIL = {
+  kicker: "PEOPLE 04 — ROASTER, HONYAMA",
+  role: "焙煎士 ／ roji の火入れを担う",
+  meta: "静岡県 本山｜2007年から、roji に届くすべての茶葉に火を入れている。",
+  stats: [
+    { value: "18", label: "YEARS" },
+    { value: "6", label: "STORIES" },
+  ],
+  interviewer: { name: "髙橋 志乃", role: "roji 編集 ／ 産地取材担当" },
+  quote:
+    "火は、こちらの都合では動いてくれない。その日の葉がどんな顔をしているかで、決めさせてもらう。",
+  workHead: "火入れは、三度に分けて決まる",
+  work: [
+    {
+      name: "葉を見る",
+      description:
+        "袋を開けて、まず匂いを嗅ぐ。数値は後から。手ざわりと香りで、その日の火の強さを決める。",
+    },
+    {
+      name: "火を入れる",
+      description:
+        "一度に仕上げず、弱い火で三度に分ける。急がないぶん、葉の芯まで均一に熱が通る。",
+    },
+    {
+      name: "止める",
+      description:
+        "いちばん難しいのは止めどき。冷まし台に広げた瞬間の香りで、合っていたかどうかが分かる。",
+    },
+  ],
+  interview: [
+    {
+      question: "焙煎士になろうと思ったきっかけは何でしたか。",
+      answer:
+        "なろうと思ったことはないんです。製材所にいたころ、木を乾かす釜の番をしていて、同じ木でも日によって仕上がりが変わるのが面白かった。お茶に変わっただけで、やっていることはあまり変わっていません。",
+    },
+    {
+      question: "いちばん難しいのはどの工程ですか。",
+      answer:
+        "止めどきです。火を入れるのは誰でもできますが、止めるのは戻せない。あと十秒いけるかもしれない、と思ったところで下ろします。",
+    },
+    {
+      question: "roji で飲む人に、何を届けたいですか。",
+      answer:
+        "「今日の分」でいいと思っています。毎日ちがう葉に、毎日ちがう火を入れているので、同じ味は二度と出ません。それを欠点だと思っていた時期もありましたが、いまはそれごと飲んでもらえたらいい。正解を決めてしまうと、次の年の葉が入る場所がなくなるので。",
+    },
+  ],
+  profileBand: [
+    { label: "拠点", value: "静岡県 静岡市 葵区 本山" },
+    { label: "担当", value: "火入れ・仕上げ（全ライン）" },
+    { label: "はじまり", value: "2007年 ／ 前職は製材所の乾燥釜" },
+    { label: "手の届く量", value: "年間 約1.2t まで" },
+  ],
+  fieldBand: [
+    { label: "産地", value: "静岡県 静岡市 葵区 本山 ／ 安倍川上流" },
+    { label: "標高", value: "320〜480m ／ 川霧の出る谷あい" },
+    { label: "品種", value: "やぶきた・つゆひかり・在来" },
+    { label: "栽培", value: "自然仕立て ／ 農薬不使用 (2015年〜)" },
+  ],
+  fieldHead: "畑の一年は、三つの季節で決まる",
+  fieldSeasons: [
+    {
+      name: "芽をまつ",
+      description:
+        "冬のあいだ畝の草は残しておく。土の温度が落ちきらないぶん、春の芽が揃って動きだす。",
+    },
+    {
+      name: "摘む",
+      description:
+        "一番茶は手摘みと機械を使い分ける。同じ畑でも斜面の上と下で三日ずれる、その差を待つ。",
+    },
+    {
+      name: "休ませる",
+      description: "摘んだあとは肥料を足さずに休ませる。収量は落ちるが、翌年の香りが変わる。",
+    },
+  ],
+  teasHead: "このひとが火を入れたお茶",
+} as const;
+
+/** 確定版 8 節「このひとが育てたお茶」の見本 (Shopify にハンドルが無いとき用)。 */
+export const SEED_FARMER_TEAS: { title: string; note: string; price: string }[] = [
+  { title: "本山 やぶきた 一番茶", note: "三度火・弱", price: "¥ 1,480" },
+  { title: "川根 在来 秋摘み", note: "二度火・中", price: "¥ 1,280" },
+  { title: "本山 くき ほうじ", note: "直火・強", price: "¥ 980" },
+];
+
+/**
+ * 未入力の R2 フィールドを見本で埋めた農家ドキュメントを返す。
+ * フラグ未設定なら入力をそのまま返す (production は完全に無影響)。
+ */
+export function withSeedFarmerDetail<T extends SeedFarmerDetail & { name: string }>(
+  farmer: T,
+): T {
+  if (!previewSeedEnabled()) return farmer;
+
+  const s = SEED_FARMER_DETAIL;
+  const has = (v: unknown) => (Array.isArray(v) ? v.length > 0 : Boolean(v));
+
+  return {
+    ...farmer,
+    kicker: has(farmer.kicker) ? farmer.kicker : s.kicker,
+    role: has(farmer.role) ? farmer.role : s.role,
+    meta: has(farmer.meta) ? farmer.meta : s.meta,
+    stats: has(farmer.stats) ? farmer.stats : [...s.stats],
+    interviewer: has(farmer.interviewer) ? farmer.interviewer : { ...s.interviewer },
+    quote: has(farmer.quote) ? farmer.quote : s.quote,
+    // 帰属は実在の氏名を使う (見本の氏名を inject しない)。
+    quoteBy: has(farmer.quoteBy)
+      ? farmer.quoteBy
+      : `${farmer.name} ／ ${has(farmer.role) ? farmer.role : s.role}`,
+    workHead: has(farmer.workHead) ? farmer.workHead : s.workHead,
+    work: has(farmer.work) ? farmer.work : s.work.map((w) => ({ ...w })),
+    interview: has(farmer.interview) ? farmer.interview : s.interview.map((q) => ({ ...q })),
+    profileBand: has(farmer.profileBand)
+      ? farmer.profileBand
+      : s.profileBand.map((r) => ({ ...r })),
+    fieldBand: has(farmer.fieldBand) ? farmer.fieldBand : s.fieldBand.map((r) => ({ ...r })),
+    fieldHead: has(farmer.fieldHead) ? farmer.fieldHead : s.fieldHead,
+    fieldSeasons: has(farmer.fieldSeasons)
+      ? farmer.fieldSeasons
+      : s.fieldSeasons.map((f) => ({ ...f })),
+    teasHead: has(farmer.teasHead) ? farmer.teasHead : s.teasHead,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Elxea Journal (tea-menu journal — akane / sui / sohi themes)
 // ---------------------------------------------------------------------------
 

@@ -29,11 +29,6 @@
       "count": 2
     }
   },
-  "app/[locale]/farmers/[slug]/page.tsx": {
-    "elxea-tokens/no-raw-colors": {
-      "count": 1
-    }
-  },
   "app/[locale]/farmers/page.tsx": {
     "elxea-tokens/no-raw-colors": {
       "count": 2

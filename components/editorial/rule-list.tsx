@@ -42,12 +42,21 @@ const BODY_SM =
 /** `typography.style.h4` — 16px / 500 / tracking .02em。行の主見出し。 */
 const H4 =
   "[font:var(--typography-style-h4)] [letter-spacing:var(--typography-style-h4-tracking)]";
+/**
+ * `typography.style.h3` — 20px / 400 / tracking .05em。節見出しと同スケール。
+ * 見出し要素 (h2/h3) には `globals.css` の `[data-slot="section-title"]` 規則が
+ * 当たるので、こちらは「見出しではないが h3 スケールで組む」テキスト
+ * (肩書 / 引用文) 用。Figma `elxea/typography/editorial/jp/h3` に対応。
+ */
+const H3 =
+  "[font:var(--typography-style-h3)] [letter-spacing:var(--typography-style-h3-tracking)]";
 
 export {
   OVERLINE as overlineClass,
   CAPTION as captionClass,
   BODY_SM as bodySmClass,
   H4 as h4Class,
+  H3 as h3Class,
 };
 
 /* -------------------------------------------------------------------------- */

@@ -744,6 +744,83 @@
       "code_path": "components/layout/header.tsx",
       "kind": "module",
       "notes": "SP ハンバーガー展開時の全幅オーバーレイ (Sheet)。ヘッダー56 / Nav行56 / 検索(下線2px) / アカウント導線の4ブロック。AudioToggle は Figma 非掲載だが機能維持のため末尾に残す (意図的差分)。"
+    },
+    {
+      "figma_node_id": "8079:3748",
+      "figma_name": "農家詳細 / 【R2: 確定版】People 詳細テンプレ統合 (茶園セクション拡張) — PC 1440",
+      "code_path": "app/[locale]/farmers/[slug]/page.tsx",
+      "kind": "module",
+      "notes": "9 ブロック構成 (PersonHead / Quote / THE WORK / INTERVIEW / PROFILE / THE FIELD 帯 / THE FIELD 一年 / TEAS / OTHER PEOPLE)。データが無い節は枠ごと出さない。SP は 8079:3966。bio / FollowButton / CommentSection は Figma 非掲載だが既存機能なので残す (意図的差分)。"
+    },
+    {
+      "figma_node_id": "8079:3966",
+      "figma_name": "農家詳細 / 【R2: 確定版】People 詳細テンプレ統合 (茶園セクション拡張) — SP 375",
+      "code_path": "app/[locale]/farmers/[slug]/page.tsx",
+      "kind": "module",
+      "notes": "同ページの SP。写真は Figma では全幅 375 だが実装はページカラム幅 343 に収める (C4-3 と同じ判断)。"
+    },
+    {
+      "figma_node_id": "8079:3750",
+      "figma_name": "PersonHead (写真 + 氏名 + 肩書 + メタ + 実数 + 聞き手)",
+      "code_path": "components/farmers/farmer-detail.tsx",
+      "kind": "ds-component",
+      "notes": "FarmerHead。主見出しは 44px display (.page-title) — Figma フレームは 32px だがページ主見出し 44px の全体裁定に従う。SP は 8079:3970。"
+    },
+    {
+      "figma_node_id": "8079:3771",
+      "figma_name": "Quote (反転面)",
+      "code_path": "components/farmers/farmer-detail.tsx",
+      "kind": "ds-component",
+      "notes": "FarmerQuote。primary 面 / 640 幅の中央列だが行は左揃え。SP は 8079:3990。"
+    },
+    {
+      "figma_node_id": "8079:3774",
+      "figma_name": "THE WORK (手仕事の三工程)",
+      "code_path": "components/farmers/farmer-detail.tsx",
+      "kind": "ds-component",
+      "notes": "ProcessGrid。番号は並び順から自動。罫線 0 本・グルーピングは余白のみ。SP は 8079:3993。茶園の一年 (8079:3947) と同じ部品。"
+    },
+    {
+      "figma_node_id": "8079:3793",
+      "figma_name": "INTERVIEW (本文幅640 / サイドバー無し)",
+      "code_path": "components/farmers/farmer-detail.tsx",
+      "kind": "ds-component",
+      "notes": "InterviewList。Q 番号は並び順から自動。見出し→本体は他節 52 に対しここだけ PC 76。SP は 8079:4011。"
+    },
+    {
+      "figma_node_id": "8079:3806",
+      "figma_name": "PROFILE (データ帯)",
+      "code_path": "app/[locale]/farmers/[slug]/page.tsx",
+      "kind": "module",
+      "notes": "FarmerDataBand (muted 面) + 共有部品 SpecBand を罫線なしで使う (farmerBandClass)。SP は 8079:4024。"
+    },
+    {
+      "figma_node_id": "8079:3937",
+      "figma_name": "FIELD DATA (茶園データ帯: 産地 / 標高 / 品種 / 栽培)",
+      "code_path": "app/[locale]/farmers/[slug]/page.tsx",
+      "kind": "module",
+      "notes": "PROFILE 帯と同型。茶園を持たない人は fieldBand 未入力で帯ごと出ない。SP は 8079:4071。"
+    },
+    {
+      "figma_node_id": "8079:3947",
+      "figma_name": "THE FIELD (茶園の一年: 芽をまつ / 摘む / 休ませる)",
+      "code_path": "components/farmers/farmer-detail.tsx",
+      "kind": "ds-component",
+      "notes": "ProcessGrid を再利用 (THE WORK と同型)。SP は 8079:4081。"
+    },
+    {
+      "figma_node_id": "8079:3816",
+      "figma_name": "このひとが育てたお茶 (購入導線は最下部)",
+      "code_path": "components/farmers/farmer-detail.tsx",
+      "kind": "ds-component",
+      "notes": "FarmerCardGrid。CTA ボタン・在庫あおりは置かず価格のみ静かに併記する (Figma roji 方針注記)。ほかの人をたずねる (8079:3835) と同じ部品で note のスケールだけ切替。SP は 8079:4034。"
+    },
+    {
+      "figma_node_id": "8079:3835",
+      "figma_name": "ほかの人をたずねる",
+      "code_path": "components/farmers/farmer-detail.tsx",
+      "kind": "ds-component",
+      "notes": "FarmerCardGrid (noteScale=caption)。Figma 注記どおり PersonCard は DS 未登録のため素の骨格。SP は 8079:4053。"
     }
   ],
   "unmapped_figma_nodes": [

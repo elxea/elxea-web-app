@@ -135,7 +135,38 @@ export const FARMER_BY_SLUG_QUERY = groq`
     country,
     bio,
     relatedProducts,
+    kicker,
+    role,
+    meta,
+    stats[]{value, label},
+    interviewer->{name, role, image},
+    quote,
+    quoteBy,
+    workHead,
+    work[]{name, description, photo},
+    interview[]{question, answer},
+    profileBand[]{label, value},
+    fieldBand[]{label, value},
+    fieldHead,
+    fieldSeasons[]{name, description, photo},
+    teasHead,
     seo
+  }
+`;
+
+/**
+ * 農家詳細の最下部「ほかの人をたずねる」(Figma 8079:3835 / 8079:4053)。
+ * 表示中の本人を除いた 3 件。肩書行は role を使う。
+ */
+export const OTHER_FARMERS_QUERY = groq`
+  *[_type == "farmer" && language == $language && slug.current != $slug] | order(name asc) [0...3] {
+    _id,
+    name,
+    slug,
+    photo,
+    role,
+    region,
+    country
   }
 `;
 
