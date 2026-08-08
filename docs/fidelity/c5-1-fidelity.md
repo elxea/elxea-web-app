@@ -379,3 +379,27 @@ Next.js RSC prefetch** (Header / Footerが全ナビリンクをprefetchし、ブ
 | Q5 | 空カートの文言をFigmaプレースホルダ「カートは空です」ではなく既存コピーのまま維持した | 既存コピー維持 (Figma側はレイアウト用の見本と解釈) | カートのみ |
 | Q6 | 数量 `-` を下限1で無効にし、0による暗黙削除をやめた (削除は「削除」ボタン経由) | この挙動 (破壊的操作を明示操作に寄せる) | カートのみ |
 | Q7 | 本文色 `foreground` がFigma (#464748) とコード (#5d5e61) でΔlab L 9.8食い違う。全R2ページが `text-foreground` でbaseのgraphite規則を打ち消している (注16) | 「`foreground` をFigma値へ寄せる」か「各ページの `text-foreground` を外す」かをDS案件として決める。本レーンは兄弟ページとの一貫性を優先し現状維持 | 本文テキストの全画面 |
+
+## 12. Vercel Preview での確認 (2026-08-08 22:36 JST)
+
+- Preview URL: https://elxea-web-5csejkdcw-setaka1103s-projects.vercel.app
+- デプロイ元コミット: `d6ff31b` (`feat/c1-ds-foundation` に push 済み)
+
+| 項目 | PC 1440 | SP 390 |
+|---|---|---|
+| `/ja/cart` HTTP | 200 | 200 |
+| console error | 0 | 0 |
+| console warning | 0 | 0 |
+| pageerror | 0 | 0 |
+| `requestfailed` | 25 (すべて `?_rsc=` prefetch abort) | 11 (同) |
+| 明細行の有無 | なし (= 空カート・仕様どおり) | なし |
+| 空カート枠 上下 padding / gap / 揃え | 80 / 80 / 24 / center | 80 / 80 / 24 / center |
+| 空カート 文言 font-size / lh | 14 / 25.2 | 14 / 25.2 |
+| 「商品一覧」ボタン 高さ / 遷移先 | 36 / `/ja/products` | 36 / `/ja/products` |
+
+Preview は `PREVIEW_SEED` 未設定なので **空カート状態が正**。数値はローカル production
+ビルドでの空カート計測 (7 節) と一致した。DOM に `カート` / `Items in your cart` /
+`data-slot="cart-header"` / 空カート文言が含まれることも HTML 取得で確認済み。
+
+商品ありの状態は Shopify の cart cookie を持つブラウザでのみ出るため、Preview では
+実カート投入後に確認する (本タスクでは注文確定を行わないため未実施)。
