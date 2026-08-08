@@ -34,16 +34,6 @@
       "count": 1
     }
   },
-  "app/[locale]/login/line-login-button.tsx": {
-    "elxea-tokens/no-raw-colors": {
-      "count": 1
-    }
-  },
-  "app/[locale]/login/page.tsx": {
-    "elxea-tokens/no-raw-colors": {
-      "count": 1
-    }
-  },
   "app/[locale]/membership/page.tsx": {
     "elxea-tokens/no-raw-colors": {
       "count": 1
