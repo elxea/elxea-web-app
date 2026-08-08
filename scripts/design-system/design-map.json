@@ -174,9 +174,9 @@
     {
       "figma_node_id": "6904:337",
       "figma_name": "FarmerCard",
-      "code_path": "app/[locale]/farmers/page.tsx",
+      "code_path": "components/catalog/catalog-list.tsx",
       "kind": "ds-component",
-      "notes": "inline (FarmersList, ImageCard を利用)。lib/fictional-farmers.ts がデータ源。"
+      "notes": "C9-1 で農家一覧を共通リストパターン R2 に組み直したため、専用の inline カードは廃止し 共有 CatalogCard (8061:1807) に統合した。旧 R1 の FarmerCard 固有体裁 (中央寄せ・氏名 14px) は無い。データ源は lib/fictional-farmers.ts + FARMERS_QUERY。"
     },
     {
       "figma_node_id": "6904:17378",
@@ -631,14 +631,14 @@
       "figma_name": "ProductCard (Proposed) — elxea/EC products",
       "code_path": "components/catalog/catalog-list.tsx",
       "kind": "ds-component",
-      "notes": "共通リストパターン R2 の CatalogCard。EC 固有の中身は components/product/product-card.tsx。"
+      "notes": "共通リストパターン R2 の CatalogCard。EC 固有の中身は components/product/product-card.tsx。C9-1 で `href` を任意化 (省略時は同じ体裁の非リンク要素で描画)。農家一覧の見本カード seed-farmer-N は詳細ドキュメントが無く /ja/farmers/[slug] が notFound になるため使う。既定 (href あり) の表示は不変。"
     },
     {
       "figma_node_id": "8061:1789",
       "figma_name": "Toolbar",
       "code_path": "components/catalog/catalog-toolbar.tsx",
       "kind": "ds-component",
-      "notes": "共通リストパターン R2。ピル型チップ h44 + 並び替え Select 180x44。SP は横スクロール (8062:2017)。"
+      "notes": "共通リストパターン R2。ピル型チップ h44 + 並び替え Select 180x44。SP は横スクロール (8062:2017)。C9-1 で絞り込みクエリのキーを `chipParam` prop で差し替え可能にした (既定 `category` のまま。農家一覧は `region` を渡す)。"
     },
     {
       "figma_node_id": "8062:2077",
@@ -1101,6 +1101,20 @@
       "code_path": "components/account/subscription-parts.tsx",
       "kind": "ds-component",
       "notes": "SubscriptionEmptyCard。中央寄せ・上下 32 / 段間 16・本文 16 (jp/body)。「商品一覧」は DS Button 既定 (塗り)。SP は 6723:14874。C6-3 新規。"
+    },
+    {
+      "figma_node_id": "6639:7029",
+      "figma_name": "農家一覧 変A（部品ベース）— PC/SP @/ja/farmers",
+      "code_path": "app/[locale]/farmers/page.tsx",
+      "kind": "module",
+      "notes": "農家一覧。この画面は R2 確定版フレームが存在しない (Structure List 行 33270c9d064c81e089dff5ab464cce55 の ステータス：Design=Not started。R2 セクションを 7567:2 / 7567:4 / 7567:6 全数走査して不在を確認)。よって構造の正本は共通リストパターン【R2: 確定版】お茶メニュー一覧 PC 8063:2144 / SP 8063:2372 (= 商品一覧 8061:1781 / 8062:2008) とし、部品は components/catalog/catalog-list.tsx をそのまま共有する。本ノードは内容モデル (FarmerCard = 写真 + 氏名 + 産地) とラベルの由来として登録。差分は英字キッカー FARMERS / 絞り込み軸が産地 (region) / meta 行なしの 3 点。C9-1 新規。"
+    },
+    {
+      "figma_node_id": "6654:13189",
+      "figma_name": "お茶メニュー詳細 変A（部品ベース）— PC/SP @/ja/tea-menu/[slug]",
+      "code_path": "app/[locale]/tea-menu/[slug]/page.tsx",
+      "kind": "module",
+      "notes": "お茶メニュー詳細。この画面も R2 確定版フレームが存在しない (Structure List 行 36b70c9d064c8159915bca38ddc7965d の ステータス：Design=Not started)。構造の正本は商品詳細【R2: 確定版】PC 8056:1517 / SP 8057:1700 の節骨格 (components/editorial/section-blocks.tsx = PageSection / SectionHead / SectionBody / SpecBand)。本ノードは内容モデル (お茶の詳細 4 項目 6654:13244 / 淹れ方ガイド 3 項目 6654:13259 / 購入 / 関連記事 6654:13272) と見本文言の由来として登録。主見出しは 44px display の全体裁定。データが無い節・行は出さない (変A はスペック 4 行を常時表示していたが是正)。C9-1 新規。"
     }
   ],
   "unmapped_figma_nodes": [
