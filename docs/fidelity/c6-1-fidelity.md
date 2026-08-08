@@ -42,15 +42,16 @@
 
 | 判定 | 件数 |
 |---|---|
-| [OK] | 62 |
+| [OK] | 63 |
 | [仕様] | 7 |
-| [要判断] | 4 |
+| [要判断] | 3 |
 | **[粗]** | **0** |
 
-**[粗] 0件。** [要判断] 4件はいずれも **DS全体 (semanticトークン / shadcnプリミティブ)
+**[粗] 0件。** [要判断] 3件はいずれも **DS全体 (semanticトークン / shadcnプリミティブ)
 に効く事項**で、C6-1単独で書き換えると全ページの既存忠実度表と並列レーンに波及するため、
 本レーンでは正しいsemanticクラス (`bg-card` / `bg-secondary` 等) を使い、値の是正は
-Reviewへ切り出している (末尾「要判断の4件」節)。
+Reviewへ切り出している (末尾「要判断の3件」節)。
+着手時は4件あったが、`card` トークンの乖離はrebaseで取り込んだC5-1レーンの是正で解消した (注1)。
 
 ---
 
@@ -73,7 +74,7 @@ Reviewへ切り出している (末尾「要判断の4件」節)。
 | Auth Card | 角丸 | 12 (`radius-xl`) | 12 (`rounded-xl`) | [OK] |
 | Auth Card | 罫線幅 | 1 (`border-width-1`) | 1 (`border`) | [OK] |
 | Auth Card | 罫線色 | `#888675` (`border`) | `#858581` (`--color-border`) | [要判断] 注4 |
-| Auth Card | 面色 | `#f4f3ed` (`card`) | `#d5d3c0` (`--color-card`) | [要判断] 注1 |
+| Auth Card | 面色 | `#f4f3ed` (`card`) | `#f4f3ed` (`--color-card`) | [OK] 注1 |
 | Auth Card | 高さ (PC) | 438 | 450.80 | [仕様] 注5 |
 | Auth Card | 高さ (SP) | 409 | 422.00 | [仕様] 注5 |
 
@@ -222,20 +223,24 @@ Reviewへ切り出している (末尾「要判断の4件」節)。
 
 Figma variableと `tokens/base.json` の実効値を突き合わせた結果:
 
-| token | 実装 (`tokens/base.json` のOKLCH → hex) | Figma variable | 差 |
+Figma variableと `tokens/base.json` の実効値を突き合わせた結果、着手時点で2件ずれていた。
+**うち `card` はrebaseで取り込んだC5-1レーンの修正により解消済み**で、残るのは `secondary` 1件。
+
+| token | 実装 (rebase後の実測) | Figma variable | 状態 |
 |---|---|---|---|
-| `card` | `oklch(0.863 0.026 102.0)` = **#d5d3c0** | **#f4f3ed** | カード面が1段暗いベージュになる |
-| `secondary` | `oklch(0.846 0.173 85.6)` = **#ffc202** | **#d5d3c0** | secondaryボタンが金色になる |
+| `card` | `oklch(0.963 0.008 98.9)` = **#f4f3ed** | **#f4f3ed** | **[OK] 解消** — C5-1が `tokens/base.json` を是正 (旧 #d5d3c0) |
+| `secondary` | `oklch(0.846 0.173 85.6)` = **#ffc202** | **#d5d3c0** | [要判断] secondaryボタンが金色になる |
 
-Figmaの `secondary` (#d5d3c0) が実装の `card` と同値で、実装の階調が1段ずれている形。
-これは **本2画面固有ではなくDSのsemanticトークンそのもののドリフト**で、`bg-card` /
-`bg-secondary` を使う全ページ (カート・商品詳細・定期便LPほか) に同じ影響が出ている。
-
-本レーンの対応: **クラスはsemanticのまま正しく当て、値は変えない**。
-`tokens/base.json` を書き換えると (a) 既にゲート通過済みの他ページの忠実度表が一斉に無効化し、
-(b) 並列レーン (C5-1カート) と衝突するため、C6-1の裁量を超える。
-コントラストは実装値でもAAを満たしている (タイトル6.17:1 / 説明文4.73:1 /
-secondaryラベル5.75:1) ため機能上の不具合は無い。→ 是正はReviewへ。
+- **`card`**: 着手時は #d5d3c0 (Figmaより3段暗い、Webflow由来のgray-40) だったが、C5-1レーンが
+  同じ乖離をカート画面で検出してFigma実在値へ是正した (`tokens/base.json` の当該
+  `$description` に経緯が記録されている)。本レーンはrebaseでその修正を取り込んでおり、
+  **rebase後の実測値は #f4f3edでFigmaと完全一致**している (§1の面色行)。
+  カード上のコントラストもタイトル8.38:1 / 説明文6.43:1でAA達成。
+- **`secondary`**: 未是正。Figmaの `secondary` (#d5d3c0) は**是正前の実装の `card` と同値**で、
+  実装の階調が1段ずれている疑いが残る (同種のドリフト)。これは本2画面固有ではなく
+  `bg-secondary` を使う全ページに効くため、本レーンでは**クラスはsemanticのまま正しく当て、
+  値は変えない**。ラベルのコントラストは実装値 (#464748 on #ffc202) でも5.75:1でAA達成のため
+  機能上の不具合は無い。→ 是正はReviewへ。
 
 ### 注2 — AUTO行高はフォント既定に依存するためDSプリセットを採る【仕様】
 
@@ -321,15 +326,14 @@ Figmaは30px Boldのテキストグリフ「✓」。実装はアイコンをluc
 
 ---
 
-## 要判断の4件 (Reviewへ回す事項)
+## 要判断の3件 (Reviewへ回す事項)
 
 | # | 事項 | 実装の現状 | 推奨 |
 |---|---|---|---|
-| 1 | `--color-card` が #d5d3c0 (Figma #f4f3ed) | クラスは `bg-card` のまま | `tokens/base.json` をFigma値へ是正。ただし全ページ再検証が必要なので独立タスク化 |
-| 2 | `--color-secondary` が #ffc202 (Figma #d5d3c0) | クラスは `bg-secondary` のまま | 同上。#1と1タスクで扱うのが妥当 (階調が1段ずれている疑い) |
-| 3 | 成功バナーの文字色 (Figma 1.47:1) | `success-foreground` に読み替え (7.66:1) | 実装の読み替えを承認or Figma側を修正して再凍結 |
-| 4 | LINE CTAのブランド緑・アイコン撤去 | 確定版どおりprimary / アイコン無し | 確定版どおりで確定 (ブランド緑を残すならFigmaに戻す) |
+| 1 | `--color-secondary` が #ffc202 (Figma #d5d3c0) | クラスは `bg-secondary` のまま | `tokens/base.json` をFigma値へ是正。`card` と同じ「1段ずれ」の疑いで、C5-1が `card` を直した続きに当たる。全ページ影響のため独立タスク化 |
+| 2 | 成功バナーの文字色 (Figma 1.47:1) | `success-foreground` に読み替え (7.66:1) | 実装の読み替えを承認or Figma側を修正して再凍結 |
+| 3 | LINE CTAのブランド緑・アイコン撤去 | 確定版どおりprimary / アイコン無し | 確定版どおりで確定 (ブランド緑を残すならFigmaに戻す) |
 
 補足: ボタン角丸8→6px (注6) は [OK] 許容内だが、DSとしてFigmaに合わせるなら
-`components/ui/button.tsx` の変更 = 全ページ影響のため、上記 #1・#2と同じ
+`components/ui/button.tsx` の変更 = 全ページ影響のため、上記 #1と同じ
 「DSトークン是正」タスクにまとめるのが妥当。
