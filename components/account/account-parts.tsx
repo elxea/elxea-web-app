@@ -124,9 +124,11 @@ export function AccountGreetingBand({
     <div data-slot="account-greeting-band" className="bg-card">
       <div className="page-container flex flex-col gap-1.5 py-8 lg:gap-2 lg:py-12">
         {/* 見出し要素ではなく本文 (挨拶) なので p。体裁だけ h1 トークン
-            (32 / Light / lh 1.2 = Figma jp/h1) に合わせる。lh は :lang(ja) の
-            h1 規則と同じ 1.2 を明示する (h1 トークンの cjk 値 1.4 ではない)。 */}
-        <p className="[font:var(--typography-style-h1)] leading-[1.2] [letter-spacing:var(--typography-style-h1-tracking)] text-foreground">
+            (32 / Light / lh 1.2 = Figma jp/h1) に合わせる。値は globals.css の
+            `p[data-slot="account-greeting"]` 規則 (h1 トークン + lh 1.2) から来る。
+            utilities では font shorthand と leading の適用順を制御できず lh が
+            cjk 値 1.4 になってしまうため、他の *-title 規則と同じ形に寄せた。 */}
+        <p data-slot="account-greeting" className="text-foreground">
           {greeting}
         </p>
         {lead ? (

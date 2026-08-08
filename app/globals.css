@@ -212,6 +212,20 @@ h1.auth-card-title[data-emphasis="strong"] {
   letter-spacing: var(--typography-style-h5-tracking);
 }
 
+/* マイページ【R2: 確定版】の挨拶 (Figma PC 8095:741 / SP 8095:800) は
+ * `elxea/typography/editorial/jp/h1` = 32px / Light / lh 1.2 / tracking .02em。
+ * 見出しではなく本文 (挨拶) なので要素は p のままにして体裁だけ h1 に揃える。
+ * Unlayered なのは utilities では `[font:…]` (shorthand) と `leading-*` の適用順を
+ * 制御できず、lh が h1 トークンの cjk 値 (1.4) に上書きされてしまうため
+ * (実測で確認済み)。ここでは 1 つの規則の中で font の後に line-height を書けるので
+ * Figma の 1.2 が確実に効く。値は h1 トークン経由で生 px は書かない。 */
+:lang(ja) p[data-slot="account-greeting"],
+:lang(en) p[data-slot="account-greeting"] {
+  font: var(--typography-style-h1);
+  letter-spacing: var(--typography-style-h1-tracking);
+  line-height: 1.2;
+}
+
 :root {
   /* Third-party brand colors */
   --brand-line: #06C755;
