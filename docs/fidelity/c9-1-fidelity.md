@@ -392,6 +392,29 @@ rebaseしたあと、同じハーネスで**全4パターンを再計測して�
 C6-1Rが触ったのは `semantic.destructive` と `elevation.focus.ringColor.destructive` のみで、
 本レーンの2画面は `destructive` を1箇所も使わないため影響が出ないことと整合する。
 
+### Vercel Previewでの裏取り
+
+Preview: https://elxea-web-panzeutog-setaka1103s-projects.vercel.app
+(計測は実在slug `/ja/tea-menu/spring-sencha`。出力 `/tmp/c91-preview.json`)
+
+| 確認項目 | 結果 |
+|---|---|
+| `/ja/farmers` PC / SP | **200 / 200** |
+| `/ja/tea-menu/spring-sencha` PC / SP | **200 / 200** |
+| `error` / `warning` / `pageerror` | **0 / 0 / 0** |
+| `requestfailed` | 95 (RSC prefetch 91 + Sentry 4) = ページ由来ではない |
+| 節構成 (実データ) | hero / SPECIFICATION / HOW TO BREWの**3節** (購入・関連記事は`spring-sencha`が値を持たないため非表示 = 意図どおり) |
+| スペック項目 | 品種 / 産地 / 収穫時期 / 内容量 (4/4) |
+| 淹れ方項目 | 温度 / 湯量 / 抽出時間 (3/3) |
+| 主要寸法 | hero gap **64** / 写真アスペクト **1.0** / info段間 **24/24/24** / 外余白 **64** / grid gap **32・48** — **ローカル実測と完全一致** |
+| 色 | `background` #ebe9e0 / `border` #858581 / 節見出し #464748 — **ローカル実測と完全一致** |
+
+**Previewには見本フラグ (`PREVIEW_SEED`) が無い**ため農家一覧は実データ2件のみが出る
+(2枚ともリンクあり = 実ドキュメントが存在)。これは正しい挙動で、
+**見本が本番に漏れないことの裏取り**でもある。見本データでの寸法実測は
+ローカル本番相当ビルド (`next start` + `PREVIEW_SEED=1`) の値を正とする
+(Boss裁定2026-08-09。他レーンC7-1・C6-3と同じ扱い)。
+
 ---
 
 # D. Setaka確認事項 (作業は止めていない)
