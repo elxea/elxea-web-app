@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "node sd.config.mjs && next build",
+    "build": "node sd.config.mjs && npx tsx scripts/check-placeholders.ts && next build",
     "start": "next start",
     "lint": "eslint . --max-warnings 0",
     "typecheck:clean": "node -e \"const fs=require('node:fs');for(const p of ['.next/types','.next/dev/types'])fs.rmSync(p,{recursive:true,force:true});fs.rmSync('tsconfig.tsbuildinfo',{force:true})\"",
@@ -15,6 +15,7 @@
     "build:tokens": "node sd.config.mjs",
     "validate:tokens": "npx tsx scripts/design-system/validate-tokens.ts",
     "validate:design-map": "npx tsx scripts/design-system/validate-design-map.ts",
+    "validate:placeholders": "npx tsx scripts/check-placeholders.ts",
     "generate:design-kit": "npx tsx scripts/design-system/generate-design-kit.ts",
     "validate:design-kit": "npx tsx scripts/design-system/validate-design-kit.ts",
     "sync:notion": "tsx scripts/sync-notion-to-sanity.ts",
