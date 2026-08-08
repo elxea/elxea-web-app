@@ -14,7 +14,7 @@
   --color-muted-foreground: oklch(0.460 0.006 106.6);
   --color-accent: oklch(0.846 0.173 85.6);
   --color-accent-foreground: oklch(0.397 0.002 247.9);
-  --color-destructive: oklch(0.572 0.133 16.4);
+  --color-destructive: oklch(0.537 0.135 17);
   --color-destructive-foreground: oklch(1 0 0);
   --color-border: oklch(0.615 0.006 106.6);
   --color-input: oklch(0.615 0.006 106.6);
@@ -250,7 +250,7 @@
   --elevation-focus-ringOffset-default: 2px;
   --elevation-focus-ringColor-default: oklch(0.615 0.006 106.6);
   --elevation-focus-ringColor-primary: oklch(0.397 0.002 247.9);
-  --elevation-focus-ringColor-destructive: oklch(0.572 0.133 16.4);
+  --elevation-focus-ringColor-destructive: oklch(0.537 0.135 17);
   --component-button-height-sm: 2rem;
   --component-button-height-md: 2.25rem;
   --component-button-height-lg: 2.5rem;

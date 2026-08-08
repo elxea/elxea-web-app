@@ -56,8 +56,8 @@
         "$value": "oklch(0.397 0.002 247.9)"
       },
       "destructive": {
-        "$value": "oklch(0.572 0.133 16.4)",
-        "$description": "Tea red (#b9525c)"
+        "$value": "oklch(0.537 0.135 17)",
+        "$description": "Tea red (#ae4751) — Figma Variable `destructive` の実値。Figma が正本なのでコードを合わせた (旧値 oklch(0.572 0.133 16.4) = #b9525c は Figma に存在しない値で、3 段明るい方向にドリフトしていた)。旧値ではログイン画面の状態バナー (面色 background #ebe9e0 に destructive の文字) が 3.896:1 で WCAG AA (通常テキスト 4.5:1) 未達。新値は 4.521:1 で達成。C6-1R で是正 (card #f4f3ed の是正と同じ前例)。"
       },
       "destructive-foreground": {
         "$value": "oklch(1 0 0)"
@@ -1100,7 +1100,8 @@
           "$value": "oklch(0.397 0.002 247.9)"
         },
         "destructive": {
-          "$value": "oklch(0.572 0.133 16.4)"
+          "$value": "oklch(0.537 0.135 17)",
+          "$description": "= color.semantic.destructive (#ae4751)。フォーカスリングを役割色と揃える。C6-1R で semantic 側と同時に是正 (旧値 #b9525c)。"
         }
       }
     }

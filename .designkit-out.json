@@ -26,7 +26,7 @@
   "media_profile": [
     "web_ui"
   ],
-  "generated_at": "(volatile — normalized in repo mirror)",
+  "generated_at": "2026-08-08T15:44:49.891Z",
   "generator": {
     "agent": "circl-designer",
     "task_id": null,
@@ -54,8 +54,8 @@
   "value_sot": {
     "primary": {
       "type": "code_repo",
-      "git_ref": "(volatile — normalized in repo mirror)",
-      "head_commit_at_read": "(volatile — normalized in repo mirror)",
+      "git_ref": "HEAD",
+      "head_commit_at_read": "53b0ff3 docs(c7-1): 忠実度対比表に Vercel Preview の再計測結果を追記",
       "token_files": [
         {
           "path": "tokens/base.json",
