@@ -85,8 +85,8 @@ SPはTitleBlock (`8095:796`) 1帯。実装は1ブロックにして内部gapで�
 | 識別行 | line-height | 18 (1.5) | 21 (cjk 1.75) | [DS案件] 注2 |
 | 識別行 | letter-spacing | 0.6 (5%) | 0.6 | [OK] 完全一致 |
 | 識別行 | 色 | `muted-foreground` #585854 (lab 37.29) | lab 37.41 | [OK] Δ0.12 |
-| 「設定・契約 →」 | PC表示 / 位置 | 表示・右端baseline揃え | `display:block` / 右端baseline | [OK] |
-| 「設定・契約 →」 | SP表示 | **無し** (SP TitleBlockはリンクを持たない) | `display:none` | [OK] 完全一致 |
+| 「設定・契約 →」 | PC表示 / 位置 | 表示・右端baseline揃え | 親ラッパが `display:block` (lg以上) / 右端baseline | [OK] 注20 |
+| 「設定・契約 →」 | SP表示 | **無し** (SP TitleBlockはリンクを持たない) | 親ラッパが `display:none` (lg未満) | [OK] 完全一致 注20 |
 
 注1: 主見出しは**全体裁定** (R2の全ページ主見出しをdisplayトークン44pxに揃える)
 に従い `.page-title` を使う。Figmaのこのフレームは32 (jp/h1) だが、products /
@@ -103,6 +103,25 @@ tea-menu / collections / journal / カート等の兄弟ページが44なので�
 注3: `foreground` トークンがFigmaと食い違う既知差分 (C5-1注16と同一。Figma #464748 =
 lab L 30.10 vsコード #5d5e61 = lab L 39.88)。兄弟ページと本文色を揃える方を採り
 `text-foreground` のままにした。
+
+注20 (C6-1Rで訂正): **出し入れしているのはリンク自身ではなく親ラッパ**。旧記述は
+リンクに `display:block` / `display:none` が当たっているように読めたが、実装は
+`components/account/account-parts.tsx` の `AccountTitleBlock` で
+
+```tsx
+{action ? (
+  <div className="hidden lg:block">   {/* ← ここが出し入れの機構 */}
+    <AccountTextLink {...action} />
+  </div>
+) : null}
+```
+
+となっており、
+- 出し入れ = **親 `<div>` の `hidden lg:block`** (lg未満 `display:none` / lg以上 `display:block`)
+- リンク自身 (`AccountTextLink` の `<a>` / `<Link>`) はdisplay系クラスを持たず **`display:inline`** (要素の既定値)
+
+画面上の見え方 (SPで出ない / PCで右端に出る) は旧記述と同じなので判定は [OK] のまま。
+訂正したのは「どこが効いているか」の記述のみ。
 
 ## 2. GreetingBand (PC `8095:740` / SP `8095:799`)
 
@@ -374,7 +393,13 @@ in-flight分が `net::ERR_ABORTED` になる)。マイページ固有のURL / AP
 | `pnpm test` | PASS 529/529 (97 files。うち本レーン新規20件) |
 | `pnpm build` | PASS |
 | `pnpm validate:tokens` | PASS 0 error / 20 warning (既存のcamelCase命名warningのみ) |
-| `pnpm validate:design-map` | PASS 137 entries (本レーンで8件追加) |
+| `pnpm validate:design-map` | PASS **141** entries (本レーンで8件追加: 133 → 141) 注21 |
+
+注21 (C6-1Rで訂正): 旧記述は「137 entries」だったが実測は**141**。本レーンの
+コミット `8e076d2` の前後で `scripts/design-system/design-map.json` の `entries`
+は **133 → 141** (差分 = 8件。「8件追加」の部分は正しい)。総数の137は誤記。
+参考: 現在のブランチ先端では **148 entries** (C7-1が7件追加済み)。
+検証コマンド: `pnpm validate:design-map` の最終行 `OK: design-map valid — N entries checked`。
 
 `eslint-suppressions.json` から `app/[locale]/account/page.tsx` の
 `elxea-tokens/no-raw-colors` 抑制1件を削除した (書き直しで違反が消え、残置すると
