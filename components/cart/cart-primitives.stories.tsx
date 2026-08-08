@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { expect, fn, userEvent, within } from "storybook/test";
 import * as React from "react";
 
 import { CartLine } from "./cart-line";
@@ -43,6 +44,54 @@ export const LineWithSubscription: Story = {
       <CartLine {...args} />
     </ul>
   ),
+};
+
+/**
+ * 数量変更・削除の配線テスト。
+ * `+` / `-` が現在数量 ±1 で `onQuantityChange` を呼ぶこと、`削除` が `onRemove` を
+ * 呼ぶこと、`-` が下限 (1) で無効化されることを実クリックで確認する。
+ * 実カートの Server Action は cart-context 側の責務なので、ここでは行部品の
+ * コールバック配線だけを検証する。
+ */
+export const LineInteractions: Story = {
+  args: {
+    ...LINE_BASE,
+    planLabel: "定期便: 毎月1回お届け",
+    onQuantityChange: fn(),
+    onRemove: fn(),
+  },
+  render: (args) => (
+    <ul className="divide-border divide-y">
+      <CartLine {...args} />
+    </ul>
+  ),
+  play: async ({ args, canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await userEvent.click(canvas.getByRole("button", { name: "数量 +1" }));
+    await expect(args.onQuantityChange).toHaveBeenLastCalledWith(3);
+
+    await userEvent.click(canvas.getByRole("button", { name: "数量 -1" }));
+    await expect(args.onQuantityChange).toHaveBeenLastCalledWith(1);
+
+    await userEvent.click(canvas.getByRole("button", { name: "削除" }));
+    await expect(args.onRemove).toHaveBeenCalled();
+  },
+};
+
+/** 数量 1 のとき `-` は無効 (0 にして暗黙削除しない。削除は「削除」ボタン経由)。 */
+export const LineMinQuantity: Story = {
+  args: { ...LINE_BASE, quantity: 1, onQuantityChange: fn() },
+  render: (args) => (
+    <ul className="divide-border divide-y">
+      <CartLine {...args} />
+    </ul>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole("button", { name: "数量 -1" })).toBeDisabled();
+    await expect(canvas.getByRole("button", { name: "数量 +1" })).toBeEnabled();
+  },
 };
 
 /** 通常購入の行 (定期便ラベルなし)。 */
@@ -95,7 +144,11 @@ export const Stepper: Story = {
   },
 };
 
-/** 注文サマリー枠。PC は 360px 固定、SP は全幅。 */
+/**
+ * 注文サマリー枠。PC は 360px 固定、SP は全幅。
+ * 「購入手続きへ」は Shopify の `checkoutUrl` へ出る素の `<a href>` (外部遷移なので
+ * next-intl の Link ではない)。href が渡した URL になっていることを検証する。
+ */
 export const Summary: Story = {
   args: LINE_BASE,
   render: () => (
@@ -106,7 +159,16 @@ export const Summary: Story = {
       totalLabel="合計"
       total="¥6,000"
       checkoutLabel="購入手続きへ"
-      checkoutUrl="#"
+      checkoutUrl="https://example.myshopify.com/checkout/abc"
+      onCheckout={fn()}
     />
   ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const cta = canvas.getByRole("link", { name: "購入手続きへ" });
+    await expect(cta).toHaveAttribute(
+      "href",
+      "https://example.myshopify.com/checkout/abc",
+    );
+  },
 };
