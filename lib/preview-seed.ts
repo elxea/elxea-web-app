@@ -372,3 +372,178 @@ export function withSeedJournals<T extends SeedJournal>(
     summary: s.summary,
   }));
 }
+
+// ---------------------------------------------------------------------------
+// Elxea Journal 詳細【R2: 確定版】(Figma PC 8110:46893 / SP 8110:47043)
+// ---------------------------------------------------------------------------
+
+/** PortableText の素の段落 / 見出しを 1 ブロック作る。 */
+function seedBlock(style: "normal" | "h2", text: string, key: string) {
+  return {
+    _type: "block",
+    _key: key,
+    style,
+    markDefs: [],
+    children: [{ _type: "span", _key: `${key}s`, text, marks: [] }],
+  };
+}
+
+/** 確定版の本文 (見出し 3 本 + 段落) の見本。文言は Figma 正本から写した。 */
+const SEED_JOURNAL_BODY = [
+  seedBlock(
+    "normal",
+    "このページは、一杯を飲み終えるくらいの時間で読み切れる長さにしています。続きを探しに、どこかへ移動する必要はありません。",
+    "b0"
+  ),
+  seedBlock("h2", "霧が、茶葉を遅くする", "b1"),
+  seedBlock(
+    "normal",
+    "霧の多い畑では、日射しが柔らかくなり、葉の育ちが数日ぶん遅れます。その遅れが、旨みの層をひとつ増やす。急がなかった葉は、湯の中でも急ぎません。",
+    "b2"
+  ),
+  seedBlock(
+    "normal",
+    "この号の三種は、その遅さの度合いで選びました。もっとも霧の深い区画のものを一煎目に、風の通る尾根のものを最後に。順番そのものが、この号の編集です。",
+    "b3"
+  ),
+  seedBlock(
+    "normal",
+    "「どれから飲むか」を決めるのは、いつも読み手のほうです。ただ、この号にかぎっては、こちらで順番を決めさせてもらいました。三煎のあいだに季節がひとつ動く、その速さを味わってほしかったからです。",
+    "b4"
+  ),
+  seedBlock("h2", "二杯目の時間", "b5"),
+  seedBlock(
+    "normal",
+    "一煎目を飲み終えて、二煎目を淹れるまでの数分間。急須の中では、まだ葉が開き続けています。この待ち時間のために、読みものの分量を決めました。",
+    "b6"
+  ),
+  seedBlock(
+    "normal",
+    "二煎目の湯を注ぐころ、ちょうどこの節を読み終えるはずです。音は流したままで構いません。ページを閉じずに、そのまま次の段落へ進めるようにしてあります。",
+    "b7"
+  ),
+  seedBlock("h2", "読み終えたら、三杯目を", "b8"),
+  seedBlock(
+    "normal",
+    "この号の読みものは、ここで終わります。続きを探して別のページへ移る必要はありません。もし気が向いたら、下にあるほかの読みものを、このまま開いてください。",
+    "b9"
+  ),
+  seedBlock(
+    "normal",
+    "霧は、朝のあいだだけのものです。この号が手元にある数週間も、たぶん同じくらいの長さでしょう。急がずに、三種を飲み終えるまで置いておいてください。",
+    "b10"
+  ),
+];
+
+/** 確定版の節に必要な欄だけを持つ最小形 (page 側の型と構造だけ合わせる)。 */
+export type SeedJournalDetail = {
+  summary?: string;
+  body?: unknown[];
+  mainImageCaption?: string;
+  author?: { name: string; role?: string };
+  teaMenus?: {
+    _id: string;
+    slug: { current: string };
+    displayName?: string;
+    title?: string;
+    origin?: string;
+    variety?: string;
+  }[];
+  otherReads?: { _id: string; title: string; slug: { current: string } }[];
+  nextReadTags?: { _id: string; title: string; slug: { current: string } }[];
+};
+
+const SEED_JOURNAL_DETAIL = {
+  summary:
+    "この号の茶葉は、霧の多い斜面で育ちました。読みものと音楽を同じ時間から選んでいます。まずは一煎目を淹れて、湯気の向こうで読んでください。",
+  mainImageCaption: "PHOTO — 朝霧の斜面 5:40",
+  author: { name: "高橋 志乃", role: "elxea 茶師 / この号の選茶" },
+  teaMenus: [
+    {
+      title: "霧尾",
+      displayName: "霧尾 — くらしげ農園 2026 一番茶",
+      origin: "静岡・本山 標高620m",
+      variety: "やぶきた",
+      slug: "seed-tea-kirio",
+    },
+  ],
+  otherReads: [
+    { title: "霧が茶をつくる", slug: "seed-read-0" },
+    { title: "湯冷ましという時間", slug: "seed-read-1" },
+    { title: "くらしげ農園の一年", slug: "seed-read-2" },
+  ],
+  nextReadTags: [
+    { title: "霧", slug: "seed-tag-kiri" },
+    { title: "産地のこと", slug: "seed-tag-sanchi" },
+  ],
+} as const;
+
+/**
+ * 未入力の確定版フィールドを見本で埋めた journal ドキュメントを返す。
+ * フラグ未設定なら入力をそのまま返す (production は完全に無影響)。
+ *
+ * production の Sanity dataset の journal は確定版のフィールド
+ * (`author` / `mainImage.caption` / `otherReads` / `nextReadTags`) が未整備で、
+ * 素のままでは該当の節が「データ無し = 非表示」になり実寸計測ができない。
+ */
+export function withSeedJournalDetail<T extends SeedJournalDetail>(journal: T): T {
+  if (!previewSeedEnabled()) return journal;
+
+  const s = SEED_JOURNAL_DETAIL;
+  const has = (v: unknown) => (Array.isArray(v) ? v.length > 0 : Boolean(v));
+
+  return {
+    ...journal,
+    summary: has(journal.summary) ? journal.summary : s.summary,
+    body: has(journal.body) ? journal.body : SEED_JOURNAL_BODY,
+    mainImageCaption: has(journal.mainImageCaption)
+      ? journal.mainImageCaption
+      : s.mainImageCaption,
+    author: has(journal.author) ? journal.author : { ...s.author },
+    teaMenus: has(journal.teaMenus)
+      ? journal.teaMenus
+      : s.teaMenus.map((t, i) => ({
+          _id: `seed-tea-${i}`,
+          slug: { current: t.slug },
+          title: t.title,
+          displayName: t.displayName,
+          origin: t.origin,
+          variety: t.variety,
+        })),
+    otherReads: has(journal.otherReads)
+      ? journal.otherReads
+      : s.otherReads.map((r, i) => ({
+          _id: `seed-read-${i}`,
+          title: r.title,
+          slug: { current: r.slug },
+        })),
+    nextReadTags: has(journal.nextReadTags)
+      ? journal.nextReadTags
+      : s.nextReadTags.map((r, i) => ({
+          _id: `seed-tag-${i}`,
+          title: r.title,
+          slug: { current: r.slug },
+        })),
+  };
+}
+
+/**
+ * `seed-journal-N` (一覧の見本カード) を開いたときに返す見本の詳細。
+ * 実データが引けなかったときだけ使う。フラグ未設定なら常に null。
+ */
+export function seedJournalDetail(slug: string) {
+  if (!previewSeedEnabled()) return null;
+  const match = /^seed-journal-(\d+)$/.exec(slug);
+  if (!match) return null;
+  const index = Number(match[1]);
+  const base = SEED_JOURNALS[index];
+  if (!base) return null;
+
+  return withSeedJournalDetail({
+    _id: `seed-journal-${index}`,
+    title: base.title,
+    slug: { current: slug },
+    theme: base.theme,
+    summary: base.summary,
+  });
+}

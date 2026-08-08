@@ -330,7 +330,10 @@ export const JOURNAL_BY_SLUG_QUERY = groq`
     body,
     mainImage,
     thumbnail,
-    relatedPost->{title, slug},
+    author->{name, role, image, slug},
+    relatedPost->{_id, title, slug, thumbnail, mainImage},
+    otherReads[]->{_id, title, slug, thumbnail, mainImage},
+    nextReadTags[]->{_id, title, slug},
     playlist->{title, slug, albumImage, spotifyUrl},
     teaMenus[]->{
       _id, title, slug, displayName, productNumber,

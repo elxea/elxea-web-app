@@ -154,6 +154,22 @@ h1.contact-title {
   letter-spacing: var(--typography-style-h3-tracking);
 }
 
+/* elxea Journal 記事詳細【R2: 確定版】の本文内 節見出し (Figma 8110:46910) は
+ * `elxea/typography/editorial/jp/h1` = 32px / Light / lh 1.2 / tracking .02em。
+ * 記事本文の H2 は Sanity の blockContent 由来で data-slot を持てないため、
+ * 本文枠 (`[data-slot="article-prose"]`) を前置してスコープする。
+ * Unlayered な理由は上の catalog-card-title と同じ (`h2 { font: … }` が
+ * Tailwind utilities に勝つため utility 側からは当てられない)。
+ * 詳細度 (0,2,1) は `:lang(ja) h2 { line-height: 1.3 }` (0,1,1) に勝つ。
+ * lh は h1 トークンの cjk 値 (1.4) ではなく Figma の 1.2 を明示する
+ * (`:lang(ja) h1 { line-height: 1.2 }` と同じ値・同じ出どころ)。 */
+:lang(ja) [data-slot="article-prose"] h2,
+:lang(en) [data-slot="article-prose"] h2 {
+  font: var(--typography-style-h1);
+  letter-spacing: var(--typography-style-h1-tracking);
+  line-height: 1.2;
+}
+
 /* R2 ジャーナル:カテゴリ の棚見出し (8083:4087 / 8083:4230) は 16px / 行高 24 =
  * h4 プリセット。棚は 1 カテゴリ = 1 セクションなので要素は文書構造上 h2 のまま
  * 体裁だけ h4 に揃える。Unlayered な理由・`:lang()` 前置の理由は上の

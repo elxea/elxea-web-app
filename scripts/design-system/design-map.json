@@ -2,7 +2,7 @@
   "$schema_note": "Figma node ⇄ code path 対応表。経済化施策① (Decision Log 39c70c9d064c81079145f69744e7b8f5)。自動化が Figma コンポーネントに対して正しいソースファイルを編集できるようにする lookup index。値の二重管理はしない。SoT=Figma (トークン・デザイン値の正本は Figma。コードは追従側で tokens/base.json が Figma の写し、dist/ は生成物 / Setaka 宣言 2026-08-08。旧「案 B = SoT=Code, Figma=参照」を置換)。本ファイルはどちらの向きにも値を持たない lookup index なので、この方針転換で役割は変わらない。検証は scripts/design-system/validate-design-map.ts (schema + code_path 実在 + --figma で node 実在)。",
   "figma_file_key": "AWLnI0XF07e8rScuxPYPc7",
   "figma_components_page": "5246:3",
-  "updated_at": "2026-08-07T16:19:06Z",
+  "updated_at": "2026-08-08T05:08:17Z",
   "conventions": {
     "entry": "{ figma_node_id, figma_name, code_path, kind, notes }。code_path はリポジトリルート相対。inline 定義部品は「定義/描画を含むファイル」を code_path とする (編集対象がそのファイルのため)。",
     "kind": "ds-component = elxea 固有の DS 部品 / module = Header/Footer 等の大型合成モジュール / shadcn = shadcn/ui プリミティブ。",
@@ -204,7 +204,7 @@
       "figma_name": "Journal Theme Badge",
       "code_path": "app/[locale]/elxea-journal/page.tsx",
       "kind": "ds-component",
-      "notes": "inline theme badge (themeColors で着色)。詳細ページ app/[locale]/elxea-journal/[slug]/page.tsx にも同種あり。"
+      "notes": "inline theme badge (themeColors で着色)。一覧のみ。詳細ページは【R2: 確定版】(8110:46893) で英字キッカー (ELXEA JOURNAL) に置き換わったためバッジを持たない。"
     },
     {
       "figma_node_id": "6936:126",
@@ -821,6 +821,69 @@
       "code_path": "components/farmers/farmer-detail.tsx",
       "kind": "ds-component",
       "notes": "FarmerCardGrid (noteScale=caption)。Figma 注記どおり PersonCard は DS 未登録のため素の骨格。SP は 8079:4053。"
+    },
+    {
+      "figma_node_id": "8110:46893",
+      "figma_name": "elxea Journal 詳細 / 【R2: 確定版】本文完結 + 末尾のみ回遊 (同梱セット文脈・執筆者クレジット) — PC 1440",
+      "code_path": "app/[locale]/elxea-journal/[slug]/page.tsx",
+      "kind": "module",
+      "notes": "9 ブロック構成 (ReadingProgress / Breadcrumb / Head / lead / 冒頭写真 / 本文 / この号に入っているお茶 / この号のほかの読みもの / NextRead)。データが無い節は枠ごと出さない。SP は 8110:47043。Playlist は Figma 非掲載だが既存データを残す意図的差分。"
+    },
+    {
+      "figma_node_id": "8110:47043",
+      "figma_name": "elxea Journal 詳細 / 【R2: 確定版】本文完結 + 末尾のみ回遊 (同梱セット文脈・執筆者クレジット) — SP 375",
+      "code_path": "app/[locale]/elxea-journal/[slug]/page.tsx",
+      "kind": "module",
+      "notes": "同ページの SP。写真は全幅 375 (`.sp-full-bleed`)・本文は余白内 343 (Setaka 裁定 2026-08-08)。"
+    },
+    {
+      "figma_node_id": "8110:46900",
+      "figma_name": "Head (キッカー + 記事タイトル + 執筆者クレジット)",
+      "code_path": "components/journal/article-blocks.tsx",
+      "kind": "ds-component",
+      "notes": "ArticleHead。主見出しは 44px display (.page-title) — Figma は functional/jp/h1 52px だがページ主見出し 44px の全体裁定に従う。SP は 8110:47050。"
+    },
+    {
+      "figma_node_id": "8110:46904",
+      "figma_name": "lead (明朝 — 実装では秀英横太明朝)",
+      "code_path": "components/journal/article-blocks.tsx",
+      "kind": "ds-component",
+      "notes": "ArticleLead。body-lg プリセット + typography.family.special。Figma は 19px/lh36 だがスケール外の生値を書かず 18px/lh 1.9 に丸めた。SP は 8110:47054。"
+    },
+    {
+      "figma_node_id": "8110:46906",
+      "figma_name": "ArticleImageBleed (+40px)",
+      "code_path": "components/journal/article-blocks.tsx",
+      "kind": "ds-component",
+      "notes": "ArticleImageBleed。PC 720 (= 640 + 40x2) / SP 全幅 375 (`.sp-full-bleed`)。キャプションは写真枠の左下に重ねる。SP は 8110:47056。"
+    },
+    {
+      "figma_node_id": "8110:46909",
+      "figma_name": "H2 (前56/後20)",
+      "code_path": "components/journal/article-blocks.tsx",
+      "kind": "ds-component",
+      "notes": "ArticleProse の縦リズム。本文 H2 は Sanity blockContent 由来のため体裁は app/globals.css の `[data-slot=\"article-prose\"] h2` 規則 (jp/h1 = 32px / lh 1.2) で当てる。SP は 8110:47059。"
+    },
+    {
+      "figma_node_id": "8110:46925",
+      "figma_name": "この号に入っているお茶 (同梱セット文脈)",
+      "code_path": "components/journal/article-blocks.tsx",
+      "kind": "ds-component",
+      "notes": "ArticleBlock + ArticleProductRow。thumb PC 160 / SP 96、リンクのタップ域 49。Figma 注記の「ページ内モーダルで開く」は未実装 (通常遷移) — 意図的差分。SP は 8110:47072。"
+    },
+    {
+      "figma_node_id": "8110:46934",
+      "figma_name": "この号のほかの読みもの (末尾のみ = 行き止まり回避)",
+      "code_path": "components/journal/article-blocks.tsx",
+      "kind": "ds-component",
+      "notes": "ArticleBlock (gap=sm) + ArticleReadList / ArticleReadRow。行 72 (thumb 56 + py 8) / 行間 8。SP は 8110:47080。"
+    },
+    {
+      "figma_node_id": "8110:46945",
+      "figma_name": "NextRead (末尾のみ・テーマ回遊)",
+      "code_path": "components/journal/article-blocks.tsx",
+      "kind": "ds-component",
+      "notes": "ArticleNextRead + ArticlePill。primary 面の全角丸 h48 / px16 / py8 (上寄せ)、行 gap 8 中央寄せ。SP は 8110:47091 (2 段に折り返す)。"
     }
   ],
   "unmapped_figma_nodes": [

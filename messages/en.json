@@ -184,7 +184,12 @@
     "variety": "Variety",
     "season": "Season",
     "origin": "Origin",
-    "netWeight": "Net Wt."
+    "netWeight": "Net Wt.",
+    "kicker": "ELXEA JOURNAL",
+    "issueTeas": "Tea in This Issue",
+    "teaDetailOpen": "Open tea details →",
+    "otherReads": "More Reading in This Issue",
+    "nextReadTag": "Keep reading “{name}”"
   },
   "people": {
     "loadError": "Could not load profile.",

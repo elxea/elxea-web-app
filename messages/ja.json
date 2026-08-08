@@ -184,7 +184,12 @@
     "variety": "Variety",
     "season": "Season",
     "origin": "Origin",
-    "netWeight": "Net Wt."
+    "netWeight": "Net Wt.",
+    "kicker": "ELXEA JOURNAL",
+    "issueTeas": "この号に入っているお茶",
+    "teaDetailOpen": "茶葉の詳細を開く →",
+    "otherReads": "この号のほかの読みもの",
+    "nextReadTag": "「{name}」の読みものをこのまま開く"
   },
   "people": {
     "loadError": "プロフィールを読み込めませんでした。",
