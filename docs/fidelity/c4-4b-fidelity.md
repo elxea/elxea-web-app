@@ -18,6 +18,17 @@
   - 計測スクリプト: `scripts/scratch/c44b-measure.mjs` (gitignore対象・使い捨て)
   - 計測ログ: `scripts/scratch/c44b-measured.json` (gitignore対象)
   - 計測日時: 2026-08-08 14:2x JST
+- **Vercel Previewでの再計測 (同スクリプト・同値)**:
+  https://elxea-web-73frq7i0i-setaka1103s-projects.vercel.app/ja/elxea-journal/seed-journal-0
+  (2026-08-08 14:4x JST。**PC / SPの全比較項目がlocal prodと完全一致 (差分0件)**、
+  HTTP 200 / console error 0 / warning 0 / pageerror 0 / scrollWidth = viewport)
+  - このPreviewは本表の計測用に **deploy単位で `PREVIEW_SEED=1` を渡して**発行した
+    (`vercel deploy --build-env PREVIEW_SEED=1 --env PREVIEW_SEED=1`)。Vercelプロジェクトの
+    環境変数は変更していない
+  - フラグ無しで発行した通常のPreview
+    (https://elxea-web-mfi1livdz-setaka1103s-projects.vercel.app) では、production Sanity
+    datasetに `journal` ドキュメントが **0件**のため詳細ルートはnot-foundを描画する
+    (`/ja/elxea-journal` 一覧は200で描画)。これは仕様どおりの挙動であり実装の欠陥ではない
 - 判定: `[OK]` 一致 (Δ≤2px) / `[仕様]` 意図的な差分 / `[要確認]` DS側で判断が要る差分
 
 ## 計測データについて (重要)
