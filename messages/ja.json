@@ -371,7 +371,7 @@
     "lineButton": "LINE でログイン",
     "or": "または",
     "shopifyButton": "メールアドレスでログイン",
-    "terms": "ログインすることで、利用規約とプライバシーポリシーに同意したものとみなされます。",
+    "terms": "ログインすることで、<terms>利用規約</terms>と<privacy>プライバシーポリシー</privacy>に同意したものとみなされます。",
     "linkedSuccess": "LINE アカウントと連携しました",
     "errorLineAuthFailed": "LINE ログインに失敗しました。もう一度お試しください。",
     "errorStateMismatch": "セッションの有効期限が切れました。もう一度お試しください。",

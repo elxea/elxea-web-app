@@ -371,8 +371,15 @@
     "lineButton": "Sign in with LINE",
     "or": "or",
     "shopifyButton": "Sign in with Email",
-    "terms": "By signing in, you agree to our Terms of Service and Privacy Policy.",
-    "linkedSuccess": "Your LINE account has been linked"
+    "terms": "By signing in, you agree to our <terms>Terms of Service</terms> and <privacy>Privacy Policy</privacy>.",
+    "linkedSuccess": "Your LINE account has been linked",
+    "errorLineAuthFailed": "LINE sign-in failed. Please try again.",
+    "errorStateMismatch": "Your session has expired. Please try again.",
+    "errorTokenFailed": "Could not obtain an authentication token. Please try again.",
+    "errorProfileFailed": "Could not load your LINE profile. Please try again.",
+    "errorNotConfigured": "LINE sign-in is not configured. Please contact the administrator.",
+    "errorMissingParams": "Authentication parameters were missing. Please try again.",
+    "errorUnexpected": "An unexpected error occurred. Please try again."
   },
   "loginComplete": {
     "title": "Account Linked",

@@ -2,7 +2,7 @@
   "$schema_note": "Figma node ⇄ code path 対応表。経済化施策① (Decision Log 39c70c9d064c81079145f69744e7b8f5)。自動化が Figma コンポーネントに対して正しいソースファイルを編集できるようにする lookup index。値の二重管理はしない。SoT=Figma (トークン・デザイン値の正本は Figma。コードは追従側で tokens/base.json が Figma の写し、dist/ は生成物 / Setaka 宣言 2026-08-08。旧「案 B = SoT=Code, Figma=参照」を置換)。本ファイルはどちらの向きにも値を持たない lookup index なので、この方針転換で役割は変わらない。検証は scripts/design-system/validate-design-map.ts (schema + code_path 実在 + --figma で node 実在)。",
   "figma_file_key": "AWLnI0XF07e8rScuxPYPc7",
   "figma_components_page": "5246:3",
-  "updated_at": "2026-08-08T05:08:17Z",
+  "updated_at": "2026-08-08T13:40:00Z",
   "conventions": {
     "entry": "{ figma_node_id, figma_name, code_path, kind, notes }。code_path はリポジトリルート相対。inline 定義部品は「定義/描画を含むファイル」を code_path とする (編集対象がそのファイルのため)。",
     "kind": "ds-component = elxea 固有の DS 部品 / module = Header/Footer 等の大型合成モジュール / shadcn = shadcn/ui プリミティブ。",
@@ -85,14 +85,14 @@
       "figma_name": "AuthErrorBanner",
       "code_path": "app/[locale]/login/auth-error-banner.tsx",
       "kind": "ds-component",
-      "notes": "Login S1。"
+      "notes": "Login S1。R2 確定版の配置は状態枠 6706:14468 / 完了画面 6750:15802 と同形 (カード内上部・h44)。体裁は AuthCardBanner (components/auth/auth-card.tsx) が持つ。"
     },
     {
       "figma_node_id": "5344:5",
       "figma_name": "LinkSuccessBanner",
       "code_path": "app/[locale]/login/link-success-banner.tsx",
       "kind": "ds-component",
-      "notes": "Login S2。"
+      "notes": "Login S2。R2 確定版の配置は状態枠 6706:14468 / 完了画面 6750:15802 (カード内・h44)。体裁は AuthCardBanner (components/auth/auth-card.tsx) が持つ。"
     },
     {
       "figma_node_id": "5252:2",
@@ -912,6 +912,34 @@
       "code_path": "components/cart/order-summary.tsx",
       "kind": "ds-component",
       "notes": "注文サマリー枠 (小計 / 罫線 / 合計 / 購入手続きへ)。SP は 6686:14228。DS Card は radius / 影 / gap / padding が Figma と食い違うため専用部品。C5-1 新規。"
+    },
+    {
+      "figma_node_id": "6702:9009",
+      "figma_name": "Auth Card",
+      "code_path": "components/auth/auth-card.tsx",
+      "kind": "ds-component",
+      "notes": "認証カード外殻 (ログイン)。AuthSection/AuthCard/AuthCardHeader/Kicker/Title/Description/Actions/Divider/Footnote/Mark/Banner を 1 ファイルに束ねる。SP は 6706:14449。"
+    },
+    {
+      "figma_node_id": "6750:10383",
+      "figma_name": "Complete Card",
+      "code_path": "components/auth/auth-card.tsx",
+      "kind": "ds-component",
+      "notes": "認証カード外殻 (ログイン完了)。Auth Card 6702:9009 と同寸法なので同一部品を再利用する。SP は 6750:15885。"
+    },
+    {
+      "figma_node_id": "6702:9018",
+      "figma_name": "Separator (または)",
+      "code_path": "components/auth/auth-card.tsx",
+      "kind": "ds-component",
+      "notes": "AuthCardDivider。行枠 h100 / 罫線の溝 12。SP は 6706:14458。"
+    },
+    {
+      "figma_node_id": "6750:10384",
+      "figma_name": "Check Circle",
+      "code_path": "components/auth/auth-card.tsx",
+      "kind": "ds-component",
+      "notes": "AuthCardMark。64px の success 円 + 白抜きチェック (Figma のテキスト ✓ は lucide Check に置換)。SP は 6750:15886。"
     }
   ],
   "unmapped_figma_nodes": [
