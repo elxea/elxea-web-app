@@ -908,3 +908,61 @@ export function seedSubscriptionContracts(): SubscriptionContract[] | null {
     },
   ];
 }
+
+// ---------------------------------------------------------------------------
+// お茶メニュー詳細 (C9-1)
+// ---------------------------------------------------------------------------
+
+export type SeedTeaMenuDetail = {
+  _id: string;
+  displayName: string;
+  slug: { current: string };
+  productNumber: string;
+  category: string;
+  variety: string;
+  origin: string;
+  season: string;
+  netWeight: string;
+  imageUrl?: string;
+  description: string;
+  brewingGuide: { temperature: string; water: string; time: string };
+  relatedArticle?: { title: string; slug: { current: string } };
+  shopifyHandle?: string;
+};
+
+/**
+ * `/ja/tea-menu/[slug]` の見本詳細 (計測用)。
+ *
+ * production の Sanity dataset には `teaMenu` ドキュメントがまだ揃っておらず、
+ * 素のままでは詳細ページが 404 になるため、確定版の節 (お茶の詳細 / 淹れ方ガイド /
+ * 購入 / 関連記事) を実寸計測できない。
+ *
+ * - フラグ未設定時 (= production / Vercel Preview の既定) は `null` を返すので、
+ *   描画は見本導入前と byte-identical (実データが無ければ従来どおり notFound)
+ * - Sanity には読み書きしない (純粋なオブジェクトリテラル)
+ * - 実データが引けたときは**呼ばれない** (呼び出し側が `tea ?? seedTeaMenuDetail(slug)`)
+ * - 文言・数値は変A `6654:13189` の見本表記をそのまま写した
+ *   (品種 やぶきた / 産地 静岡・牧之原 / 一番茶 / 50g / 70℃ / 180ml / 60秒)
+ * - `shopifyHandle` は入れない。実在しないハンドルを入れると購入ボタンが
+ *   `/ja/products/<不在>` に飛んで 404 になるため、見本では購入節を出さない
+ *   (関連記事も同じ理由で slug を持たせない)
+ */
+export function seedTeaMenuDetail(slug: string): SeedTeaMenuDetail | null {
+  if (!previewSeedEnabled()) return null;
+
+  return {
+    _id: `${SEED_ID_PREFIX}tea-menu-${slug}`,
+    displayName: "茜 -akane-",
+    slug: { current: slug },
+    productNumber: "ELX-2026-04",
+    category: "煎茶",
+    variety: "やぶきた",
+    origin: "静岡・牧之原",
+    season: "一番茶（2026年春）",
+    netWeight: "50",
+    imageUrl: previewImageForKey(slug),
+    description:
+      "静岡・牧之原の茶園で育てたやぶきたを、一番茶のみで丁寧に仕上げた煎茶です。",
+    brewingGuide: { temperature: "70℃", water: "180ml", time: "60秒" },
+  };
+}
