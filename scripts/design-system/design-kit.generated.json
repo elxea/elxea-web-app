@@ -128,7 +128,7 @@
           "note": "Figma page background 相当 (base.json は VariableID:373:398 と記す)。2026-07-13 に sand から cream へ是正済。"
         },
         "foreground": {
-          "value": "oklch(0.482 0.005 271.3)",
+          "value": "oklch(0.397 0.002 247.9)",
           "css_var": "--color-foreground",
           "hex_note": "#5d5e61 charcoal / gray-100"
         },
@@ -138,7 +138,7 @@
           "hex_note": "#d5d3c0 sand / gray-40"
         },
         "card-foreground": {
-          "value": "oklch(0.482 0.005 271.3)",
+          "value": "oklch(0.397 0.002 247.9)",
           "css_var": "--color-card-foreground"
         },
         "popover": {
@@ -146,7 +146,7 @@
           "css_var": "--color-popover"
         },
         "popover-foreground": {
-          "value": "oklch(0.482 0.005 271.3)",
+          "value": "oklch(0.397 0.002 247.9)",
           "css_var": "--color-popover-foreground"
         },
         "primary": {
@@ -155,12 +155,12 @@
           "hex_note": "#464748 graphite / gray-120"
         },
         "primary-foreground": {
-          "value": "oklch(1 0 0)",
+          "value": "oklch(0.979 0.005 95.5)",
           "css_var": "--color-primary-foreground",
           "hex_note": "#ffffff"
         },
         "secondary": {
-          "value": "oklch(0.846 0.173 85.6)",
+          "value": "oklch(0.863 0.026 102.0)",
           "css_var": "--color-secondary",
           "hex_note": "#ffc200 gold",
           "warning": "コードでは secondary = gold。elxea-custom.json では secondary = sand。意味が反転している。conflicts[c-02] 参照。"
@@ -170,7 +170,7 @@
           "css_var": "--color-secondary-foreground"
         },
         "muted": {
-          "value": "oklch(0.933 0.012 96.4)",
+          "value": "oklch(0.892 0.018 99.8)",
           "css_var": "--color-muted"
         },
         "muted-foreground": {
@@ -198,16 +198,16 @@
           "css_var": "--color-destructive-foreground"
         },
         "border": {
-          "value": "oklch(0.615 0.006 106.6)",
+          "value": "oklch(0.617 0.025 101.7)",
           "css_var": "--color-border",
           "hex_note": "#858581 ash / gray-80"
         },
         "input": {
-          "value": "oklch(0.615 0.006 106.6)",
+          "value": "oklch(0.617 0.025 101.7)",
           "css_var": "--color-input"
         },
         "ring": {
-          "value": "oklch(0.615 0.006 106.6)",
+          "value": "oklch(0.617 0.025 101.7)",
           "css_var": "--color-ring",
           "warning": "コードの ring は ash。elxea-custom.json は gold。conflicts[c-02] 参照。"
         },
@@ -842,7 +842,7 @@
           "default": "2px"
         },
         "ringColor": {
-          "default": "oklch(0.615 0.006 106.6)",
+          "default": "oklch(0.617 0.025 101.7)",
           "primary": "oklch(0.397 0.002 247.9)",
           "destructive": "oklch(0.537 0.135 17)"
         },
@@ -1021,7 +1021,7 @@
           "lg": "1rem"
         },
         "radius": {
-          "default": "0.375rem"
+          "default": "0.5rem"
         },
         "iconGap": {
           "default": "0.5rem"
