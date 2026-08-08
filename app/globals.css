@@ -119,6 +119,28 @@ h1.contact-title {
   font-weight: 500;
 }
 
+/* Auth card title — 認証画面のカード見出し (Figma【R2: 確定版】ログイン 6702:9012 /
+ * 6706:14452、ログイン完了 6750:10387 / 6750:15889)。SP 20px / PC(md+) 24px で、
+ * base h1 (32px/300) より小さい。44px の display プリセットは一覧・ヒーローの
+ * `.page-title` / `.hero-display` 用で、認証カードは `.contact-title` と同じ
+ * 「読み枠内の控えめな見出し」系統。Unlayered なのは上の 3 クラスと同じ理由
+ * (`h1 { font: … }` が unlayered なので Tailwind utilities からは当てられない)。
+ * 値は既存トークンを参照し生 px は書かない (1.25rem = h3 / 1.5rem = h2 の size)。
+ * line-height は `:lang(ja) h1 { line-height: 1.2 }` を維持する。
+ * data-emphasis="strong" はログイン完了の「連携完了」(Figma weight 700)。 */
+h1.auth-card-title {
+  font-size: var(--typography-size-xl);
+  font-weight: var(--typography-weight-medium);
+}
+h1.auth-card-title[data-emphasis="strong"] {
+  font-weight: var(--typography-weight-bold);
+}
+@media (min-width: 768px) {
+  h1.auth-card-title {
+    font-size: var(--typography-size-2xl);
+  }
+}
+
 /* Catalog card title — Figma【R2: 確定版】共通リストパターンの ProductCard
  * (8061:1807 ほか) はカード見出しに h4 プリセット (16px / 500) を使う。
  * 見出しレベルは文書構造上 h2 が正しいので、要素は h2 のまま体裁だけ h4 に
