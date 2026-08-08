@@ -695,10 +695,33 @@ async function executeSubscriptionMutation(
   return { success: true };
 }
 
+/**
+ * Shared shape guard for every contract-scoped subscription mutation.
+ *
+ * Why every mutation needs it, not just skip: `subscriptionContractId` reaches
+ * these functions from a Server Action argument, i.e. from an untrusted HTTP
+ * body. The Customer Account API scopes the *contract* to the token holder, but
+ * it does not police the *shape* of the id — a caller can hand us
+ * `gid://shopify/Customer/1` or a raw `1111` and we would forward it to Shopify
+ * and surface whatever error comes back. Rejecting the wrong shape here keeps
+ * malformed ids from reaching Shopify at all (no request is issued), so the
+ * response cannot be used to probe which resources exist on the store.
+ *
+ * Kept identical in wording to the skip path so all four operations
+ * (pause / activate / cancel / skip) fail the same way for the same reason.
+ */
+const INVALID_CONTRACT_ID: SubscriptionMutationResult = {
+  success: false,
+  error: "Invalid subscription contract ID",
+};
+
 export async function pauseSubscription(
   accessToken: string,
   subscriptionContractId: string
 ): Promise<SubscriptionMutationResult> {
+  if (!isSubscriptionContractGid(subscriptionContractId)) {
+    return INVALID_CONTRACT_ID;
+  }
   return executeSubscriptionMutation(accessToken, SUBSCRIPTION_PAUSE_MUTATION, {
     subscriptionContractId,
   });
@@ -708,6 +731,9 @@ export async function activateSubscription(
   accessToken: string,
   subscriptionContractId: string
 ): Promise<SubscriptionMutationResult> {
+  if (!isSubscriptionContractGid(subscriptionContractId)) {
+    return INVALID_CONTRACT_ID;
+  }
   return executeSubscriptionMutation(accessToken, SUBSCRIPTION_ACTIVATE_MUTATION, {
     subscriptionContractId,
   });
@@ -717,6 +743,9 @@ export async function cancelSubscription(
   accessToken: string,
   subscriptionContractId: string
 ): Promise<SubscriptionMutationResult> {
+  if (!isSubscriptionContractGid(subscriptionContractId)) {
+    return INVALID_CONTRACT_ID;
+  }
   return executeSubscriptionMutation(accessToken, SUBSCRIPTION_CANCEL_MUTATION, {
     subscriptionContractId,
   });
@@ -739,7 +768,7 @@ export async function skipNextBillingCycle(
   billingCycleIndex?: number
 ): Promise<SubscriptionMutationResult> {
   if (!isSubscriptionContractGid(subscriptionContractId)) {
-    return { success: false, error: "Invalid subscription contract ID" };
+    return INVALID_CONTRACT_ID;
   }
 
   let cycleIndex = billingCycleIndex;

@@ -227,7 +227,12 @@ export function SubscriptionCardFrame({
     <article
       data-slot="subscription-card"
       className={cn(
-        "flex flex-col gap-3 rounded-lg border bg-card p-5 lg:gap-4 lg:p-6",
+        // `border` はTailwind v4では**太さだけ**で、色は currentColor に落ちる
+        // (v3 の gray-200 既定は撤去された)。色クラスを付けないと罫線が本文色
+        // (`foreground` #5d5e61) になり、Figma の #888675 とは別系統の濃さで出る。
+        // DS の罫線トークンに束縛するため `border-border` を明示する
+        // (`Badge variant=outline` など DS 側も同じ書き方)。
+        "flex flex-col gap-3 rounded-lg border border-border bg-card p-5 lg:gap-4 lg:p-6",
         className
       )}
     >
@@ -273,6 +278,19 @@ export function SubscriptionLines({ children }: { children: React.ReactNode }) {
 /* thumb 48 (SP 44) / 溝 12 / 情報の行間 4 / 価格は右端                          */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * 行の横方向の分割は確定版の実測どおり **thumb + 12 + 商品情報 + 価格** で、
+ * 商品情報と価格のあいだに溝は無い (Figma SP 6723:14801: 行 310 =
+ * thumb 44 + 溝 12 + info 207 + 価格 47、info の右端 x263 と価格の左端 x263 が
+ * 一致する。PC 6718:14894 も同じ分割で 1232 = 48 + 12 + info + 47)。
+ *
+ * よって商品情報カラムの幅は「行幅 − thumb − 12 − 価格幅」で決まる。ここに
+ * 余分な溝を挟むとカラムが Figma より狭くなり、SP で折り返し行数が変わる
+ * (旧実装は行に `gap-3` を持っており SP の商品情報が Figma 207 相当より 12px
+ * 狭かった)。thumb と価格だけを `shrink-0` にして、商品情報は残りを取る
+ * (= Figma の info と同じ挙動: PC は文字幅ぶんだけ使い、SP は上限で折り返す)。
+ */
+
 export function SubscriptionLineRow({
   title,
   meta,
@@ -289,9 +307,12 @@ export function SubscriptionLineRow({
   return (
     <div
       data-slot="subscription-line"
-      className="flex items-center justify-between gap-3"
+      className="flex items-center justify-between"
     >
-      <div className="flex min-w-0 items-center gap-3">
+      <div
+        data-slot="subscription-line-left"
+        className="flex min-w-0 items-center gap-3"
+      >
         <div
           data-slot="subscription-line-thumb"
           className="relative size-11 shrink-0 overflow-hidden rounded-sm lg:size-12"
@@ -308,7 +329,10 @@ export function SubscriptionLineRow({
             <ImagePlaceholder />
           )}
         </div>
-        <div className="flex min-w-0 flex-col gap-1">
+        <div
+          data-slot="subscription-line-info"
+          className="flex min-w-0 flex-col gap-1"
+        >
           <p className={cn(bodySmClass, "text-foreground")}>{title}</p>
           {meta ? (
             <p className={cn(captionClass, "text-muted-foreground")}>{meta}</p>
@@ -317,7 +341,10 @@ export function SubscriptionLineRow({
       </div>
       {/* 金額は英数字なので CJK の行間 (1.8) ではなく Figma の en/body-sm
           (14 / lh 1.4 / tracking 0) に寄せる (C6-2 の PaymentMethodCard と同じ理由)。 */}
-      <p className="shrink-0 text-sm leading-[1.4] tracking-normal text-foreground">
+      <p
+        data-slot="subscription-line-price"
+        className="shrink-0 text-sm leading-[1.4] tracking-normal text-foreground"
+      >
         {price}
       </p>
     </div>
@@ -365,7 +392,8 @@ export function SubscriptionPanel({
     <div
       data-slot="subscription-panel"
       className={cn(
-        "flex flex-col gap-3 rounded-lg border bg-card p-5 lg:gap-4 lg:p-6",
+        // 罫線色は `border-border` を明示 (SubscriptionCardFrame と同じ理由)。
+        "flex flex-col gap-3 rounded-lg border border-border bg-card p-5 lg:gap-4 lg:p-6",
         className
       )}
     >
@@ -453,7 +481,8 @@ export function SubscriptionEmptyCard({
   return (
     <div
       data-slot="subscription-empty-card"
-      className="flex flex-col items-center gap-4 rounded-lg border bg-card px-5 py-8 text-center lg:px-6"
+      /* 罫線色は `border-border` を明示 (SubscriptionCardFrame と同じ理由)。 */
+      className="flex flex-col items-center gap-4 rounded-lg border border-border bg-card px-5 py-8 text-center lg:px-6"
     >
       <p className={cn(BODY, "text-foreground")}>{message}</p>
       {children}
