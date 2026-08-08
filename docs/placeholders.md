@@ -115,6 +115,16 @@ PC 1440x900・SP 375x812 / 2026-08-09 JST。`getBoundingClientRect` の実測値
 | 連絡先 | 53.19 → 53.19 | 0 | 78.38 → 78.38 | 0 (旧値も 2 行) |
 | 電話 (S4 窓口) | 53.19 → 53.19 | 0 | 53.19 → 78.38 | +25.19 (1 行増) |
 
+### Vercel Preview での裏取り
+
+同じ計測を Vercel Preview (`https://elxea-web-3vgnfc1qo-setaka1103s-projects.vercel.app`,
+2026-08-09 JST) に対しても実行し、dev 計測と全項目一致を確認した
+(DateRibbon PC 49.19 / SP 74.38、特商法 MetaRow PC 53.19 / SP 53.19-78.38、横スクロールなし)。
+`/ja/subscription` と `/ja/legal/tokushoho` はいずれも HTTP 200。
+
+この Preview ビルドが通ったこと自体が「Preview では仮値ガードが発火しない」実機確認になる
+(Vercel は Preview に `VERCEL_ENV=preview` を注入するため)。
+
 判定: PC は全行 Δ0。SP は 2 行が 1 行分 (25.19px) 高くなるが、`MetaRow` の値列は
 `min-w-0 flex-1` で折り返す設計 (`components/editorial/rule-list.tsx`) のため、
 はみ出し・切れ・重なりは発生しない。横スクロールも PC / SP どちらも発生なし
