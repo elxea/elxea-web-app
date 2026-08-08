@@ -232,11 +232,18 @@ export default async function EventPage({
 
         {/*
           SP 追従 CTA 6664:13496。ページに spacer を敷かないので Figma の実寸を
-          歪めない。本来の登録カードが見えている間 (CTA の二重表示) と、共通
-          フッターが見えている間 (最下部の表記に重なる) は出さない。
+          歪めない。隠す条件は「本来の登録カードが見えている間」だけにする
+          (CTA が二重に見えるのを避ける目的)。
+
+          フッターも隠す条件に入れる案は捨てた: 登録カードとフッターの間 (本文節)
+          は実測 682px しかなく viewport 844px より短いため、**どの scroll 位置でも
+          両方が視界から外れず追従バーが一度も出ない** (実測: 出せる scroll 窓 =
+          -162px)。Figma がバーを描いている以上、常用端末で機能が死ぬ方が忠実度と
+          しても不利なので、最下部でフッター末尾に重なることは追従 CTA の通常挙動
+          として受け入れる (忠実度対比表の要判断に記載)。
         */}
         <EventStickyRegisterBar
-          hideWhenVisibleSelectors={["#event-registration", "footer"]}
+          hideWhenVisibleSelectors={["#event-registration"]}
         />
       </EventRegistrationProvider>
     </EventDetailPage>

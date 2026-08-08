@@ -228,23 +228,36 @@ for (const [label, width, height] of [
   // 追従バーは「登録カードもページ末尾も見えていない」位置でだけ出る仕様。
   // 上端 (登録カード未通過) / 中間 / 最下部の 3 点で挙動を測る。
   results[`${label}_sticky_top`] = await page.evaluate(stickyProbe);
-  const window_ = await page.evaluate(() => {
-    // 追従バーが出る条件は「登録カードもフッターも視界に無い」。
-    // その scroll 範囲 [regBottom, footerTop - innerHeight] を実測して中点へ送る。
+  // 追従バーは「登録カードが視界に無い」ときだけ出る。判定は絶対座標
+  // (getBoundingClientRect + window.scrollY) で行い、scrollIntoView は使わない。
+  const stickyWindow = await page.evaluate(() => {
     const reg = document.querySelector('[data-slot="event-registration-card"]');
     const footer = document.querySelector("footer");
     if (!reg) return null;
-    const regBottom = reg.getBoundingClientRect().bottom + window.scrollY;
-    const footerTop = footer
+    const r = reg.getBoundingClientRect();
+    const regTopAbs = r.top + window.scrollY;
+    const regBottomAbs = r.bottom + window.scrollY;
+    const footerTopAbs = footer
       ? footer.getBoundingClientRect().top + window.scrollY
-      : document.body.scrollHeight;
-    const lo = regBottom;
-    const hi = footerTop - window.innerHeight;
-    const usable = Math.round((hi - lo) * 100) / 100;
-    if (usable > 0) window.scrollTo(0, Math.round((lo + hi) / 2));
-    return { regBottom, footerTop, innerHeight: window.innerHeight, lo, hi, usable };
+      : null;
+    // 登録カードが視界外になる最小 scroll = カード下端 (上に抜ける)
+    const target = Math.round(regBottomAbs + 8);
+    window.scrollTo(0, target);
+    return {
+      regTopAbs: Math.round(regTopAbs),
+      regBottomAbs: Math.round(regBottomAbs),
+      footerTopAbs: footerTopAbs === null ? null : Math.round(footerTopAbs),
+      innerHeight: window.innerHeight,
+      docHeight: document.body.scrollHeight,
+      scrolledTo: target,
+      // 参考: フッターも隠す設計にした場合に出せる scroll 窓 (負なら一度も出ない)
+      footerRuleUsableWindow:
+        footerTopAbs === null
+          ? null
+          : Math.round(footerTopAbs - window.innerHeight - regBottomAbs),
+    };
   });
-  results[`${label}_sticky_window`] = window_;
+  results[`${label}_sticky_window`] = stickyWindow;
   await page.waitForTimeout(500);
   results[`${label}_sticky_mid`] = await page.evaluate(stickyProbe);
   await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
