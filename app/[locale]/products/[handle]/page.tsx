@@ -134,7 +134,7 @@ export default async function ProductPage({
    *
    * 引き当て方式 (2026-08-08 決定): **Sanity 記事の `relatedProducts`
    * (Shopify ハンドルの配列) を唯一の根拠にする**。既に schema にあり
-   * (sanity/schemas/article.ts)、記事詳細の「この記事に出てきた茶葉」でも
+   * (sanity/schemas/article.ts)、記事詳細の「この記事に合わせたい茶葉」でも
    * 同じフィールドを使っているので、1 本の紐付けが記事→商品・商品→記事の
    * 両方向に効く。Shopify metafield 側に記事 slug を持つ案は、編集導線が
    * Sanity と Shopify 管理画面に割れるうえ metafield 定義の追加が要るため採らない。
@@ -447,7 +447,6 @@ export default async function ProductPage({
                 <ArticleCard
                   key={article._id}
                   article={article}
-                  locale={locale}
                   memberOnlyLabel={tc("memberOnly")}
                   /* 関連商品と同じく Figma は SP 2 枚 / PC 3 枚。 */
                   className={i === 2 ? "hidden lg:flex" : undefined}

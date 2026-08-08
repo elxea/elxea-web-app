@@ -451,7 +451,6 @@ async function FeaturedArticles() {
             <ArticleCard
               key={article._id}
               article={article}
-              locale={locale}
               memberOnlyLabel={t("common.memberOnly")}
             />
           )

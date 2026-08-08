@@ -111,7 +111,6 @@ export default async function PeoplePage({
                 <ArticleCard
                   key={article._id}
                   article={article}
-                  locale={locale}
                   memberOnlyLabel={tCommon("memberOnly")}
                 />
               )

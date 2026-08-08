@@ -1,6 +1,7 @@
 import { Link } from "@/i18n/navigation";
 import { urlFor } from "@/sanity/lib/image";
 import { ImageCard } from "@/components/ui/image-card";
+import { formatArticleDate } from "@/lib/format-date";
 
 type RelatedArticle = {
   _id: string;
@@ -17,10 +18,9 @@ type RelatedArticle = {
 type RelatedArticlesProps = {
   articles: RelatedArticle[];
   heading: string;
-  locale: string;
 };
 
-export function RelatedArticles({ articles, heading, locale }: RelatedArticlesProps) {
+export function RelatedArticles({ articles, heading }: RelatedArticlesProps) {
   if (!articles || articles.length === 0) return null;
 
   return (
@@ -55,7 +55,9 @@ export function RelatedArticles({ articles, heading, locale }: RelatedArticlesPr
                 </h3>
                 {article.publishedAt && (
                   <p className="text-xs text-muted-foreground">
-                    {new Date(article.publishedAt).toLocaleDateString(locale)}
+                    <time dateTime={article.publishedAt}>
+                      {formatArticleDate(article.publishedAt)}
+                    </time>
                   </p>
                 )}
               </div>

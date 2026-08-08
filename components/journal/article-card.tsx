@@ -2,6 +2,7 @@ import { Link } from "@/i18n/navigation";
 import { urlFor } from "@/sanity/lib/image";
 import { ImageCard } from "@/components/ui/image-card";
 import { bodySmClass, captionClass } from "@/components/editorial/rule-list";
+import { formatArticleDate } from "@/lib/format-date";
 import { previewSeedEnabled, previewImageForKey } from "@/lib/preview-seed";
 import { cn } from "@/lib/utils";
 
@@ -16,6 +17,8 @@ import { cn } from "@/lib/utils";
  * - 見出し         行高 21 = body-sm 14px  → `bodySmClass` (体裁のみ・要素は h2)
  * - 抜粋           行高 21 / 2 行で省略    → `bodySmClass` + `line-clamp-2`
  * - メタ行         行高 18 / 著者・区切り・日付 → `captionClass`
+ *                  日付は `YYYY.MM.DD` 固定 (`formatArticleDate`)。Figma の
+ *                  「2026.08.05」表記に合わせるためロケール書式は使わない。
  *
  * 見出しの体裁は `globals.css` の `h2[data-slot="article-card-title"]` で当てる
  * (同ファイルの unlayered な `h2 { font: … }` に Tailwind utilities が勝てない
@@ -35,7 +38,6 @@ type ArticleCardProps = {
     tags?: { _id: string; title: string; slug: { current: string } }[];
     author?: { name: string; image?: { asset: object } };
   };
-  locale: string;
   memberOnlyLabel: string;
   className?: string;
   /**
@@ -48,7 +50,6 @@ type ArticleCardProps = {
 
 export function ArticleCard({
   article,
-  locale,
   memberOnlyLabel,
   className,
   hrefBase = "/journal",
@@ -96,7 +97,9 @@ export function ArticleCard({
           {article.author && <span>{article.author.name}</span>}
           {article.author && article.publishedAt && <span>&middot;</span>}
           {article.publishedAt && (
-            <time>{new Date(article.publishedAt).toLocaleDateString(locale)}</time>
+            <time dateTime={article.publishedAt}>
+              {formatArticleDate(article.publishedAt)}
+            </time>
           )}
         </div>
       </div>

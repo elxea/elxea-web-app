@@ -210,7 +210,6 @@ export default async function TagPage({
               <ArticleCard
                 key={article._id}
                 article={article}
-                locale={locale}
                 memberOnlyLabel={tCommon("memberOnly")}
               />
             ))}

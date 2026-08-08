@@ -17,6 +17,7 @@ import {
   JournalLayout,
 } from "@/components/journal/journal-list";
 import { urlFor } from "@/sanity/lib/image";
+import { formatArticleDate } from "@/lib/format-date";
 import { previewSeedEnabled, previewImageForKey } from "@/lib/preview-seed";
 import { toPlainText } from "@/lib/sanity-text";
 import type { PortableTextBlock } from "@portabletext/types";
@@ -210,9 +211,7 @@ async function PlaylistContent({ params }: { params: SearchParams }) {
           imageAlt={featured.albumImage?.alt ?? featured.title}
           meta={[
             featured.category,
-            featured.dateRecorded
-              ? new Date(featured.dateRecorded).toLocaleDateString(locale)
-              : null,
+            formatArticleDate(featured.dateRecorded) || null,
           ]
             .filter(Boolean)
             .join(" — ")}
@@ -242,7 +241,6 @@ async function PlaylistContent({ params }: { params: SearchParams }) {
               <ArticleCard
                 key={pl._id}
                 article={toCardShape(pl)}
-                locale={locale}
                 memberOnlyLabel={tCommon("memberOnly")}
                 hrefBase="/playlists"
               />

@@ -191,7 +191,6 @@ export default async function CategoryPage({
               <ArticleCard
                 key={article._id}
                 article={article}
-                locale={locale}
                 memberOnlyLabel={tCommon("memberOnly")}
               />
             ))}

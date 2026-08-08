@@ -138,7 +138,8 @@ export type PlaylistHeadProps = {
  * - kicker → name      20 / name → subtitle 28 / subtitle → lead 20
  * - lead → 罫線        4 / 罫線 → Stats 24 (Figma 23)
  * - Stats → byline見出し 36 / byline見出し → byline 4 (Figma 5)
- * - SP は写真 → HeroText の縦積み (オフセットなし)
+ * - SP は写真 → HeroText の縦積み (オフセットなし)。写真は全幅 375
+ *   (`.sp-full-bleed`)、テキストはページカラム 343 のまま。
  */
 export function PlaylistHead({
   overline,
@@ -154,13 +155,20 @@ export function PlaylistHead({
 }: PlaylistHeadProps) {
   return (
     <section data-slot="playlist-head" className="page-container pt-12 pb-8">
+      {/* BreadcrumbRow は Figma 8089:4520 で h44 の枠 (中の Breadcrumb は h16)。
+          `Breadcrumb` は既定で自前の `mb-8` を持ち、それが flex 行の高さに
+          加算されて実測 48 になっていた (C4-3 QA F5)。行の余白はこの枠が
+          `min-h-11` で持つので、行の中では子の下マージンを打ち消して 44 に
+          収める。Breadcrumb 本体の既定は他ページ用にそのまま残す。 */}
       {children ? (
-        <div className="flex min-h-11 items-center">{children}</div>
+        <div className="flex min-h-11 items-center [&_nav]:mb-0">{children}</div>
       ) : null}
 
       <div className="mt-8 lg:grid lg:grid-cols-2 lg:gap-x-8">
+        {/* SP はアートワークも全幅 (Figma 8089:4629 = x0 w375 h469 ≒ 4:5)。
+            PC 8089:4518 では本文カラム内 640x800 のままなので lg で戻す。 */}
         <ImageCard
-          className="lg:col-start-1"
+          className="sp-full-bleed rounded-none lg:col-start-1 lg:rounded-md"
           aspectRatio="4/5"
           image={image}
           alt={imageAlt ?? title}
@@ -285,8 +293,10 @@ export type PhotoCardItem = {
  * - PC 3 列 416 / gap-x 32、SP 縦積み
  * - 写真 → 見出し 16、見出し → note 4、note → meta 2 (→ `mt-1` に丸め)
  * - ARTISTS の写真は PC 416x312 (4:3) / SP 3:2、他は 8:5 で共通
- * - SP の写真は Figma では全幅 375 (ページ余白外) だが、実装はページ
- *   カラム幅 (343) に収める【仕様】
+ * - SP の写真は全幅。Figma 8089:4622 は Photo frame を x0 w375 (ページ左右
+ *   余白の外) に置き、見出し・本文だけを x16 w343 に残す。実装は
+ *   `.sp-full-bleed` でページ余白を打ち消して再現する (Setaka 裁定 2026-08-08)。
+ *   角丸は端に接する SP では落とす (記事詳細の冒頭写真と同じ扱い)。
  */
 export function PhotoCardGrid({
   items,
@@ -316,7 +326,8 @@ export function PhotoCardGrid({
           <ImageCard
             className={cn(
               aspectSp && "[--pc-ar:var(--pc-ar-sp)]",
-              "lg:[--pc-ar:var(--pc-ar-pc)]"
+              "lg:[--pc-ar:var(--pc-ar-pc)]",
+              "sp-full-bleed rounded-none lg:rounded-md"
             )}
             style={
               {

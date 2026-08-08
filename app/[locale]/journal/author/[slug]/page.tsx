@@ -112,7 +112,6 @@ export default async function AuthorPage({
               <ArticleCard
                 key={article._id}
                 article={article}
-                locale={locale}
                 memberOnlyLabel={tCommon("memberOnly")}
               />
             )

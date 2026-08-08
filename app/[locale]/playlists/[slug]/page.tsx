@@ -11,7 +11,6 @@ import { urlFor } from "@/sanity/lib/image";
 import { Breadcrumb } from "@/components/seo/breadcrumb";
 import { AuthorByline } from "@/components/journal/author-byline";
 import { SpecBand } from "@/components/editorial/section-blocks";
-import { bodySmClass, captionClass } from "@/components/editorial/rule-list";
 import { PortableText } from "@/components/sanity/portable-text";
 import {
   CuratorQuote,
@@ -26,6 +25,7 @@ import {
 } from "@/components/playlist/playlist-detail";
 import { getProductByHandle } from "@/lib/shopify";
 import { formatPrice } from "@/lib/utils";
+import { formatArticleDate } from "@/lib/format-date";
 import { previewSeedEnabled, previewImageForKey } from "@/lib/preview-seed";
 import { toPlainText } from "@/lib/sanity-text";
 import type { PortableTextBlock } from "@portabletext/types";
@@ -46,6 +46,14 @@ import type { PortableTextBlock } from "@portabletext/types";
  * データが無い節は枠ごと出さない (空枠を出さない方針 — C4-2 の PDP 読みものと
  * 同じ)。3〜6 は C4-3 で Sanity schema に追加したフィールド
  * (`artists` / `tracks` / `dataBand` / `pairedTeas`) を唯一の根拠にする。
+ *
+ * 上の 7 ブロック以外の節は置かない。C4-3 まで残っていた旧実装の
+ * 「LISTEN / 配信で聴く」節 (Spotify・SoundCloud・YouTube リンク + 録音日) は
+ * 確定版の構成に無いため C4-2R で削除した (C4-3 QA F1)。`spotifyUrl` /
+ * `soundcloudUrl` / `youtubeUrl` / `dateRecorded` は Sanity schema と
+ * `PLAYLIST_BY_SLUG_QUERY` には残してある (入力済みデータを消さないため) が、
+ * このページでは描画しない。配信リンクの枠が必要になったら Figma 側に足して
+ * 凍結してから実装する — コード側で先に生やさない。
  */
 
 type AuthorRef = {
@@ -219,17 +227,11 @@ export default async function PlaylistDetailPage({
     title: other.title,
     note: [
       other.category,
-      other.dateRecorded ? new Date(other.dateRecorded).toLocaleDateString(locale) : null,
+      formatArticleDate(other.dateRecorded) || null,
     ]
       .filter(Boolean)
       .join(" — "),
   }));
-
-  const streamingLinks = [
-    pl.spotifyUrl ? { label: "Spotify", href: pl.spotifyUrl } : null,
-    pl.soundcloudUrl ? { label: "SoundCloud", href: pl.soundcloudUrl } : null,
-    pl.youtubeUrl ? { label: "YouTube", href: pl.youtubeUrl } : null,
-  ].filter(Boolean) as { label: string; href: string }[];
 
   return (
     <>
@@ -325,30 +327,6 @@ export default async function PlaylistDetailPage({
           <div className="prose-custom max-w-160">
             <PortableText value={pl.body} />
           </div>
-        </PlaylistSection>
-      ) : null}
-
-      {streamingLinks.length > 0 ? (
-        <PlaylistSection>
-          <PlaylistSectionHead overline="LISTEN" title={t("listen")} />
-          <PlaylistSectionBody className="flex flex-wrap gap-3">
-            {streamingLinks.map((link) => (
-              <a
-                key={link.href}
-                href={link.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={`${bodySmClass} inline-flex min-h-11 items-center gap-2 rounded-full border border-border px-5 text-foreground transition-colors hover:bg-foreground hover:text-background`}
-              >
-                {link.label} <span aria-hidden>&#8599;</span>
-              </a>
-            ))}
-          </PlaylistSectionBody>
-          {pl.dateRecorded ? (
-            <p className={`${captionClass} mt-6 text-muted-foreground`}>
-              {t("recorded")}: {new Date(pl.dateRecorded).toLocaleDateString(locale)}
-            </p>
-          ) : null}
         </PlaylistSection>
       ) : null}
 

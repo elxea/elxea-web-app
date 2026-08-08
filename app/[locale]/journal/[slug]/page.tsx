@@ -26,6 +26,7 @@ import { BookmarkButton } from "@/components/journal/bookmark-button";
 import { ArticleReadTracker } from "@/components/journal/article-read-tracker";
 import { ReadingProgress } from "@/components/journal/reading-progress";
 import { CommentSection } from "@/components/community/comment-section";
+import { formatArticleDate } from "@/lib/format-date";
 import { cn } from "@/lib/utils";
 
 /**
@@ -140,7 +141,7 @@ export default async function ArticlePage({
     }
   }
 
-  // 「この記事に出てきた茶葉」— Sanity の relatedProducts (Shopify ハンドル) を
+  // 「この記事に合わせたい茶葉」— Sanity の relatedProducts (Shopify ハンドル) を
   // 引き当てる。商品連動のある記事だけに出る枠 (Figma 8074:44880)。
   const handles: string[] = Array.isArray(article.relatedProducts)
     ? article.relatedProducts.filter((h: unknown): h is string => typeof h === "string")
@@ -216,8 +217,11 @@ export default async function ArticlePage({
                   <AuthorByline name={author.name} role={author.role} avatarUrl={authorAvatar} />
                 )}
                 {article.publishedAt && (
-                  <time className={cn(captionClass, "text-muted-foreground")}>
-                    {new Date(article.publishedAt).toLocaleDateString(locale)}
+                  <time
+                    dateTime={article.publishedAt}
+                    className={cn(captionClass, "text-muted-foreground")}
+                  >
+                    {formatArticleDate(article.publishedAt)}
                   </time>
                 )}
                 {isGated && (
@@ -296,7 +300,7 @@ export default async function ArticlePage({
                 </div>
               )}
 
-              {/* この記事に出てきた茶葉 (商品連動のある記事のみ) */}
+              {/* この記事に合わせたい茶葉 (商品連動のある記事のみ) */}
               {relatedProducts.length > 0 && (
                 <section className="mt-6">
                   <p className={cn(captionClass, "text-muted-foreground")}>{t("teaInArticle")}</p>

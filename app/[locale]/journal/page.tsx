@@ -17,6 +17,7 @@ import {
   JournalLayout,
 } from "@/components/journal/journal-list";
 import { urlFor } from "@/sanity/lib/image";
+import { formatArticleDate } from "@/lib/format-date";
 import { previewSeedEnabled, previewImageForKey } from "@/lib/preview-seed";
 import { requireAuth } from "@/lib/firebase/auth-guard";
 import { getRecommendedArticles } from "@/lib/recommendations/content-engine";
@@ -226,9 +227,7 @@ async function JournalContent({ params }: { params: SearchParams }) {
           imageAlt={featured.title}
           meta={[
             featured.category?.title,
-            featured.publishedAt
-              ? new Date(featured.publishedAt).toLocaleDateString(locale)
-              : null,
+            formatArticleDate(featured.publishedAt) || null,
           ]
             .filter(Boolean)
             .join(" — ")}
@@ -259,7 +258,6 @@ async function JournalContent({ params }: { params: SearchParams }) {
               <ArticleCard
                 key={article._id}
                 article={article}
-                locale={locale}
                 memberOnlyLabel={tCommon("memberOnly")}
               />
             ))}

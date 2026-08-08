@@ -8,6 +8,7 @@ import { Section } from "@/components/layout/container";
 import { CatalogToolbar } from "@/components/catalog/catalog-toolbar";
 import { ArticleCard } from "@/components/journal/article-card";
 import { CategoryShelf, StackPageHead } from "@/components/journal/journal-list";
+import { formatArticleDate } from "@/lib/format-date";
 
 /**
  * ジャーナル:カテゴリ (索引) — Figma【R2: 確定版】統一ナビ + 縦積み一覧
@@ -104,7 +105,7 @@ export default async function JournalCategoryIndexPage() {
 
   const meta = [
     t("categoryStackMeta", { count: categories.length, total }),
-    ...(latest ? [t("lastUpdated", { date: new Date(latest).toLocaleDateString(locale) })] : []),
+    ...(latest ? [t("lastUpdated", { date: formatArticleDate(latest) })] : []),
   ];
 
   const chips = [
@@ -133,8 +134,12 @@ export default async function JournalCategoryIndexPage() {
         meta={meta}
       />
 
+      {/* Head → NavBar は Figma PC 64 (TitleRow 下端 abs357 → NavBar abs421 /
+          8083:4073)。SP は Figma の CategoryStackHead 枠に下パディングが無く 0 に
+          読めるが、兄弟のタグ SP (8082:4048 PageHead 下端178 → Chips 210) は 32 で
+          あり、こちらを SP の意図として 32 を維持する【要判断】。 */}
       <CatalogToolbar
-        className="mt-8 lg:mt-12"
+        className="mt-8 lg:mt-16"
         chips={chips}
         activeChip="__all__"
         sortLabel={tl("sortLabel")}
@@ -160,7 +165,6 @@ export default async function JournalCategoryIndexPage() {
                 <ArticleCard
                   key={article._id}
                   article={article}
-                  locale={locale}
                   memberOnlyLabel={tCommon("memberOnly")}
                   /* Figma は SP 1 枚 / PC 3 枚 (8083:4232 / 8083:4089)。 */
                   className={index > 0 ? "hidden lg:flex" : undefined}

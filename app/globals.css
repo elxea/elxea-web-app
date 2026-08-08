@@ -257,6 +257,25 @@ h1.contact-title {
   /* Padding-only variant for elements that bring their own width constraint. */
   .page-inset { padding-inline: var(--page-margin); }
 
+  /* SP full-bleed. Cancels the page gutter so a child of `.page-container`
+   * spans the full container width below lg, then snaps back inside the column
+   * from lg up.
+   *
+   * Why it cannot produce a horizontal scrollbar: the negative margin is
+   * exactly `--page-margin`, the same token `.page-container` uses for its
+   * padding-inline, so the element's outer width resolves to the container's
+   * own width (never wider). `.page-container` itself is `width: 100%`, so on
+   * SP that is the viewport width. Hard-coding a viewport unit (`100vw`) would
+   * overshoot by the scrollbar width on desktop and is deliberately avoided.
+   *
+   * Figma SoT: プレイリスト詳細 SP 8089:4622 places every Photo frame at x0
+   * w375 (page 375) while the text stays at x16 w343 — photos are full-bleed,
+   * copy is not. Setaka 裁定 2026-08-08. */
+  .sp-full-bleed { margin-inline: calc(var(--page-margin) * -1); }
+  @media (min-width: 64rem) {
+    .sp-full-bleed { margin-inline: 0; }
+  }
+
   /* Narrow content column (long-form text: legal / FAQ / about 本文).
    * Width only — vertical rhythm lives in `.section-*` / <Section>, so a block
    * can change its padding without inventing a new width. Same calc as
