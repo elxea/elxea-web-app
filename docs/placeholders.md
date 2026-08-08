@@ -55,28 +55,70 @@ flowchart LR
 1. `lib/placeholders.ts` の該当エントリの `value` を実値にする
 2. 同エントリの `status` を `"confirmed"` にする
 3. 本ファイルの該当行の「状態」を `差し替え済 (YYYY-MM-DD)` にする
-4. `pnpm validate:placeholders` と `pnpm test` を通す
+4. `VERCEL_ENV=production pnpm validate:placeholders` と `ROJI_PLACEHOLDER_GUARD=error pnpm test` を通す
 5. #1 / #2は定数のままにせず、Shopify実データ配線に置き換える (根拠列参照)
 
 ## 仮値が本番に出ない仕組み
 
-| 層 | 実体 | production相当で | dev / Previewで |
+| 層 | 実体 | 発火条件 | 落ち方 |
 |---|---|---|---|
-| ビルドゲート | `scripts/check-placeholders.ts` (`pnpm validate:placeholders`、`pnpm build` の `next build` 前段) | exit 1でビルド中止 | 一覧をWARN表示してexit 0 |
-| テスト | `__tests__/placeholders.test.ts` | 未解決0件を要求して失敗 | 判定ロジックのみ検証して通過 |
+| ビルドゲート (本番の実ブロック) | `scripts/check-placeholders.ts` (`pnpm validate:placeholders`、`pnpm build` の `next build` 前段) | `VERCEL_ENV=production` または `ROJI_PLACEHOLDER_GUARD=error` | 検出した id・ラベル・仮値・担当を列挙して exit 1 |
+| テスト (公開前チェック) | `__tests__/placeholders.test.ts` | `ROJI_PLACEHOLDER_GUARD=error` の明示指定のみ | 未解決 id 一覧との差分を出して fail |
 
-production判定はVercelが自動注入する `VERCEL_ENV=production` のみ。
-`NODE_ENV` は見ない (`next build` はローカルでも `NODE_ENV=production` になり、
-それで判定するとPreview用ビルドまで落ちてしまうため)。
+いずれも dev / Preview では発火しない (ビルドは一覧を WARN 表示して通過、テストは skip)。
 
-手元で本番相当の挙動を確認するとき、およびCIで強制するときは
-`ROJI_PLACEHOLDER_GUARD=error` を渡す (`=off` で無効化)。
+判定は Vercel が自動注入する `VERCEL_ENV=production` を見る。`NODE_ENV` は見ない
+(`next build` はローカルでも `NODE_ENV=production` になり、それで判定すると Preview 用
+ビルドまで落ちてしまうため)。
+
+テスト側だけ `VERCEL_ENV` で発火させていない理由: vitest は `.env.local` を process.env に
+読み込むため、手元の `.env.local` が `VERCEL_ENV="production"` を持っていると通常の
+`pnpm test` が落ちてしまう (このリポジトリの手元環境が実際にそうだった)。ビルドゲート側は
+dotenv を読まない素の node プロセスなので、この影響を受けない。
 
 ```bash
-# 仮値が残っている状態で本番相当ビルドが落ちることの確認
-VERCEL_ENV=production pnpm validate:placeholders   # exit 1
-VERCEL_ENV=production pnpm test                    # fail
+# 仮値が残っている状態で落ちることの確認
+VERCEL_ENV=production pnpm build            # exit 1 (next build に到達しない)
+ROJI_PLACEHOLDER_GUARD=error pnpm test      # fail
+
+# 差し替え後に通ることの確認 (status を confirmed にしてから)
+VERCEL_ENV=production pnpm build            # exit 0
+ROJI_PLACEHOLDER_GUARD=error pnpm test      # pass
 ```
+
+## 仮値投入でレイアウトが崩れていないか (実測)
+
+計測: `next dev -p 3117` / `VERCEL_ENV=preview` / Playwright chromium / deviceScaleFactor 1 /
+PC 1440x900・SP 375x812 / 2026-08-09 JST。`getBoundingClientRect` の実測値 (px)。
+
+### 定期便LP (/ja/subscription)
+
+仮値を messages のインライン直書きからレジストリ差し込みに移しただけで、**表示文字列は
+1 文字も変えていない**。よって DateRibbon の実測値は C3-2R 忠実度対比表と一致する。
+
+| 項目 | C3-2R 記録値 | 今回の実測 | Δ | 判定 |
+|---|---|---|---|---|
+| DateRibbon 高さ (PC 1440) | 49.19 | 49.19 | 0 | [OK] |
+| DateRibbon 幅 (PC 1440) | 1312 | 1312 | 0 | [OK] |
+| DateRibbon 高さ (SP 375・2 行折返し) | 74.38 | 74.38 | 0 | [OK] |
+| 横スクロール (PC / SP) | なし | なし | 0 | [OK] |
+
+### 特商法ページ (/ja/legal/tokushoho)
+
+こちらは仮値の文字列自体を「（公開前に差し替え）…」に変えたため、行高を変更前の文字列と
+同一レイアウト文脈で比較した (同じ行を clone して旧文字列を入れ、高さだけ測る)。
+
+| 行 | PC 変更前 → 変更後 | PC Δ | SP 変更前 → 変更後 | SP Δ |
+|---|---|---|---|---|
+| 運営統括責任者 | 53.19 → 53.19 | 0 | 53.19 → 78.38 | +25.19 (1 行増) |
+| 所在地 | 53.19 → 53.19 | 0 | 78.38 → 78.38 | 0 (旧値も 2 行) |
+| 連絡先 | 53.19 → 53.19 | 0 | 78.38 → 78.38 | 0 (旧値も 2 行) |
+| 電話 (S4 窓口) | 53.19 → 53.19 | 0 | 53.19 → 78.38 | +25.19 (1 行増) |
+
+判定: PC は全行 Δ0。SP は 2 行が 1 行分 (25.19px) 高くなるが、`MetaRow` の値列は
+`min-w-0 flex-1` で折り返す設計 (`components/editorial/rule-list.tsx`) のため、
+はみ出し・切れ・重なりは発生しない。横スクロールも PC / SP どちらも発生なし
+(`documentElement.scrollWidth` = `clientWidth`)。実値に差し替えれば行高は実値の長さで決まる。
 
 ## Open items (仮値ではなく、要判断の不一致)
 

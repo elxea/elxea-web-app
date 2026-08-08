@@ -21,12 +21,17 @@
  *
  * ## 本番ビルドで機械的に止まる仕組み
  *
- * `status: PLACEHOLDER_MARKER` が 1 件でも残っていると、production 相当の環境で
- * ビルドとテストの両方が落ちる。
+ * `status: PLACEHOLDER_MARKER` が 1 件でも残っていると本番公開できない。止める層は 2 つ:
  *
- * - ビルド: `pnpm build` が `validate:placeholders` (`scripts/check-placeholders.ts`) を
- *   先に走らせ、production 判定時に exit 1 する
- * - テスト: `__tests__/placeholders.test.ts` が production 判定時に未解決 0 件を要求する
+ * - **ビルド (本番の実ブロック)**: `pnpm build` が `next build` の前に
+ *   `validate:placeholders` (`scripts/check-placeholders.ts`) を走らせ、
+ *   production 判定時に exit 1 する。dotenv を読まない素の node プロセスなので、
+ *   Vercel が注入する `VERCEL_ENV=production` にだけ反応する
+ * - **テスト (公開前チェック)**: `__tests__/placeholders.test.ts` は
+ *   `ROJI_PLACEHOLDER_GUARD=error` を明示したときだけ未解決 0 件を要求する。
+ *   vitest は `.env.local` を process.env に読み込むため `VERCEL_ENV` で発火させると
+ *   手元の env ファイル次第で通常の `pnpm test` が落ちてしまう (実際にこのリポジトリの
+ *   手元環境の `.env.local` が `VERCEL_ENV="production"` を持っていた)
  *
  * production 判定は Vercel が自動注入する `VERCEL_ENV=production` のみ
  * (dev / Preview は落とさない = 作業を止めない)。CI や手元での動作確認用に

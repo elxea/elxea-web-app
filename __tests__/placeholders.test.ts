@@ -143,12 +143,27 @@ describe("PLACEHOLDERS レジストリ", () => {
 });
 
 describe("公開ゲート", () => {
-  it("本番相当環境で走ったときは未解決の仮値が 0 件であること", () => {
-    if (placeholderGuardMode(process.env) !== "error") {
-      // dev / Preview / 通常の CI ではスキップ相当 (作業を止めない)
-      expect(placeholderGuardMode(process.env)).toBe("off");
-      return;
-    }
+  /**
+   * 実レジストリに対する公開可否チェック。`ROJI_PLACEHOLDER_GUARD=error` を
+   * 明示したときだけ発火させる (`ROJI_PLACEHOLDER_GUARD=error pnpm test`)。
+   *
+   * なぜ `VERCEL_ENV` で発火させないか: vitest は `.env.local` を process.env に
+   * 読み込むため、手元の `.env.local` が `VERCEL_ENV="production"` を持っていると
+   * 通常の `pnpm test` が落ちてしまう (実際にこのリポジトリの手元環境がそうだった)。
+   * 「dev / Preview では作業を止めない」を守るため、テスト側の発火は明示指定に限る。
+   *
+   * 本番公開の実ブロックはビルド側 (`scripts/check-placeholders.ts`) が担う。
+   * こちらは dotenv を読まない素の node プロセスなので、Vercel が注入する
+   * `VERCEL_ENV=production` だけに反応する。
+   */
+  const releaseCheck = process.env.ROJI_PLACEHOLDER_GUARD === "error";
+
+  it.runIf(releaseCheck)("未解決の仮値が 0 件であること (公開前チェック)", () => {
     expect(unresolvedPlaceholderIds()).toEqual([]);
+  });
+
+  it("明示指定がないときは公開ゲートを発火させない (作業を止めない)", () => {
+    expect(placeholderGuardMode({ VERCEL_ENV: "preview" })).toBe("off");
+    expect(placeholderGuardMode({})).toBe("off");
   });
 });
