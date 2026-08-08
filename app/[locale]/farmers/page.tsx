@@ -1,125 +1,199 @@
-import { useTranslations } from "next-intl";
+import type { Metadata } from "next";
 import { getLocale, getTranslations } from "next-intl/server";
-import { Link } from "@/i18n/navigation";
+
 import { getClient } from "@/sanity/lib/client";
-import { ImageCard } from "@/components/ui/image-card";
 import { FARMERS_QUERY } from "@/sanity/lib/queries";
 import { urlFor } from "@/sanity/lib/image";
-import { withSeedFarmers, isSeedId } from "@/lib/preview-seed";
+import { Breadcrumb } from "@/components/seo/breadcrumb";
+import { Section } from "@/components/layout/container";
+import { CatalogToolbar } from "@/components/catalog/catalog-toolbar";
+import {
+  CatalogCard,
+  CatalogGrid,
+  KindIndex,
+  ListPageHead,
+  MoreRow,
+} from "@/components/catalog/catalog-list";
 import { filterOutFictionalFarmers } from "@/lib/fictional-farmers";
+import { isSeedId, withSeedFarmers } from "@/lib/preview-seed";
 
-export default function FarmersPage() {
-  const tf = useTranslations("farmer");
+/**
+ * 農家一覧 — Figma【R2: 確定版】共通リストパターンの実装。
+ *
+ * ## この画面に R2 確定版フレームが無いことの扱い (C9-1 の判断)
+ * Structure List「農家一覧」(https://app.notion.com/33270c9d064c81e089dff5ab464cce55)
+ * の `ステータス：Design` は **Not started** で、`Figma` プロパティが指す
+ * `6639:7029` は R1 世代の「農家一覧 変A（部品ベース）」だった。R2 確定版セクションを
+ * 3 ページ (7567:2 EC / 7567:4 Journal / 7567:6 Event) 全数走査しても農家一覧は無い。
+ *
+ * よって**確定済みの兄弟テンプレから導出**する:
+ * - 構造の正本 = 共通リストパターン お茶メニュー一覧 PC `8063:2144` / SP `8063:2372`
+ *   (商品一覧 PC `8061:1781` / SP `8062:2008` と同一骨格)
+ * - 内容モデルの正本 = 変A `6639:7029` (FarmerCard = 写真 + 氏名 + 産地)
+ *
+ * 部品は `components/catalog/catalog-list.tsx` を丸ごと共有するので、寸法・文字組み・
+ * 色は商品一覧 / お茶メニュー一覧と 1 px も違わない。本ファイルに生 px は書かない。
+ *
+ * 差分は 3 点だけ:
+ * 1. 英字キッカーが `FARMERS`
+ * 2. フィルタ軸が category ではなく **産地 (region)**
+ * 3. カードの meta 行を持たない (氏名 + 産地の 2 行 = 変A FarmerCard と同じ)
+ */
+
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("farmer");
+  // en の lead は未入稿 (空文字) なので description には載せない。
+  const lead = t("lead") || undefined;
+  return {
+    title: t("heading"),
+    description: lead,
+    openGraph: {
+      title: t("heading"),
+      description: lead,
+    },
+  };
+}
+
+/** Figma の共通リストパターンは 3 列 x 4 段 = 12 件を初期表示する (8063:2169)。 */
+const PAGE_SIZE = 12;
+
+type Farmer = {
+  _id: string;
+  name: string;
+  slug: { current: string };
+  imageUrl?: string;
+  photo?: { asset: object; alt?: string };
+  region?: string;
+  country?: string;
+};
+
+type SearchParams = { region?: string; show?: string };
+
+/** 産地の表示単位。region が空なら country に落とす (どちらも無ければ未分類)。 */
+function regionOf(farmer: Farmer): string {
+  return farmer.region || farmer.country || "";
+}
+
+export default async function FarmersPage({
+  searchParams,
+}: {
+  searchParams: Promise<SearchParams>;
+}) {
+  const params = await searchParams;
+  const t = await getTranslations("farmer");
+  const tc = await getTranslations("common");
+  const bt = await getTranslations("breadcrumb");
 
   return (
-    <div className="section-wide">
-      {/* 変A: centered editorial header */}
-      <div className="text-center mb-12 md:mb-16">
-        <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-4">
-          Farmers
-        </p>
-        <h1>{tf("heading")}</h1>
-        {tf("lead") && (
-          <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl mx-auto mt-6">{tf("lead")}</p>
-        )}
-      </div>
-      <FarmersList />
-    </div>
+    <Section spacing="none" className="pt-6 pb-16 lg:pb-28">
+      <Breadcrumb items={[{ label: bt("home"), href: "/" }, { label: tc("farmers") }]} />
+
+      <ListPageHead overline="FARMERS" title={t("heading")} lead={t("lead")} />
+
+      <FarmersList params={params} />
+    </Section>
   );
 }
 
-async function FarmersList() {
+async function FarmersList({ params }: { params: SearchParams }) {
   const locale = await getLocale();
   const t = await getTranslations("farmer");
+  const tl = await getTranslations("catalog");
 
+  let fetched: Farmer[];
   try {
     const client = getClient();
-    const fetched: Array<{
-      _id: string;
-      name: string;
-      slug: { current: string };
-      photo?: { asset: object; alt?: string };
-      region?: string;
-      country?: string;
-    }> = await client.fetch(FARMERS_QUERY, { language: locale });
-
-    // Hide fictional/seed farmer docs still present in the production dataset
-    // until real producer stories are approved. Code-only; no Sanity mutation.
-    const real = filterOutFictionalFarmers(fetched);
-
-    // Preview-only: real farmers lack photos and the list is thin. Attach
-    // placeholder imagery and pad to a full grid. No effect when flag unset.
-    const farmers = withSeedFarmers(real);
-
-    if (!farmers || farmers.length === 0) {
-      return (
-        <p className="text-muted-foreground text-sm">
-          {t("empty")}
-        </p>
-      );
-    }
-
-    return (
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-10 md:gap-x-8 md:gap-y-14">
-        {farmers.map(
-          (farmer: {
-            _id: string;
-            slug: { current: string };
-            imageUrl?: string;
-            photo?: { asset: object; alt?: string };
-            name: string;
-            region?: string;
-            country?: string;
-          }) => {
-            const seeded = isSeedId(farmer._id);
-            const inner = (
-              <>
-                <ImageCard
-                  image={farmer.imageUrl ?? (farmer.photo?.asset ? urlFor(farmer.photo).width(600).height(400).url() : undefined)}
-                  alt={farmer.photo?.alt || farmer.name}
-                  className="mb-5"
-                  hover={!seeded}
-                />
-                <div className="space-y-2 text-center">
-                  <h3 className="text-sm font-normal leading-relaxed group-hover:underline underline-offset-4">
-                    {farmer.name}
-                  </h3>
-                  {(farmer.region || farmer.country) && (
-                    <p className="text-[13px] text-muted-foreground">
-                      {[farmer.region, farmer.country].filter(Boolean).join(", ")}
-                    </p>
-                  )}
-                </div>
-              </>
-            );
-
-            // Seed (dummy) farmers have no real detail route -> render non-linked.
-            if (seeded) {
-              return (
-                <div key={farmer._id} className="block cursor-default">
-                  {inner}
-                </div>
-              );
-            }
-
-            return (
-              <Link
-                key={farmer._id}
-                href={`/farmers/${farmer.slug.current}`}
-                className="group block"
-              >
-                {inner}
-              </Link>
-            );
-          }
-        )}
-      </div>
-    );
+    fetched = (await client.fetch(FARMERS_QUERY, { language: locale })) ?? [];
   } catch {
-    return (
-      <p className="text-muted-foreground text-sm">
-        {t("loadError")}
-      </p>
-    );
+    return <p className="mt-8 text-sm text-muted-foreground lg:mt-12">{t("loadError")}</p>;
   }
+
+  // 承認前の架空プロフィールは production dataset に残っていても出さない
+  // (コードのみの除外・Sanity への書き戻しはしない)。
+  const real = filterOutFictionalFarmers(fetched);
+
+  // Preview 限定: 実データは写真が無く件数も薄いので、見本の写真を当てて
+  // グリッドを 1 段ぶん埋める。フラグ未設定時は入力をそのまま返す。
+  const farmers = withSeedFarmers(real) as Farmer[];
+
+  if (farmers.length === 0) {
+    return <p className="mt-8 text-sm text-muted-foreground lg:mt-12">{t("empty")}</p>;
+  }
+
+  // チップは実データの産地から組む (Figma の固定文言は焼かない)。
+  const regions = [...new Set(farmers.map(regionOf).filter(Boolean))];
+  const chips = [
+    { value: "all", label: tl("all") },
+    ...regions.map((r) => ({ value: r, label: r })),
+  ];
+
+  const activeRegion =
+    params.region && regions.includes(params.region) ? params.region : "all";
+  const filtered =
+    activeRegion === "all"
+      ? farmers
+      : farmers.filter((farmer) => regionOf(farmer) === activeRegion);
+
+  const show = Math.max(PAGE_SIZE, Number(params.show) || PAGE_SIZE);
+  const visible = filtered.slice(0, show);
+  const remaining = filtered.length - visible.length;
+
+  const moreHref = () => {
+    const usp = new URLSearchParams();
+    if (activeRegion !== "all") usp.set("region", activeRegion);
+    usp.set("show", String(show + PAGE_SIZE));
+    return `/farmers?${usp.toString()}`;
+  };
+
+  const kindEntries = regions.map((region) => ({
+    label: region,
+    count: farmers.filter((farmer) => regionOf(farmer) === region).length,
+    href: `/farmers?region=${encodeURIComponent(region)}`,
+  }));
+
+  return (
+    <>
+      <CatalogToolbar
+        className="mt-8 lg:mt-12"
+        chips={chips}
+        activeChip={activeRegion}
+        chipParam="region"
+        sortLabel={tl("sortLabel")}
+      />
+
+      <CatalogGrid className="mt-8 lg:mt-12">
+        {visible.map((farmer) => {
+          // 見本カード (`seed-farmer-N`) は詳細ドキュメントが無く
+          // `/ja/farmers/[slug]` が notFound になるので、リンクを張らない。
+          const seeded = isSeedId(farmer._id);
+          const image =
+            farmer.imageUrl ??
+            (farmer.photo?.asset
+              ? urlFor(farmer.photo).width(600).height(400).url()
+              : undefined);
+
+          return (
+            <CatalogCard
+              key={farmer._id}
+              href={seeded ? undefined : `/farmers/${farmer.slug.current}`}
+              image={image}
+              imageAlt={farmer.photo?.alt || farmer.name}
+              overline={regionOf(farmer) || undefined}
+              title={farmer.name}
+            />
+          );
+        })}
+      </CatalogGrid>
+
+      <KindIndex className="mt-8" title={t("byRegion")} entries={kindEntries} />
+
+      {remaining > 0 ? (
+        <MoreRow
+          className="mt-8 lg:mt-12"
+          href={moreHref()}
+          label={tl("showMore", { count: Math.min(remaining, PAGE_SIZE) })}
+        />
+      ) : null}
+    </>
+  );
 }

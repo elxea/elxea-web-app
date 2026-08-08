@@ -203,6 +203,7 @@
     "lead": "",
     "empty": "No farmer profiles yet.",
     "loadError": "Could not load farmer profiles.",
+    "byRegion": "Browse by region",
     "follow": "Follow",
     "unfollow": "Unfollow",
     "followedMessage": "Now following this farmer",

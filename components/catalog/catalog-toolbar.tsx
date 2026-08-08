@@ -38,6 +38,12 @@ export type CatalogToolbarProps = {
   chips: CatalogChip[];
   /** 現在選択中の chip value。未指定は先頭 (すべて)。 */
   activeChip?: string;
+  /**
+   * 絞り込みを載せる URL クエリのキー。既定は `category` (商品一覧 / お茶メニュー)。
+   * 農家一覧は絞り込み軸が産地なので `region` を渡す。既定値を変えていないので
+   * 既存ページの URL は不変。
+   */
+  chipParam?: string;
   /** 並び替えの選択肢。空なら Select を出さない。 */
   sortOptions?: CatalogChip[];
   activeSort?: string;
@@ -49,6 +55,7 @@ export type CatalogToolbarProps = {
 export function CatalogToolbar({
   chips,
   activeChip,
+  chipParam = "category",
   sortOptions = [],
   activeSort,
   sortLabel,
@@ -114,7 +121,9 @@ export function CatalogToolbar({
               data-slot="catalog-chip"
               aria-pressed={selected}
               onClick={() =>
-                router.push(hrefWith("category", chip.value === chips[0]?.value ? undefined : chip.value))
+                router.push(
+                  hrefWith(chipParam, chip.value === chips[0]?.value ? undefined : chip.value)
+                )
               }
               className={chipClass}
             >

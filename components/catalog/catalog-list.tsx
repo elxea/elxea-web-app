@@ -87,7 +87,15 @@ export function CatalogGrid({ className, ...props }: React.ComponentProps<"div">
 /* -------------------------------------------------------------------------- */
 
 export type CatalogCardProps = {
-  href: string;
+  /**
+   * 詳細ルートがあるときだけ渡す。省略すると**同じ体裁のまま非リンク**で出す。
+   * 農家一覧の見本カード (preview seed の `seed-farmer-N`) は
+   * `/ja/farmers/[slug]` に実ドキュメントが無く notFound になるため、
+   * リンクを張らずにグリッド密度だけ再現する用途で使う。
+   * 既存の呼び出し (商品一覧 / お茶メニュー / PDP の近い茶葉) は必ず渡すので
+   * 表示は不変。
+   */
+  href?: string;
   image?: string;
   imageAlt?: string;
   /** 産地・カテゴリ等の英字/日本語キッカー。 */
@@ -113,13 +121,16 @@ export function CatalogCard({
   imageStyle,
   className,
 }: CatalogCardProps) {
-  return (
-    <Link
-      href={href}
-      data-slot="catalog-card"
-      className={cn("group flex flex-col gap-3 lg:gap-5", className)}
-    >
-      <ImageCard image={image} alt={imageAlt ?? title} style={imageStyle} hover />
+  const frameClass = cn("group flex flex-col gap-3 lg:gap-5", className);
+
+  const inner = (
+    <>
+      <ImageCard
+        image={image}
+        alt={imageAlt ?? title}
+        style={imageStyle}
+        hover={Boolean(href)}
+      />
       <div className="flex flex-col items-start gap-2 text-left">
         {overline ? (
           <p className={cn(overlineClass, "text-muted-foreground")}>{overline}</p>
@@ -129,13 +140,31 @@ export function CatalogCard({
             体裁は同ファイルの `h2[data-slot="catalog-card-title"]` 規則で当てる。 */}
         <h2
           data-slot="catalog-card-title"
-          className={cn(h4Class, "text-foreground underline-offset-4 group-hover:underline")}
+          className={cn(
+            h4Class,
+            "text-foreground",
+            href && "underline-offset-4 group-hover:underline"
+          )}
         >
           {title}
         </h2>
         {meta ? <div className={cn(bodySmClass, "text-foreground")}>{meta}</div> : null}
         {footer}
       </div>
+    </>
+  );
+
+  if (!href) {
+    return (
+      <div data-slot="catalog-card" data-linked="false" className={frameClass}>
+        {inner}
+      </div>
+    );
+  }
+
+  return (
+    <Link href={href} data-slot="catalog-card" className={frameClass}>
+      {inner}
     </Link>
   );
 }
