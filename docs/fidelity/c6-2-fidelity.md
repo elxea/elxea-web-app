@@ -393,3 +393,29 @@ eslintが「もう発生しない抑制がある」でexit 2になるため)。
 | Q7 | 確定版に無いためマイページから外れた機能: お気に入り/フォローの削除UI・イベント登録キャンセル・会員ステータスとプラン導線・ダッシュボードの件数 | 確定版どおり (=外す) で進める。削除操作の置き場が必要なら別画面として設計 | マイページの機能面 |
 | Q8 | LINE連携エントリは確定版に無いが、web側で唯一の入口なので案内帯の後に残した | 残す (消すと連携フローに入れなくなる)。確定版に組み込むならFigma側へ追記 | マイページ末尾 |
 | Q9 | 12px系の行間 (18 vs 21) / h4の行間・字間 / `foreground` / `primary-foreground` / overlineのweight・字間 がFigmaと食い違う | DS一括棚卸しタスク (3b670c9d-064c-8166) で扱う。本レーンでは動かしていない | DS全域 |
+
+## 13. Vercel Preview での確認 (2026-08-08 23:5x JST)
+
+- Preview URL: https://elxea-web-opm3g9h6g-setaka1103s-projects.vercel.app
+- デプロイ元コミット: `826b5d9` (`feat/c1-ds-foundation` に push 済み)
+
+| 項目 | PC 1440 | SP 375 |
+|---|---|---|
+| `/ja/account` (cookie なし) | 200 → `/ja/login` にリダイレクト (middleware) | 200 → `/ja/login` |
+| `/ja/account` (ダミー `line_session` あり) | **200** / `h1` = 「マイページ」 | **200** / 同 |
+| console error | 0 | 0 |
+| console warning | 0 | 0 |
+| pageerror | 0 | 0 |
+| 横スクロール | なし (scrollWidth 1440) | なし (scrollWidth 375) |
+| `requestfailed` | 30 (すべて `?_rsc=` prefetch abort) | 9 (同) |
+| 確定版のカード (`[data-slot^="account-"]`) | 0 = 未ログインなので出ない (仕様どおり) | 0 (同) |
+
+Preview は `PREVIEW_SEED` 未設定 + 実セッション無しなので、**正しい期待値は
+「ログイン誘導」**。したがって確定版 4 節の実寸は 11 節までのローカル production ビルド
+(`PREVIEW_SEED=1`) の計測が正で、Preview では「ルートが 200 で描画され、コンソールが
+きれいなこと」を確認した。
+
+**実ログインはしていない** (パスワード入力・有効トークンの生成をしていない)。ダミーの
+`line_session` は middleware の存在チェック (`middleware.ts` L99-106) を満たすためだけの
+値で、ページ側の実セッション判定は通らない。ログイン済み状態での目視確認は Setaka の
+セッションでのみ可能なため**残項目**。
