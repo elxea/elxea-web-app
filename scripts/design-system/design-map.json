@@ -194,10 +194,10 @@
     },
     {
       "figma_node_id": "6906:335",
-      "figma_name": "Stepper",
-      "code_path": "components/cart/cart-content.tsx",
+      "figma_name": "Stepper / Qty (Proposed) — elxea/cart 数量",
+      "code_path": "components/ui/quantity-stepper.tsx",
       "kind": "ds-component",
-      "notes": "inline 数量ステッパ (minus/value/plus, updateQuantity)。専用 component 無し。"
+      "notes": "数量ステッパ。DS Button variant=outline size=icon-xs を 2 個 + 数値 (w-8 / text-sm)。C5-1 で cart-content.tsx の inline 定義から専用部品へ切り出した。"
     },
     {
       "figma_node_id": "6934:143",
@@ -267,7 +267,7 @@
       "figma_name": "CartContent (Module) / State=filled",
       "code_path": "components/cart/cart-content.tsx",
       "kind": "module",
-      "notes": "商品ありの状態。同一コンポーネントの分岐。"
+      "notes": "商品ありの状態。同一コンポーネントの分岐。行は cart-line.tsx / サマリー枠は order-summary.tsx に委譲する (C5-1)。"
     },
     {
       "figma_node_id": "6845:17103",
@@ -884,6 +884,34 @@
       "code_path": "components/journal/article-blocks.tsx",
       "kind": "ds-component",
       "notes": "ArticleNextRead + ArticlePill。primary 面の全角丸 h48 / px16 / py8 (上寄せ)、行 gap 8 中央寄せ。SP は 8110:47091 (2 段に折り返す)。"
+    },
+    {
+      "figma_node_id": "6679:14041",
+      "figma_name": "カート 変A（部品ベース）— PC/SP @/ja/cart",
+      "code_path": "app/[locale]/cart/page.tsx",
+      "kind": "module",
+      "notes": "【R2: 確定版】カート の section。PC 6684:8698 / SP 6686:14177。ページ枠 (Section width=wide + CartHeader) を持ち、明細は CartContent へ委譲。"
+    },
+    {
+      "figma_node_id": "6684:120",
+      "figma_name": "CartHeader",
+      "code_path": "app/[locale]/cart/page.tsx",
+      "kind": "ds-component",
+      "notes": "主見出し (.page-title = PC 44 / SP 32) + 英字リード (body-sm)。SP は 6686:14182。inline 定義部品の規約に従い定義ファイルを code_path とする。"
+    },
+    {
+      "figma_node_id": "6684:124",
+      "figma_name": "CartLine (PC) / CartItemSP (SP 6686:14186)",
+      "code_path": "components/cart/cart-line.tsx",
+      "kind": "ds-component",
+      "notes": "カート 1 行。PC 3 列 (写真 / 情報 / 価格) と SP 2 段を 1 つの CSS Grid で切り替える (hidden による二重描画をしない)。C5-1 新規。"
+    },
+    {
+      "figma_node_id": "6684:163",
+      "figma_name": "OrderSummary",
+      "code_path": "components/cart/order-summary.tsx",
+      "kind": "ds-component",
+      "notes": "注文サマリー枠 (小計 / 罫線 / 合計 / 購入手続きへ)。SP は 6686:14228。DS Card は radius / 影 / gap / padding が Figma と食い違うため専用部品。C5-1 新規。"
     }
   ],
   "unmapped_figma_nodes": [

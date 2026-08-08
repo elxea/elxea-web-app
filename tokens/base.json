@@ -13,8 +13,8 @@
         "$description": "gray-100 (#5d5e61) — Webflow text-color"
       },
       "card": {
-        "$value": "oklch(0.863 0.026 102.0)",
-        "$description": "gray-40 (#d5d3c0) — Webflow card_bg-color"
+        "$value": "oklch(0.963 0.008 98.9)",
+        "$description": "#f4f3ed — Figma Variable `card` の実値 (get_variable_defs 2026-08-08 / node 6684:8698)。Figma が正本なのでコードを合わせた (旧値 oklch(0.863 0.026 102.0) = #d5d3c0 は Webflow 由来の gray-40 で、Figma より 3 段暗く、面が背景より暗くなって意図が反転していた)。旧値では foreground (#5d5e61) とのコントラストが 4.29:1 で WCAG AA 未達 (新値 5.83:1 で達成)。C5-1 で是正。"
       },
       "card-foreground": {
         "$value": "oklch(0.482 0.005 271.3)"

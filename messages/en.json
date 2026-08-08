@@ -46,6 +46,9 @@
     "error": "Something went wrong. Please try again.",
     "loginRequired": "Please log in to continue."
   },
+  "cart": {
+    "subtitle": "Items in your cart"
+  },
   "home": {
     "tagline": "Single-Origin Japanese Tea",
     "hero": "Single-Origin Japanese Tea",

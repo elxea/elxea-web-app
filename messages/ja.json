@@ -46,6 +46,9 @@
     "error": "エラーが発生しました。もう一度お試しください。",
     "loginRequired": "この機能を使用するにはログインが必要です。"
   },
+  "cart": {
+    "subtitle": "Items in your cart"
+  },
   "home": {
     "tagline": "Single-Origin Japanese Tea",
     "hero": "日本各地の小規模茶農家から厳選した、シングルオリジンのクラフトティー。いつもの一杯に、静かなきらめきを。",

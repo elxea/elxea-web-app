@@ -18,6 +18,8 @@
  * download / remote host is required.
  */
 
+import type { Cart } from "@/lib/shopify/types";
+
 /** True when preview seeding is enabled via either the unified or legacy flag. */
 export function previewSeedEnabled(): boolean {
   return (
@@ -546,4 +548,84 @@ export function seedJournalDetail(slug: string) {
     theme: base.theme,
     summary: base.summary,
   });
+}
+
+// ---------------------------------------------------------------------------
+// Cart
+// ---------------------------------------------------------------------------
+
+/**
+ * 見本のカート (計測用)。
+ *
+ * `/ja/cart` は Shopify の cart cookie が無いと常に空カートになるため、確定版の
+ * レイアウト (2 行 = 通常購入 + 定期便 / 小計 / 合計 / 決済ボタン) を実寸で計測
+ * できない。見本は Figma【R2: 確定版】カート 変A の PC フレーム (6684:8698) に
+ * 載っている値をそのまま使う。
+ *
+ * - フラグ未設定時 (= production / Vercel Preview の既定) は `null` を返すので、
+ *   描画は見本導入前と byte-identical
+ * - Shopify へは一切書き込まない (読み取りもしない。純粋なオブジェクトリテラル)
+ * - `checkoutUrl` は Shopify の実 URL ではなく `#` 相当のダミー。見本カートから
+ *   決済に進めないのは意図どおり (注文確定はしない)
+ */
+export function seedCart(): Cart | null {
+  if (!previewSeedEnabled()) return null;
+
+  const jpy = (amount: string) => ({ amount, currencyCode: "JPY" });
+  const product = (handle: string, title: string) => ({
+    id: `${SEED_ID_PREFIX}product-${handle}`,
+    handle,
+    title,
+    featuredImage: {
+      url: previewImageForKey(handle),
+      altText: title,
+      width: 1600,
+      height: 1067,
+    },
+    vendor: "roji",
+  });
+
+  return {
+    id: `${SEED_ID_PREFIX}cart`,
+    checkoutUrl: "#preview-seed-no-checkout",
+    totalQuantity: 3,
+    cost: {
+      subtotalAmount: jpy("6000"),
+      totalAmount: jpy("6000"),
+      totalTaxAmount: null,
+    },
+    lines: [
+      {
+        id: `${SEED_ID_PREFIX}cart-line-1`,
+        quantity: 2,
+        merchandise: {
+          id: `${SEED_ID_PREFIX}variant-akane-100g`,
+          title: "100g",
+          selectedOptions: [{ name: "内容量", value: "100g" }],
+          product: product("sencha-akane", "煎茶 茜 -akane-"),
+          price: jpy("1800"),
+        },
+        cost: { totalAmount: jpy("3600") },
+        sellingPlanAllocation: {
+          sellingPlan: {
+            id: `${SEED_ID_PREFIX}selling-plan-monthly`,
+            name: "毎月1回お届け",
+          },
+        },
+      },
+      {
+        id: `${SEED_ID_PREFIX}cart-line-2`,
+        quantity: 1,
+        merchandise: {
+          id: `${SEED_ID_PREFIX}variant-midori-50g`,
+          title: "50g",
+          selectedOptions: [{ name: "内容量", value: "50g" }],
+          product: product("gyokuro-midori", "玉露 翠 -midori-"),
+          price: jpy("2400"),
+        },
+        cost: { totalAmount: jpy("2400") },
+        sellingPlanAllocation: null,
+      },
+    ],
+  };
 }
