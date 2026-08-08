@@ -28,9 +28,14 @@ import { cn } from "@/lib/utils";
  *   → 写真 96、info は 列2+列3 を跨いで 238 (Figma 238)、
  *     ctrl は 列1+列2 を跨いで左端 x0 (Figma lc x=0 w=133)、価格は x=303 (Figma 303)
  * - PC 1440: 列 = `35*4px(140)` / `1fr` / `auto`、gap-x 20 / gap-y 8
- *   → 写真 140 (row-span 2)、info 640 (Figma 640)、価格 x=820 (Figma 820 / row-span 2)
+ *   → 写真 140 (行 1-2)、info 640 (Figma 640)、価格 x=820 (Figma 820 / 行 1-2)
  * - 行の上下余白 24 (Figma CartLine py-24)。SP は先頭/末尾の余白なし
  *   (Figma SP CartItems は gap-24 + 罫線で、行自身に padding を持たない)
+ *
+ * 配置は `col-start-*` / `col-end-*` / `row-start-*` / `row-end-*` だけで書く。
+ * `col-span-*` / `row-span-*` は `grid-column: span N / span N` の**一括指定**なので
+ * `grid-column-start` を巻き戻し、CSS の出力順次第で col-start が無効化される
+ * (2026-08-08 の初回実装で info が列 1 に落ちる不具合を実測した)。span は使わない。
  *
  * 文字組み:
  * - タイトル / 行合計  SP `h5` (14/500) → PC `h4` (16/500)
@@ -102,12 +107,12 @@ export function CartLine({
         width={280}
         height={188}
         sizes="(min-width: 64rem) 140px, 96px"
-        className="col-start-1 row-start-1 w-full self-start lg:row-span-2"
+        className="col-start-1 col-end-2 row-start-1 row-end-2 w-full self-start lg:row-end-3"
       />
 
       <div
         data-slot="cart-line-info"
-        className="col-span-2 col-start-2 row-start-1 flex min-w-0 flex-col gap-1 lg:col-span-1 lg:gap-2"
+        className="col-start-2 col-end-4 row-start-1 row-end-2 flex min-w-0 flex-col gap-1 lg:col-end-3 lg:gap-2"
       >
         <p className={cn(TITLE_SCALE, "text-foreground")}>{title}</p>
         {variantLabel ? (
@@ -120,7 +125,7 @@ export function CartLine({
 
       <div
         data-slot="cart-line-ctrl"
-        className="col-span-2 col-start-1 row-start-2 flex items-center gap-4 lg:col-span-1 lg:col-start-2"
+        className="col-start-1 col-end-3 row-start-2 row-end-3 flex items-center gap-4 lg:col-start-2 lg:col-end-3"
       >
         <QuantityStepper
           value={quantity}
@@ -143,7 +148,7 @@ export function CartLine({
 
       <div
         data-slot="cart-line-price"
-        className="col-start-3 row-start-2 flex flex-col items-end text-right lg:row-span-2 lg:row-start-1 lg:gap-1 lg:self-start"
+        className="col-start-3 col-end-4 row-start-2 row-end-3 flex flex-col items-end text-right lg:row-start-1 lg:row-end-3 lg:gap-1 lg:self-start"
       >
         <p className={cn(bodySmClass, "text-muted-foreground")}>{unitPrice}</p>
         <p className={cn(TITLE_SCALE, "text-foreground")}>{linePrice}</p>

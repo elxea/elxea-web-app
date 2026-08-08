@@ -4,8 +4,6 @@ import { getTranslations } from "next-intl/server";
 
 import { CartContent } from "@/components/cart/cart-content";
 import { Section } from "@/components/layout/container";
-import { bodySmClass } from "@/components/editorial/rule-list";
-import { cn } from "@/lib/utils";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("common");
@@ -43,7 +41,18 @@ export default function CartPage() {
       <div className="flex flex-col gap-10 lg:gap-16">
         <div data-slot="cart-header" className="flex flex-col gap-2">
           <h1 className="page-title text-foreground">{t("cart")}</h1>
-          <p className={cn(bodySmClass, "text-muted-foreground")}>{tc("subtitle")}</p>
+          {/* Figma 6684:122 のリードは `elxea/body-sm` = Inter 14 / lh 21 (= 1.5) /
+              tracking 5%。`typography.style.body-sm` の base 値 (14 / 1.5 / .05em) と
+              一致するが、ページが `:lang(ja)` なので dist/tokens-cjk.css の再束縛
+              (lh 1.8 = 25.2px) がカスタムプロパティ継承で効いてしまう (要素に
+              `lang="en"` を付けても変数は html から継承されるので戻らない)。
+              英字リードに CJK の行間を当てるのは誤りなので、font shorthand を使わず
+              `text-sm/normal` (14px / 1.5 = 21px) で Figma 値に合わせる。共有トークンは
+              動かさない (同種の cjk スコープ問題は rule-list の overline に既知として
+              記録済み)。`lang="en"` は読み上げ用に付ける。 */}
+          <p lang="en" className="text-muted-foreground text-sm/normal">
+            {tc("subtitle")}
+          </p>
         </div>
         <CartContent />
       </div>
