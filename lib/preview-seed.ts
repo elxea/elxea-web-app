@@ -943,9 +943,10 @@ export type SeedTeaMenuDetail = {
  * - 実データが引けたときは**呼ばれない** (呼び出し側が `tea ?? seedTeaMenuDetail(slug)`)
  * - 文言・数値は変A `6654:13189` の見本表記をそのまま写した
  *   (品種 やぶきた / 産地 静岡・牧之原 / 一番茶 / 50g / 70℃ / 180ml / 60秒)
- * - `shopifyHandle` は入れない。実在しないハンドルを入れると購入ボタンが
- *   `/ja/products/<不在>` に飛んで 404 になるため、見本では購入節を出さない
- *   (関連記事も同じ理由で slug を持たせない)
+ * - `shopifyHandle` / `relatedArticle` は **production dataset に実在する値**を指す
+ *   (Shopify `tea-ats-g-01` / Sanity 記事 `tea-journey-single-origin-terroir`)。
+ *   見本から 404 に飛ばさないため実在確認済みの値のみ使う。これで購入節・関連記事節も
+ *   実寸計測でき、かつリンクを踏んでも壊れない
  */
 export function seedTeaMenuDetail(slug: string): SeedTeaMenuDetail | null {
   if (!previewSeedEnabled()) return null;
@@ -964,5 +965,10 @@ export function seedTeaMenuDetail(slug: string): SeedTeaMenuDetail | null {
     description:
       "静岡・牧之原の茶園で育てたやぶきたを、一番茶のみで丁寧に仕上げた煎茶です。",
     brewingGuide: { temperature: "70℃", water: "180ml", time: "60秒" },
+    shopifyHandle: "tea-ats-g-01",
+    relatedArticle: {
+      title: "シングルオリジンとテロワール — 一杯に土地が出る",
+      slug: { current: "tea-journey-single-origin-terroir" },
+    },
   };
 }

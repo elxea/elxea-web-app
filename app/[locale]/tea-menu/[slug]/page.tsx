@@ -203,8 +203,9 @@ export default async function TeaMenuDetailPage({
           />
 
           {/* 変A の Info Column は写真の上端に揃う (中央寄せではない)。
-              段間はいずれも 24 (`mt-6`)。 */}
-          <div data-slot="tea-hero-info" className="mt-8 lg:mt-0">
+              段間はいずれも 24 (`mt-6`)。SP は写真の下に 20 で積む
+              (変A 6656:7944 = 写真下端 340 → Info Column y360)。 */}
+          <div data-slot="tea-hero-info" className="mt-5 lg:mt-0">
             {tea.category ? (
               <p className={cn(overlineClass, "text-muted-foreground")}>{tea.category}</p>
             ) : null}
@@ -255,9 +256,11 @@ export default async function TeaMenuDetailPage({
       {tea.shopifyHandle || tea.relatedArticle ? (
         <PageSection>
           {tea.shopifyHandle ? (
-            <Button asChild className="w-full lg:w-auto">
-              <Link href={`/products/${tea.shopifyHandle}`}>{t("buyNow")}</Link>
-            </Button>
+            <div data-slot="tea-buy">
+              <Button asChild className="w-full lg:w-auto">
+                <Link href={`/products/${tea.shopifyHandle}`}>{t("buyNow")}</Link>
+              </Button>
+            </div>
           ) : null}
 
           {tea.relatedArticle ? (

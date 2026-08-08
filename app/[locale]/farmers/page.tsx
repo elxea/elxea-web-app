@@ -113,8 +113,10 @@ async function FarmersList({ params }: { params: SearchParams }) {
   const real = filterOutFictionalFarmers(fetched);
 
   // Preview 限定: 実データは写真が無く件数も薄いので、見本の写真を当てて
-  // グリッドを 1 段ぶん埋める。フラグ未設定時は入力をそのまま返す。
-  const farmers = withSeedFarmers(real) as Farmer[];
+  // グリッドを埋める。フラグ未設定時は入力をそのまま返す。
+  // 14 件にするのは計測のため — 初期表示 12 件 (Figma 3 列 x 4 段) を満たしたうえで
+  // 残 2 件が出るので `MoreRow` も実寸計測できる (既定 6 件では MoreRow が出ない)。
+  const farmers = withSeedFarmers(real, 14) as Farmer[];
 
   if (farmers.length === 0) {
     return <p className="mt-8 text-sm text-muted-foreground lg:mt-12">{t("empty")}</p>;
