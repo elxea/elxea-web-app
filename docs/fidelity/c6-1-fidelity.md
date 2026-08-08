@@ -27,6 +27,13 @@
   - 計測日時: 2026-08-08 22:4x JST
   - **console error / warning / pageerror = 0件**、`document.scrollWidth` = viewport幅
     (PC 1440 / SP 390 — 横スクロール無し)、両ページHTTP 200
+- **Vercel Previewでの再計測 (同スクリプト・同値)**:
+  https://elxea-web-fgq3imb2n-setaka1103s-projects.vercel.app
+  (`/ja/login` / `/ja/login/complete` ともHTTP 200。2026-08-08 22:5x JST)
+  - **PC / SPの全比較項目がlocal production buildと完全一致 (差分0件)**、
+    console error / warning / pageerror 0件、`scrollWidth` = viewport幅
+  - rebase後 (origin/feat/c1-ds-foundation = C5-1カートレーンの6 commitを取り込んだ上) に
+    全ゲートを再実行し、同じ数値を再取得している
 - 色は測定値のCSS `lab()` をsRGB hexに戻して比較している (CSS `lab()` はD50白色点)。
 - 判定: `[OK]` 一致 (Δ≤2px) / `[仕様]` 承認済みor出典付きの意図的差分 /
   `[要判断]` オーナー判断が要る差分 / `[粗]` 修正必須の乖離
