@@ -18,6 +18,7 @@
  * download / remote host is required.
  */
 
+import type { AccountView } from "@/lib/account-view";
 import type { Cart } from "@/lib/shopify/types";
 
 /** True when preview seeding is enabled via either the unified or legacy flag. */
@@ -627,5 +628,99 @@ export function seedCart(): Cart | null {
         sellingPlanAllocation: null,
       },
     ],
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Account (マイページ)【R2: 確定版】(Figma 親 8095:731 / PC 8095:733 / SP 8095:792)
+// ---------------------------------------------------------------------------
+
+/**
+ * 見本のマイページ (計測用)。
+ *
+ * `/ja/account` はログイン必須で、ログインしていないとログイン誘導だけが出る。
+ * 確定版の 4 節 (これから / 続き / これまで / お支払い方法) をカードが載った状態で
+ * 実寸計測するには、**セッション無しでも確定版の骨格を描ける見本**が必要になる。
+ * 値は Figma 確定版のフレームに載っている見本文言・見本日付をそのまま写した。
+ *
+ * - フラグ未設定時 (= production / Vercel Preview の既定) は `null` を返すので、
+ *   描画は見本導入前と byte-identical (ログイン誘導のまま)
+ * - Shopify / Firestore には読み書きしない (純粋なオブジェクトリテラル)
+ * - 実在の顧客データは 1 件も含まない。メールは予約ドメイン (example.com) の見本
+ * - 実セッションがあるときは呼ばれない (実データが優先。見本で上書きしない)
+ */
+export function seedAccountView(): AccountView | null {
+  if (!previewSeedEnabled()) return null;
+
+  return {
+    displayName: "結城",
+    email: "yuki@example.com",
+    upcoming: [
+      {
+        id: `${SEED_ID_PREFIX}subscription-1`,
+        kind: "subscription",
+        date: "2026-08-20T00:00:00.000Z",
+        title: "深蒸し煎茶「やまかげ」",
+        href: "/account/subscriptions",
+      },
+      {
+        id: `${SEED_ID_PREFIX}account-event-1`,
+        kind: "event",
+        date: "2026-09-02T00:00:00.000Z",
+        title: "火入れの飲みくらべ会",
+        href: "/events/seed-event-1",
+      },
+      {
+        id: `${SEED_ID_PREFIX}account-event-2`,
+        kind: "event",
+        date: "2026-09-14T00:00:00.000Z",
+        title: "秋のお茶会",
+        href: "/events/seed-event-2",
+      },
+    ],
+    continueItems: [
+      {
+        id: `${SEED_ID_PREFIX}account-favorite-1`,
+        kind: "favorite-article",
+        title: "火入れという時間のかけ方",
+        imageUrl: previewImageAt(0),
+        href: "/journal/seed-journal-0",
+      },
+      {
+        id: `${SEED_ID_PREFIX}account-favorite-2`,
+        kind: "favorite-article",
+        title: "八女、白折の朝",
+        imageUrl: previewImageAt(1),
+        href: "/journal/seed-journal-1",
+      },
+    ],
+    past: [
+      {
+        id: `${SEED_ID_PREFIX}account-order-1`,
+        kind: "order",
+        date: "2026-07-06T00:00:00.000Z",
+        title: "#1042",
+        amount: { value: "4200", currencyCode: "JPY" },
+      },
+      {
+        id: `${SEED_ID_PREFIX}account-order-2`,
+        kind: "order",
+        date: "2026-06-12T00:00:00.000Z",
+        title: "#1031",
+        amount: { value: "6000", currencyCode: "JPY" },
+      },
+      {
+        id: `${SEED_ID_PREFIX}account-order-3`,
+        kind: "order",
+        date: "2026-05-24T00:00:00.000Z",
+        title: "#1018",
+        amount: { value: "2400", currencyCode: "JPY" },
+      },
+    ],
+    // 確定版の「お支払い方法」を計測するために見本のカードを 1 枚だけ持つ。
+    // 実データ経路は無い (アプリ権限 read_customer_payment_methods 未付与) ので、
+    // これは**プレビュー限定の見本**であり実登録カードではない。
+    paymentMethod: { brand: "VISA", last4: "1234" },
+    seeded: true,
   };
 }
