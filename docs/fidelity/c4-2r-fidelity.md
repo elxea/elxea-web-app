@@ -11,6 +11,9 @@
   `getComputedStyle` / `getBoundingClientRect` 実測 (viewport PC 1440x1000 / SP 375x812)
   - 計測スクリプト: `scripts/scratch/c42r-measure.mjs` (gitignore対象)
   - 計測日時: 2026-08-08 11:4x JST
+- **Vercel Previewでの再計測 (同スクリプト・同値)**:
+  https://elxea-web-8ujsyip9o-setaka1103s-projects.vercel.app
+  (2026-08-08 12:0x JST。57項目すべてlocal prodと一致 / console・pageerror 0件)
 - 判定: `[OK]` 一致 / `[仕様]` 意図的な差分 / `[要判断]` Figmaから値が一意に導けない /
   `[未実測]` データ未整備でDOMに出ないため未計測
 
@@ -153,6 +156,11 @@ C4-2 QAがF-2 (LOW) として挙げていた表記差。`lib/format-date.ts` の
   8089:4622 / 8089:4518 / 8085:4353) — `get_metadata` 取得2026-08-08 11:2x JST
 - 実装計測ログ: `scripts/scratch/c42r-measure.mjs` 実行2026-08-08 11:4x JST
   (local prod build / `VERCEL_ENV=preview` でサイトパスワードgateを外して計測)
+  および同スクリプトをVercel Previewに対して再実行 2026-08-08 12:0x JST
+  (https://elxea-web-8ujsyip9o-setaka1103s-projects.vercel.app / 全項目同値)
+- Preview到達確認 (HTTP 200): `/ja` `/ja/journal` `/ja/journal/category`
+  `/ja/journal/category/recipe` `/ja/journal/tag/5de53eded6f9` `/ja/playlists`
+  `/ja/playlists/morning-forest` (`/en/*` は既存のlocaleリダイレクトで `/ja` へ301 → 200)
 - C4-2 QA監査 (F-1 / F-2の出所): task `3b570c9d-064c-81cd-bb1a-eaab822e086c`
 - C4-3 QA監査 (F1〜F5の出所): task `3b670c9d-064c-81af-b00e-cae93f0f6a5c`
 - 変更ファイル: `app/globals.css` / `lib/format-date.ts` /
