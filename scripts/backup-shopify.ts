@@ -28,6 +28,8 @@ import { writeFileSync, mkdirSync, existsSync } from "fs";
 import { join } from "path";
 import { readFileSync } from "fs";
 
+import { SHOPIFY_API_VERSION } from "../lib/shopify/api-version";
+
 // ─── Config ───────────────────────────────────────────────────────────
 
 // Load .env manually (tsx doesn't auto-load it)
@@ -51,7 +53,7 @@ const getEnv = (key: string): string =>
 
 const STORE_DOMAIN = getEnv("SHOPIFY_STORE_DOMAIN");
 const ACCESS_TOKEN = getEnv("SHOPIFY_ADMIN_ACCESS_TOKEN");
-const API_VERSION = "2025-04";
+const API_VERSION = SHOPIFY_API_VERSION;
 const ADMIN_ENDPOINT = `https://${STORE_DOMAIN}/admin/api/${API_VERSION}/graphql.json`;
 
 const args = process.argv.slice(2);

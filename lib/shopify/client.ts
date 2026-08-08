@@ -1,9 +1,10 @@
+import { SHOPIFY_API_VERSION } from "./api-version";
+
 const SHOPIFY_STORE_DOMAIN = process.env.SHOPIFY_STORE_DOMAIN || "";
 const SHOPIFY_STOREFRONT_ACCESS_TOKEN =
   process.env.SHOPIFY_STOREFRONT_ACCESS_TOKEN || "";
-const API_VERSION = "2025-04";
 
-const endpoint = `https://${SHOPIFY_STORE_DOMAIN}/api/${API_VERSION}/graphql.json`;
+const endpoint = `https://${SHOPIFY_STORE_DOMAIN}/api/${SHOPIFY_API_VERSION}/graphql.json`;
 
 type ShopifyResponse<T> = {
   data: T;

@@ -22,6 +22,8 @@
 import { readFileSync } from "fs";
 import { join } from "path";
 
+import { SHOPIFY_API_VERSION } from "../lib/shopify/api-version";
+
 // ─── Env loading (same pattern as backup-shopify.ts) ─────────────────────────
 
 function loadEnvFile(filename: string): Record<string, string> {
@@ -43,7 +45,7 @@ const getEnv = (key: string): string => process.env[key] ?? localEnv[key] ?? "";
 
 const SHOPIFY_STORE_DOMAIN = getEnv("SHOPIFY_STORE_DOMAIN");
 const SHOPIFY_ADMIN_ACCESS_TOKEN = getEnv("SHOPIFY_ADMIN_ACCESS_TOKEN");
-const API_VERSION = "2025-04";
+const API_VERSION = SHOPIFY_API_VERSION;
 const DRY_RUN = process.argv.includes("--dry-run");
 
 // ─── GraphQL types ────────────────────────────────────────────────────────────

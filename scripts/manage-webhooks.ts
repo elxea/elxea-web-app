@@ -16,12 +16,14 @@
 import { config } from "dotenv";
 import path from "path";
 
+import { SHOPIFY_API_VERSION } from "../lib/shopify/api-version";
+
 // Load .env.local from project root
 config({ path: path.resolve(__dirname, "../.env.local") });
 
 const STORE_DOMAIN = process.env.SHOPIFY_STORE_DOMAIN;
 const ACCESS_TOKEN = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN;
-const API_VERSION = "2025-04";
+const API_VERSION = SHOPIFY_API_VERSION;
 const PRODUCTION_HOST = "elxea.com";
 
 if (!STORE_DOMAIN || !ACCESS_TOKEN) {

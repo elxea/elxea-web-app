@@ -1,5 +1,7 @@
 import { createHash, randomBytes, createCipheriv, createDecipheriv } from "crypto";
 
+import { SHOPIFY_API_VERSION } from "./api-version";
+
 const CLIENT_ID = process.env.SHOPIFY_CUSTOMER_ACCOUNT_CLIENT_ID || "";
 const SESSION_SECRET = process.env.SESSION_SECRET || "";
 
@@ -34,7 +36,7 @@ const TOKEN_URL =
 const LOGOUT_URL =
   process.env.SHOPIFY_CUSTOMER_ACCOUNT_LOGOUT_URL ||
   `https://${DEFAULT_ACCOUNT_DOMAIN}/authentication/logout`;
-const CUSTOMER_API_URL = `https://shopify.com/${process.env.SHOPIFY_SHOP_ID}/account/customer/api/2025-04/graphql`;
+const CUSTOMER_API_URL = `https://shopify.com/${process.env.SHOPIFY_SHOP_ID}/account/customer/api/${SHOPIFY_API_VERSION}/graphql`;
 
 export { LOGOUT_URL };
 
@@ -310,6 +312,220 @@ export async function getCustomer(accessToken: string): Promise<Customer | null>
   return json.data?.customer ?? null;
 }
 
+/**
+ * Query used to prove that a subscription contract belongs to the customer who
+ * owns `accessToken`.
+ *
+ * `customer` is implicitly scoped to the bearer of the token, so
+ * `customer.subscriptionContract(id:)` returns null for any contract the caller
+ * does not own. That makes it a positive ownership proof rather than a guess
+ * derived from client-supplied data.
+ *
+ * Ref: https://shopify.dev/docs/api/customer/latest/queries/customer
+ */
+const SUBSCRIPTION_CONTRACT_OWNERSHIP_QUERY = /* GraphQL */ `
+  query SubscriptionContractOwnership($id: ID!) {
+    customer {
+      subscriptionContract(id: $id) {
+        id
+      }
+    }
+  }
+`;
+
+const UPCOMING_BILLING_CYCLES_QUERY = /* GraphQL */ `
+  query UpcomingBillingCycles($id: ID!, $first: Int!) {
+    customer {
+      subscriptionContract(id: $id) {
+        id
+        upcomingBillingCycles(first: $first, sortKey: CYCLE_INDEX) {
+          edges {
+            node {
+              cycleIndex
+              skipped
+              billingAttemptExpectedDate
+            }
+          }
+        }
+      }
+    }
+  }
+`;
+
+/**
+ * Shape of a Shopify SubscriptionContract GID.
+ * Anything else is rejected before it reaches an API call, so a caller cannot
+ * smuggle a different resource type (or a raw numeric id) into a mutation.
+ */
+const SUBSCRIPTION_CONTRACT_GID_PATTERN =
+  /^gid:\/\/shopify\/SubscriptionContract\/\d+$/;
+
+export function isSubscriptionContractGid(value: unknown): value is string {
+  return typeof value === "string" && SUBSCRIPTION_CONTRACT_GID_PATTERN.test(value);
+}
+
+function gidNumericSuffix(gid: string): string | null {
+  const match = gid.match(/(\d+)$/);
+  return match ? match[1] : null;
+}
+
+/**
+ * Verify that `subscriptionContractId` belongs to the customer authenticated by
+ * `accessToken`.
+ *
+ * Fail-closed by construction: every path that is not an explicit, matching
+ * contract id returns `false` — transport failure, GraphQL error, null contract,
+ * malformed GID, or an id that does not match what we asked for. A caller that
+ * cannot prove ownership must be treated exactly like a caller that does not own
+ * the contract.
+ */
+export async function verifySubscriptionContractOwnership(
+  accessToken: string,
+  subscriptionContractId: string
+): Promise<boolean> {
+  if (!accessToken) return false;
+  if (!isSubscriptionContractGid(subscriptionContractId)) return false;
+
+  let json: {
+    data?: { customer?: { subscriptionContract?: { id?: string } | null } | null };
+    errors?: unknown[];
+  };
+
+  try {
+    const res = await fetch(CUSTOMER_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: accessToken,
+      },
+      body: JSON.stringify({
+        query: SUBSCRIPTION_CONTRACT_OWNERSHIP_QUERY,
+        variables: { id: subscriptionContractId },
+      }),
+      cache: "no-store",
+    });
+
+    if (!res.ok) {
+      console.error(
+        "[verifySubscriptionContractOwnership] Customer API error:",
+        res.status
+      );
+      return false;
+    }
+
+    json = await res.json();
+  } catch (e) {
+    console.error("[verifySubscriptionContractOwnership] request failed:", e);
+    return false;
+  }
+
+  if (json.errors && json.errors.length > 0) {
+    console.error(
+      "[verifySubscriptionContractOwnership] GraphQL errors:",
+      JSON.stringify(json.errors)
+    );
+    return false;
+  }
+
+  const returnedId = json.data?.customer?.subscriptionContract?.id;
+  if (!returnedId) return false;
+
+  // Compare on the numeric suffix so an equivalent-but-differently-formatted
+  // GID from Shopify still matches, while a different contract never does.
+  const requested = gidNumericSuffix(subscriptionContractId);
+  const returned = gidNumericSuffix(returnedId);
+  return requested !== null && requested === returned;
+}
+
+export type UpcomingBillingCycle = {
+  cycleIndex: number;
+  skipped: boolean;
+  billingAttemptExpectedDate: string | null;
+};
+
+/**
+ * Resolve the cycle index of the next billing cycle that has not already been
+ * skipped, for a contract owned by the bearer of `accessToken`.
+ *
+ * Returns `null` when the index cannot be determined (not owned, API failure,
+ * no upcoming cycles). Callers must treat `null` as "do not proceed" — never as
+ * "use a default index".
+ *
+ * Cycle indexes are 1-based, so there is no valid `0`. We read the real value
+ * from `upcomingBillingCycles` instead of assuming one.
+ *
+ * Ref: https://shopify.dev/docs/api/customer/latest/objects/SubscriptionContract
+ */
+export async function resolveNextBillingCycleIndex(
+  accessToken: string,
+  subscriptionContractId: string,
+  lookahead: number = 10
+): Promise<number | null> {
+  if (!accessToken) return null;
+  if (!isSubscriptionContractGid(subscriptionContractId)) return null;
+
+  let json: {
+    data?: {
+      customer?: {
+        subscriptionContract?: {
+          id?: string;
+          upcomingBillingCycles?: { edges?: { node: UpcomingBillingCycle }[] };
+        } | null;
+      } | null;
+    };
+    errors?: unknown[];
+  };
+
+  try {
+    const res = await fetch(CUSTOMER_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: accessToken,
+      },
+      body: JSON.stringify({
+        query: UPCOMING_BILLING_CYCLES_QUERY,
+        variables: { id: subscriptionContractId, first: lookahead },
+      }),
+      cache: "no-store",
+    });
+
+    if (!res.ok) {
+      console.error(
+        "[resolveNextBillingCycleIndex] Customer API error:",
+        res.status
+      );
+      return null;
+    }
+
+    json = await res.json();
+  } catch (e) {
+    console.error("[resolveNextBillingCycleIndex] request failed:", e);
+    return null;
+  }
+
+  if (json.errors && json.errors.length > 0) {
+    console.error(
+      "[resolveNextBillingCycleIndex] GraphQL errors:",
+      JSON.stringify(json.errors)
+    );
+    return null;
+  }
+
+  const contract = json.data?.customer?.subscriptionContract;
+  if (!contract?.id) return null;
+
+  const edges = contract.upcomingBillingCycles?.edges ?? [];
+  const next = edges
+    .map((e) => e.node)
+    .find((node) => node && node.skipped === false);
+
+  if (!next || typeof next.cycleIndex !== "number" || next.cycleIndex < 1) {
+    return null;
+  }
+  return next.cycleIndex;
+}
+
 export async function getSubscriptionContracts(
   accessToken: string
 ): Promise<SubscriptionContract[]> {
@@ -385,13 +601,23 @@ const SUBSCRIPTION_CANCEL_MUTATION = /* GraphQL */ `
   }
 `;
 
+/**
+ * `subscriptionBillingCycleSkip` takes exactly one argument:
+ *   billingCycleInput: SubscriptionBillingCycleInput!
+ *     { contractId: ID!, selector: { date: DateTime, index: Int } }
+ *
+ * The previous version of this document passed `subscriptionContractId` and
+ * `billingCycleIndex` as top-level arguments. Neither argument exists on this
+ * mutation, so every skip request failed schema validation before it ever
+ * reached the store.
+ *
+ * Ref: https://shopify.dev/docs/api/customer/latest/mutations/subscriptionBillingCycleSkip
+ */
 const SUBSCRIPTION_BILLING_SKIP_MUTATION = /* GraphQL */ `
-  mutation subscriptionBillingCycleSkip($subscriptionContractId: ID!, $billingCycleIndex: Int!) {
-    subscriptionBillingCycleSkip(
-      subscriptionContractId: $subscriptionContractId
-      billingCycleIndex: $billingCycleIndex
-    ) {
+  mutation subscriptionBillingCycleSkip($billingCycleInput: SubscriptionBillingCycleInput!) {
+    subscriptionBillingCycleSkip(billingCycleInput: $billingCycleInput) {
       billingCycle {
+        cycleIndex
         skipped
       }
       userErrors {
@@ -412,40 +638,58 @@ async function executeSubscriptionMutation(
   query: string,
   variables: Record<string, unknown>
 ): Promise<SubscriptionMutationResult> {
-  const res = await fetch(CUSTOMER_API_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: accessToken,
-    },
-    body: JSON.stringify({ query, variables }),
-  });
+  let json: {
+    data?: Record<string, { userErrors?: { message: string }[] } | null>;
+    errors?: { message: string }[];
+  };
 
-  if (!res.ok) {
-    return { success: false, error: `API error: ${res.status}` };
+  try {
+    const res = await fetch(CUSTOMER_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: accessToken,
+      },
+      body: JSON.stringify({ query, variables }),
+      cache: "no-store",
+    });
+
+    if (!res.ok) {
+      return { success: false, error: `API error: ${res.status}` };
+    }
+
+    json = await res.json();
+  } catch (e) {
+    console.error("[executeSubscriptionMutation] request failed:", e);
+    return { success: false, error: "Subscription API request failed" };
   }
 
-  const json = await res.json();
   // Check for userErrors in any mutation response
   const data = json.data;
   if (data) {
     const mutationKey = Object.keys(data)[0];
     if (mutationKey) {
-      const result = data[mutationKey];
-      if (result?.userErrors?.length > 0) {
+      const userErrors = data[mutationKey]?.userErrors;
+      if (userErrors && userErrors.length > 0) {
         return {
           success: false,
-          error: result.userErrors.map((e: { message: string }) => e.message).join(", "),
+          error: userErrors.map((e) => e.message).join(", "),
         };
       }
     }
   }
 
-  if (json.errors) {
+  if (json.errors && json.errors.length > 0) {
     return {
       success: false,
-      error: json.errors.map((e: { message: string }) => e.message).join(", "),
+      error: json.errors.map((e) => e.message).join(", "),
     };
+  }
+
+  // No data at all means the request did not produce a mutation result — treat
+  // that as failure rather than reporting success on an empty response.
+  if (!data) {
+    return { success: false, error: "Subscription API returned no data" };
   }
 
   return { success: true };
@@ -478,14 +722,53 @@ export async function cancelSubscription(
   });
 }
 
+/**
+ * Skip a billing cycle of a subscription contract.
+ *
+ * When `billingCycleIndex` is omitted we resolve the real next un-skipped cycle
+ * index from `upcomingBillingCycles` rather than guessing. There is no safe
+ * default: cycle indexes are 1-based, and picking the wrong index would skip a
+ * delivery the customer did not ask to skip.
+ *
+ * The resolve step queries the contract through `customer`, so it doubles as an
+ * ownership check for the token holder.
+ */
 export async function skipNextBillingCycle(
   accessToken: string,
   subscriptionContractId: string,
-  billingCycleIndex: number = 0
+  billingCycleIndex?: number
 ): Promise<SubscriptionMutationResult> {
+  if (!isSubscriptionContractGid(subscriptionContractId)) {
+    return { success: false, error: "Invalid subscription contract ID" };
+  }
+
+  let cycleIndex = billingCycleIndex;
+
+  if (cycleIndex === undefined) {
+    const resolved = await resolveNextBillingCycleIndex(
+      accessToken,
+      subscriptionContractId
+    );
+    if (resolved === null) {
+      return {
+        success: false,
+        error: "Could not determine the next billing cycle to skip",
+      };
+    }
+    cycleIndex = resolved;
+  }
+
+  // Cycle indexes are 1-based; reject 0 / negatives / non-integers outright
+  // instead of letting Shopify interpret them.
+  if (!Number.isInteger(cycleIndex) || cycleIndex < 1) {
+    return { success: false, error: "Invalid billing cycle index" };
+  }
+
   return executeSubscriptionMutation(accessToken, SUBSCRIPTION_BILLING_SKIP_MUTATION, {
-    subscriptionContractId,
-    billingCycleIndex,
+    billingCycleInput: {
+      contractId: subscriptionContractId,
+      selector: { index: cycleIndex },
+    },
   });
 }
 
