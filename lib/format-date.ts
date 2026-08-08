@@ -45,3 +45,103 @@ export function formatArticleDate(value: string | number | Date | null | undefin
 
   return `${year}.${month}.${day}`;
 }
+
+/**
+ * イベントの開催日時 — Figma【R2: 確定版】イベント詳細 6658:13327 / 6663:8175 の
+ * 「2026年8月10日（日）14:00–17:00」形式。
+ *
+ * 上の `formatArticleDate` と方針が違う点:
+ * - **ロケール依存**。取引系 (注文・定期便・イベント) は意図してロケールの長い
+ *   表記を使う (このファイル冒頭の但し書きどおり)。曜日も Figma に載っている。
+ * - **タイムゾーンは Asia/Tokyo に固定**。Sanity の datetime は UTC で入り、
+ *   実行環境の TZ (Vercel は UTC) で組むと JST 夜のイベントが 1 日前に見える。
+ *   サーバ / クライアントどちらで描いても同じ文字列になるので hydration も安定する。
+ *   (旧実装は `toLocaleDateString(locale)` を TZ 指定なしで呼んでいたためズレた)
+ *
+ * 出力規則:
+ * - 時刻が 00:00 (JST) の値は「時刻の入力なし」とみなして日付だけを出す
+ * - 終了日時が同じ日 → `日付 開始–終了` (Figma と同じ en dash)
+ * - 終了日時が別の日 → `開始日付 開始時刻 – 終了日付 終了時刻`
+ * - 読めない値は空文字を返すので、呼び側は節ごと落とせる
+ */
+const EVENT_TZ = "Asia/Tokyo";
+
+function eventDayFormatter(locale: string) {
+  return new Intl.DateTimeFormat(locale, {
+    timeZone: EVENT_TZ,
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    weekday: "short",
+  });
+}
+
+function eventTimeFormatter(locale: string) {
+  return new Intl.DateTimeFormat(locale, {
+    timeZone: EVENT_TZ,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+}
+
+/** JST での `YYYY-MM-DD` (同日判定用)。 */
+function jstDayKey(date: Date): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: EVENT_TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
+
+/** JST の時刻が 00:00 かどうか (= 時刻未入力とみなす)。 */
+function isMidnightJst(date: Date): boolean {
+  return (
+    new Intl.DateTimeFormat("en-GB", {
+      timeZone: EVENT_TZ,
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(date) === "00:00"
+  );
+}
+
+function toDate(value: string | number | Date | null | undefined): Date | null {
+  if (value === null || value === undefined || value === "") return null;
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+export function formatEventSchedule(
+  start: string | number | Date | null | undefined,
+  end: string | number | Date | null | undefined,
+  locale: string,
+): string {
+  const startDate = toDate(start);
+  if (!startDate) return "";
+
+  const day = eventDayFormatter(locale);
+  const time = eventTimeFormatter(locale);
+  const startDay = day.format(startDate);
+  const startHasTime = !isMidnightJst(startDate);
+  const startTime = startHasTime ? time.format(startDate) : "";
+
+  const endDate = toDate(end);
+  if (!endDate) {
+    return startHasTime ? `${startDay} ${startTime}` : startDay;
+  }
+
+  const sameDay = jstDayKey(startDate) === jstDayKey(endDate);
+  const endHasTime = !isMidnightJst(endDate);
+  const endTime = endHasTime ? time.format(endDate) : "";
+
+  if (sameDay) {
+    if (startHasTime && endHasTime) return `${startDay} ${startTime}–${endTime}`;
+    return startHasTime ? `${startDay} ${startTime}` : startDay;
+  }
+
+  const left = startHasTime ? `${startDay} ${startTime}` : startDay;
+  const right = endHasTime ? `${day.format(endDate)} ${endTime}` : day.format(endDate);
+  return `${left} – ${right}`;
+}

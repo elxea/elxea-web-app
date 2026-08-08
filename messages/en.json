@@ -231,7 +231,8 @@
     "dateLabel": "Date",
     "locationLabel": "Location",
     "detailsHeading": "Details & Registration",
-    "detailsPageLink": "Open details & registration page"
+    "detailsPageLink": "Open details & registration page",
+    "memberOnlyNotice": "This is a members-only event. Please log in to join."
   },
   "page": {
     "loadError": "Could not load page.",

@@ -5,7 +5,7 @@ import { getClient } from "@/sanity/lib/client";
 import { ImageCard } from "@/components/ui/image-card";
 import { EVENTS_QUERY } from "@/sanity/lib/queries";
 import { urlFor } from "@/sanity/lib/image";
-import { previewSeedEnabled, seedEvents, isSeedId } from "@/lib/preview-seed";
+import { previewSeedEnabled, seedEvents } from "@/lib/preview-seed";
 
 export default function EventsPage() {
   const t = useTranslations("common");
@@ -109,15 +109,9 @@ async function EventsList() {
               </>
             );
 
-            // Seed (dummy) events have no real detail route -> render non-linked.
-            if (isSeedId(event._id)) {
-              return (
-                <div key={event._id} className="block cursor-default">
-                  {inner}
-                </div>
-              );
-            }
-
+            // 見本カード (seed) も `seedEventDetail()` が `/events/[slug]` を
+            // 解決できるようになったので通常どおり詳細へリンクする (C7-1)。
+            // 以前は詳細ルートが無く非リンクにしていた。
             if (event.externalUrl) {
               return (
                 <a

@@ -231,7 +231,8 @@
     "dateLabel": "日時",
     "locationLabel": "開催地",
     "detailsHeading": "詳細・申し込み",
-    "detailsPageLink": "詳細・申し込みページを開く"
+    "detailsPageLink": "詳細・申し込みページを開く",
+    "memberOnlyNotice": "会員限定イベントです。ご参加にはログインが必要です。"
   },
   "page": {
     "loadError": "ページを読み込めませんでした。少し時間をおいて、もう一度お試しください。",

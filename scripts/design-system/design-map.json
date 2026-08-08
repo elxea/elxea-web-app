@@ -2,7 +2,7 @@
   "$schema_note": "Figma node ⇄ code path 対応表。経済化施策① (Decision Log 39c70c9d064c81079145f69744e7b8f5)。自動化が Figma コンポーネントに対して正しいソースファイルを編集できるようにする lookup index。値の二重管理はしない。SoT=Figma (トークン・デザイン値の正本は Figma。コードは追従側で tokens/base.json が Figma の写し、dist/ は生成物 / Setaka 宣言 2026-08-08。旧「案 B = SoT=Code, Figma=参照」を置換)。本ファイルはどちらの向きにも値を持たない lookup index なので、この方針転換で役割は変わらない。検証は scripts/design-system/validate-design-map.ts (schema + code_path 実在 + --figma で node 実在)。",
   "figma_file_key": "AWLnI0XF07e8rScuxPYPc7",
   "figma_components_page": "5246:3",
-  "updated_at": "2026-08-08T14:20:00Z",
+  "updated_at": "2026-08-09T00:10:00Z",
   "conventions": {
     "entry": "{ figma_node_id, figma_name, code_path, kind, notes }。code_path はリポジトリルート相対。inline 定義部品は「定義/描画を含むファイル」を code_path とする (編集対象がそのファイルのため)。",
     "kind": "ds-component = elxea 固有の DS 部品 / module = Header/Footer 等の大型合成モジュール / shadcn = shadcn/ui プリミティブ。",
@@ -996,6 +996,55 @@
       "code_path": "components/account/account-parts.tsx",
       "kind": "ds-component",
       "notes": "AccountOpsBand + AccountCta。末尾の案内帯。SP は 8095:850 (縦積み)。CTA は高さ 49 / radius-sm で DS Button と寸法体系が違うため専用部品。C6-2 新規。"
+    },
+    {
+      "figma_node_id": "6657:13352",
+      "figma_name": "Event Header (イベント詳細)",
+      "code_path": "components/events/event-detail.tsx",
+      "kind": "ds-component",
+      "notes": "Figma【R2: 確定版】イベント詳細 6657:7931。PC 6657:13352 / SP 6663:8166。キッカー + 会員限定バッジ + 主見出し + 日時・開催地カードの見出しブロック。"
+    },
+    {
+      "figma_node_id": "6658:13324",
+      "figma_name": "日時・開催地 card",
+      "code_path": "components/events/event-detail.tsx",
+      "kind": "ds-component",
+      "notes": "PC 6658:13324 / SP 6663:8172。bg=card / border 1px / radius-lg 8 / p 24-20 / gap 16。行は label 左 + 値 右寄せ、間に Separator。"
+    },
+    {
+      "figma_node_id": "6659:8002",
+      "figma_name": "Hero (ImageWithFallback) — イベント詳細",
+      "code_path": "components/events/event-detail.tsx",
+      "kind": "ds-component",
+      "notes": "PC 6659:8002 (1280x560 = 16:7) / SP 6664:8160 (358x240 = 3:2)。代替画像は Figma 指定の /placeholder-hero-approach.jpg。"
+    },
+    {
+      "figma_node_id": "6660:8002",
+      "figma_name": "Registration (EventRegisterButton + MemberGate)",
+      "code_path": "components/events/event-detail.tsx",
+      "kind": "ds-component",
+      "notes": "PC 6660:8002 / SP 6664:8163。card 外殻 p 24-20 / gap 16-12。中身は全幅 CTA + 会員限定注記 (+ 権限不足時のみ MemberGate)。6660:8006 はデザイン注記で UI 文言ではない。"
+    },
+    {
+      "figma_node_id": "6660:8003",
+      "figma_name": "EventRegisterButton",
+      "code_path": "components/events/event-register-button.tsx",
+      "kind": "ds-component",
+      "notes": "PC 6660:8003 / SP 6664:8164。全幅・h43 (Button size=\"cta\" / component.button.height.cta) / radius-lg 8 / 16px。R2 でアイコン廃止。登録状態は EventRegistrationProvider が保持し追従バーと共有する。"
+    },
+    {
+      "figma_node_id": "6661:13493",
+      "figma_name": "詳細リンク (event.detailsLink → externalUrl)",
+      "code_path": "components/events/event-detail.tsx",
+      "kind": "ds-component",
+      "notes": "PC 6661:13493 / SP 6664:8171。罫線 + h43 (size=\"cta\") / px 20 / 末尾に ↗。SP 全幅・PC 内容幅。"
+    },
+    {
+      "figma_node_id": "6664:13496",
+      "figma_name": "Sticky Register Bar (追従)",
+      "code_path": "components/events/event-register-button.tsx",
+      "kind": "ds-component",
+      "notes": "SP のみ。bg=card / border-t 1px / px 16 py 10。ページ内の登録カードとページ末尾の目印が視界にある間は出さない (spacer を敷かないので実寸を歪めない)。"
     }
   ],
   "unmapped_figma_nodes": [

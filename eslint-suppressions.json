@@ -9,11 +9,6 @@
       "count": 1
     }
   },
-  "app/[locale]/events/[slug]/page.tsx": {
-    "elxea-tokens/no-raw-colors": {
-      "count": 2
-    }
-  },
   "app/[locale]/events/page.tsx": {
     "elxea-tokens/no-raw-colors": {
       "count": 2
