@@ -813,3 +813,85 @@ export function seedEventDetail(slug: string): SeedEventDetail | null {
     description: SEED_EVENT_BODY,
   };
 }
+
+// ---------------------------------------------------------------------------
+// 定期便管理【R2: 確定版】(Figma section 6717:14526 / PC 6717:14527 / SP 6723:14747)
+// ---------------------------------------------------------------------------
+
+/**
+ * 見本の定期便契約 3 件 (計測用)。
+ *
+ * `/ja/account/subscriptions` はログイン必須で、さらに Shopify に定期便契約が
+ * 無いと確定版の 3 状態 (契約中 / 一時停止中 / 解約済み) を実寸計測できない。
+ * 値は Figma 確定版のカードに載っている見本文言・見本価格・見本日付をそのまま写した。
+ *
+ * - フラグ未設定時 (= production / Vercel Preview の既定) は `null` を返すので、
+ *   描画は見本導入前と byte-identical (ログイン誘導のまま)
+ * - Shopify には読み書きしない (純粋なオブジェクトリテラル)
+ * - 実在の顧客データ・実在の契約 ID は 1 件も含まない。ID は `seed-` 前置きで、
+ *   Shopify の `gid://shopify/SubscriptionContract/...` 形式では**ない**
+ * - 画面側は見本のとき `preview` を立てて Server Action を 1 度も呼ばない。
+ *   見本から実契約への mutation が飛ぶ経路は作らない
+ * - 実セッションがあるときは呼ばれない (実データが優先)
+ */
+export function seedSubscriptionContracts(): SubscriptionContract[] | null {
+  if (!previewSeedEnabled()) return null;
+
+  const line = (
+    key: string,
+    title: string,
+    variantTitle: string | null,
+    quantity: number,
+    amount: string
+  ) => ({
+    node: {
+      id: `${SEED_ID_PREFIX}subscription-line-${key}`,
+      title,
+      variantTitle,
+      quantity,
+      currentPrice: { amount, currencyCode: "JPY" },
+      variantImage: null,
+    },
+  });
+
+  return [
+    {
+      // 契約中 (Figma 6717:14573 / SP 6723:14760)
+      id: `${SEED_ID_PREFIX}subscription-contract-active`,
+      status: "ACTIVE",
+      createdAt: "2026-03-15T00:00:00.000Z",
+      nextBillingDate: "2026-06-15T00:00:00.000Z",
+      deliveryPolicy: { interval: "MONTH", intervalCount: { count: 1 } },
+      lines: {
+        edges: [
+          line("coffee", "深煎りブレンド コーヒー豆（200g）", "粉 / 中挽き", 1, "1800"),
+          line("tea", "和紅茶ティーバッグ（12個入）", "標準", 2, "2400"),
+        ],
+      },
+    },
+    {
+      // 一時停止中 (Figma 6718:14888 / SP 6723:14796)
+      id: `${SEED_ID_PREFIX}subscription-contract-paused`,
+      status: "PAUSED",
+      createdAt: "2026-02-02T00:00:00.000Z",
+      nextBillingDate: null,
+      deliveryPolicy: { interval: "WEEK", intervalCount: { count: 2 } },
+      lines: {
+        edges: [line("tea-paused", "和紅茶ティーバッグ（12個入）", "標準", 1, "2400")],
+      },
+    },
+    {
+      // 解約済み (Figma 6718:14906 / SP 6723:14813)
+      id: `${SEED_ID_PREFIX}subscription-contract-cancelled`,
+      status: "CANCELLED",
+      createdAt: "2025-11-08T00:00:00.000Z",
+      nextBillingDate: null,
+      deliveryPolicy: { interval: "MONTH", intervalCount: { count: 1 } },
+      lines: {
+        edges: [
+          line("coffee-cancelled", "深煎りブレンド コーヒー豆（200g）", "粉 / 中挽き", 1, "1800"),
+        ],
+      },
+    },
+  ];
+}

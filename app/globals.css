@@ -247,6 +247,37 @@ h1.auth-card-title[data-emphasis="strong"] {
   }
 }
 
+/* 定期便管理【R2: 確定版】(Figma 6717:14526) の節見出し・パネル見出しは、SP と PC で
+ * プリセットが 1 段変わる (実測: 節見出し SP h24 = 16/1.5 → PC h27 = 20/1.35、
+ * パネル見出し SP h21 = 14/1.5 → PC h24 = 16/1.5)。要素は文書構造上 h2 / h3 が
+ * 正しいので、要素はそのままにして体裁だけ切り替える。Unlayered な理由・`:lang()`
+ * 前置の理由は上の catalog-card-title と同じ (`h2 { font: … }` / `h3 { font: … }` が
+ * unlayered なので Tailwind utilities では当てられず、`:lang(ja) h2 { line-height }`
+ * (0,1,1) にも勝つ必要がある)。値はすべて h3 / h4 / h5 トークン経由で生 px は書かない。
+ * 切替点 64rem は Tailwind の `lg:` と同じで、部品側の `lg:` 指定と揃う。 */
+:lang(ja) h2[data-slot="subscription-section-title"],
+:lang(en) h2[data-slot="subscription-section-title"] {
+  font: var(--typography-style-h4);
+  letter-spacing: var(--typography-style-h4-tracking);
+}
+:lang(ja) h3[data-slot="subscription-panel-title"],
+:lang(en) h3[data-slot="subscription-panel-title"] {
+  font: var(--typography-style-h5);
+  letter-spacing: var(--typography-style-h5-tracking);
+}
+@media (min-width: 64rem) {
+  :lang(ja) h2[data-slot="subscription-section-title"],
+  :lang(en) h2[data-slot="subscription-section-title"] {
+    font: var(--typography-style-h3);
+    letter-spacing: var(--typography-style-h3-tracking);
+  }
+  :lang(ja) h3[data-slot="subscription-panel-title"],
+  :lang(en) h3[data-slot="subscription-panel-title"] {
+    font: var(--typography-style-h4);
+    letter-spacing: var(--typography-style-h4-tracking);
+  }
+}
+
 :root {
   /* Third-party brand colors */
   --brand-line: #06C755;

@@ -125,9 +125,9 @@
     {
       "figma_node_id": "5447:7",
       "figma_name": "SubscriptionCard",
-      "code_path": "app/[locale]/account/subscriptions/page.tsx",
+      "code_path": "components/account/subscription-parts.tsx",
       "kind": "ds-component",
-      "notes": "inline 定義 (function SubscriptionCard, 従来 L98 付近)。EC account subscriptions。"
+      "notes": "SubscriptionCardFrame + CardTopRow + Lines + CardNote。旧 inline 定義 (page.tsx の function SubscriptionCard) は C6-3 で解体し、確定版 (6718:14888) の器に置き換えた。"
     },
     {
       "figma_node_id": "5723:49",
@@ -216,9 +216,9 @@
     {
       "figma_node_id": "6936:17638",
       "figma_name": "Status Badge (paused)",
-      "code_path": "app/[locale]/account/subscriptions/page.tsx",
+      "code_path": "components/account/subscription-parts.tsx",
       "kind": "ds-component",
-      "notes": "inline status span (statusMap/statusColorMap, PAUSED 状態を含む)。SubscriptionCard 内。"
+      "notes": "SubscriptionStatusBadge (kind=paused)。DS Badge variant=outline。Figma の paused/active バッジは code 由来 instance で生パレット (yellow-50/700・green-50/700) を持つため、色は semantic token に寄せた。C6-3 で移設。"
     },
     {
       "figma_node_id": "6932:139",
@@ -1045,6 +1045,62 @@
       "code_path": "components/events/event-register-button.tsx",
       "kind": "ds-component",
       "notes": "SP のみ。bg=card / border-t 1px / px 16 py 10。ページ内の登録カードとページ末尾の目印が視界にある間は出さない (spacer を敷かないので実寸を歪めない)。"
+    },
+    {
+      "figma_node_id": "6717:14526",
+      "figma_name": "アカウント:定期便 / R2: 確定版",
+      "code_path": "app/[locale]/account/subscriptions/page.tsx",
+      "kind": "module",
+      "notes": "【R2: 確定版】定期便管理の section。PC 6717:14527 / SP 6723:14747。戻る導線 / ページ見出し / ご契約中の定期便 (カード縦積み) の 3 ブロック。「定期便の操作」6719:14702 と「空の状態（0件）」6720:9376 は状態を並べた注記フレームで、前者はカード内パネル・後者は 0 件時の差し替えとして実装する。部品は components/account/subscription-parts.tsx。C6-3 新規。"
+    },
+    {
+      "figma_node_id": "6717:14566",
+      "figma_name": "Page Header (定期便)",
+      "code_path": "components/account/subscription-parts.tsx",
+      "kind": "ds-component",
+      "notes": "SubscriptionPageHead。戻る導線 (6717:14565) + キッカー SUBSCRIPTION + 主見出し + リード。主見出しは全体裁定どおり .page-title (PC 44 display / SP 32)。Figma は 32 固定。SP は 6723:14752 + 6723:14753。C6-3 新規。"
+    },
+    {
+      "figma_node_id": "6717:14570",
+      "figma_name": "定期便一覧 (節)",
+      "code_path": "components/account/subscription-parts.tsx",
+      "kind": "ds-component",
+      "notes": "SubscriptionSection + SubscriptionList。節見出しは SP h4 16 → PC h3 20 で globals.css の h2[data-slot=subscription-section-title] 規則。カード間 PC 24 / SP 16。SP は 6723:14757。C6-3 新規。"
+    },
+    {
+      "figma_node_id": "6718:14888",
+      "figma_name": "SubscriptionCard (native 一時停止中)",
+      "code_path": "components/account/subscription-parts.tsx",
+      "kind": "ds-component",
+      "notes": "SubscriptionCardFrame。面 card / 枠 1px / 角丸 8 (rounded-lg・実測) / padding PC 24・SP 20 / 段間 PC 16・SP 12。DS Card は rounded-xl + 影 + py-6 で寸法体系が違うため専用の器。解約済みは 6718:14906、SP は 6723:14796 / 6723:14813。C6-3 新規。"
+    },
+    {
+      "figma_node_id": "6718:14894",
+      "figma_name": "Product Row (定期便)",
+      "code_path": "components/account/subscription-parts.tsx",
+      "kind": "ds-component",
+      "notes": "SubscriptionLineRow。thumb PC 48 / SP 44、thumb→情報 12、情報の行間 4、価格は右端。金額は en/body-sm (14 / lh 1.4 / tracking 0)。SP は 6723:14801。C6-3 新規。"
+    },
+    {
+      "figma_node_id": "6719:14705",
+      "figma_name": "Panel / お届け頻度を変更",
+      "code_path": "components/account/subscription-actions.tsx",
+      "kind": "ds-component",
+      "notes": "SubscriptionPanel (frequency)。カード内に開くパネル。chips 5 個は DS Button size=default / variant=ghost (Figma 実測 h36・塗りなし)。現在値は secondary + aria-pressed (確定版に現在値の指定が無いための自己決定)。器は subscription-parts.tsx の SubscriptionPanel。SP は 6723:14845。C6-3 新規。"
+    },
+    {
+      "figma_node_id": "6719:14723",
+      "figma_name": "Panel / 解約 (確認)",
+      "code_path": "components/account/subscription-actions.tsx",
+      "kind": "ds-component",
+      "notes": "SubscriptionPanel (cancel)。破壊的操作の確認ステップ。destructive「本当に解約する」+ outline「キャンセル」。カード側の「解約する」から必ずこのパネルを経由する。SP は 6723:14863。C6-3 新規。"
+    },
+    {
+      "figma_node_id": "6720:9378",
+      "figma_name": "EmptyCard (定期便 0 件)",
+      "code_path": "components/account/subscription-parts.tsx",
+      "kind": "ds-component",
+      "notes": "SubscriptionEmptyCard。中央寄せ・上下 32 / 段間 16・本文 16 (jp/body)。「商品一覧」は DS Button 既定 (塗り)。SP は 6723:14874。C6-3 新規。"
     }
   ],
   "unmapped_figma_nodes": [
