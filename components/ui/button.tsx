@@ -31,6 +31,12 @@ const buttonVariants = cva(
         // (= 左右 padding 20px = spacing.5、Label と Arrow の溝 8px = spacing.2)
         service:
           "h-(--component-button-height-service) gap-2 rounded-full px-5 text-xs",
+        // Figma【R2: 確定版】イベント詳細 6657:7931 の面 CTA 実測 …… h43 /
+        // px 24 (space.6) / radius-lg 8 / 本文と同じ 16px。「読み枠の中で行を
+        // 占める申込ボタン」用で、既存 sm/default/lg (36-40px / 14px) より
+        // 一段大きい。高さは component.button.height.cta トークンから解決する
+        // (service と同じ作法。生 px は書かない)。
+        cta: "h-(--component-button-height-cta) gap-2 rounded-lg px-6 text-base",
         xs: "h-6 gap-1 rounded-md px-2 text-xs has-[>svg]:px-1.5 [&_svg:not([class*='size-'])]:size-3",
         sm: "h-8 gap-1.5 rounded-md px-3 has-[>svg]:px-2.5",
         lg: "h-10 rounded-md px-6 has-[>svg]:px-4",

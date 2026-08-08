@@ -22,6 +22,8 @@ const SIZES = [
   "xs",
   "sm",
   "lg",
+  "service",
+  "cta",
   "icon",
   "icon-xs",
   "icon-sm",

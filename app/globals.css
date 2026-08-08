@@ -226,6 +226,27 @@ h1.auth-card-title[data-emphasis="strong"] {
   line-height: 1.2;
 }
 
+/* R2 イベント詳細の本文節見出し (Figma 6661:13491 = PC 24px / 6664:8169 = SP
+ * 20px、どちらも weight 500) は h2 / h3 プリセットのサイズに一致するが太さだけ
+ * medium。要素は文書構造上 h2 のまま体裁を当てる。Unlayered な理由・`:lang()`
+ * 前置の理由は上の catalog-card-title と同じ。`font:` ショートハンドは
+ * font-weight をリセットするので weight は必ずその後に置く。値はすべて
+ * typography トークン経由で生 px は書かない。 */
+:lang(ja) h2[data-slot="event-section-title"],
+:lang(en) h2[data-slot="event-section-title"] {
+  font: var(--typography-style-h3);
+  letter-spacing: var(--typography-style-h3-tracking);
+  font-weight: var(--typography-weight-medium);
+}
+@media (min-width: 768px) {
+  :lang(ja) h2[data-slot="event-section-title"],
+  :lang(en) h2[data-slot="event-section-title"] {
+    font: var(--typography-style-h2);
+    letter-spacing: var(--typography-style-h2-tracking);
+    font-weight: var(--typography-weight-medium);
+  }
+}
+
 :root {
   /* Third-party brand colors */
   --brand-line: #06C755;

@@ -1129,6 +1129,10 @@
         "service": {
           "$value": "2.1875rem",
           "$description": "35px — Figma BtnService (Module) 6953:124 実測高"
+        },
+        "cta": {
+          "$value": "2.6875rem",
+          "$description": "43px — Figma【R2: 確定版】イベント詳細 6657:7931 の面 CTA 実測高 (EventRegisterButton 6660:8003 / 詳細リンク 6661:13493 / Sticky Register Bar 内 6664:13497)。py 12 + 16px 1 行 = 43。"
         }
       },
       "padding": {

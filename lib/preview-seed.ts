@@ -90,12 +90,16 @@ export type SeedEvent = {
 export function seedEvents(): SeedEvent[] {
   return [
     {
+      // 1 件目は Figma【R2: 確定版】イベント詳細 6657:7931 の見本と同じ値にして
+      // ある (一覧カード → 詳細で同じイベントが出る + 詳細を Figma と同条件で
+      // 実測できる)。日時は 2026-08-10 14:00 JST = 05:00 UTC。
       _id: "seed-event-1",
       slug: { current: "seed-event-1" },
       imageUrl: "/hero-day.jpg",
-      title: "朝の茶会 — Morning Tea Ceremony",
-      date: "2026-07-25T01:00:00.000Z",
-      location: "elxea Studio, Tokyo",
+      title: "新茶テイスティング会 2026",
+      date: "2026-08-10T05:00:00.000Z",
+      location: "東京・南青山 elxea atelier",
+      memberOnly: true,
     },
     {
       _id: "seed-event-2",
@@ -722,5 +726,66 @@ export function seedAccountView(): AccountView | null {
     // これは**プレビュー限定の見本**であり実登録カードではない。
     paymentMethod: { brand: "VISA", last4: "1234" },
     seeded: true,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Events (detail) — イベント詳細【R2: 確定版】(Figma PC 6657:7932 / SP 6662:8160)
+// ---------------------------------------------------------------------------
+
+/** 確定版の本文 (Body 6661:13492 / 6664:8170)。文言は Figma 正本から写した。 */
+const SEED_EVENT_BODY = [
+  seedBlock(
+    "normal",
+    "会員の皆さまに向けた、季節のお茶を少人数で楽しむ集まりです。当日の内容や持ち物、参加方法の詳細は、下記の申し込みページよりご確認ください。",
+    "e0",
+  ),
+];
+
+export type SeedEventDetail = {
+  _id: string;
+  title: string;
+  slug: { current: string };
+  imageUrl?: string;
+  date: string;
+  endDate?: string;
+  location?: string;
+  memberOnly?: boolean;
+  requiredTier?: "none";
+  externalUrl?: string;
+  description: unknown[];
+};
+
+/**
+ * `seed-event-N` (一覧の見本カード) を開いたときに返す見本の詳細。
+ * 実データが引けなかったときだけ使う。フラグ未設定なら常に null。
+ *
+ * production の Sanity dataset には未来日のイベントが無く、`/ja/events/[slug]`
+ * は素のままでは 404 になるため確定版のレイアウトを実寸計測できない。
+ *
+ * `requiredTier: "none"` を明示しているのは**計測のため**。`memberOnly` だけを
+ * true にすると tier ゲートが閉じ、未ログインの Preview では「詳細・申し込み」節が
+ * MemberGate に置き換わって Body を測れない。見本は「会員限定バッジ + 登録カードの
+ * 注記は出るが、本文は見える」状態 (= Figma のフレームと同じ見た目) にしてある。
+ * 本番データは `requiredTier` を Sanity 側の値でそのまま評価するので影響しない。
+ */
+export function seedEventDetail(slug: string): SeedEventDetail | null {
+  if (!previewSeedEnabled()) return null;
+
+  const base = seedEvents().find((e) => e.slug.current === slug);
+  if (!base) return null;
+
+  return {
+    _id: base._id,
+    title: base.title,
+    slug: base.slug,
+    imageUrl: base.imageUrl,
+    date: base.date,
+    endDate: base.endDate,
+    location: base.location,
+    memberOnly: base.memberOnly,
+    requiredTier: "none",
+    externalUrl: "https://elxea.com/",
+    description: SEED_EVENT_BODY,
   };
 }
