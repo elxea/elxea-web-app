@@ -245,7 +245,7 @@ export function Header({ navItems: externalNavItems }: HeaderProps) {
                     </SheetTitle>
                     <SheetClose
                       aria-label="Close"
-                      className="text-brand-graphite transition-opacity hover:opacity-70 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-hidden"
+                      className="text-foreground transition-opacity hover:opacity-70 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-hidden"
                     >
                       <X className="size-6" />
                     </SheetClose>
@@ -259,7 +259,7 @@ export function Header({ navItems: externalNavItems }: HeaderProps) {
                         href={item.href}
                         onClick={() => setMobileOpen(false)}
                         className={cn(
-                          "flex items-center justify-between border-b border-brand-stone py-4 text-brand-graphite",
+                          "flex items-center justify-between border-b border-brand-stone py-4 text-foreground",
                           SP_NAV_LABEL,
                           pathname.startsWith(item.href) && "font-medium",
                         )}
@@ -287,7 +287,7 @@ export function Header({ navItems: externalNavItems }: HeaderProps) {
                   {/* 4. アカウント導線 */}
                   <div
                     className={cn(
-                      "flex flex-wrap items-center gap-6 px-4 pt-6 pb-8 text-brand-graphite",
+                      "flex flex-wrap items-center gap-6 px-4 pt-6 pb-8 text-foreground",
                       SP_ACCOUNT_LABEL,
                     )}
                   >

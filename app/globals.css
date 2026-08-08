@@ -93,6 +93,19 @@ h6 { font: var(--typography-style-h6); }
  * therefore beat Tailwind utilities (which live in @layer utilities), so a
  * `md:[font:…]` utility on the element would never win. line-height is set
  * explicitly so the display token's own lh (1.3) does not override the 1.2. */
+/* KNOWN GAP (DS トークン整合タスク 3b670c9d-064c-8166 / 項目2 — 保留中):
+ * `.page-title` / `.hero-display` の字間が Figma と符号が逆 (Figma display は
+ * -0.01em = -0.44px、実際に効くのは +0.02em = +0.88px)。原因は 2 段:
+ *   1. `font:` ショートハンドは letter-spacing を含まないので、上の
+ *      `h1 { letter-spacing: var(--typography-style-h1-tracking) }` が残る
+ *   2. かつ `dist/tokens-cjk.css` が `:lang(ja)` で
+ *      `--typography-style-display-tracking` 自体を 0.02em に再束縛する
+ * よって `letter-spacing: var(--typography-style-display-tracking)` を足しても
+ * 日本語ページ (html lang="ja") では -0.44px にならない (実測で確認済)。
+ * 直すには「CJK オーバーライドと Figma のどちらを正とするか」の判断が要り、
+ * これは未解決の Setaka レビュー案件 (All Tasks「Review: CJK 文字組みトークン
+ * vs Figma の食い違いの正を決める (roji)」3b570c9d-064c-81b7) の対象。
+ * 判断が出るまで触らない (妥協値を作らない)。 */
 @media (min-width: 768px) {
   h1.hero-display { font: var(--typography-style-display); line-height: 1.2; }
 }
@@ -103,6 +116,7 @@ h6 { font: var(--typography-style-h6); }
  * (44px = display token) at md+.
  * Same unlayered-rule rationale as .hero-display above so it beats the h1{font}
  * shorthand and Tailwind utilities. Mobile keeps the base h1 (32px). */
+/* 字間は上の `.hero-display` の KNOWN GAP と同じ (項目2・保留中)。 */
 @media (min-width: 768px) {
   h1.page-title { font: var(--typography-style-display); line-height: 1.2; }
 }
@@ -357,10 +371,19 @@ h1.auth-card-title[data-emphasis="strong"] {
 }
 
 @layer base {
-  /* Heading color — Figma headings use graphite (#464748), not the charcoal
-   * body foreground (#5d5e61). Placed in @layer base so page-level color
-   * utilities (e.g. hero `text-overlay-foreground`) still override it. */
-  h1, h2, h3, h4, h5, h6 { color: var(--color-brand-graphite); }
+  /* Heading color — no rule here on purpose.
+   *
+   * Until 2026-08-09 this block carried
+   *   h1, h2, h3, h4, h5, h6 { color: var(--color-brand-graphite); }
+   * because the `foreground` token had drifted to charcoal (#5d5e61) while
+   * Figma's `foreground` variable is graphite (#464748), so every heading had
+   * to opt out of the inherited body color to look right. That made the R2
+   * pages override the base rule instead of relying on it.
+   *
+   * `foreground` now IS graphite (tokens/base.json, DS トークン整合タスク), so
+   * headings inherit the correct color from `<body class="… text-foreground">`
+   * (app/[locale]/layout.tsx) and the override is redundant. Do not reintroduce
+   * it: a heading that needs a different color should say so with a utility. */
 
   /* Outer page margin — bound to layout.grid.margin tokens (Figma Foundations
    * 規約 64 / 32 / 16). Do NOT hardcode px here: the value must stay a copy of
