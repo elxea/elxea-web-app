@@ -160,13 +160,13 @@ design-kitの `known_gaps[gap-focus-binding]` が指すとおりの未束縛状�
 
 ## 6. 機械検証
 
-rebase後 (`feat/c1-ds-foundation` = `50c48d7` の上) に全件再実行。
+push直前のrebase後 (`feat/c1-ds-foundation` = `7365093` の上) に全件再実行。
 
 | コマンド | 結果 |
 |---|---|
 | `pnpm lint` | PASS (`--max-warnings 0` / 指摘0) |
 | `pnpm typecheck` | PASS (`next typegen` + `tsc --noEmit` エラー0) |
-| `pnpm test` | PASS **557/557** (99 files。うち本レーン新規 **10件** = `__tests__/format-event-schedule.test.ts`) |
+| `pnpm test` | PASS **570 passed / 1 skipped** (100 files。うち本レーン新規 **10件** = `__tests__/format-event-schedule.test.ts`。skip 1件は他レーン由来) |
 | `pnpm build` | PASS (`Compiled successfully` → 全ルート生成) |
 | `pnpm validate:tokens` | PASS **0 error** / 20 warning / 303 token (warningは既存のcamelCase命名のみ) |
 | `pnpm validate:design-map` | PASS **156 entries** (本レーンでの追加は0件) |
