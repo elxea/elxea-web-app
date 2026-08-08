@@ -6,6 +6,7 @@ import { ImageCard } from "@/components/ui/image-card";
 import { EVENTS_QUERY } from "@/sanity/lib/queries";
 import { urlFor } from "@/sanity/lib/image";
 import { previewSeedEnabled, seedEvents } from "@/lib/preview-seed";
+import { isSameEventDay } from "@/lib/format-date";
 
 export default function EventsPage() {
   const t = useTranslations("common");
@@ -91,7 +92,12 @@ async function EventsList() {
                     month: "long",
                     day: "numeric",
                   })}
+                  {/* 一覧カードは日付だけを出す面なので、終了日は**別の日のときだけ**
+                      併記する。同日開催 (例: 14:00–17:00) で無条件に併記すると
+                      「2026年8月10日 — 2026年8月10日」と同じ日付を 2 回描くため。
+                      時刻レンジは詳細側 (`formatEventSchedule`) が受け持つ。 */}
                   {event.endDate &&
+                    !isSameEventDay(event.date, event.endDate) &&
                     ` — ${new Date(event.endDate).toLocaleDateString(locale, {
                       year: "numeric",
                       month: "long",

@@ -145,3 +145,21 @@ export function formatEventSchedule(
   const right = endHasTime ? `${day.format(endDate)} ${endTime}` : day.format(endDate);
   return `${left} – ${right}`;
 }
+
+/**
+ * 開始と終了が JST で**同じ日**か。値が読めない / 終了が無いときは `false`。
+ *
+ * 一覧カードのように「日付だけ」を出す面で、終了日を無条件に併記すると同日開催の
+ * イベントが「2026年8月10日 — 2026年8月10日」と同じ日付を 2 回描いてしまう。
+ * 日付だけを出す呼び側は、終了日の併記をこの判定で落とす
+ * (時刻レンジまで出す面は `formatEventSchedule` を使う)。
+ */
+export function isSameEventDay(
+  start: string | number | Date | null | undefined,
+  end: string | number | Date | null | undefined,
+): boolean {
+  const startDate = toDate(start);
+  const endDate = toDate(end);
+  if (!startDate || !endDate) return false;
+  return jstDayKey(startDate) === jstDayKey(endDate);
+}

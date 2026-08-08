@@ -94,11 +94,18 @@ export function seedEvents(): SeedEvent[] {
       // 1 件目は Figma【R2: 確定版】イベント詳細 6657:7931 の見本と同じ値にして
       // ある (一覧カード → 詳細で同じイベントが出る + 詳細を Figma と同条件で
       // 実測できる)。日時は 2026-08-10 14:00 JST = 05:00 UTC。
+      //
+      // `endDate` = 17:00 JST (08:00 UTC)。Figma の見本は
+      // 「2026年8月10日（日）14:00–17:00」と時間レンジで書いているのに、見本データが
+      // 終了時刻を持っていなかったため `formatEventSchedule()` の**同日レンジ分岐が
+      // 一度も通らず**、実際の描画は「2026年8月10日(月) 14:00」だった (C6-1R で是正)。
+      // 見本に終了時刻を持たせて分岐を実際に踏ませる。
       _id: "seed-event-1",
       slug: { current: "seed-event-1" },
       imageUrl: "/hero-day.jpg",
       title: "新茶テイスティング会 2026",
       date: "2026-08-10T05:00:00.000Z",
+      endDate: "2026-08-10T08:00:00.000Z",
       location: "東京・南青山 elxea atelier",
       memberOnly: true,
     },
