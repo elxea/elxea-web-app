@@ -6,6 +6,9 @@ import { Button } from "@/components/ui/button";
 /**
  * LINE Login button — Direct OAuth 2.0 via <a href> to access.line.me.
  *
+ * 見た目は Figma【R2: 確定版】6893:17349 (ログイン) に従う = primary 塗り / h36 /
+ * ラベルのみ。R2 で LINE ブランド緑 (#06C755) とブランドアイコンは廃止された。
+ *
  * CRITICAL DESIGN DECISIONS (do not change without reading):
  *
  * 1. The <a href> must point DIRECTLY at access.line.me, not at an
@@ -28,11 +31,7 @@ import { Button } from "@/components/ui/button";
  *    (single HTTP round-trip, no external I/O), typically <100ms on good
  *    networks, so users almost never see the disabled state.
  */
-export function LineLoginButton({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export function LineLoginButton({ children }: { children: React.ReactNode }) {
   const [authUrl, setAuthUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -79,23 +78,14 @@ export function LineLoginButton({
 
   if (!authUrl) {
     return (
-      <Button
-        size="lg"
-        disabled
-        aria-busy="true"
-        className="w-full bg-[#06C755] text-white hover:bg-[#06C755]/90 active:bg-[#06C755]/80 disabled:opacity-70 disabled:bg-[#06C755]"
-      >
+      <Button disabled aria-busy="true" className="w-full shadow-xs">
         {children}
       </Button>
     );
   }
 
   return (
-    <Button
-      asChild
-      size="lg"
-      className="w-full bg-brand-line text-brand-white hover:bg-brand-line/90 active:bg-brand-line/80"
-    >
+    <Button asChild className="w-full shadow-xs">
       {/* Intentional: <a> with external href (authUrl) required for Universal Links to open the LINE app. Must NOT be <Link>. no-html-link-for-pages does not fire here (external href), so no disable directive is needed. */}
       <a href={authUrl} onClick={handleClick}>
         {children}
