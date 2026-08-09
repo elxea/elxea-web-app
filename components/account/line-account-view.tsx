@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { FavoritesSection } from "@/components/account/favorites-section";
 import { FollowsSection } from "@/components/account/follows-section";
+import { AccountPanelSection } from "@/components/account/account-panel";
 
 type LineAccountViewProps = {
   displayName: string;
@@ -60,10 +61,7 @@ export async function LineAccountView({
       </section>
 
       {/* Available features */}
-      <section className="mb-12">
-        <h2 className="text-lg mb-6 pb-3 border-b border-border">
-          {t("availableFeatures")}
-        </h2>
+      <AccountPanelSection title={t("availableFeatures")}>
         <ul className="space-y-3 text-sm text-muted-foreground">
           <li className="flex items-center gap-2">
             <span className="text-foreground">&#10003;</span>
@@ -82,7 +80,7 @@ export async function LineAccountView({
             {t("featureFavorites")}
           </li>
         </ul>
-      </section>
+      </AccountPanelSection>
 
       {/* Favorite products — Phase 1/2: available to LINE-only users.
           FavoritesSection is a client component that fetches via
@@ -121,10 +119,7 @@ export async function LineAccountView({
       />
 
       {/* Locked features */}
-      <section className="mb-12">
-        <h2 className="text-lg mb-6 pb-3 border-b border-border">
-          {t("lockedFeatures")}
-        </h2>
+      <AccountPanelSection title={t("lockedFeatures")}>
         <p className="text-sm text-muted-foreground mb-4">
           {t("lockedFeaturesDescription")}
         </p>
@@ -138,7 +133,7 @@ export async function LineAccountView({
             {t("featureSubscriptions")}
           </li>
         </ul>
-      </section>
+      </AccountPanelSection>
 
       {/* Quick links */}
       <Separator />

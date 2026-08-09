@@ -1,5 +1,7 @@
 import { Button } from "@/components/ui/button";
 
+import { AccountPanelSection } from "@/components/account/account-panel";
+
 /**
  * Web 側の LINE 連携エントリ（案A 第2弾 / Phase 2）。
  *
@@ -51,8 +53,7 @@ export function LineLinkageEntry({ locale }: { locale: string }) {
   const t = COPY[(locale as Locale) in COPY ? (locale as Locale) : "ja"];
 
   return (
-    <section className="mb-12" data-testid="line-linkage-entry">
-      <h2 className="text-lg mb-6 pb-3 border-b border-border">{t.heading}</h2>
+    <AccountPanelSection title={t.heading} testId="line-linkage-entry">
       <div className="flex items-start justify-between gap-6">
         <p className="text-sm text-muted-foreground leading-relaxed">
           {t.description}
@@ -64,6 +65,6 @@ export function LineLinkageEntry({ locale }: { locale: string }) {
           </a>
         </Button>
       </div>
-    </section>
+    </AccountPanelSection>
   );
 }
