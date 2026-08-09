@@ -131,9 +131,7 @@
     "categoryStackMeta": "{count} categories · {total} articles",
     "lastUpdated": "Updated {date}",
     "articleCount": "{count}",
-    "shelfMore": "More in {name} →",
-    "authorArticles": "Articles by this author",
-    "authorLinkLabel": "Link"
+    "shelfMore": "More in {name} →"
   },
   "teaMenu": {
     "title": "Tea Menu",

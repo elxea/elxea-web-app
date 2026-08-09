@@ -15,8 +15,12 @@ type AuthorProfileProps = {
 };
 
 export function AuthorProfile({ author, writtenByLabel }: AuthorProfileProps) {
+  // C17-1: 著者ページ (/journal/author/[slug]) は People 詳細へ統合された
+  // (Figma 7805:1952「【廃止: People 詳細へ統合】 ジャーナル:著者」)。
+  // 旧 URL は next.config.ts の 308 で寄せてあるが、内部リンクは 1 ホップ
+  // 無駄に踏ませないよう直接 /people/[slug] を指す。
   const authorLink = author.slug?.current
-    ? `/journal/author/${author.slug.current}`
+    ? `/people/${author.slug.current}`
     : null;
 
   return (

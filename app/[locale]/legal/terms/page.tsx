@@ -306,7 +306,19 @@ export default async function TermsPage() {
 
       {/* S4 事業者情報・お問い合わせ (Figma 7850:799) */}
       <Section spacing="none" className="pt-24 pb-12">
-        <h3>この規約に関するお問い合わせ</h3>
+        {/* C17-1: 節見出しに `legal-section-title` スロットを先行適用する。
+            この節はプライバシー S4 (7851:39869 系) と同じ「事業者情報・お問い合わせ」で、
+            **条見出し (`第N条` = h2) の上位**にあたる節。プライバシー側では素の `<h3>` が
+            条 (h2) より下のタグなのに文字が大きい **見出しレベルの逆転**を起こしていて、
+            C10-1 で `legal-section-title` (要素は h2 / 体裁は素の h3 と同値) に是正済み。
+
+            利用規約側は現在 条見出しが 24px で描かれているため逆転が表に出ていないが、
+            条見出しを Figma どおり 24px 化する改修が入った時点で同じ逆転が再発する。
+            **体裁は 1px も変えず**要素とスロットだけ先に揃えておく
+            (globals.css の `legal-section-title` は `font: h3` + `line-height: 1.3` で、
+            素の `<h3>` = h3 トークン + `:lang(ja) h3 { line-height: 1.3 }` と同値)。
+            c10-1 確認事項 12 の申し送りをここで閉じる。 */}
+        <h2 data-slot="legal-section-title">この規約に関するお問い合わせ</h2>
         <p className={`${bodySmClass} mt-4 max-w-160 text-muted-foreground`}>
           本規約の内容についてのご質問は、下記までお寄せください。
         </p>

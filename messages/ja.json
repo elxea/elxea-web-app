@@ -131,9 +131,7 @@
     "categoryStackMeta": "{count} カテゴリ ・ 全 {total} 本",
     "lastUpdated": "最終更新 {date}",
     "articleCount": "{count}本",
-    "shelfMore": "{name}を、もっと見る →",
-    "authorArticles": "この人の記事",
-    "authorLinkLabel": "リンク"
+    "shelfMore": "{name}を、もっと見る →"
   },
   "teaMenu": {
     "title": "お茶メニュー",

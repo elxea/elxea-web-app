@@ -210,7 +210,11 @@ export default async function ArticlePage({
             {author ? (
               <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
                 {author.slug?.current ? (
-                  <Link href={`/journal/author/${author.slug.current}`}>
+                  {/* C17-1: 著者ページは People 詳細へ統合 (Figma 7805:1952
+                      「【廃止: People 詳細へ統合】 ジャーナル:著者」)。旧 URL は
+                      next.config.ts の 308 で寄せてあるが、内部リンクは 1 ホップ
+                      無駄に踏ませないよう直接 /people/[slug] を指す。 */}
+                  <Link href={`/people/${author.slug.current}`}>
                     <AuthorByline name={author.name} role={author.role} avatarUrl={authorAvatar} />
                   </Link>
                 ) : (

@@ -261,7 +261,9 @@ export default async function ElxeaJournalDetailPage({
           >
             {journal.author ? (
               journal.author.slug?.current ? (
-                <Link href={`/journal/author/${journal.author.slug.current}`}>
+                /* C17-1: 著者ページは People 詳細へ統合済み (旧 URL は
+                   next.config.ts の 308 で寄せてある)。 */
+                <Link href={`/people/${journal.author.slug.current}`}>
                   <AuthorByline
                     name={journal.author.name}
                     role={journal.author.role}

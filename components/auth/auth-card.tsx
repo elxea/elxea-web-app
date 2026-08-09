@@ -180,14 +180,24 @@ function AuthCardFootnote({ children }: { children: React.ReactNode }) {
 
 /**
  * 完了マーク (Figma Check Circle 6750:10384)。
- * 64px の success 円 + 白抜きチェック。Figma はテキストグリフ「✓」だが、
+ * 64px の success 円 + チェック。Figma はテキストグリフ「✓」だが、
  * アイコンは lucide に寄せる本リポの作法に合わせて children でアイコンを受ける。
+ *
+ * C17-1 (Q3): チェックの色を `primary-foreground` (= 純白) から
+ * `success-foreground` に変えた。円は `success` (oklch 0.807) なので白抜きだと
+ * **1.79:1** で、WCAG 1.4.11 の非テキストコントラスト 3:1 に届かない
+ * (この✓は「完了した」という状態を伝える唯一の図なので装飾例外に当たらない)。
+ * `success-foreground` (oklch 0.397) にすると同じ円の上で 3:1 を超える。
+ * 実測値は忠実度対比表 (docs/fidelity/c6-1-fidelity.md) に載せる。
+ *
+ * 円の色・寸法・角丸は Figma のまま。`success` / `success-foreground` は
+ * DS が対で持つ意味色なので、生カラーは書かない。
  */
 function AuthCardMark({ children }: { children: React.ReactNode }) {
   return (
     <div
       data-slot="auth-card-mark"
-      className="flex size-16 items-center justify-center rounded-full bg-success text-primary-foreground"
+      className="bg-success text-success-foreground flex size-16 items-center justify-center rounded-full"
     >
       {children}
     </div>

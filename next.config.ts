@@ -169,6 +169,37 @@ const nextConfig: NextConfig = {
         destination: "/ja/subscription",
         permanent: true,
       },
+      /* C17-1: 著者ページ → People 詳細 の恒久統合 (C14-1 の E3 / E4 を閉じる)。
+       *
+       * 著者ページは Figma の凍結決定
+       * 「【廃止: People 詳細へ統合】 ジャーナル:著者」(section `7805:1952`) で
+       * ページごと廃止され、`【採用: 作り手の共通テンプレ】 People 詳細`
+       * (section `7822:37212`) に吸収された。C14-1 の忠実度対比表でも
+       * 「本来は `/journal/author/[slug]` を `/people/[slug]` に寄せて 1 本にするのが筋」
+       * として上げていた宿題を、ここで閉じる。
+       *
+       * データ面で安全に寄せられる根拠: `/people/[slug]` の `PERSON_BY_SLUG_QUERY` は
+       * `*[_type == "author" && slug.current == $slug]` を引いており、旧著者ページの
+       * `AUTHOR_BY_SLUG_QUERY` と **同じ `author` ドキュメント・同じ slug 空間** を見る。
+       * したがって旧 URL で 200 だった slug はすべて新 URL でも 200 になる
+       * (取りこぼしが構造上ありえない)。sitemap も既に `/[locale]/people/[slug]` しか
+       * 出していない (`app/sitemap.ts`) ので、正規 URL 側の変更は不要。
+       *
+       * ページ側の `permanentRedirect()` ではなく本ブロックで転送するのは
+       * membership (C13-1) と同じ理由 — App Router がシェルを流し始めたあとの
+       * redirect は 200 + クライアント遷移に畳まれ 308 にならない。
+       *
+       * `/en/*` は middleware が先に 301 で `/ja/*` へ送るため ja だけで足りる。 */
+      {
+        source: "/ja/journal/author/:slug",
+        destination: "/ja/people/:slug",
+        permanent: true,
+      },
+      {
+        source: "/journal/author/:slug",
+        destination: "/ja/people/:slug",
+        permanent: true,
+      },
     ];
   },
   async headers() {
