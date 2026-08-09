@@ -151,7 +151,7 @@ function reshapeProduct(raw: Record<string, unknown>): Product {
  * store never silently serves dummy products. See
  * `lib/preview-seed-storefront.ts` for the full rationale.
  */
-function useSeededStorefront(): boolean {
+function seededStorefrontActive(): boolean {
   return !storefrontConfigured() && previewSeedStorefrontEnabled();
 }
 
@@ -170,7 +170,7 @@ export async function getProducts(options?: {
   sortKey?: string;
   reverse?: boolean;
 }) {
-  if (useSeededStorefront()) {
+  if (seededStorefrontActive()) {
     const all = seedProductCatalogue();
     const sorted =
       options?.sortKey === "PRICE"
@@ -205,7 +205,7 @@ export async function getProductByHandle(handle: string) {
   // Returns null for an unknown handle, so the page reaches `notFound()` and
   // answers 404 instead of the soft-404 "商品を読み込めませんでした" it used to
   // render when the Storefront call threw.
-  if (useSeededStorefront()) return seedProductByHandle(handle);
+  if (seededStorefrontActive()) return seedProductByHandle(handle);
 
   const data = await shopifyFetch<{ product: Record<string, unknown> | null }>({
     query: GET_PRODUCT_BY_HANDLE_QUERY,
@@ -257,7 +257,7 @@ export async function searchProducts(
   query: string,
   options?: { first?: number; after?: string }
 ) {
-  if (useSeededStorefront()) {
+  if (seededStorefrontActive()) {
     const hits = seedSearchProducts(query);
     return {
       products: hits.slice(0, options?.first ?? hits.length),
