@@ -4,11 +4,6 @@
       "count": 2
     }
   },
-  "app/[locale]/people/[slug]/page.tsx": {
-    "elxea-tokens/no-raw-colors": {
-      "count": 1
-    }
-  },
   "app/[locale]/search/page.tsx": {
     "elxea-tokens/no-raw-colors": {
       "count": 1

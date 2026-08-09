@@ -76,7 +76,6 @@ export function CatalogToolbar({
    * 既存の呼び出しは全て非空のチップ列を渡すため、描画は一切変わらない。
    */
   const chipless = chips.length === 0;
-  if (chipless && sortOptions.length === 0) return null;
 
   const hrefWith = React.useCallback(
     (key: string, value: string | undefined) => {
@@ -90,6 +89,10 @@ export function CatalogToolbar({
     },
     [pathname, searchParams]
   );
+
+  // 出すものが何も無いときは枠ごと出さない。early return は hooks より後に置く
+  // (rules-of-hooks: 呼び出し順を分岐させられない)。
+  if (chipless && sortOptions.length === 0) return null;
 
   return (
     <div

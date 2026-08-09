@@ -437,6 +437,54 @@ export const AUTHOR_BY_SLUG_QUERY = groq`
   }
 `;
 
+/**
+ * People 詳細 (/people/[slug]) 用。凍結テンプレ (Figma 7822:37213 / 7823:37542
+ * 「【採用: 作り手の共通テンプレ】 People 詳細」) の全節を引く (C12-1)。
+ *
+ * `AUTHOR_BY_SLUG_QUERY` は Journal の著者バイライン等が使っている軽いクエリなので
+ * 触らず別に立てる (取得フィールドを増やすと無関係な呼び出しまで重くなる)。
+ */
+export const PERSON_BY_SLUG_QUERY = groq`
+  *[_type == "author" && slug.current == $slug][0] {
+    _id,
+    name,
+    slug,
+    image,
+    role,
+    bio,
+    website,
+    kicker,
+    meta,
+    stats[]{value, label},
+    interviewer->{name, role, image},
+    quote,
+    quoteBy,
+    workHead,
+    work[]{name, description, photo},
+    interview[]{question, answer},
+    profileBand[]{label, value},
+    relatedProducts,
+    teasHead
+  }
+`;
+
+/**
+ * People 詳細の「ほかの人をたずねる」。`author` は language フィールドを持たない
+ * (全言語共通のドキュメント) ので、農家の `OTHER_FARMERS_QUERY` と違い言語で
+ * 絞らない。写真を持つ人を優先したいが GROQ の order で表現しづらいので、
+ * 描画側で写真の有無を見て 3 件に整える。
+ */
+export const OTHER_PEOPLE_QUERY = groq`
+  *[_type == "author" && slug.current != $slug && defined(slug.current)]
+    | order(name asc) [0...6] {
+    _id,
+    name,
+    slug,
+    image,
+    role
+  }
+`;
+
 export const ARTICLES_BY_AUTHOR_QUERY = groq`
   *[_type == "article" && language == $language && author->slug.current == $authorSlug] | order(publishedAt desc) [$start...$end] {
     _id,

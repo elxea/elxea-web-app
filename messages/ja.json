@@ -201,7 +201,18 @@
   },
   "people": {
     "loadError": "プロフィールを読み込めませんでした。",
-    "articlesByAuthor": "この人の記事"
+    "articlesByAuthor": "この人の記事",
+    "kickerDefault": "PEOPLE",
+    "interviewerLabel": "聞き手",
+    "workKicker": "THE WORK",
+    "interviewKicker": "INTERVIEW",
+    "interviewHead": "聞く",
+    "questionPrefix": "Q",
+    "profileKicker": "PROFILE",
+    "teasKicker": "TEAS BY THIS PERSON",
+    "storiesKicker": "STORIES",
+    "otherKicker": "OTHER PEOPLE",
+    "otherHead": "roji に関わる人たち"
   },
   "farmer": {
     "heading": "茶畑をたずねて",

@@ -201,7 +201,18 @@
   },
   "people": {
     "loadError": "Could not load profile.",
-    "articlesByAuthor": "Articles by this author"
+    "articlesByAuthor": "Articles by this author",
+    "kickerDefault": "PEOPLE",
+    "interviewerLabel": "Interviewer",
+    "workKicker": "THE WORK",
+    "interviewKicker": "INTERVIEW",
+    "interviewHead": "In conversation",
+    "questionPrefix": "Q",
+    "profileKicker": "PROFILE",
+    "teasKicker": "TEAS BY THIS PERSON",
+    "storiesKicker": "STORIES",
+    "otherKicker": "OTHER PEOPLE",
+    "otherHead": "The people behind roji"
   },
   "farmer": {
     "heading": "Farmers",

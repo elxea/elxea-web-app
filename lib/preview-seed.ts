@@ -346,6 +346,129 @@ export function withSeedFarmerDetail<T extends SeedFarmerDetail & { name: string
 }
 
 // ---------------------------------------------------------------------------
+// People 詳細 (/people/[slug]) — C12-1
+// ---------------------------------------------------------------------------
+
+/**
+ * People 詳細の凍結テンプレ (Figma 7822:37213 / 7823:37542) は農家詳細から
+ * 茶園 2 節を除いた構成なので、見本も `SeedFarmerDetail` から `fieldBand` /
+ * `fieldHead` / `fieldSeasons` を落とした形になる。
+ */
+export type SeedPersonDetail = {
+  kicker?: string;
+  role?: string;
+  meta?: string;
+  stats?: { value: string; label: string }[];
+  interviewer?: { name: string; role?: string; image?: { asset: object; alt?: string } };
+  quote?: string;
+  quoteBy?: string;
+  workHead?: string;
+  work?: { name: string; description?: string; photo?: { asset: object; alt?: string } }[];
+  interview?: { question: string; answer: string }[];
+  profileBand?: { label: string; value: string }[];
+  teasHead?: string;
+};
+
+/**
+ * 見本文言。プレビュー専用の見本であり正本ではない。
+ *
+ * 農家詳細の見本 (`SEED_FARMER_DETAIL` = 焙煎士) と**別の人物像**にしている。
+ * People 詳細は「作り手の共通テンプレ」で、焙煎士だけでなく書き手・編集も乗る枠
+ * なので、同じ見本を流用すると節の汎用性 (肩書や工程が茶の製造に限らないこと) が
+ * 検証できない。
+ */
+const SEED_PERSON_DETAIL = {
+  kicker: "PEOPLE 01 — EDITOR, TOKYO",
+  role: "編集 ／ roji の読みものをつくる",
+  meta: "東京都｜2019年から、産地に通って聞き書きを続けている。",
+  stats: [
+    { value: "7", label: "YEARS" },
+    { value: "42", label: "STORIES" },
+  ],
+  interviewer: { name: "白井 亮", role: "roji 焙煎 ／ 火入れ担当" },
+  quote:
+    "聞いたことを、そのまま書けるとは限らない。それでも、その人が黙った時間のことは残しておきたい。",
+  workHead: "聞き書きは、三度たずねて決まる",
+  work: [
+    {
+      name: "たずねる",
+      description:
+        "初回は録音しない。何を聞かないでおくかを決めるために行く。畑や作業場をただ一緒に歩く。",
+    },
+    {
+      name: "聞く",
+      description:
+        "二度目に録る。同じ問いをもう一度出すと、前回と違う答えが返ってくることがある。そこを書く。",
+    },
+    {
+      name: "戻す",
+      description:
+        "原稿は必ず本人に読んでもらう。直しが入った箇所こそ、その人が大事にしていることだと分かる。",
+    },
+  ],
+  interview: [
+    {
+      question: "産地に通うようになったきっかけは何でしたか。",
+      answer:
+        "最初は取材ではなく、単に買いに行っていました。畑のことを何も知らずに味の話をしているのが、だんだん気まずくなって。年に一度が季節ごとになり、いまは月に一度は誰かのところにいます。",
+    },
+    {
+      question: "書くときにいちばん気をつけていることは何ですか。",
+      answer:
+        "きれいにまとめすぎないことです。作り手の話はたいてい矛盾していて、去年と逆のことを言っていたりする。整えると読みやすくなるけれど、その人ではなくなる。だから言い切っていない部分は、言い切っていないまま置きます。",
+    },
+    {
+      question: "roji の読みもので、これから増やしたいものはありますか。",
+      answer:
+        "うまくいかなかった年の話です。霜が降りた、摘めなかった、火が入りすぎた。そういう年のほうが、その人の判断がよく見える。売る側としては書きにくいのですが、いちばん読みたいのはそこだと思っています。",
+    },
+  ],
+  profileBand: [
+    { label: "拠点", value: "東京都 ／ 月に一度は産地" },
+    { label: "担当", value: "聞き書き・産地取材・編集" },
+    { label: "はじまり", value: "2019年 ／ 前職は書店員" },
+    { label: "書いた本数", value: "42本 ／ 産地 11か所" },
+  ],
+  teasHead: "この人が聞いた人のお茶",
+} as const;
+
+/**
+ * 未入力の People 詳細フィールドを見本で埋めた author ドキュメントを返す。
+ * フラグ未設定なら入力をそのまま返す (production は完全に無影響)。
+ *
+ * 帰属 (`quoteBy`) だけは見本の氏名を注入せず、実在の氏名から組む
+ * (`withSeedFarmerDetail` と同じ方針 — 架空の人名を本人の発言として出さない)。
+ */
+export function withSeedPersonDetail<T extends SeedPersonDetail & { name: string }>(
+  person: T,
+): T {
+  if (!previewSeedEnabled()) return person;
+
+  const s = SEED_PERSON_DETAIL;
+  const has = (v: unknown) => (Array.isArray(v) ? v.length > 0 : Boolean(v));
+
+  return {
+    ...person,
+    kicker: has(person.kicker) ? person.kicker : s.kicker,
+    role: has(person.role) ? person.role : s.role,
+    meta: has(person.meta) ? person.meta : s.meta,
+    stats: has(person.stats) ? person.stats : [...s.stats],
+    interviewer: has(person.interviewer) ? person.interviewer : { ...s.interviewer },
+    quote: has(person.quote) ? person.quote : s.quote,
+    quoteBy: has(person.quoteBy)
+      ? person.quoteBy
+      : `${person.name} ／ ${has(person.role) ? person.role : s.role}`,
+    workHead: has(person.workHead) ? person.workHead : s.workHead,
+    work: has(person.work) ? person.work : s.work.map((w) => ({ ...w })),
+    interview: has(person.interview) ? person.interview : s.interview.map((q) => ({ ...q })),
+    profileBand: has(person.profileBand)
+      ? person.profileBand
+      : s.profileBand.map((r) => ({ ...r })),
+    teasHead: has(person.teasHead) ? person.teasHead : s.teasHead,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Elxea Journal (tea-menu journal — akane / sui / sohi themes)
 // ---------------------------------------------------------------------------
 
