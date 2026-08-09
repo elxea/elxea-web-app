@@ -12,7 +12,7 @@ import { urlFor } from "@/sanity/lib/image";
 import { Breadcrumb } from "@/components/seo/breadcrumb";
 import { AuthorByline } from "@/components/journal/author-byline";
 import { ArticleCard } from "@/components/journal/article-card";
-import { JournalGrid } from "@/components/journal/journal-list";
+import { CatalogGrid } from "@/components/catalog/catalog-list";
 import { SpecBand } from "@/components/editorial/section-blocks";
 import { bodySmClass, captionClass } from "@/components/editorial/rule-list";
 import {
@@ -69,7 +69,7 @@ import { cn } from "@/lib/utils";
  *   6. PROFILE        4 カラムのデータ帯
  *   7. この人のお茶    relatedProducts (Shopify)
  *   8. この人の記事    ARTICLES_BY_AUTHOR (既存機能。会員限定バッジを保つため
- *                     テンプレの写真カードではなく ArticleCard + JournalGrid)
+ *                     テンプレの写真カードではなく ArticleCard を使う)
  *   9. OTHER PEOPLE   ほかの人をたずねる
  *
  * データが無い節は枠ごと出さない (空枠を出さない方針 — C4-2 PDP / C4-3 と同じ)。
@@ -81,7 +81,16 @@ import { cn } from "@/lib/utils";
  * 本実装では明示的に範囲を渡す。
  */
 
-/** テンプレの記事グリッドは 3 列 x 1 段。 */
+/**
+ * 記事の節に出す上限。PC 3 列 x 2 段 / SP 2 列 x 3 段でちょうど収まる 6 件。
+ *
+ * グリッドは `JournalGrid` (ジャーナル一覧の PC 2 列) ではなく `CatalogGrid`
+ * (PC 3 列 / SP 2 列) を使う。**詳細ページの中に記事の帯を置くとき**の既存の
+ * 正は商品詳細の「読みもの」節 (`app/[locale]/products/[handle]/page.tsx` が
+ * `CatalogGrid` + `ArticleCard`) であり、People 詳細テンプレの写真カード帯
+ * (PC 3 列 416) とも列リズムが揃う。会員限定バッジを保つためカードは
+ * `ArticleCard` のまま使う。
+ */
 const ARTICLE_LIMIT = 6;
 
 type AuthorRef = {
@@ -405,7 +414,7 @@ export default async function PeoplePage({
             title={t("articlesByAuthor")}
           />
           <PersonSectionBody>
-            <JournalGrid>
+            <CatalogGrid>
               {articles.map((article) => (
                 <ArticleCard
                   key={article._id}
@@ -413,7 +422,7 @@ export default async function PeoplePage({
                   memberOnlyLabel={tCommon("memberOnly")}
                 />
               ))}
-            </JournalGrid>
+            </CatalogGrid>
           </PersonSectionBody>
         </PersonSection>
       ) : null}

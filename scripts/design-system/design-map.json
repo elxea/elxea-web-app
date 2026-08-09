@@ -2,7 +2,7 @@
   "$schema_note": "Figma node ⇄ code path 対応表。経済化施策① (Decision Log 39c70c9d064c81079145f69744e7b8f5)。自動化が Figma コンポーネントに対して正しいソースファイルを編集できるようにする lookup index。値の二重管理はしない。SoT=Figma (トークン・デザイン値の正本は Figma。コードは追従側で tokens/base.json が Figma の写し、dist/ は生成物 / Setaka 宣言 2026-08-08。旧「案 B = SoT=Code, Figma=参照」を置換)。本ファイルはどちらの向きにも値を持たない lookup index なので、この方針転換で役割は変わらない。検証は scripts/design-system/validate-design-map.ts (schema + code_path 実在 + --figma で node 実在)。",
   "figma_file_key": "AWLnI0XF07e8rScuxPYPc7",
   "figma_components_page": "5246:3",
-  "updated_at": "2026-08-09T09:28:57Z",
+  "updated_at": "2026-08-09T10:16:48Z",
   "conventions": {
     "entry": "{ figma_node_id, figma_name, code_path, kind, notes }。code_path はリポジトリルート相対。inline 定義部品は「定義/描画を含むファイル」を code_path とする (編集対象がそのファイルのため)。",
     "kind": "ds-component = elxea 固有の DS 部品 / module = Header/Footer 等の大型合成モジュール / shadcn = shadcn/ui プリミティブ。",
@@ -638,7 +638,7 @@
       "figma_name": "Toolbar",
       "code_path": "components/catalog/catalog-toolbar.tsx",
       "kind": "ds-component",
-      "notes": "共通リストパターン R2。ピル型チップ h44 + 並び替え Select 180x44。SP は横スクロール (8062:2017)。C9-1 で絞り込みクエリのキーを `chipParam` prop で差し替え可能にした (既定 `category` のまま。農家一覧は `region` を渡す)。"
+      "notes": "共通リストパターン R2。ピル型チップ h44 + 並び替え Select 180x44。SP は横スクロール (8062:2017)。C9-1 で絞り込みクエリのキーを `chipParam` prop で差し替え可能にした (既定 `category` のまま。農家一覧は `region` を渡す)。 C12-1: chips=[] (チップ列なし) を許容。チップが無いときは残るのが PC 限定の並び替え Select だけになるため枠ごと hidden lg:flex にして SP の幽霊余白を消す (実測 SP display=none / PageHead→Grid 32)。既存呼び出しは全て非空チップなので描画不変。"
     },
     {
       "figma_node_id": "8062:2077",
@@ -1332,6 +1332,27 @@
       "code_path": "app/[locale]/tasting-note/page.tsx",
       "kind": "ds-component",
       "notes": "中央寄せの静かな 1 本 (body 16 / lh 28)。SP 8105:1330 は link 枠が h48 なのでタップ域 48 を min-h-12 で確保する。"
+    },
+    {
+      "figma_node_id": "7822:37213",
+      "figma_name": "People 詳細 (【採用: 作り手の共通テンプレ】 PC 1440)",
+      "code_path": "app/[locale]/people/[slug]/page.tsx",
+      "kind": "module",
+      "notes": "People 詳細テンプレは複数画面が参照する上位 SoT (農家詳細 8079:3747 が『People 詳細テンプレ統合』を名乗り、プレイリスト詳細 8089:4518 も『People 詳細テンプレ整合』)。テンプレ自身は R1 で【採用】凍結され、R2 世代の実測値は農家詳細確定版 8079:3748/8079:3966 に入っているため、実装はその値を体現する components/farmers/farmer-detail.tsx を components/people/person-detail.tsx 経由で再利用する。節構成は農家詳細から茶園 2 節 (FIELD DATA 8079:3937 / THE FIELD 8079:3947) を除いた形。SP は 7823:37542。Structure DB の Figma プロパティ 6703:14332 は旧 elxea 変A (page 6054:15) を指す stale。"
+    },
+    {
+      "figma_node_id": "7822:37212",
+      "figma_name": "People 詳細 共通テンプレ (section / 作り手テンプレの SoT)",
+      "code_path": "components/people/person-detail.tsx",
+      "kind": "ds-component",
+      "notes": "People 層での命名を与える薄い再輸出 (PersonHead / PersonQuote / PersonSection* / PersonDataBand / PersonCardGrid / ProcessGrid / InterviewList / personBandClass)。実装は複製せず farmer-detail.tsx を指す。farmer-detail の注記どおり『People 詳細テンプレ共通骨格』への一本化は農家・プレイリストを同時に動かすため後続タスクに残す。"
+    },
+    {
+      "figma_node_id": "6647:7525",
+      "figma_name": "コレクション詳細 (roji 世代デザイン不在 → 共通リストパターンから導出)",
+      "code_path": "app/[locale]/collections/[handle]/page.tsx",
+      "kind": "module",
+      "notes": "全 14 ページ走査の結果 roji 世代の『コレクション詳細』は 0 件で、このノードは旧 elxea 変A (page 6054:15) = Structure DB の stale。C9-1 の先例に従い凍結済み兄弟 R2『共通リストパターン』(商品一覧 PC 8061:1781 / SP 8062:2008、お茶メニュー一覧 8063:2144/8063:2372) から導出。商品一覧との差分は 3 点: キッカー COLLECTION / チップ列なし (コレクション自体が絞り込み結果) / KindIndex なし。並び替えは ProductCollectionSortKeys (既定 BEST_SELLING = おすすめ順)。"
     }
   ],
   "unmapped_figma_nodes": [
