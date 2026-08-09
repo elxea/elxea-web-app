@@ -7,7 +7,6 @@ import { badgeVariants } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { toggleVariants } from "@/components/ui/toggle";
 
-// @ts-expect-error -- local ESLint plugin, plain .mjs with no type declarations
 import { findColorless, classify, splitVariants } from "@/eslint-rules/no-colorless-border.mjs";
 
 /**
