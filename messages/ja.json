@@ -131,7 +131,9 @@
     "categoryStackMeta": "{count} カテゴリ ・ 全 {total} 本",
     "lastUpdated": "最終更新 {date}",
     "articleCount": "{count}本",
-    "shelfMore": "{name}を、もっと見る →"
+    "shelfMore": "{name}を、もっと見る →",
+    "authorArticles": "この人の記事",
+    "authorLinkLabel": "リンク"
   },
   "teaMenu": {
     "title": "お茶メニュー",
@@ -192,7 +194,10 @@
     "issueTeas": "この号に入っているお茶",
     "teaDetailOpen": "茶葉の詳細を開く →",
     "otherReads": "この号のほかの読みもの",
-    "nextReadTag": "「{name}」の読みものをこのまま開く"
+    "nextReadTag": "「{name}」の読みものをこのまま開く",
+    "featuredIssue": "今月号",
+    "otherIssues": "ほかの号",
+    "themes": "テーマ"
   },
   "people": {
     "loadError": "プロフィールを読み込めませんでした。",

@@ -325,6 +325,7 @@ export const OTHER_PLAYLISTS_QUERY = groq`
 export const JOURNALS_QUERY = groq`
   *[_type == "journal" && language == $language] | order(title asc) {
     _id,
+    _createdAt,
     title,
     slug,
     theme,

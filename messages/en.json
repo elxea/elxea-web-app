@@ -131,7 +131,9 @@
     "categoryStackMeta": "{count} categories · {total} articles",
     "lastUpdated": "Updated {date}",
     "articleCount": "{count}",
-    "shelfMore": "More in {name} →"
+    "shelfMore": "More in {name} →",
+    "authorArticles": "Articles by this author",
+    "authorLinkLabel": "Link"
   },
   "teaMenu": {
     "title": "Tea Menu",
@@ -192,7 +194,10 @@
     "issueTeas": "Tea in This Issue",
     "teaDetailOpen": "Open tea details →",
     "otherReads": "More Reading in This Issue",
-    "nextReadTag": "Keep reading “{name}”"
+    "nextReadTag": "Keep reading “{name}”",
+    "featuredIssue": "This issue",
+    "otherIssues": "Other issues",
+    "themes": "Themes"
   },
   "people": {
     "loadError": "Could not load profile.",
