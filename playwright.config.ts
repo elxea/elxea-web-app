@@ -46,9 +46,10 @@ export default defineConfig({
    * - staging-smoke.spec.ts (4 tests) … ステージング公開後にしか意味がない。
    *   CIではなくデプロイ後ジョブへ移すのが正で、そのワークフロー改修は別件。
    */
-  testIgnore: process.env.CI
-    ? ["**/membership.spec.ts", "**/staging-smoke.spec.ts"]
-    : ["**/membership.spec.ts", "**/staging-smoke.spec.ts"],
+  /* CI / 非CIで同じ2 specを外す。以前は三項演算子で書かれていたが両辺が同じ配列で、
+   * 「CIだけ違う」と読めてしまう死んだ条件分岐だった。除外理由はどちらの環境でも
+   * 同じ (仕様が消えた / ステージング前提) なので、条件を持たない1つの配列にする。 */
+  testIgnore: ["**/membership.spec.ts", "**/staging-smoke.spec.ts"],
   use: {
     baseURL,
     trace: "on-first-retry",
