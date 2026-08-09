@@ -69,7 +69,7 @@ test.describe("Product detail page", () => {
     const hasProduct = await productLink.isVisible().catch(() => false);
 
     if (!hasProduct) {
-      test.skip();
+      test.skip(true, "商品一覧に商品カードが無い — Shopify に公開商品が必要です");
       return;
     }
 
@@ -101,7 +101,7 @@ test.describe("Product detail page", () => {
     const hasProduct = await productLink.isVisible().catch(() => false);
 
     if (!hasProduct) {
-      test.skip();
+      test.skip(true, "商品一覧に商品カードが無い — Shopify に公開商品が必要です");
       return;
     }
 
@@ -122,7 +122,7 @@ test.describe("Product detail page", () => {
     const hasProduct = await productLink.isVisible().catch(() => false);
 
     if (!hasProduct) {
-      test.skip();
+      test.skip(true, "商品一覧に商品カードが無い — Shopify に公開商品が必要です");
       return;
     }
 
@@ -143,7 +143,7 @@ test.describe("Product detail page", () => {
     const hasProduct = await productLink.isVisible().catch(() => false);
 
     if (!hasProduct) {
-      test.skip();
+      test.skip(true, "商品一覧に商品カードが無い — Shopify に公開商品が必要です");
       return;
     }
 
@@ -175,7 +175,7 @@ test.describe("Product detail page", () => {
     const hasProduct = await productLink.isVisible().catch(() => false);
 
     if (!hasProduct) {
-      test.skip();
+      test.skip(true, "商品一覧に商品カードが無い — Shopify に公開商品が必要です");
       return;
     }
 

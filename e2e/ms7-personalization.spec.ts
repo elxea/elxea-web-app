@@ -27,6 +27,17 @@ import { test, expect, type Page } from "@playwright/test";
 // Test fixtures & helpers
 // ---------------------------------------------------------------------------
 
+/**
+ * Reason attached to the four permanently-skipped LIFF page tests.
+ *
+ * Kept as a shared constant so the CI skip summary groups them as one item
+ * (4 tests / 1 cause) instead of four look-alike rows. Delete the constant and
+ * its `test.skip` calls together when /ja/liff ships.
+ */
+const PENDING_LIFF_ROUTE =
+  "/ja/liff ルート未実装 — 実装まで保留。LINE アプリ外では LIFF SDK を初期化できないため、" +
+  "当面は scripts/README.md TC-1 の手動テスト手順で担保する";
+
 /** テスト用 Shopify カスタマー ID（モック） */
 const TEST_CUSTOMER_ID = process.env.TEST_SHOPIFY_CUSTOMER_ID ?? "test-customer-001";
 
@@ -77,8 +88,14 @@ async function setTestSession(page: Page) {
 // ---------------------------------------------------------------------------
 
 test.describe("TC-1: LIFF 紐付けフロー", () => {
-  // LIFF route (/ja/liff) does not exist yet — skip page-level tests until implemented.
-  test.skip("LIFF ページが正常にロードされる", async ({ page }) => {
+  // LIFF route (/ja/liff) does not exist yet — skip page-level tests until
+  // implemented. Declared as `test(...)` with a first-statement `test.skip(true,
+  // reason)` rather than `test.skip("title", ...)`: both skip, but only this form
+  // records the reason as an annotation, which is what puts it in the CI skip
+  // summary (scripts/ci/e2e-skip-summary.mjs). A bare `test.skip("title")` shows
+  // up as an unexplained skip and reads like an oversight.
+  test("LIFF ページが正常にロードされる", async ({ page }) => {
+    test.skip(true, PENDING_LIFF_ROUTE);
     await page.goto("/ja/liff");
 
     // LIFF SDK 未初期化時はローディング or ログイン画面が表示される
@@ -90,7 +107,8 @@ test.describe("TC-1: LIFF 紐付けフロー", () => {
     await expect(page.locator("body")).toBeVisible();
   });
 
-  test.skip("Shopify 未ログイン時は認証誘導画面が表示される", async ({ page }) => {
+  test("Shopify 未ログイン時は認証誘導画面が表示される", async ({ page }) => {
+    test.skip(true, PENDING_LIFF_ROUTE);
     await page.goto("/ja/liff");
 
     // LIFF を MOCK モードで起動（NEXT_PUBLIC_LIFF_ID 未設定時はモック）
@@ -362,7 +380,8 @@ test.describe("TC-7: Shopify 注文 Webhook フロー", () => {
 
 // LIFF route (/ja/liff) does not exist yet — skip until implemented.
 test.describe("統合: LIFF テイスティングプロフィール画面", () => {
-  test.skip("LIFF ページが正しい構造で表示される", async ({ page }) => {
+  test("LIFF ページが正しい構造で表示される", async ({ page }) => {
+    test.skip(true, PENDING_LIFF_ROUTE);
     await page.goto("/ja/liff");
 
     // ページが 500 エラーにならないこと
@@ -373,9 +392,10 @@ test.describe("統合: LIFF テイスティングプロフィール画面", () =
     await expect(page.locator("body")).toBeVisible();
   });
 
-  test.skip("LIFF ページがモバイルビューポートで正常に表示される", async ({
+  test("LIFF ページがモバイルビューポートで正常に表示される", async ({
     page,
   }) => {
+    test.skip(true, PENDING_LIFF_ROUTE);
     // LINE アプリはモバイルで使用される
     await page.setViewportSize({ width: 390, height: 844 }); // iPhone 14 Pro
     await page.goto("/ja/liff");

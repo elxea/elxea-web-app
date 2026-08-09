@@ -12,6 +12,12 @@ elxea EC サイト（Next.js ヘッドレスコマース）のプロジェクト
 - **push前に `pnpm lint` / `pnpm typecheck` / `pnpm test` が通ること**。これはpre-commitのpre-pushフックで機械強制される（下記「ローカル品質ゲート」）
 - コミットメッセージはconventional commitsに従う（feat:, fix:, ci:, test:, docs:, chore:）
 
+### マージゲート（運用強制・3行）
+
+- **mainへのマージはCIが緑になったことをBossが確認してから行う。** 赤・未実行のままマージしない
+- **branch protectionは張れない**（無料プランでrequired status checksが有料）ため、CIは検査と可視化までで、**マージを止めるのは運用のみ**
+- 確認は `gh run list --branch <branch> --limit 5` で当該コミットのconclusionが `success` であること。詳細は `docs/ci-gates.md`
+
 ### ローカル品質ゲート（pre-push・必須）
 
 本リポはGitHub / Vercel無料プランのためbranch protection（required status checks）を張れない。壊れたコードがmainに入るのを止める唯一の機械強制がローカルのpre-pushフックなので、**clone直後に必ず入れる**。

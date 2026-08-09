@@ -14,6 +14,12 @@ const eslintConfig = [
       ".phase-*",
       // 使い捨てスクリプト置き場 (gitignore 対象・.gitignore と対で維持する)
       "scripts/scratch/**",
+      // vitest のカバレッジ出力 (`pnpm test:coverage`)。lcov-report/ に istanbul の
+      // ベンダー JS (block-navigation.js / prettify.js / sorter.js) が入り、その
+      // 先頭の eslint-disable が「Unused eslint-disable directive」warning になる。
+      // `pnpm lint` は --max-warnings 0 なので、無視しないと一度カバレッジを計測
+      // した作業ツリーで lint が必ず落ちる。.gitignore の `/coverage` と対で維持する。
+      "coverage/**",
     ],
   },
   ...nextCoreWebVitals,

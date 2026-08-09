@@ -1,10 +1,33 @@
 name: CI
 
+# Trigger design (2026-08-09, P0 of the QA plan).
+#
+# The problem this fixes: triggers were `main` / `developer` / `PR to main` only,
+# so `feat/**` — where all the actual work happens — never ran CI at all. The
+# C1 design-system branch reached 151 commits ahead of main without a single run.
+# CI existed and looked healthy; it just wasn't pointed at the code being written.
+#
+# `feat/**` now runs a lean gate on every push. Heavy jobs (Chromatic) stay on
+# PRs, because they cost more than they return on a work-in-progress branch.
+#
+# There is no branch protection on this repo (GitHub Free + private = required
+# status checks are a paid feature; `gh api .../branches/main/protection` returns
+# 403 "Upgrade to GitHub Pro"). So CI here *inspects and reports* — it cannot
+# block a merge. Enforcement is the operational rule in docs/ci-gates.md: Boss
+# confirms CI green before merging.
 on:
   push:
-    branches: [main, developer]
+    branches: [main, developer, "feat/**"]
+    # Docs-only pushes cannot break any of these gates, and ~21% of this branch's
+    # commits are fidelity-table markdown. Skipping them keeps the Actions budget
+    # for pushes that can actually regress something. PRs are deliberately NOT
+    # filtered — a PR gets the full suite regardless of what it touches.
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
+      - "LICENSE"
+  # No `branches:` filter — every PR is checked, whatever its base.
   pull_request:
-    branches: [main]
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -38,7 +61,13 @@ jobs:
         run: pnpm lint
 
       - name: Type check
-        run: pnpm tsc --noEmit
+        # `pnpm typecheck`, not a bare `pnpm tsc --noEmit`. The script is
+        # `typecheck:clean && next typegen && tsc --noEmit`: without the
+        # `next typegen` step, the generated route types under .next/types are
+        # missing, so any type error involving a generated PageProps / route type
+        # was invisible to CI while the pre-push hook (which does run the script)
+        # caught it locally. CI and pre-push now check the same thing.
+        run: pnpm typecheck
 
       - name: Validate design tokens
         # Fails the build (validate-tokens.ts exits 1) when tokens drift from
@@ -94,6 +123,114 @@ jobs:
           name: unit-test-results
           path: test-results/
           retention-days: 7
+
+  coverage:
+    name: coverage
+    needs: static-checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Measure coverage
+        # `@vitest/coverage-v8` was in devDependencies but nothing ever ran it, so
+        # the untested surface (36 of 38 API routes, most of lib/) was real but
+        # invisible — nobody could see it shrinking. Fails when coverage drops
+        # below the pinned baseline in vitest.config.ts.
+        #
+        # Uses `pnpm test:coverage` (VITEST_COVERAGE=1) rather than `--coverage`:
+        # the CLI flag makes @chromatic-com/storybook's bundled chromatic CLI
+        # parse argv, hit the boolean, and throw
+        # `Cannot create property 'provider' on boolean 'true'`, which fails
+        # config load before any test runs. See the comment in vitest.config.ts.
+        run: pnpm test:coverage
+
+      - name: Publish coverage to job summary
+        if: always()
+        run: |
+          {
+            echo "## Coverage"
+            echo
+            if [ -f coverage/coverage-summary.json ]; then
+              node -e '
+                const t = require("./coverage/coverage-summary.json").total;
+                const row = (k) => `| ${k} | ${t[k].pct}% | ${t[k].covered}/${t[k].total} |`;
+                console.log("| Metric | % | Covered |");
+                console.log("| --- | ---: | ---: |");
+                for (const k of ["statements", "branches", "functions", "lines"]) console.log(row(k));
+              '
+            else
+              echo "[WARN] coverage/coverage-summary.json not found."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 7
+
+  build:
+    name: build
+    needs: static-checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NODE_OPTIONS: --max-old-space-size=4096
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Production build
+        # Previously CI never built. The first real build was `vercel build --prod`
+        # in deploy.yml, i.e. *after* the merge to main — so a broken build was
+        # discovered in production deploys rather than on the branch.
+        #
+        # `pnpm build` = `node sd.config.mjs && tsx scripts/check-placeholders.ts
+        # && next build`, so this also exercises token generation and the
+        # placeholder scan.
+        run: pnpm build
+        env:
+          # Seeded preview data so the seeded routes render at real density
+          # during prerender instead of collapsing to empty states.
+          PREVIEW_SEED: "1"
+          # Public (non-secret) Sanity coordinates, same values e2e-tests uses.
+          NEXT_PUBLIC_SANITY_PROJECT_ID: 5s8ahx87
+          NEXT_PUBLIC_SANITY_DATASET: production
+          # NOT a credential — a throwaway string that only has to be non-empty.
+          # lib/shopify/customer.ts hard-fails at module load without it (unless
+          # NODE_ENV=test), which aborts `next build` at "Collecting page data"
+          # on /api/auth/logout. It is used solely as a sha256 input for token
+          # encryption at runtime; nothing in a build signs or verifies anything
+          # with it. The real value lives in the Vercel project env.
+          SESSION_SECRET: ci-build-only-placeholder-not-a-secret
 
   storybook-tests:
     name: storybook-tests
@@ -151,11 +288,29 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium
 
       - name: Run E2E tests (with retries for flaky tests)
-        run: pnpm test:e2e --retries=2 --reporter=junit --output=test-results/e2e-junit.xml
+        # Reporters now come from playwright.config.ts (list + html + json +
+        # junit). The old `--reporter=junit --output=test-results/e2e-junit.xml`
+        # was silently broken: `--output` is the artifacts *directory*, not the
+        # JUnit path, so the XML went to stdout and the uploaded artifact
+        # contained no report.
+        run: pnpm test:e2e --retries=2
         env:
           CI: true
           NEXT_PUBLIC_SANITY_PROJECT_ID: 5s8ahx87
           NEXT_PUBLIC_SANITY_DATASET: production
+
+      - name: Report skipped tests (no-op green visibility)
+        # Runs even when the suite fails. 33 runtime skip guards mean a large part
+        # of this job can pass without asserting anything (CRON_SECRET,
+        # SHOPIFY_WEBHOOK_SECRET, Shopify SellingPlan fixtures are all absent in
+        # CI). This publishes the count and the reasons to the job summary so the
+        # gap is visible on every run.
+        #
+        # Deliberately does NOT fail the build and does NOT enable those tests —
+        # switching them on requires provisioning secrets, which is a separate
+        # decision (see docs/ci-gates.md for the list).
+        if: always()
+        run: pnpm report:e2e-skips
 
       - name: Upload E2E results
         if: always()
@@ -175,6 +330,9 @@ jobs:
 
   visual-regression:
     name: visual-regression
+    # PR-only, unchanged. Chromatic bills per snapshot, so running it on every
+    # `feat/**` push would burn the quota on intermediate states nobody reviews.
+    # The gate that matters is on the PR, where changes are not auto-accepted.
     if: github.event_name == 'pull_request'
     needs: static-checks
     runs-on: ubuntu-latest

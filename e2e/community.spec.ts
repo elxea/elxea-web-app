@@ -13,7 +13,7 @@ test.describe("Community features — Unauthenticated", () => {
       const productExists = await productLink.isVisible().catch(() => false);
 
       if (!productExists) {
-        test.skip();
+        test.skip(true, "商品一覧に商品カードが無い — Shopify に公開商品が必要です");
         return;
       }
 
@@ -56,7 +56,7 @@ test.describe("Community features — Unauthenticated", () => {
       const articleExists = await articleLink.isVisible().catch(() => false);
 
       if (!articleExists) {
-        test.skip();
+        test.skip(true, "ジャーナル一覧に記事カードが無い — Sanity に公開記事が必要です");
         return;
       }
 

@@ -11,8 +11,10 @@
  * deploys are unaffected. Nothing is ever written back to Sanity/Shopify.
  *
  * Flag:
- *   PREVIEW_SEED=1         -> unified master flag (all seeded sections)
- *   PREVIEW_SEED_EVENTS=1  -> legacy flag, kept for backward compatibility
+ *   PREVIEW_SEED=1                 -> unified master flag (all seeded sections)
+ *   PREVIEW_SEED_EVENTS=1          -> legacy flag, kept for backward compatibility
+ *   PREVIEW_SEED_DETERMINISTIC=1   -> pin every placeholder photo to one image
+ *                                     (screenshot-regression mode, see below)
  *
  * All `imageUrl` values point at existing local /public assets so no external
  * download / remote host is required.
@@ -45,7 +47,15 @@ export function isSeedId(id: string | null | undefined): boolean {
   return typeof id === "string" && id.startsWith(SEED_ID_PREFIX);
 }
 
-/** Local /public images reused as preview placeholder photography. */
+/**
+ * Local /public images reused as preview placeholder photography.
+ *
+ * NOTE the pool is not aspect-ratio uniform — `hero-approach` is 1920x1200
+ * (1.60), `hero-day` / `hero-night` are 1920x1440 (1.33), and the three
+ * `placeholder-hero-*` are 1024x1024 (1.00). Anywhere a placeholder is rendered
+ * without a fixed frame, *which* image lands on a card changes that card's
+ * height. See `previewSeedDeterministic()`.
+ */
 const PREVIEW_IMAGES = [
   "/hero-day.jpg",
   "/hero-night.jpg",
@@ -55,8 +65,34 @@ const PREVIEW_IMAGES = [
   "/placeholder-hero-approach.jpg",
 ];
 
+/**
+ * Screenshot-regression mode: collapse the placeholder pool to a single image.
+ *
+ * Why this exists. Selection is already deterministic *per key*
+ * (`previewImageForKey`), but the keys are not stable across runs: the seeded
+ * pages fall back to a placeholder only for documents that have no real photo,
+ * and they read the live production Sanity dataset. As its content shifts, the
+ * set of ids — and therefore which of the six images appear and in what order —
+ * shifts with it. Because the pool spans three aspect ratios, that reshuffle
+ * moves total page height, which is what made screenshot diffing unusable on
+ * the journal SP routes (C16-1: `journal__sp` / `elxea-journal__sp` measured
+ * 52,422 px vs 51,889 px across two runs of *identical* code, swamping the
+ * 2-3 px deltas the comparison was trying to detect).
+ *
+ * With this flag on, every key resolves to `PREVIEW_IMAGES[0]`, so page height
+ * no longer depends on which documents came back. Layout/spacing measurement is
+ * unaffected — that is what the fidelity lanes actually measure. Turn it OFF
+ * when reviewing the seeded pages by eye, since every photo becomes identical.
+ *
+ * Default (flag unset) behaviour is byte-identical to before.
+ */
+export function previewSeedDeterministic(): boolean {
+  return process.env.PREVIEW_SEED_DETERMINISTIC === "1";
+}
+
 /** Deterministic image by numeric index (cycles through the pool). */
 export function previewImageAt(index: number): string {
+  if (previewSeedDeterministic()) return PREVIEW_IMAGES[0];
   const n = PREVIEW_IMAGES.length;
   return PREVIEW_IMAGES[((index % n) + n) % n];
 }

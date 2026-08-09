@@ -13,7 +13,28 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
-  reporter: "html",
+  /*
+   * Reporters are declared here rather than passed with `--reporter` on the CI
+   * command line, because the old CI invocation
+   * (`--reporter=junit --output=test-results/e2e-junit.xml`) did not do what it
+   * looks like: `--output` sets the *artifacts* directory, not the JUnit path,
+   * so the XML went to stdout and `test-results/e2e-junit.xml` was never
+   * written — the uploaded artifact had no report in it.
+   *
+   * The `json` report is what `scripts/ci/e2e-skip-summary.mjs` reads to publish
+   * the skip count and reasons to the CI job summary. Without it, tests that
+   * skip themselves at runtime (missing CRON_SECRET etc.) are indistinguishable
+   * from tests that actually verified something — a green check that asserted
+   * nothing. See docs/ci-gates.md.
+   */
+  reporter: process.env.CI
+    ? [
+        ["list"],
+        ["html", { open: "never" }],
+        ["json", { outputFile: "test-results/e2e-report.json" }],
+        ["junit", { outputFile: "test-results/e2e-junit.xml" }],
+      ]
+    : "html",
   /* Betaの守備範囲 = 定期便・LINE連携・コミュニティを含む全部 (Setaka決定
    * 2026/08/08)。よって旧「外部サービスが要るものは全部CI除外」をやめ、
    * community / subscription-* / ms7-personalization の4 spec (68 tests) を
