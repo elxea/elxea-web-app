@@ -148,10 +148,10 @@ production Sanity datasetのjournalドキュメントは **確定版のフィー
 | 段落 | letter-spacing | 0.8 (.05em) | 0.64 (.04em) | [OK] Δ0.16注2 |
 | 段落 | 段落間 | 24 | 24.00 x 4箇所 | [OK] |
 | 段落 | 幅 | PC 640 / SP 343 | 640 / 343 | [OK] |
-| 節見出し | font-size | 32 (jp/h1) | 32 / 32 | [OK] |
-| 節見出し | line-height | 38.4 (1.2) | 38.4 (1.2) | [OK] |
-| 節見出し | font-weight | 300 (Light) | 300 / 300 | [OK] |
-| 節見出し | letter-spacing | 0.64 (.02em) | 0.64 (.02em) | [OK] |
+| 節見出し | font-size | PC 32 (jp/h1) / **SP 24 (jp/h2)** | 32 / **24** | [OK] 注15 |
+| 節見出し | line-height | PC 38.4 (1.2) / **SP 31.2 (1.3)** | 38.4 / **31.2** | [OK] 注15 |
+| 節見出し | font-weight | PC 300 (Light) / **SP 400 (Regular)** | 300 / **400** | [OK] 注15 |
+| 節見出し | letter-spacing | PC 0.64 (.02em) / **SP 0** | 0.64 / **0.48** | [OK] SP Δ0.48注2・注15 |
 | 節見出し | 前 (直前段落下端→見出し上端) | 80 (リズム24 + frame pt56) | 80.00 x 3箇所 (`mt-20`) | [OK] |
 | 節見出し | 後 (見出し下端→直後段落上端) | 44 (frame pb20 + リズム24) | 44.00 x 3箇所 (`mt-11`) | [OK] |
 | 節見出し | SPの前後 | 80 / 44 (「続き2」枠) | 80.00 / 44.00 | [OK] 注10 |
@@ -160,6 +160,9 @@ production Sanity datasetのjournalドキュメントは **確定版のフィー
 `:lang(ja) [data-slot="article-prose"] h2` 規則 (詳細度0,2,1) で当てている。
 Sanity blockContent由来のH2はdata-slotを持てず、unlayeredな `h2 { font: … }` が
 Tailwind utilitiesに勝つため、utility側からは指定できない (page-titleと同じ理由)。
+**PC (`@media (min-width: 64rem)`) だけがこの規則でjp/h1に上書きされ、SPはbaseの
+`h2 { font: var(--typography-style-h2) }` + `:lang(ja) h2 { line-height: 1.3 }` が
+そのままFigmaのSP値になる** (C15-1で是正。注15)。
 
 ## 6. この号に入っているお茶 (同梱セット文脈) — Figma 8110:46925 / 8110:47072
 
@@ -337,6 +340,62 @@ Tailwind utilitiesに勝つため、utility側からは指定できない (page-
     - レイアウト値 (寸法・文字組み・余白) はすべてFigmaに追従済みで、本注記は
       遷移方式のみの差分。
 
+15. **節見出しはPC / SPでプリセットが1段変わる【2026-08-09 C15-1で是正・旧申告の訂正】**
+
+    当初この表の§5は節見出しを「Figma 32 / 38.4 → 実装32 / 38.4 [OK]」とPC / SP共通で
+    申告していたが、**SP側は裏付けが無い誤申告だった**。QAバッチ2 (elxea-qa独立監査
+    https://app.notion.com/p/3b770c9d064c815f8e4bef43a85adf6b) が「SP実測lh 38.4に対し
+    Figma SPのH2 text node高は31」と指摘し、C15-1でFigmaを再取得して正を確定した。
+
+    **Figma再取得の結果 (2026-08-09 / `get_design_context` + `get_metadata`)**:
+
+    | ノード | 適用トークン | size | weight | line-height | letter-spacing | text node高 |
+    |---|---|---|---|---|---|---|
+    | PC `8110:46910` | `elxea/typography/editorial/jp/h1` | 32 | 300 Light | 1.2 (=38.4) | .02em (=0.64px) | 38 |
+    | SP `8110:47060` | `elxea/typography/editorial/jp/h2` | 24 | 400 Regular | 1.3 (=31.2) | 0 | 31 |
+
+    裏取り: SP frame `8110:47059` の高さ107 = pt56 + text31 + pb20。24 x 1.3 = 31.2と一致。
+    つまり**Figmaが正しく、実装 (SPも32/38.4) が誤り**だった (QA指摘のとおり)。
+
+    **是正**: `app/globals.css` の `[data-slot="article-prose"] h2` 規則を
+    `@media (min-width: 64rem)` で囲み、PCのみjp/h1に上書きする形にした。SPはbaseの
+    h2プリセット (24 / 400) + `:lang(ja) h2 { line-height: 1.3 }` がそのままFigma値になる。
+    切替点64remはこのページ側の `lg:` 指定 (`articlePagePadding` / `ArticleImageBleed`) と揃う。
+
+    **是正後の実測 (local production build / Playwright `getComputedStyle`・
+    PC 1440x1000 / SP 375x812・`/ja/elxea-journal/seed-journal-0`・console error 0)**:
+
+    | レーン | font-size | line-height | font-weight | letter-spacing | 前/後 | 判定 |
+    |---|---|---|---|---|---|---|
+    | PC (修正前) | 32 | 38.4 | 300 | 0.64px | 80 / 44 | — |
+    | PC (修正後) | 32 | 38.4 | 300 | 0.64px | 80 / 44 | **無回帰** |
+    | SP (修正前) | 32 | 38.4 | 300 | 0.64px | 80 / 44 | Figma乖離 |
+    | SP (修正後) | **24** | **31.2** | **400** | 0.48px | 80 / 44 | Figma一致 (lsのみΔ0.48) |
+
+    残差はletter-spacingのみ (Figma 0 vs実装0.48px)。これは注2と同じCJK override由来
+    (`dist/tokens-cjk.css` が `:lang(ja)` で `--typography-style-h2-tracking` を0.02emに
+    再束縛する) で、**1ページ都合で共有トークンを動かさない方針**に従い踏襲した。
+    解消はSetakaレビュー案件「CJK文字組みトークンvs Figmaの食い違いの正を決める (roji)」
+    (All Tasks `3b570c9d-064c-81b7`) の判断待ち。
+
+    **PC側は再取得しても乖離なし** (QAが「SPで乖離が確定すればPC側も要確認」と付記していたが、
+    PCはFigma jp/h1と完全一致。PC/SPでH2が同値という当初の読みだけが誤りだった)。
+
+16. **不存在slugが200を返していた (soft-404) の是正【2026-08-09 C15-1・全動的ルート横断】**
+
+    QAバッチ2の実Fail #2。`/ja/farmers/<不存在>` がHTTP 200 + not-found DOMを返していた。
+    **本ページ (`/ja/elxea-journal/[slug]`) を含む動的ルート13本すべてで同型**だった。
+
+    根因は `app/[locale]/loading.tsx`。これがSuspense境界を作るため、Next.jsは
+    「レイアウト + loadingフォールバック」のシェルを**ステータス200のまま先にflush**し、
+    そのあとページ本体をストリームする。ページが `notFound()` を投げるのはシェル送出後で、
+    ステータスを404に差し替えられない。`generateMetadata` 側で `notFound()` を投げる案も
+    実測したが200のまま (metadataもストリームされる) で不採用。
+
+    是正 = `app/[locale]/loading.tsx` を撤去。理由と再追加禁止は
+    `app/[locale]/not-found.tsx` の冒頭コメントに記載した。結果表はDevlog参照。
+    クライアント遷移の無回帰 (一覧→詳細クリックでh1描画・console error 0) も確認済み。
+
 ---
 
 ## 参照元
@@ -344,6 +403,15 @@ Tailwind utilitiesに勝つため、utility側からは指定できない (page-
 - Figma file `AWLnI0XF07e8rScuxPYPc7` — elxea Journal詳細PC `8110:46893` /
   SP `8110:47043` (`get_metadata` / `get_design_context` / `get_variable_defs` で
   2026-08-08 13:5x〜14:0x JST取得)
+- **節見出しの再取得 (C15-1 / 注15)**: 同fileのH2 frame PC `8110:46909` (text `8110:46910`) /
+  SP `8110:47059` (text `8110:47060`) を `get_metadata` + `get_design_context` で
+  2026-08-09 18:3x JST再取得。適用トークンがPC `editorial/jp/h1` (32/300/1.2/.02em) /
+  SP `editorial/jp/h2` (24/400/1.3/0) と別物であることを確定した
+- **是正後の実装計測 (C15-1)**: local production build (`PREVIEW_SEED=1 pnpm build` →
+  `PREVIEW_SEED=1 PORT=3195 next start`) をPlaywrightで実測
+  (viewport PC 1440x1000 / SP **375**x812・URL `/ja/elxea-journal/seed-journal-0`・
+  計測スクリプト `scripts/scratch/c151-h2-measure.mjs` = gitignore対象・使い捨て・
+  2026-08-09 18:5x JST)
 - 実装: `app/[locale]/elxea-journal/[slug]/page.tsx` /
   `components/journal/article-blocks.tsx` / `app/globals.css` (本文H2規則)
 - データ: `sanity/schemas/journal.ts` / `sanity/lib/queries.ts` /

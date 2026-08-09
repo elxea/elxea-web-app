@@ -862,7 +862,7 @@
       "figma_name": "H2 (前56/後20)",
       "code_path": "components/journal/article-blocks.tsx",
       "kind": "ds-component",
-      "notes": "ArticleProse の縦リズム。本文 H2 は Sanity blockContent 由来のため体裁は app/globals.css の `[data-slot=\"article-prose\"] h2` 規則 (jp/h1 = 32px / lh 1.2) で当てる。SP は 8110:47059。"
+      "notes": "ArticleProse の縦リズム。本文 H2 は Sanity blockContent 由来のため体裁は app/globals.css の `[data-slot=\"article-prose\"] h2` 規則で当てる。PC (min-width 64rem) のみ jp/h1 = 32 / 300 / lh 1.2 に上書きし、SP (8110:47060 = jp/h2 = 24 / 400 / lh 1.3) は base の h2 プリセットをそのまま使う (C15-1 で是正)。SP frame は 8110:47059。"
     },
     {
       "figma_node_id": "8110:46925",
