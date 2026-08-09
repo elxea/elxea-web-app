@@ -197,10 +197,12 @@ export function ArticleImageBleed({
  * - 段落の文字組みは jp/body (16 / lh 1.75)。共有シリアライザ
  *   (`components/sanity/portable-text.tsx`) は body-sm 相当を当てるので、
  *   この枠の中だけトークン経由で body に戻す。
- * - 節見出しの体裁 (Figma = jp/h1 32 / lh 1.2) は `globals.css` の
- *   `[data-slot="article-prose"] h2` 規則で当てる。unlayered な `h2 { font: … }`
- *   が Tailwind utilities に勝つため、utility 側からは指定できない
- *   (catalog-card-title / page-title と同じ理由)。
+ * - 節見出しの体裁は PC / SP でプリセットが 1 段変わる
+ *   (PC 8110:46910 = jp/h1 32 / lh 1.2 / 300、SP 8110:47060 = jp/h2 24 / lh 1.3 / 400)。
+ *   `globals.css` の `[data-slot="article-prose"] h2` 規則で PC 側だけ h1 に
+ *   上書きし、SP は base の h2 プリセットをそのまま使う。unlayered な
+ *   `h2 { font: … }` が Tailwind utilities に勝つため、utility 側からは
+ *   指定できない (catalog-card-title / page-title と同じ理由)。
  */
 export function ArticleProse({
   className,

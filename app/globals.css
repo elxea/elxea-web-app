@@ -235,20 +235,36 @@ h1.auth-card-title[data-emphasis="strong"] {
   letter-spacing: var(--typography-style-h2-tracking);
 }
 
-/* elxea Journal 記事詳細【R2: 確定版】の本文内 節見出し (Figma 8110:46910) は
- * `elxea/typography/editorial/jp/h1` = 32px / Light / lh 1.2 / tracking .02em。
+/* elxea Journal 記事詳細【R2: 確定版】の本文内 節見出しは PC と SP でプリセットが
+ * 1 段変わる。Figma を `get_design_context` で再取得して確定した値 (2026-08-09):
+ *   PC 8110:46910 = `elxea/typography/editorial/jp/h1`
+ *                   32px / Light(300) / lh 1.2 (= 38.4) / tracking .02em (= 0.64px)
+ *   SP 8110:47060 = `elxea/typography/editorial/jp/h2`
+ *                   24px / Regular(400) / lh 1.3 (= 31.2) / tracking 0
+ * SP の text node 高 31 (frame 8110:47059 は 56 + 31 + 20 = 107) が 24 x 1.3 と
+ * 一致することが裏取り。以前はここで PC の h1 プリセットを無条件に当てていたため
+ * SP も 32 / 38.4 になっていた (C15-1 で是正。QA バッチ2 の実 Fail #1)。
+ *
+ * SP は base の `h2 { font: var(--typography-style-h2) }` (24 / 400) +
+ * `:lang(ja) h2 { line-height: 1.3 }` がそのまま Figma 値になるので、ここでは
+ * 何も当てない。PC 側だけ h1 プリセットに上書きする。
+ *
  * 記事本文の H2 は Sanity の blockContent 由来で data-slot を持てないため、
  * 本文枠 (`[data-slot="article-prose"]`) を前置してスコープする。
  * Unlayered な理由は上の catalog-card-title と同じ (`h2 { font: … }` が
  * Tailwind utilities に勝つため utility 側からは当てられない)。
  * 詳細度 (0,2,1) は `:lang(ja) h2 { line-height: 1.3 }` (0,1,1) に勝つ。
  * lh は h1 トークンの cjk 値 (1.4) ではなく Figma の 1.2 を明示する
- * (`:lang(ja) h1 { line-height: 1.2 }` と同じ値・同じ出どころ)。 */
-:lang(ja) [data-slot="article-prose"] h2,
-:lang(en) [data-slot="article-prose"] h2 {
-  font: var(--typography-style-h1);
-  letter-spacing: var(--typography-style-h1-tracking);
-  line-height: 1.2;
+ * (`:lang(ja) h1 { line-height: 1.2 }` と同じ値・同じ出どころ)。
+ * 切替点 64rem は Tailwind の `lg:` と同じで、記事詳細ページ側の `lg:` 指定
+ * (`articlePagePadding` / `ArticleImageBleed` ほか) と揃う。 */
+@media (min-width: 64rem) {
+  :lang(ja) [data-slot="article-prose"] h2,
+  :lang(en) [data-slot="article-prose"] h2 {
+    font: var(--typography-style-h1);
+    letter-spacing: var(--typography-style-h1-tracking);
+    line-height: 1.2;
+  }
 }
 
 /* R2 ジャーナル:カテゴリ の棚見出し (8083:4087 / 8083:4230) は 16px / 行高 24 =
