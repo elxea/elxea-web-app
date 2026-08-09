@@ -18,6 +18,10 @@
   突き合わせる (内容カラムFigma 343 → 実測358、外余白16は同値)。
 - console error / warning / pageerror **0件** (requestfailed 78はRSC prefetch中断と
   Sentryのみ。詳細は `/tmp/c11-measure.json` の `console`)。
+- **rebase後の再計測で差分0件**。並行レーン (C10-1 / C14-1 / C15-1 ほか) のコミットを
+  取り込んだ上で同一ハーネスを再実行し、1670キーを機械比較して全一致を確認した
+  (`/tmp/c11-measure.json` vs `/tmp/c11-measure-after.json`)。console error / warning /
+  pageerror も再計測で0件。
 - 判定の凡例:
   - `[OK]` 一致 (Δ≤2pxは一致扱い。理由を併記)
   - `[仕様]` 意図的にプロジェクト裁定・DSトークン・共有部品の骨格へ寄せた差分
