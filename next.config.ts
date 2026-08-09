@@ -234,6 +234,47 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      /* LINE 純正 Account Link の入口 (`app/[locale]/link/route.ts`) だけは
+       * `Referrer-Policy: no-referrer` にする。
+       *
+       * なぜ必要か: この入口は `?linkToken=...` を **URL クエリ**で受ける。
+       * 上の全体設定 `strict-origin-when-cross-origin` だと、外部 (LINE の
+       * 連携ダイアログ = access.line.me) へ 302 したときにリファラとして
+       * オリジンが出る。値そのものは載らないが、linkToken を扱う入口だけは
+       * リファラを一切出さない `no-referrer` に寄せる — route の doc コメントが
+       * 宣言している内容そのもの。
+       *
+       * なぜ route ではなく next.config か: route handler 側で
+       * `res.headers.set("Referrer-Policy", "no-referrer")` しても、実応答は
+       * `headers()` 由来の値になる (Next の router は config の header route を
+       * `resHeaders` に積んで応答へ載せ、Vercel でも header phase が関数応答の
+       * 後に適用される)。宣言と実応答が食い違っていたため、実際に効く層で
+       * 指定し直す。
+       *
+       * 同じキーは **後で一致したエントリが勝つ** (`resHeaders[key] = value` の
+       * 上書き) ので、このエントリは全体設定より **後** に置く必要がある。
+       * route 側の set は残す (直呼び・将来の配線変更に対する二重防御)。
+       *
+       * source は locale 付き / 無しの両方を書く。`/en/link` は middleware が
+       * 301 で `/ja/link` へ送るが、その 301 応答自体にも付けたいため ja|en 双方。 */
+      {
+        source: "/:locale(ja|en)/link",
+        headers: [
+          {
+            key: "Referrer-Policy",
+            value: "no-referrer",
+          },
+        ],
+      },
+      {
+        source: "/link",
+        headers: [
+          {
+            key: "Referrer-Policy",
+            value: "no-referrer",
+          },
+        ],
+      },
     ];
   },
 };
