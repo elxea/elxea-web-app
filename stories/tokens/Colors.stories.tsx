@@ -1,70 +1,83 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import React from "react";
 
-const colorTokens = [
-  { name: "background", cssVar: "--color-semantic-background", value: "oklch(1 0 0)" },
-  { name: "foreground", cssVar: "--color-semantic-foreground", value: "oklch(0.145 0 0)" },
-  { name: "card", cssVar: "--color-semantic-card", value: "oklch(1 0 0)" },
-  { name: "card-foreground", cssVar: "--color-semantic-card-foreground", value: "oklch(0.145 0 0)" },
-  { name: "popover", cssVar: "--color-semantic-popover", value: "oklch(1 0 0)" },
-  { name: "popover-foreground", cssVar: "--color-semantic-popover-foreground", value: "oklch(0.145 0 0)" },
-  { name: "primary", cssVar: "--color-semantic-primary", value: "oklch(0.205 0 0)" },
-  { name: "primary-foreground", cssVar: "--color-semantic-primary-foreground", value: "oklch(0.985 0 0)" },
-  { name: "secondary", cssVar: "--color-semantic-secondary", value: "oklch(0.97 0 0)" },
-  { name: "secondary-foreground", cssVar: "--color-semantic-secondary-foreground", value: "oklch(0.205 0 0)" },
-  { name: "muted", cssVar: "--color-semantic-muted", value: "oklch(0.97 0 0)" },
-  { name: "muted-foreground", cssVar: "--color-semantic-muted-foreground", value: "oklch(0.556 0 0)" },
-  { name: "accent", cssVar: "--color-semantic-accent", value: "oklch(0.97 0 0)" },
-  { name: "accent-foreground", cssVar: "--color-semantic-accent-foreground", value: "oklch(0.205 0 0)" },
-  { name: "destructive", cssVar: "--color-semantic-destructive", value: "oklch(0.577 0.245 27.325)" },
-  { name: "destructive-foreground", cssVar: "--color-semantic-destructive-foreground", value: "oklch(0.985 0 0)" },
-  { name: "border", cssVar: "--color-semantic-border", value: "oklch(0.922 0 0)" },
-  { name: "input", cssVar: "--color-semantic-input", value: "oklch(0.922 0 0)" },
-  { name: "ring", cssVar: "--color-semantic-ring", value: "oklch(0.708 0 0)" },
-];
+import baseTokens from "../../tokens/base.json";
 
-/** Group tokens by base name (e.g. "primary" groups primary + primary-foreground) */
-function groupTokens() {
-  const groups: Record<string, typeof colorTokens> = {};
-  for (const token of colorTokens) {
+/**
+ * Tokens/Colors — 色見本。
+ *
+ * 値は `tokens/base.json` から直接導出する。以前はトークン名と oklch 値を
+ * この file に手書きしていたが、shadcn 既定値 (`oklch(1 0 0)` 等) のまま
+ * 放置されて実際のトークンと完全に食い違っていた。手書きの見本は必ず
+ * ドリフトするので、名前・値・並びをすべて生成側に寄せている。
+ * ここに色を書き足さないこと (トークンを直せば見本も追随する)。
+ */
+
+type ColorLeaf = { $value: string; $description?: string };
+
+function isColorLeaf(v: unknown): v is ColorLeaf {
+  return typeof v === "object" && v !== null && typeof (v as ColorLeaf).$value === "string";
+}
+
+/** `color.semantic` / `color.brand` を {name, cssVar, value, description} に展開 */
+function readGroup(group: Record<string, unknown>, cssVarPrefix: string) {
+  const out: {
+    name: string;
+    cssVar: string;
+    value: string;
+    description?: string;
+  }[] = [];
+  for (const [key, node] of Object.entries(group)) {
+    if (key.startsWith("$")) continue; // $type / $description はメタ
+    if (!isColorLeaf(node)) continue;
+    out.push({
+      name: key,
+      cssVar: `${cssVarPrefix}${key}`,
+      value: node.$value,
+      description: node.$description,
+    });
+  }
+  return out;
+}
+
+const colorRoot = (baseTokens as { color: Record<string, Record<string, unknown>> }).color;
+
+/** sd.config.mjs の命名規則: color.semantic.X → --color-X / color.brand.X → --color-brand-X */
+const semanticTokens = readGroup(colorRoot.semantic, "--color-");
+const brandTokens = readGroup(colorRoot.brand, "--color-brand-");
+
+/** 見本の枠線が必要か = 面が地色に近いかどうかを oklch の L から機械判定する。
+ *  以前は色名の文字列マッチ ("background" を含む等) で決めており、
+ *  トークンが増えるたびに漏れていた。 */
+function needsOutline(value: string): boolean {
+  const m = /^oklch\(\s*([0-9.]+)/.exec(value);
+  return m ? Number(m[1]) > 0.85 : false;
+}
+
+/** `primary` と `primary-foreground` を 1 枚のカードにまとめる */
+function groupByRole(tokens: typeof semanticTokens) {
+  const groups: Record<string, typeof semanticTokens> = {};
+  for (const token of tokens) {
     const base = token.name.replace(/-foreground$/, "");
-    if (!groups[base]) groups[base] = [];
-    groups[base].push(token);
+    (groups[base] ??= []).push(token);
   }
   return groups;
 }
 
-function Swatch({ token }: { token: (typeof colorTokens)[0] }) {
-  const isLight =
-    token.name.includes("background") ||
-    token.name.includes("card") && !token.name.includes("foreground") ||
-    token.name === "popover" ||
-    token.name === "secondary" ||
-    token.name === "muted" ||
-    token.name === "accent" ||
-    token.name === "primary-foreground" ||
-    token.name === "destructive-foreground";
-
+function Swatch({ token }: { token: (typeof semanticTokens)[number] }) {
   return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: "1rem",
-        padding: "0.75rem 0",
-      }}
-    >
+    <div style={{ display: "flex", alignItems: "center", gap: "1rem", padding: "0.75rem 0" }}>
       <div
         style={{
           width: "64px",
           height: "64px",
           borderRadius: "var(--shape-radius-md)",
           backgroundColor: `var(${token.cssVar})`,
-          border: isLight ? "1px solid var(--color-semantic-border)" : "none",
+          border: needsOutline(token.value) ? "1px solid var(--color-border)" : "none",
           flexShrink: 0,
         }}
       />
-      <div style={{ display: "flex", flexDirection: "column", gap: "0.125rem" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: "0.125rem", minWidth: 0 }}>
         <span
           style={{
             fontWeight: 600,
@@ -77,7 +90,7 @@ function Swatch({ token }: { token: (typeof colorTokens)[0] }) {
         <code
           style={{
             fontSize: "0.75rem",
-            color: "var(--color-semantic-muted-foreground)",
+            color: "var(--color-muted-foreground)",
             fontFamily: "monospace",
           }}
         >
@@ -86,7 +99,7 @@ function Swatch({ token }: { token: (typeof colorTokens)[0] }) {
         <code
           style={{
             fontSize: "0.75rem",
-            color: "var(--color-semantic-muted-foreground)",
+            color: "var(--color-muted-foreground)",
             fontFamily: "monospace",
           }}
         >
@@ -97,22 +110,50 @@ function Swatch({ token }: { token: (typeof colorTokens)[0] }) {
   );
 }
 
-function ColorPalette() {
-  const groups = groupTokens();
-
+function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "2rem" }}>
+    <div
+      style={{
+        border: "1px solid var(--color-border)",
+        borderRadius: "var(--shape-radius-lg)",
+        padding: "1rem",
+      }}
+    >
+      <h3
+        style={{
+          fontFamily: "var(--typography-family-heading)",
+          fontSize: "0.875rem",
+          fontWeight: 600,
+          textTransform: "uppercase",
+          letterSpacing: "0.05em",
+          marginBottom: "0.5rem",
+          color: "var(--color-muted-foreground)",
+        }}
+      >
+        {title}
+      </h3>
+      {children}
+    </div>
+  );
+}
+
+function Section({ title, note, children }: { title: string; note: string; children: React.ReactNode }) {
+  return (
+    <section style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
       <h2
         style={{
           fontFamily: "var(--typography-family-heading)",
           fontSize: "1.5rem",
           fontWeight: 700,
-          borderBottom: "1px solid var(--color-semantic-border)",
+          borderBottom: "1px solid var(--color-border)",
           paddingBottom: "0.5rem",
         }}
       >
-        Color Palette
+        {title}
       </h2>
+      <p style={{ fontSize: "0.8125rem", color: "var(--color-muted-foreground)", margin: 0 }}>
+        {note}
+      </p>
       <div
         style={{
           display: "grid",
@@ -120,34 +161,40 @@ function ColorPalette() {
           gap: "2rem",
         }}
       >
-        {Object.entries(groups).map(([groupName, tokens]) => (
-          <div
-            key={groupName}
-            style={{
-              border: "1px solid var(--color-semantic-border)",
-              borderRadius: "var(--shape-radius-lg)",
-              padding: "1rem",
-            }}
-          >
-            <h3
-              style={{
-                fontFamily: "var(--typography-family-heading)",
-                fontSize: "0.875rem",
-                fontWeight: 600,
-                textTransform: "uppercase",
-                letterSpacing: "0.05em",
-                marginBottom: "0.5rem",
-                color: "var(--color-semantic-muted-foreground)",
-              }}
-            >
-              {groupName}
-            </h3>
+        {children}
+      </div>
+    </section>
+  );
+}
+
+function ColorPalette() {
+  const semanticGroups = groupByRole(semanticTokens);
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "3rem" }}>
+      <Section
+        title="Semantic"
+        note={`tokens/base.json の color.semantic から自動生成 (${semanticTokens.length} 色)。値はこの file に書かず、トークン側を直すこと。`}
+      >
+        {Object.entries(semanticGroups).map(([role, tokens]) => (
+          <Card key={role} title={role}>
             {tokens.map((token) => (
               <Swatch key={token.name} token={token} />
             ))}
-          </div>
+          </Card>
         ))}
-      </div>
+      </Section>
+
+      <Section
+        title="Brand"
+        note={`tokens/base.json の color.brand から自動生成 (${brandTokens.length} 色)。semantic が参照する元のパレット。`}
+      >
+        <Card title="palette">
+          {brandTokens.map((token) => (
+            <Swatch key={token.name} token={token} />
+          ))}
+        </Card>
+      </Section>
     </div>
   );
 }
