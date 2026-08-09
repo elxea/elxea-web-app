@@ -1121,63 +1121,70 @@
       "figma_name": "【R2: 確定版】トップ (必須5本 + 追加4 / 導線ブロック最下部) — PC 1440",
       "code_path": "app/[locale]/page.tsx",
       "kind": "module",
-      "notes": "トップ /ja。節の並びと データ配線はページ側。骨格部品は top-blocks.tsx。"
+      "notes": "トップ /ja の画面フレーム (部品ではない)。節の並び・データ配線・節ごとの余白差はページ側、骨格部品は top-blocks.tsx。節枠そのもの (TopSection = 内容幅 1312/343 + 節の上下余白) は専用の Figma symbol を持たず、各節フレーム共通のグリッドが正本なので独立エントリを立てない。C8-1R でこの棲み分けを明記。"
     },
     {
       "figma_node_id": "8109:46620",
       "figma_name": "【R2: 確定版】トップ (必須5本 + 追加4 / 導線ブロック最下部) — SP 375",
       "code_path": "app/[locale]/page.tsx",
       "kind": "module",
-      "notes": "同 PC 8109:46558 の SP 版。実装は同一ファイル (レスポンシブ)。"
+      "notes": "同 PC 8109:46558 の SP 版。実装は同一ファイル (レスポンシブ) で、SP だけ内容が変わる箇所はページ側で出し分ける: 茶 (EC) は キッカー非表示 (8109:46644 は見出しのみ) / カテゴリは 32px 見出し非表示 + タイル 3 枚 (8109:46629) / 一報リストは行ピッチ 44・日付非表示 (8110:47189)。C8-1R で SP 差分を明記。"
     },
     {
       "figma_node_id": "8109:46560",
       "figma_name": "Hero (グリッド内・非対称2カラム)",
       "code_path": "components/marketing/top-blocks.tsx",
       "kind": "ds-component",
-      "notes": "TopHero。PC 左 text 416 + IMG 864 / SP は写真が全幅で先頭。"
+      "notes": "TopHero。PC 左 text 416 + IMG 864 / SP は写真が全幅で先頭 (SP は 8109:46622 写真 + 8109:46623 テキスト)。内側 3 段 (見出し→副題→リード→CTA) の間隔は PC 24 / SP 16 (8109:46624-46627 実測)。"
     },
     {
       "figma_node_id": "8109:46597",
       "figma_name": "節見出し (キッカー + 32px 見出し)",
       "code_path": "components/marketing/top-blocks.tsx",
       "kind": "ds-component",
-      "notes": "TopSectionHead。体裁は globals.css の h2[data-slot=\"top-section-title\"] (h1 トークン 32px)。"
+      "notes": "TopSectionHead。体裁は globals.css の h2[data-slot=\"top-section-title\"] (h1 トークン 32px)。Figma は節によって head の構成が変わるので出し分けを props で持つ: overlineSpHidden = SP でキッカーを出さない (茶 (EC) SP 8109:46644) / titleSpHidden = SP で 32px 見出しを出さない (カテゴリ SP 8109:46629)。見出しは SP でも sr-only で a11y ツリーに残す。C8-1R で追加。"
     },
     {
       "figma_node_id": "8110:2503",
       "figma_name": "新着・季節の一報 (SEASONAL) — 一報リスト",
       "code_path": "components/marketing/top-blocks.tsx",
       "kind": "ds-component",
-      "notes": "FeedList。ジャーナル 8109:46605 / イベント 8110:2516 も同じ行型を共有。"
+      "notes": "FeedList。ジャーナル 8109:46605 / イベント 8110:2516 も同じ行型を共有 (SP は 8110:47189 / 47194 / 47199)。行ピッチは PC 52 (行高 28 + gap 24) / SP 44 (行枠 44 = タップ域・gap 0)。日付は PC のみ表示で SP は sr-only (Figma SP の行はタイトル 1 行のみ)。"
     },
     {
       "figma_node_id": "8109:46572",
       "figma_name": "茶を探す (カテゴリ) タイル行",
       "code_path": "components/marketing/top-blocks.tsx",
       "kind": "ds-component",
-      "notes": "ActionTileGrid / ActionTile。写真 416x300 + ラベルのみ。PC 3列 x 2段。"
+      "notes": "ActionTileGrid (タイルの並びだけを持つ器)。Figma は PC の 2 段を別フレームに割っている (1 段目 8109:46572 / 2 段目 8109:46582) が、実装は 1 つの grid で 3 列 x 行 gap 48 として表す。SP は 1 列 343 / 行 gap 24 で 3 枚 (8109:46629)。タイル本体は 8109:46573 の ActionTile に分離済 (C8-1R まで両者が本ノードを共有していた)。"
+    },
+    {
+      "figma_node_id": "8109:46573",
+      "figma_name": "茶を探す (カテゴリ) タイル 1 枚",
+      "code_path": "components/marketing/top-blocks.tsx",
+      "kind": "ds-component",
+      "notes": "ActionTile。写真 (PC 416x300 / SP 343x247) + gap 12 + ラベル 14 のみ。SP のタイル本体は 8109:46631 / 46634 / 46637。C8-1R で ActionTileGrid (8109:46572) から分離。"
     },
     {
       "figma_node_id": "8109:46592",
       "figma_name": "About / 章切り (Aesop明度反転)",
       "code_path": "components/marketing/top-blocks.tsx",
       "kind": "ds-component",
-      "notes": "ChapterStatement。bg=primary / 見出し=primary-foreground / 補助=brand sand。"
+      "notes": "ChapterStatement。bg=primary / 見出し=primary-foreground / 補助=brand sand。SP は 8109:46640。キッカー→見出しは PC / SP とも 24 (8109:46593/46594・8109:46641/46642)。"
     },
     {
       "figma_node_id": "8109:46616",
       "figma_name": "導線ブロック (茶/ジャーナル/イベント/roji/About) — 最下部",
       "code_path": "components/marketing/top-blocks.tsx",
       "kind": "ds-component",
-      "notes": "ServiceGuideBlock。bg=brand sand。4 タイル + About 行。"
+      "notes": "ServiceGuideBlock。bg=brand sand。4 タイル + About 行。SP は instance 8109:46648。"
     },
     {
       "figma_node_id": "8109:46617",
       "figma_name": "購入導線 (静か・最下部)",
       "code_path": "components/marketing/top-blocks.tsx",
       "kind": "ds-component",
-      "notes": "QuietLinkRow。中央 1 本のリンク行 (タップ域 44)。"
+      "notes": "QuietLinkRow。中央 1 本のリンク行 (タップ域 44)。SP は 8109:46649。"
     }
   ],
   "unmapped_figma_nodes": [
