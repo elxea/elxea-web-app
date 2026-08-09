@@ -437,28 +437,50 @@ export function ValueRow({ className, ...props }: React.ComponentProps<"li">) {
 /** strong = 左が見出し級 (7857:39698 h=88) / quiet = 左右とも本文級 (7857:39783 h=60) */
 export type PairRowTone = "strong" | "quiet";
 
+/**
+ * 列幅と行の詰め。
+ *
+ * - `measure` (既定) = 測度 640 の中の 304 + 溝 32 + 304 (7857:39698 / 7857:39783)
+ * - `narrow` = 副カラム 528 の中の 168 + 溝 32 + 328。行も 1 段詰める
+ *   (お問い合わせ R2 の「書いていただけると早いこと」 8109:46720 実測 h56 /
+ *   label 列 200 / SP は縦積み h68)
+ *
+ * 既定は `measure` なので既存の呼び出し (汎用ページ) の描画は変わらない。
+ */
+export type PairRowLayout = "measure" | "narrow";
+
 export type PairRowProps = {
   term: React.ReactNode;
   children: React.ReactNode;
   tone?: PairRowTone;
+  layout?: PairRowLayout;
   className?: string;
 };
 
-export function PairRow({ term, children, tone = "strong", className }: PairRowProps) {
+export function PairRow({
+  term,
+  children,
+  tone = "strong",
+  layout = "measure",
+  className,
+}: PairRowProps) {
+  const narrow = layout === "narrow";
   return (
     <div
       data-slot="pair-row"
       data-tone={tone}
+      data-layout={layout}
       className={cn(
         "flex flex-wrap gap-x-8 gap-y-2 border-t border-border",
-        tone === "strong" ? "pt-5 pb-6" : "pt-5 pb-5",
+        narrow ? "pt-4 pb-4" : tone === "strong" ? "pt-5 pb-6" : "pt-5 pb-5",
         className
       )}
     >
       <dt
         className={cn(
           tone === "strong" ? H4 : BODY_SM,
-          "basis-full text-foreground md:w-76 md:shrink-0 md:basis-auto"
+          "basis-full text-foreground md:shrink-0 md:basis-auto",
+          narrow ? "md:w-42" : "md:w-76"
         )}
       >
         {term}
@@ -466,7 +488,8 @@ export function PairRow({ term, children, tone = "strong", className }: PairRowP
       <dd
         className={cn(
           tone === "strong" ? BODY_SM : CAPTION,
-          "m-0 basis-full md:w-76 md:basis-auto",
+          "m-0 basis-full md:basis-auto",
+          narrow ? "md:w-82" : "md:w-76",
           tone === "strong" ? "text-foreground" : "text-muted-foreground"
         )}
       >
