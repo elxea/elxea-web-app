@@ -2,6 +2,27 @@
 @import "../dist/tokens.css";
 @import "../dist/tokens-cjk.css";
 
+/*
+ * Keep `docs/` out of Tailwind's source scanning.
+ *
+ * Tailwind v4 auto-detects sources across the whole project, markdown included,
+ * and does not care whether a class-shaped string is real code or prose. The
+ * fidelity tables in `docs/fidelity/*.md` quote utilities while explaining them,
+ * and on 2026-08-09 one of them wrote an abbreviated `[font:var(…)]` with a
+ * literal ellipsis. Tailwind extracted it as a candidate and emitted
+ * `.\[font\:var\(…\)\] { font: var(…) }`, which is not parseable CSS.
+ *
+ * The result was that `next dev` returned HTTP 500 on every route (dev compiles
+ * globals.css through PostCSS, which hard-errors: `Unexpected token Ident("…")`)
+ * and so the whole E2E job failed, while `next build` passed — a docs-only-looking
+ * commit taking down the test suite with no obvious connection to the change.
+ *
+ * Excluding `docs/` fixes the class of bug rather than the one occurrence: no
+ * document that merely *mentions* a utility can generate CSS. Nothing under
+ * `docs/` is ever rendered, so nothing real is lost by not scanning it.
+ */
+@source not "../docs";
+
 @custom-variant dark (&:is(.dark *));
 
 /* Prevent horizontal viewport overflow from off-screen children (e.g. wide
