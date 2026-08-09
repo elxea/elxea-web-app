@@ -190,6 +190,26 @@ h1.auth-card-title[data-emphasis="strong"] {
   letter-spacing: var(--typography-style-h3-tracking);
 }
 
+/* legal 系の条項見出し (利用規約 7849:39287 / 特商法・返品も同型・**実測 h24**)
+ * は h4 プリセット (16px / 500 / lh 1.5)。条項は節の下位だが、法的文書の
+ * 文書構造としては h2 が正しいので要素は h2 のまま体裁だけ h4 に揃える。
+ *
+ * ！`className` に `[font:var(--typography-style-h4)]` を書くだけでは効かない。
+ * 上の unlayered な `h2 { font: var(--typography-style-h2) }` (24px) が
+ * Tailwind の utilities レイヤーに勝つため、実測 31.19px (= 24 x 1.3) になる。
+ * だから同じ unlayered 面で data-slot 指定として当てる (詳細度 (0,2,1) > (0,0,1))。
+ * Unlayered な理由・`:lang()` 前置の理由は上の catalog-card-title と同じ。
+ * 値は h4 トークン経由で生 px は書かない。
+ *
+ * 申し送り: 利用規約 `app/[locale]/legal/terms/page.tsx` も同じ書き方
+ * (className だけ) で同じ 24px 化が起きている。別レーンの凍結済みページなので
+ * 本レーンでは触らず、確認事項として上げる。 */
+:lang(ja) h2[data-slot="legal-clause-title"],
+:lang(en) h2[data-slot="legal-clause-title"] {
+  font: var(--typography-style-h4);
+  letter-spacing: var(--typography-style-h4-tracking);
+}
+
 /* トップ【R2: 確定版】の節見出し (Figma 8109:46599「茶葉」/ 8109:46571
  * 「行為から、茶葉を探す」/ 8109:46594「正解を、押し付けない。」・実測 h38) は
  * `elxea/typography/editorial/jp/h1` = 32px / Light / lh 1.2。ページ主見出し

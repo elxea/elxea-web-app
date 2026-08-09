@@ -9,7 +9,6 @@ import {
   Note,
   Overline,
   bodySmClass,
-  h4Class,
 } from "@/components/editorial/rule-list";
 import { placeholderValue } from "@/lib/placeholders";
 import { cn } from "@/lib/utils";
@@ -220,7 +219,10 @@ export default async function PrivacyPage() {
             <div className="flex flex-col gap-12">
               {CLAUSES.map((clause) => (
                 <section key={clause.no} id={`clause-${clause.no}`}>
-                  <h2 className={cn(h4Class, "text-foreground")}>
+                  {/* 導出元 7849:39287 実測 h24 = h4 スケール (16px)。
+                      className だけでは unlayered な `h2{font}` (24px) に負けるため
+                      globals.css の `legal-clause-title` スロットで当てる。 */}
+                  <h2 data-slot="legal-clause-title" className="text-foreground">
                     {`${clause.no}. ${clause.title}`}
                   </h2>
                   <div className={cn(bodySmClass, "mt-4 text-foreground")}>

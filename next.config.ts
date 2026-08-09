@@ -31,6 +31,22 @@ const nextConfig: NextConfig = {
   // MS10.4: Webflow → Next.js redirects (old site URL structure → new)
   async redirects() {
     return [
+      // C10-1: 法人お問い合わせページの廃止 (R2 確定版で 1 ページに統合)。
+      // Figma【R2: 確定版】お問い合わせ `8109:46652` は「Common 静的 1 ページ」で、
+      // 法人・取材は `お問い合わせの種類` の選択肢 (`8109:46695`) に吸収された。
+      // 被リンク・ブックマーク・検索結果を 308 で新しい 1 ページへ寄せる
+      // (Server Component の redirect() だと layout が流れた後の client redirect =
+      //  HTTP 200 になり、恒久移動のシグナルにならないため routing 層で返す)。
+      {
+        source: "/:locale(ja|en)/contact/business",
+        destination: "/:locale/contact",
+        permanent: true,
+      },
+      {
+        source: "/contact/business",
+        destination: "/ja/contact",
+        permanent: true,
+      },
       // Webflow blog posts → journal
       {
         source: "/blog/:slug",

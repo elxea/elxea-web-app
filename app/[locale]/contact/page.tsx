@@ -30,8 +30,10 @@ import { ContactForm } from "./contact-form";
  * - 種類 field の注記 `8109:46695` = 「お客様のお問い合わせ / **お取引・取材等のご相談**」
  * - Common ページ (`7567:12`) 全数走査で法人専用の R2 フレームは存在しない
  *
- * よって `/contact/business` は本ページへの恒久リダイレクトにした
- * (既存の被リンク・ブックマークを切らないため。ページ削除はしていない)。
+ * よって `/contact/business` のページは畳み、`next.config.ts` の `redirects()` で
+ * 本ページへ **308 恒久リダイレクト**する (既存の被リンク・ブックマーク・検索結果を
+ * 切らないため)。Server Component の `redirect()` では layout が流れた後の
+ * client redirect = HTTP 200 になり恒久移動のシグナルにならないので routing 層で返す。
  * 送信先メールボックスの振り分け (一般 = CONTACT_TO_EMAIL / 法人 =
  * CONTACT_BUSINESS_TO_EMAIL) は R1 の挙動を保ったまま `category` で
  * サーバ側に移した (`app/api/contact/route.ts`)。
@@ -100,7 +102,17 @@ export default async function ContactPage() {
             <Note>{t("metaHeading")}</Note>
             <dl className="mt-3 border-b border-border">
               {META_KEYS.map((row) => (
-                <MetaRow key={row.label} label={t(row.label)}>
+                <MetaRow
+                  key={row.label}
+                  label={t(row.label)}
+                  /* R2 の行は MetaRow 既定より 1 段詰まっている。Figma 実測は
+                     PC 8109:46661 が label 列 140 / 行 h44、SP 8109:46745 が
+                     label 列 118 / 行 h52。MetaRow 既定は溝 16 を足すため列 156、
+                     下 padding 16 で行 54 になる。共有部品 (FAQ / 利用規約 /
+                     特商法 / 汎用ページ / About が同居) は動かさず、この 4 行だけ
+                     溝を 0 にして下 padding を PC で 1 段落とす。 */
+                  className="gap-0 pb-4 lg:pb-2"
+                >
                   {row.value ? t(row.value) : email}
                 </MetaRow>
               ))}
