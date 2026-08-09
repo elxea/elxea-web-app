@@ -91,5 +91,5 @@ workers/*/.wrangler/
 scripts/design-system/snapshots/change-manifest.json
 .env*.local
 
-# C16-1 計測ハーネス (成果物ではない)
-c16-measure.mjs
+# C16-1 計測ハーネス (成果物ではない・$HANDOFF_DIR に退避)
+c16-*.mjs
