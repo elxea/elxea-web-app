@@ -131,10 +131,10 @@
     },
     {
       "figma_node_id": "5723:49",
-      "figma_name": "ContactSuccessCard",
+      "figma_name": "ContactSuccessCard (R1 世代・R2 で廃止)",
       "code_path": "app/[locale]/contact/contact-form.tsx",
       "kind": "ds-component",
-      "notes": "success state の inline 表示 (従来 L50 付近)。専用 component 無し。Contact S3。"
+      "notes": "R2【確定版】8109:46652 に成功状態の指定が無いため、Card/影をやめ 罫線 1 本の p[role=status] に変更 (静的ページ共通の言語に合わせた)。Contact S3。"
     },
     {
       "figma_node_id": "6598:155",
@@ -1185,6 +1185,62 @@
       "code_path": "components/marketing/top-blocks.tsx",
       "kind": "ds-component",
       "notes": "QuietLinkRow。中央 1 本のリンク行 (タップ域 44)。SP は 8109:46649。"
+    },
+    {
+      "figma_node_id": "8109:46652",
+      "figma_name": "【R2: 確定版】お問い合わせ (Common 静的1ページ / 項目最小 + FAQ 誘導)",
+      "code_path": "app/[locale]/contact/page.tsx",
+      "kind": "ds-component",
+      "notes": "R2 確定版の正本。PC 8109:46653 / SP 8109:46734。R1 の 2 ページ構成 (一般 + 法人) を 1 ページに統合し、法人・取材は種類 select の選択肢に吸収 (リード 8109:46659 / 注記 8109:46695 が根拠)。/contact/business は本ページへの恒久リダイレクトにした。R1 の 6750:16786 / 6750:15711 は旧 elxea 変A で不参照。"
+    },
+    {
+      "figma_node_id": "8109:46655",
+      "figma_name": "お問い合わせ S1 ページ見出し (左 名乗り / 右 期待値メタ)",
+      "code_path": "app/[locale]/contact/page.tsx",
+      "kind": "ds-component",
+      "notes": "12 col の左 col1-5 + 右 col8-12。右は MetaRow 4 行 (label 列 140 / 行 h44)。SP 8109:46739 は縦積み (label 列 118 / 行 h52)。メールは Figma がダミー明記のため placeholders tokushoho.email。"
+    },
+    {
+      "figma_node_id": "8109:46673",
+      "figma_name": "お問い合わせ S2 お問い合わせの前に (自己解決の導線)",
+      "code_path": "app/[locale]/contact/page.tsx",
+      "kind": "ds-component",
+      "notes": "LinkRow x3 (title 300 / desc x352 w640 / arrow x1272 w40 が LinkRow の列位置と一致)。SP 8109:46757 は行 h84。カードを使わず罫線リストにするのが R2 の指定。"
+    },
+    {
+      "figma_node_id": "8109:46688",
+      "figma_name": "お問い合わせ S3 フォーム (左 測度640 / 右 補助メタ528)",
+      "code_path": "app/[locale]/contact/page.tsx",
+      "kind": "ds-component",
+      "notes": "左 col1-6 (640) にフォーム、右 col8-12 (528) に PairRow layout=narrow の hint 3 行 + 注記。SP 8109:46772 は縦積み。"
+    },
+    {
+      "figma_node_id": "8109:46691",
+      "figma_name": "お問い合わせ フォーム項目 (項目最小 4 つ)",
+      "code_path": "app/[locale]/contact/contact-form.tsx",
+      "kind": "ds-component",
+      "notes": "種類 (任意 select) / お名前 / メールアドレス / お問い合わせ内容。R1 の 件名 は R2 で廃止。field 間 32 / label→control 8 / control h PC36 SP44 / textarea h200。SP 8109:46775。"
+    },
+    {
+      "figma_node_id": "8109:46696",
+      "figma_name": "control / お問い合わせの種類 (select 幅 = 測度いっぱい)",
+      "code_path": "components/ui/native-select.tsx",
+      "kind": "shadcn",
+      "notes": "NativeSelect に wrapperClassName を追加 (既定 w-fit のままだと 640 に伸びない)。既定は不変で catalog-toolbar は無影響。SP 8109:46780 は h44。"
+    },
+    {
+      "figma_node_id": "8109:46720",
+      "figma_name": "hint / ご注文番号 (PairRow narrow — 副カラム 528)",
+      "code_path": "components/editorial/rule-list.tsx",
+      "kind": "ds-component",
+      "notes": "PairRow に layout=\"narrow\" を追加。label 列 168 + 溝 32 = 200 / 値 328 / 行 h56 (pt-4 pb-4)。既定 measure (304+32+304 / pt-5 pb-5) は不変なので返品ポリシー・汎用ページに波及なし。SP 8109:46804 は縦積み h68。"
+    },
+    {
+      "figma_node_id": "8109:46730",
+      "figma_name": "お問い合わせ S4 章切り (キッカー無し)",
+      "code_path": "components/editorial/rule-list.tsx",
+      "kind": "ds-component",
+      "notes": "ChapterBreak の overline 無し版 (pt-24)。既存の FAQ 7848:532 と同一部品。SP 8109:46814。"
     }
   ],
   "unmapped_figma_nodes": [

@@ -99,7 +99,8 @@ export const PLACEHOLDERS = {
     basis: "特定商取引法 第11条の表示義務。法人登記の代表者氏名を記載する",
   },
   "tokushoho.address": {
-    surface: "特商法ページ S1 販売者 (Figma 7856:932)",
+    surface:
+      "特商法ページ S1 販売者 (Figma 7856:932) / プライバシーポリシー S4 事業者情報 (Figma 不在・利用規約 7850:803 から導出)",
     label: "所在地",
     value: "（公開前に差し替え）所在地未確定",
     status: PLACEHOLDER_MARKER,
@@ -116,7 +117,8 @@ export const PLACEHOLDERS = {
     basis: "特定商取引法 第11条。実際に受電できる番号のみ記載可 (受付時間と整合させる)",
   },
   "tokushoho.email": {
-    surface: "特商法ページ S1 販売者 + S4 お問い合わせ窓口",
+    surface:
+      "特商法ページ S1 販売者 + S4 お問い合わせ窓口 / お問い合わせ S1 メタ「メール」(Figma 8109:46669 は value をダミーアドレスと明記)",
     label: "メールアドレス",
     value: "hello@roji.jp",
     status: PLACEHOLDER_MARKER,
