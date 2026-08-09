@@ -265,6 +265,15 @@ Shopify側にしか無い。
 `overflow-clip` なので、はみ出した補足は見えなくなる)。実装は折り返しを許して
 見出しを2行にした (欠落させない方を採った)。→「まとめ確認事項」Q3
 
+**追記 (2026-08-09 / デザイン保守タスク3b670c9d-064c-8113)**: この幅超過は
+**Figma側 (`8095:820`) のauthoring崩れ**であり、**実装側には存在しない**ことを
+再計測で確認した (SP 375 / production build + Playwright):
+`[data-slot="account-record-card"]` 6枚すべて 幅 **343** で
+`scrollWidth == clientWidth` (=343・overflowなし)、ページ全体も
+`document.scrollWidth 375 == innerWidth 375` で横スクロールなし、console error 0件。
+よって**コード側の修正は不要**。Figma側の崩れ (右寄せテキストがカード幅を超える) の
+是正はdesignerレーンの作業として残る (本タスクの範囲外)。
+
 注12: 日付は `Intl.DateTimeFormat('ja-JP', {month:'long', day:'numeric', weekday:'short',
 timeZone:'Asia/Tokyo'})` で組む。単体テストで「8月20日(木)」を固定している。
 
