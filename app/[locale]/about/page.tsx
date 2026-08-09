@@ -152,7 +152,7 @@ export default async function AboutPage() {
       </Section>
 
       {/* Statement (Figma 8121:1268 / SP 8121:1339) */}
-      <PageSection className="pt-12 pb-7 lg:pt-24 lg:pb-17">
+      <PageSection data-slot="about-statement" className="pt-12 pb-7 lg:pt-24 lg:pb-17">
         <Overline>{t("overline")}</Overline>
         {/* Figma 実測の溝: キッカー → 見出し SP 23 / PC 31 */}
         <h1 className="page-title mt-6 text-foreground lg:mt-8">{t("statementTitle")}</h1>
@@ -188,7 +188,7 @@ export default async function AboutPage() {
               <p className="mt-6">{t("us.body2")}</p>
             </SectionBody>
           </div>
-          <div className="mt-10 lg:col-span-6 lg:col-start-7 lg:mt-0">
+          <div data-slot="about-us-figure" className="mt-10 lg:col-span-6 lg:col-start-7 lg:mt-0">
             <ImageCard
               image={undefined}
               alt={t("us.imageAlt")}
@@ -206,9 +206,9 @@ export default async function AboutPage() {
       {/* 産地タイル (Figma 8121:1409 / SP 8121:1419) — 写真は撮影後に差替 */}
       <PageSection className="pt-12 lg:pt-16">
         <Overline>{t("origins.overline")}</Overline>
-        <ul className="mt-8 grid grid-cols-2 gap-x-4 gap-y-6 lg:mt-12 lg:grid-cols-4 lg:gap-x-8">
+        <ul data-slot="about-origins" className="mt-8 grid grid-cols-2 gap-x-4 gap-y-6 lg:mt-12 lg:grid-cols-4 lg:gap-x-8">
           {origins.map((area) => (
-            <li key={area}>
+            <li data-slot="about-origin" key={area}>
               {/* PC 304x224 / SP 163.5x120 = どちらも 19:14 */}
               <ImageCard image={undefined} alt="" aspectRatio="19/14" sizes="(max-width: 1024px) 50vw, 304px" />
               <p className={cn(captionClass, "mt-2 text-muted-foreground lg:mt-4")}>{area}</p>
@@ -237,7 +237,7 @@ export default async function AboutPage() {
       {/* 03 つくり方 (Figma 8121:1297 / SP 8121:1371) */}
       <PageSection id={ANCHOR.how} className={cn("pt-12 lg:pt-16", SCROLL_OFFSET)}>
         <AboutSectionHead no={t("how.no")} title={t("how.title")} />
-        <ol className="mt-7 lg:mt-13">
+        <ol data-slot="about-how" className="mt-7 lg:mt-13">
           {howSteps.map((step) => (
             <StepRow key={step.step} step={step.step} name={step.name} layout="wide">
               {step.body}
@@ -252,7 +252,7 @@ export default async function AboutPage() {
       {/* 05 お茶との向き合い方 (Figma 8121:1524 / SP 8121:1539) */}
       <PageSection id={ANCHOR.attitude} className={cn("pt-12 lg:pt-16", SCROLL_OFFSET)}>
         <AboutSectionHead no={t("attitude.no")} title={t("attitude.title")} />
-        <ol className="mt-7 lg:mt-13">
+        <ol data-slot="about-attitude" className="mt-7 lg:mt-13">
           {attitudeSteps.map((step) => (
             <StepRow key={step.step} step={step.step} name={step.name} layout="wide">
               {step.body}
@@ -264,7 +264,7 @@ export default async function AboutPage() {
       {/* 06 会社情報 (Figma 8121:1312 / SP 8121:1386) — PC 2 列 / SP 縦積み */}
       <PageSection id={ANCHOR.company} className={cn("pt-12 lg:pt-16", SCROLL_OFFSET)}>
         <AboutSectionHead no={t("company.no")} title={t("company.title")} />
-        <dl className="mt-7 lg:mt-13">
+        <dl data-slot="about-company" className="mt-7 lg:mt-13">
           {company.map((row) => (
             <MetaRow
               key={row.label}
@@ -282,7 +282,7 @@ export default async function AboutPage() {
 
       {/* 静かなリンク (Figma 8121:1330 / SP 8121:1404) — 購入導線は主張しない */}
       <PageSection className="pt-16 pb-15 lg:pt-22 lg:pb-20">
-        <div className="lg:grid lg:grid-cols-12 lg:gap-8">
+        <div data-slot="about-quiet-links" className="lg:grid lg:grid-cols-12 lg:gap-8">
           <Link
             href="/products"
             className={cn(bodySmClass, "block text-foreground hover:text-muted-foreground lg:col-span-4")}

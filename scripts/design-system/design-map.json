@@ -2,7 +2,7 @@
   "$schema_note": "Figma node ⇄ code path 対応表。経済化施策① (Decision Log 39c70c9d064c81079145f69744e7b8f5)。自動化が Figma コンポーネントに対して正しいソースファイルを編集できるようにする lookup index。値の二重管理はしない。SoT=Figma (トークン・デザイン値の正本は Figma。コードは追従側で tokens/base.json が Figma の写し、dist/ は生成物 / Setaka 宣言 2026-08-08。旧「案 B = SoT=Code, Figma=参照」を置換)。本ファイルはどちらの向きにも値を持たない lookup index なので、この方針転換で役割は変わらない。検証は scripts/design-system/validate-design-map.ts (schema + code_path 実在 + --figma で node 実在)。",
   "figma_file_key": "AWLnI0XF07e8rScuxPYPc7",
   "figma_components_page": "5246:3",
-  "updated_at": "2026-08-08T17:04:29Z",
+  "updated_at": "2026-08-09T09:28:57Z",
   "conventions": {
     "entry": "{ figma_node_id, figma_name, code_path, kind, notes }。code_path はリポジトリルート相対。inline 定義部品は「定義/描画を含むファイル」を code_path とする (編集対象がそのファイルのため)。",
     "kind": "ds-component = elxea 固有の DS 部品 / module = Header/Footer 等の大型合成モジュール / shadcn = shadcn/ui プリミティブ。",
@@ -96,10 +96,10 @@
     },
     {
       "figma_node_id": "5252:2",
-      "figma_name": "ValueCard",
-      "code_path": "app/[locale]/about/page.tsx",
+      "figma_name": "ValueCard (R1 世代・R2 で共有部品化)",
+      "code_path": "components/editorial/section-blocks.tsx",
       "kind": "ds-component",
-      "notes": "inline 定義 (function ValueCard, 従来 L113 付近)。elxea/About S5。"
+      "notes": "R2 確定版 About 8121:1284 の ValueCard は罫線なし中央寄せ 2 カラムで、共有部品 ValueCards (components/editorial/section-blocks.tsx) に移した。ページ側の inline 定義は撤去済み。"
     },
     {
       "figma_node_id": "5394:3",
@@ -1241,6 +1241,69 @@
       "code_path": "components/editorial/rule-list.tsx",
       "kind": "ds-component",
       "notes": "ChapterBreak の overline 無し版 (pt-24)。既存の FAQ 7848:532 と同一部品。SP 8109:46814。"
+    },
+    {
+      "figma_node_id": "8121:1264",
+      "figma_name": "About /【R2: 確定版】目次付き読み物型 (C案採用) — PC 1440",
+      "code_path": "app/[locale]/about/page.tsx",
+      "kind": "module",
+      "notes": "About ページ確定版。section 8121:1263 / SP は 8121:1333。11 ブロック (パンくず / Statement / 目次6章 / 01 わたしたちのこと / 産地タイル / 02 選ぶ基準 / 章切り / 03 つくり方 / 04 つくり手 / 05 お茶との向き合い方 / 06 会社情報 / 静かなリンク)。旧 R1 世代 (写真ヒーロー + max-w-3xl 読み枠) を全面置換。"
+    },
+    {
+      "figma_node_id": "8121:1272",
+      "figma_name": "About 目次 (このページの内容・C案のみ)",
+      "code_path": "components/editorial/rule-list.tsx",
+      "kind": "ds-component",
+      "notes": "CategoryIndex density=chapters / perRow=3。4 列グリッド (列 304 + 溝 32) 上に 1 段 3 項目 x 2 段、帯 208px。SP は 8121:1343 (行ピッチ 64)。同一ページ内アンカー。"
+    },
+    {
+      "figma_node_id": "8121:1284",
+      "figma_name": "About 02 選ぶ基準 (ValueCard x 6)",
+      "code_path": "components/editorial/section-blocks.tsx",
+      "kind": "ds-component",
+      "notes": "ValueCards。罫線なし・中央寄せの 2 カラム対比カード (PC 640 x 112 / 行ピッチ 144、SP 343 x 96 / ピッチ 112)。既存の対比系 (PairRow / DefinitionRow) はすべて罫線つき左寄せなので別部品にした。SP は 8121:1358。"
+    },
+    {
+      "figma_node_id": "8121:1293",
+      "figma_name": "About 章切り (明度反転 primary・中央寄せ)",
+      "code_path": "components/editorial/rule-list.tsx",
+      "kind": "ds-component",
+      "notes": "ChapterBreak size=tall align=center。帯 PC 320 / SP 288 (SP は 8121:1367)。トップ R2 の ChapterStatement (8109:46592) とは見出しスケールが別 (About は h3 20px / トップは h1 32px)。"
+    },
+    {
+      "figma_node_id": "8121:1297",
+      "figma_name": "About 03 つくり方 (番号付き3ステップ)",
+      "code_path": "components/editorial/rule-list.tsx",
+      "kind": "ds-component",
+      "notes": "StepRow layout=wide。番号 112 / 名前 448 / 説明 x624 (残り 752)・行高 96。既定 layout (返品ポリシー 7857:39713) は名前 336 / 説明 x448。05 お茶との向き合い方 8121:1524 も同じ行型。SP は 8121:1371 / 8121:1539。"
+    },
+    {
+      "figma_node_id": "8121:1312",
+      "figma_name": "About 06 会社情報 (定義リスト)",
+      "code_path": "components/editorial/rule-list.tsx",
+      "kind": "ds-component",
+      "notes": "MetaRow labelWidth=medium spLayout=stack。PC はラベル列 192 + 溝 32 (値 x288)、SP は 8121:1386 のとおりラベルを値の上に積む。所在地 2 行は lib/placeholders.ts の仮値レジストリ経由。"
+    },
+    {
+      "figma_node_id": "8121:1409",
+      "figma_name": "About 産地 (写真タイル・プレースホルダ / 撮影後差替)",
+      "code_path": "app/[locale]/about/page.tsx",
+      "kind": "ds-component",
+      "notes": "ImageCard (19:14) + caption のタイル。PC 4 列 304 gap32 / SP 2 列 163.5 gap16 (8121:1419)。写真は未撮影なので ImagePlaceholder が出る。ページ内 inline 描画 (再利用が無いため専用部品にしていない)。"
+    },
+    {
+      "figma_node_id": "8121:1429",
+      "figma_name": "About 04 つくり手 (FarmerCard x 3)",
+      "code_path": "components/catalog/catalog-list.tsx",
+      "kind": "ds-component",
+      "notes": "CatalogCard + CatalogGrid。PC 3 列 416 gap32 (写真 3:2)。SP は 8121:1434 のとおり横スクロール (カード幅 = 内容カラム 343 / ピッチ 359) なので、CatalogGrid を className で SP のみ flex + overflow-x-auto に切り替える。農家データ 0 件なら節を出さない。"
+    },
+    {
+      "figma_node_id": "8121:1330",
+      "figma_name": "About 静かなリンク (購入導線・最下部)",
+      "code_path": "app/[locale]/about/page.tsx",
+      "kind": "ds-component",
+      "notes": "body-sm のリンク 2 本。PC は 12 列グリッドの col1-4 / col5-8 (x64 / x512 = 実測どおり)、SP は縦積みピッチ 40 (8121:1404)。"
     }
   ],
   "unmapped_figma_nodes": [
