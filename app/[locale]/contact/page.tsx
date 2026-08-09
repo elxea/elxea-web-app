@@ -95,7 +95,13 @@ export default async function ContactPage() {
         <div className="mt-10 lg:grid lg:grid-cols-12 lg:gap-8">
           <div className="lg:col-span-5">
             <Overline>{t("overline")}</Overline>
-            <h1 className="mt-4">{t("title")}</h1>
+            {/* 主見出しは全体裁定 (ページ主見出し = PC 44 / SP 32) に従い共有
+                プリセット `.page-title` 経由で当てる。Figma `8109:46742` の実測は
+                SP 32 / PC 32 だが、Figma 側に古い値が残っているページ群と同じ扱いで
+                全体裁定を優先する (globals.css の `.page-title` 注記 / All Tasks
+                ID-7507)。直書きしないのはトークン変更に追従させるため。
+                キッカー → h1 の 16 (Figma 15) は据え置き。 */}
+            <h1 className="page-title mt-4">{t("title")}</h1>
             <p className={cn(bodySmClass, "mt-6 text-muted-foreground")}>{t("lead")}</p>
           </div>
           <div className="mt-12 lg:col-span-5 lg:col-start-8 lg:mt-0">

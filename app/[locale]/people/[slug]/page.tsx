@@ -420,6 +420,10 @@ export default async function PeoplePage({
                   key={article._id}
                   article={article}
                   memberOnlyLabel={tCommon("memberOnly")}
+                  /* この帯は節見出し (`PersonSectionHead` = h2「この人の記事」) を
+                     持つので、カード見出しはその下位 = h3。体裁は変わらない
+                     (globals.css の article-card-title は h2 / h3 同値)。 */
+                  headingLevel="h3"
                 />
               ))}
             </CatalogGrid>

@@ -90,3 +90,6 @@ workers/*/.wrangler/
 # The baseline snapshot (proposals.snapshot.json) IS committed; the manifest is ephemeral.
 scripts/design-system/snapshots/change-manifest.json
 .env*.local
+
+# C16-1 計測ハーネス (成果物ではない)
+c16-measure.mjs

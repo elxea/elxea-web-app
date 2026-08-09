@@ -173,7 +173,13 @@ export default async function PrivacyPage() {
         <div className="mt-10 lg:grid lg:grid-cols-12 lg:gap-8">
           <div className="lg:col-span-5">
             <Overline>PRIVACY POLICY</Overline>
-            <h1 className="mt-4">{t("privacy")}</h1>
+            {/* 主見出しは全体裁定 (ページ主見出し = PC 44 / SP 32) に従い共有
+                プリセット `.page-title` 経由で当てる。導出元 利用規約 7848:39266 の
+                実測は 32 だが、Figma 側に古い値が残っているページ群と同じ扱いで
+                全体裁定を優先する (globals.css の `.page-title` 注記 / All Tasks
+                ID-7507)。直書きしないのはトークン変更に追従させるため。
+                キッカー → h1 の 16 (Figma 15) は据え置き。 */}
+            <h1 className="page-title mt-4">{t("privacy")}</h1>
             <p className={cn(bodySmClass, "mt-6 text-muted-foreground")}>
               お客様の個人情報の取扱いについて定めたものです。全8項、すべてこのページに置いています。
             </p>
@@ -249,7 +255,12 @@ export default async function PrivacyPage() {
 
       {/* S4 事業者情報・お問い合わせ (導出元 7850:799) */}
       <Section spacing="none" className="pt-24 pb-12">
-        <h3>個人情報の取扱いに関するお問い合わせ</h3>
+        {/* 節見出し。条見出し (16px の h2) より大きい 20px なので、要素も条より
+            上位の h2 にする (素の `<h3>` だと「タグは下位・文字は大きい」逆転に
+            なる)。体裁は素の h3 と同値のまま (globals.css の
+            `legal-section-title` スロット。`section-title` は lh が 29 に動くため
+            使わない)。 */}
+        <h2 data-slot="legal-section-title">個人情報の取扱いに関するお問い合わせ</h2>
         <p className={cn(bodySmClass, "mt-4 max-w-160 text-muted-foreground")}>
           本ポリシーの内容についてのご質問は、下記までお寄せください。
         </p>

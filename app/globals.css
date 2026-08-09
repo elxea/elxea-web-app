@@ -179,11 +179,22 @@ h1.auth-card-title[data-emphasis="strong"] {
 }
 
 /* R2 ジャーナル一覧の ArticleCard (8073:45001) は見出し行高 21 = body-sm
- * (14px / 1.5) プリセット。要素は文書構造上 h2 のまま体裁だけ body-sm に
- * 揃える。Unlayered な理由・`:lang()` 前置の理由は上の catalog-card-title と
- * 同じ。値は body-sm トークン経由で生 px は書かない。 */
+ * (14px / 1.5) プリセット。体裁だけ body-sm に揃える。Unlayered な理由・
+ * `:lang()` 前置の理由は上の catalog-card-title と同じ。値は body-sm トークン
+ * 経由で生 px は書かない。
+ *
+ * 要素は h2 / h3 の両方を受ける。カードが**節見出しを持つ帯の中**に入る画面
+ * (People 詳細 / 著者ページ の「この人の記事」) では節の下位なので h3、
+ * カード帯がページ直下の兄弟ブロックである画面 (elxea Journal 一覧 /
+ * ジャーナル一覧 / プレイリスト一覧 = Figma 8085:4299 で HeroFeature と Main が
+ * 同階層) では h2。どちらでも体裁は 1px も変わらない
+ * (`font:` ショートハンドが lh を body-sm トークンの 1.8 に束ねるため、
+ * `:lang(ja) h2 {1.3}` / `:lang(ja) h3 {1.3}` のどちらも上書きされて 25.2)。
+ * 出し分けは `ArticleCard` の `headingLevel` prop (既定 h2) が行う。 */
 :lang(ja) h2[data-slot="article-card-title"],
-:lang(en) h2[data-slot="article-card-title"] {
+:lang(en) h2[data-slot="article-card-title"],
+:lang(ja) h3[data-slot="article-card-title"],
+:lang(en) h3[data-slot="article-card-title"] {
   font: var(--typography-style-body-sm);
   letter-spacing: var(--typography-style-body-sm-tracking);
 }
@@ -218,6 +229,29 @@ h1.auth-card-title[data-emphasis="strong"] {
 :lang(en) h2[data-slot="legal-clause-title"] {
   font: var(--typography-style-h4);
   letter-spacing: var(--typography-style-h4-tracking);
+}
+
+/* legal 系の**節**見出し (プライバシー S4 事業者情報 / 導出元 利用規約 7850:799・
+ * 実測 20px)。節は条 (legal-clause-title / 16px) の上位なので、見出しレベルが
+ * 条より下 (h3) になっていると「タグは下位なのに文字は大きい」逆転になる。
+ * 要素を h2 に上げ、**体裁は従来の素の `<h3>` と 1px も変えない**。
+ *
+ * ！`section-title` スロットは使えない。あれは `font:` ショートハンドで lh を
+ * h3 トークン自身の値 (実測 29 = 20 x 1.45) に戻すため、素の h3 (実測 26 =
+ * 20 x 1.3・`:lang(ja) h3 { line-height: 1.3 }` 由来) から 3px 動く。
+ * ここでは lh 1.3 を明示して素の h3 と同値に固定する。
+ * Unlayered な理由・`:lang()` 前置の理由は上の catalog-card-title と同じ。
+ * 値は h3 トークン経由で生 px は書かない (lh は既存 `:lang()` 規則と同じ 1.3)。
+ *
+ * 申し送り: 利用規約 `app/[locale]/legal/terms/page.tsx` の S4 も素の `<h3>` の
+ * ままだが、あちらは条見出しが 24px で描かれているため逆転にはなっていない
+ * (条 24 > 節 20)。別レーンの凍結済みページなので本レーンでは触らず、
+ * 条見出しの 24px 化と合わせて確認事項に上げる。 */
+:lang(ja) h2[data-slot="legal-section-title"],
+:lang(en) h2[data-slot="legal-section-title"] {
+  font: var(--typography-style-h3);
+  line-height: 1.3;
+  letter-spacing: var(--typography-style-h3-tracking);
 }
 
 /* トップ【R2: 確定版】の節見出し (Figma 8109:46599「茶葉」/ 8109:46571
