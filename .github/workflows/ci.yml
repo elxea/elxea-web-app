@@ -304,6 +304,17 @@ jobs:
           CI: true
           NEXT_PUBLIC_SANITY_PROJECT_ID: 5s8ahx87
           NEXT_PUBLIC_SANITY_DATASET: production
+          # Seeded product catalogue for the dev server the Playwright webServer
+          # starts. CI has no Shopify Storefront credentials, so every
+          # product-backed route used to degrade to "商品を読み込めませんでした"
+          # — which also made an unknown product slug answer 200 instead of 404
+          # and turned a zero-hit search into an error message. This flag only
+          # takes effect when the credentials are absent, so it can never mask a
+          # real Shopify outage. See lib/preview-seed-storefront.ts.
+          #
+          # NOT `PREVIEW_SEED=1`: the master flag also injects a seeded *cart*,
+          # which would break the cart empty-state specs.
+          PREVIEW_SEED_STOREFRONT: "1"
 
       - name: Report skipped tests (no-op green visibility)
         # Runs even when the suite fails. 33 runtime skip guards mean a large part

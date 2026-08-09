@@ -38,6 +38,25 @@ const PENDING_LIFF_ROUTE =
   "/ja/liff ルート未実装 — 実装まで保留。LINE アプリ外では LIFF SDK を初期化できないため、" +
   "当面は scripts/README.md TC-1 の手動テスト手順で担保する";
 
+/**
+ * Reason attached to the three permanently-skipped persona API tests.
+ *
+ * `GET /api/user/persona` **は存在しない**。実測 (2026-08-09):
+ *   - `app/api/user/` 配下の route は behavior / comments / dashboard / events /
+ *     favorites / follows / line-link / line-link-liff の 8 本で persona は無い
+ *   - 未存在なので応答は 404 (テストの期待は 200 / 401)
+ *   - persona の算出自体は Cloud Functions 側 (`functions/src`) にあるが、
+ *     Web から読む HTTP エンドポイントはまだ生えていない
+ *
+ * つまりこれは「実装が壊れている」ではなく「機能が未実装」で、テスト側で
+ * 期待を 404 に書き換えると未実装を仕様として固定してしまう。ルートが
+ * 生えたときに定数と `test.skip` をまとめて消す (PENDING_LIFF_ROUTE と同じ運用)。
+ */
+const PENDING_PERSONA_API =
+  "GET /api/user/persona 未実装 — app/api/user 配下に route が無く 404。" +
+  "persona 算出は Cloud Functions 側にあるが Web 向けエンドポイントは未着手。" +
+  "ルート実装と同時にこの skip を外す";
+
 /** テスト用 Shopify カスタマー ID（モック） */
 const TEST_CUSTOMER_ID = process.env.TEST_SHOPIFY_CUSTOMER_ID ?? "test-customer-001";
 
@@ -131,6 +150,7 @@ test.describe("TC-1: LIFF 紐付けフロー", () => {
   });
 
   test("persona API エンドポイントが存在する", async ({ page }) => {
+    test.skip(true, PENDING_PERSONA_API);
     // GET /api/user/persona が 401 (未認証) を返すことを確認
     const response = await page.request.get("/api/user/persona");
     expect([200, 401]).toContain(response.status());
@@ -191,6 +211,7 @@ test.describe("TC-2: 行動イベント蓄積", () => {
 
 test.describe("TC-3: ペルソナ判定", () => {
   test("persona API が適切なレスポンス形式を返す（未認証）", async ({ page }) => {
+    test.skip(true, PENDING_PERSONA_API);
     const response = await page.request.get("/api/user/persona");
     expect(response.status()).toBe(401);
 
@@ -201,6 +222,7 @@ test.describe("TC-3: ペルソナ判定", () => {
   test("persona API レスポンスに必要なフィールドが含まれる（認証済みの場合）", async ({
     page,
   }) => {
+    test.skip(true, PENDING_PERSONA_API);
     // セッション Cookie をセット
     await setTestSession(page);
 

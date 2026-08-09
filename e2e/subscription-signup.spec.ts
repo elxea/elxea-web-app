@@ -464,8 +464,11 @@ test.describe("定期便申込 UI", () => {
   }) => {
     await page.goto("/ja/account/subscriptions");
 
-    // 未ログイン時はログイン誘導が表示される
-    await expect(page.locator("h1")).toContainText("定期便", { timeout: 10000 });
-    await expect(page.getByText("ログイン")).toBeVisible();
+    // 未ログイン時は /ja/login へ 307 リダイレクトされる
+    // (middleware.ts の accountMatch ガード)。旧アサーション (h1 に「定期便」)
+    // は誘導がページ内にあった時代のもの。
+    await page.waitForURL(/\/ja\/login/);
+    await expect(page.locator("h1")).toContainText("ログイン", { timeout: 10000 });
+    await expect(page.getByRole("link", { name: /ログイン/ }).first()).toBeVisible();
   });
 });

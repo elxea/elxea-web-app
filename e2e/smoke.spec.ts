@@ -13,13 +13,15 @@ test.describe("Smoke tests", () => {
   test("homepage shows key sections", async ({ page }) => {
     await page.goto("/ja");
 
-    // Featured products section
-    await expect(page.getByText("おすすめ商品")).toBeVisible();
-
-    // Latest journal section
-    await expect(page.getByText("最新の記事")).toBeVisible();
-
-    // Upcoming events section is shown only when events exist in Sanity CMS (conditional)
+    /*
+     * 節名は C レーンのトップ再設計で変わった。「おすすめ商品」「最新の記事」は
+     * 存在しない (app/[locale]/page.tsx)。ここでは **無条件に描画される**節だけを
+     * 見る: TEA LEAVES (茶葉) と ELXEA — OVERVIEW (elxea でできること)。
+     * SEASONAL / CATEGORIES / JOURNAL / EVENT / VOICES は Sanity・Shopify の
+     * データ有無で出入りするので smoke では見ない (深さは各 spec が持つ)。
+     */
+    await expect(page.getByText("TEA LEAVES")).toBeVisible();
+    await expect(page.getByText("ELXEA — OVERVIEW")).toBeVisible();
   });
 
   test("root / redirects to /ja", async ({ page }) => {
@@ -61,7 +63,10 @@ test.describe("Smoke tests", () => {
 
   test("about page loads", async ({ page }) => {
     await page.goto("/ja/about");
-    await expect(page.locator("h1")).toContainText("elxeaについて");
+    // h1 は節タイトルではなくリード見出し。ページ名「elxeaについて」は
+    // <title> とパンくずにあり、h1 ではない (C レーン確定版)。
+    await expect(page).toHaveTitle(/elxeaについて/);
+    await expect(page.locator("h1")).toContainText("日本各地の、小さな茶園から。");
   });
 
   test("faq page loads", async ({ page }) => {

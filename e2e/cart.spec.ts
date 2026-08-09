@@ -60,6 +60,28 @@ test.describe("Cart", () => {
  */
 test.describe("Checkout happy path", () => {
   test("product -> cart -> quantity -> checkout hand-off -> remove", async ({ page }) => {
+    /*
+     * この 1 本だけは Shopify Storefront の資格情報が **必須**。
+     *
+     * 見本カタログ (PREVIEW_SEED_STOREFRONT=1 / lib/preview-seed-storefront.ts)
+     * で商品一覧・商品詳細・検索は動くようになったが、このテストが検証するのは
+     * その先の「カート書き込み → 実チェックアウトへの受け渡し」で、下の
+     * アサーションが要求するのは実物である:
+     *   - `cartCreate` / `cartLinesAdd` が Shopify に **書き込めること**
+     *   - 受け渡し先が `https://*.shopify.com/...` で、cart 識別子を持ち、
+     *     実際に GET して 400 未満で返ること
+     * 見本の checkoutUrl を通すのは、このテストが存在する理由そのもの
+     * (受け渡しが本当に成立するか) を捨てることになる。よって資格情報が無い
+     * 環境では **理由付きで skip** し、テストを弱めない。
+     * skip は `pnpm report:e2e-skips` で CI サマリに出るので不可視にはならない。
+     */
+    test.skip(
+      !process.env.SHOPIFY_STORE_DOMAIN || !process.env.SHOPIFY_STOREFRONT_ACCESS_TOKEN,
+      "Shopify Storefront の資格情報 (SHOPIFY_STORE_DOMAIN / " +
+        "SHOPIFY_STOREFRONT_ACCESS_TOKEN) が未設定 — 実カート書き込みと実チェックアウト " +
+        "URL の到達性は見本データで代替できない",
+    );
+
     // --- add ---------------------------------------------------------------
     const productTitle = await openPurchasableProduct(page);
     await addToCart(page);
