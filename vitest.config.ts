@@ -48,11 +48,17 @@ export default defineConfig({
       // ~146 files at 0%.
       include: ['lib/**/*.ts', 'app/api/**/*.ts', 'sanity/lib/**/*.ts'],
       exclude: ['**/*.d.ts', '**/*.test.ts', '**/__tests__/**'],
-      // Pinned to the baseline measured on 2026-08-09 at 83ef89e with Node
-      // v22.22.0 (same major as CI's NODE_VERSION 22), truncated to 1 decimal
-      // so the threshold is never above what was actually measured:
-      //   statements 22.31% (668/2994)   branches  25.48% (473/1856)
+      // Pinned to the baseline **as measured in CI** (2026-08-09, run 31322772252),
+      // truncated to 1 decimal so a threshold is never above what was measured:
+      //   statements 22.31% (668/2994)   branches  25.32% (470/1856)
       //   functions  23.35% (110/471)    lines     22.09% (611/2765)
+      //
+      // Use the CI numbers, not local ones. Locally (macOS, Node v22.22.0, CI
+      // unset) branches reads 25.48% = 473/1856 — same denominator, 3 more
+      // covered branches, because a few branches under lib/ are env-dependent and
+      // take the other path on the runner. Pinning to a local reading fails the
+      // gate on every CI run over a difference that says nothing about test
+      // quality. CI is where the gate runs, so CI is the number that counts.
       //
       // These are NOT a claim that ~22% is adequate — they are a ratchet. They
       // exist so that coverage going *down* fails the build instead of going
@@ -60,7 +66,7 @@ export default defineConfig({
       // red build green. See docs/ci-gates.md.
       thresholds: {
         statements: 22.3,
-        branches: 25.4,
+        branches: 25.3,
         functions: 23.3,
         lines: 22.0,
       },
