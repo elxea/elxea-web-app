@@ -1,5 +1,31 @@
 # C6-3忠実度対比表 — 定期便管理 (/ja/account/subscriptions)
 
+> **[DS トークン整合 2026-08-09 反映] 本表の色の行を読むときの注意**
+>
+> 本表は各レーンが計測した時点の記録である。その後 DS トークン整合タスク
+> (`3b670c9d-064c-8166`) で semantic 色トークンを **Figma R2 確定版の実在値**へ
+> 揃えたため、**下表の「旧実装値」で書かれた行は現在は Figma と一致している**
+> (行内には `→ 現 #xxxxxx [解決 2026-08-09]` を追記した)。
+> `[DS案件]` / `[要確認]` の判定が付いている色の行のうち、下表のトークンに
+> 該当するものは**解決済み**として読むこと。
+>
+> | トークン | 本表に出てくる旧実装値 | 現在の実装値 (= Figma) |
+> |---|---|---|
+> | `foreground` / `card-foreground` / `popover-foreground` | #5d5e61 (charcoal) | **#464748** (graphite) |
+> | `border` / `input` / `ring` | #858581 (ash) | **#888675** |
+> | `primary-foreground` | #ffffff (純白) | **#f9f8f4** |
+> | `muted` | #ebe9e0 (= `background` と同値) | **#dedccf** |
+> | `secondary` | #ffc202 / #ffc10d (金) | **#d5d3c0** (sand) |
+> | `destructive` | #b9525c | **#ae4751** (C6-1R で是正済み) |
+>
+> 実測での裏取り: Chromium (1440x900) + canvas `getImageData` で 10 ページを再計測し、
+> 上記の現在値がそのまま解決すること、罫線 `#888675` の外側対比 3.022:1、
+> `foreground` の対比 7.655:1 (background) / 8.376:1 (card)、ボタン角丸 8px、
+> 金額の円記号が半角 `¥` であることを確認 (console error 0 件)。
+> 既知の未達は `border` を `muted` 面の**内側**に引いた場合のみ (2.668:1)。
+> 実使用箇所は外側が `background` で 3.022:1 のため後退はない。
+
+
 - Figma SoT: file `AWLnI0XF07e8rScuxPYPc7`
   - section【R2: 確定版】`アカウント:定期便 変A（部品ベース）— PC/SP @/ja/account/subscriptions` `6717:14526`
     (Notion Structure DB「アカウント:定期便」行のFigmaプロパティ / ステータス：Design = Done)
@@ -44,7 +70,7 @@
 
 | # | 初回の記述 | 実測した事実 | 訂正後の原因 |
 |---|---|---|---|
-| 訂正1 | 注5「罫線色はFigma #888675に対しコードの `border` トークンが**別値に解決する**既知差分」。実装値を `lab(39.88 0.07 -1.89)` と記載 | `--color-border` をcanvas実測すると **#858581** (= `brand-ash`)。`lab(39.88 0.07 -1.89)` は **#5d5e61 = `foreground`** で、`border` トークンの値ではない。つまり初回は「トークンが別値」ではなく**罫線が本文色で描かれていた**ものを測っていた | **実装側の欠落**だった。Tailwind v4の `border` は**太さだけ**で、色クラスが無いと `currentColor` に落ちる (v3のgray-200既定は撤去)。`SubscriptionCardFrame` / `SubscriptionPanel` / `SubscriptionEmptyCard` が `border` のみだったため罫線が `foreground` #5d5e61になっていた。Rで `border-border` を明示して修正。残る差は #858581 vs Figma #888675 (CIE L\* 55.39 vs 55.65でほぼ同値・色味だけolive寄り) で、これが本来の [DS案件] |
+| 訂正1 | 注5「罫線色はFigma #888675に対しコードの `border` トークンが**別値に解決する**既知差分」。実装値を `lab(39.88 0.07 -1.89)` と記載 | `--color-border` をcanvas実測すると **#858581 → 現 #888675 [解決 2026-08-09]** (= `brand-ash`)。`lab(39.88 0.07 -1.89)` は **#5d5e61 → 現 #464748 [解決 2026-08-09] = `foreground`** で、`border` トークンの値ではない。つまり初回は「トークンが別値」ではなく**罫線が本文色で描かれていた**ものを測っていた | **実装側の欠落**だった。Tailwind v4の `border` は**太さだけ**で、色クラスが無いと `currentColor` に落ちる (v3のgray-200既定は撤去)。`SubscriptionCardFrame` / `SubscriptionPanel` / `SubscriptionEmptyCard` が `border` のみだったため罫線が `foreground` #5d5e61 → 現 #464748 [解決 2026-08-09]になっていた。Rで `border-border` を明示して修正。残る差は #858581 → 現 #888675 [解決 2026-08-09] vs Figma #888675 (CIE L\* 55.39 vs 55.65でほぼ同値・色味だけolive寄り) で、これが本来の [DS案件] |
 | 訂正2 | 注14「destructiveが #ae4751 (Figma) ではなく **#b9525c相当に解決する既知ドリフト**。C6-1Rで修正予定のため触らない」 | `--color-destructive` をcanvas実測すると **#ae4751** = Figmaと一致。`tokens/base.json` は `oklch(0.537 0.135 17)` で、コミット `d91ae04`「fix(tokens): destructiveをFigma実在値 #ae4751へ戻す」により **すでに是正済み** (初回計測の起点 `1d7a591` では旧値 #b9525cだった) | ドリフトは**残っていない**。「C6-1Rで修正予定」という前提が古く、§7「解約する」と§9「エラー文」は [DS案件] ではなく **[OK]**。Rで判定を差し替えた |
 | 訂正3 | 注16「SPの内容幅が**358 (Figma 350) で、かつ確定版のchip文言が長いため**3行に折り返す」 | chipの文言・個数・順序はFigmaと一致 (文言は長くない)。内容幅はFigmaより**広い** (358 > 350) ので、これが原因なら行数は減るはずで論理が逆。実測した折り返しの根拠は**パネルの内側幅274** (SP): 実装のパネルはカードの**中に**開くので `358 − 2(カード枠) − 40(カードpadding) − 2(パネル枠) − 40(パネルpadding) = 274`。Figmaの「定期便の操作」節はページ直下に置いた注記フレームなので内側幅310 | 原因は**入れ子の深さ**。274では1行目に3個目 (`61.28+8+158.06+8+61.28 = 296.62`) が入らず2/2/1 の3行になる。Figmaの310なら `289 ≤ 310` で3個入り2行。chip自体の寸法差 (+1.3〜5px) は副因 |
 
@@ -52,7 +78,7 @@
 
 | 項目 | 初回の断定 | 実測 | 判定 |
 |---|---|---|---|
-| 注8 | `secondary` は二重定義で実行時に金色に解決する | `--color-secondary` = **#ffc202** (`dist/tokens.css` は `tokens/base.json` の金を採用。`tokens/elxea-custom.json` のsand #d5d3c0は勝っていない) | 断定どおり [正] |
+| 注8 | `secondary` は二重定義で実行時に金色に解決する | `--color-secondary` = **#ffc202 → 現 #d5d3c0 [解決 2026-08-09]** (`dist/tokens.css` は `tokens/base.json` の金を採用。`tokens/elxea-custom.json` のsand #d5d3c0は勝っていない) | 断定どおり [正] |
 | 注17 | 確定版のchipsは5個すべて塗りなしで、現在値の示し方が**無い** | Figma `6719:14708` の5 instanceを `get_design_context` で確認。塗り指定はどれにも無く、文字色は全て `foreground` | 断定どおり [正] |
 | 注11 | Figmaの縦積みは `flex-wrap` を再現できなかった描画結果 | ACTIVEカード `6717:14573` はcode由来instance (子idが `0:11` 系・レイヤ名がTailwindクラス名) で、その中の `SubscriptionActions (flex-wrap gap-2)` が縦積み。nativeカード `6718:14902` は1ボタンなので縦積みか否かの情報を持たない | 断定どおり [正]。ただし根拠は「code由来instanceだから」でありFigmaに横並びの実例は無い → 確認事項Q2は残す |
 
@@ -184,7 +210,7 @@ PC +32 / SP +8広い」だけで、内部の余白・比率は下表のとおり
 |---|---|---|---|---|
 | Card | 面 | card #f4f3ed | `bg-card` = **#f4f3ed** (canvas実測) | [OK] |
 | Card | 枠の太さ | 1px | 1px | [OK] |
-| Card | 枠の色 | #888675 | `border-border` = **#858581** (canvas実測) | [DS案件] 注5 |
+| Card | 枠の色 | #888675 | `border-border` = **#858581 → 現 #888675 [解決 2026-08-09]** (canvas実測) | [DS案件] 注5 |
 | Card | 角丸 | 8 (実測: 罫線がy7/x7で直線化) | 8px (`rounded-lg`) | [OK] |
 | Card | PC padding | 24 | 24px | [OK] |
 | Card | SP padding | 20 | 20px | [OK] |
@@ -234,7 +260,7 @@ SPの差が大きいのは、Figmaが見本文言を1〜2行に収めている�
 | 一時停止中 | 文言 | 一時停止中 | 一時停止中 | [OK] |
 | 一時停止中 | 面 / 文字 | yellow-50 #fefce8 / yellow-700 (生パレット) | `variant=outline` (面なし + 1px `border` + `foreground`) | [仕様] 注7 |
 | 解約済み | 文言 | 解約済み | 解約済み | [OK] |
-| 解約済み | 面 / 文字 | DS Badge `secondary` #d5d3c0 / #464748 | `bg-muted` lab(92.31 -0.46 4.56) / `text-muted-foreground` lab(37.41) | [仕様] 注8 |
+| 解約済み | 面 / 文字 | DS Badge `secondary` #d5d3c0 / #464748 | `bg-muted` lab(92.31 -0.46 4.56) → 現 #dedccf [muted 是正済]。なお本来の `secondary` は金からsandへ是正済みなので、この回避 (variant差し替え) は解除可 [2026-08-09] / `text-muted-foreground` lab(37.41) | [仕様] 注8 |
 | 解約済み | コントラスト | — | 5.9:1 — WCAG AA合格 | [OK] |
 | 全状態 | 高さ | 26 (契約中/一時停止中) / 20 (解約済み) | 22 | [OK] Δ≤2 (解約済み) / 注7 |
 | 全状態 | 角丸 | 8 (radius-lg) | `rounded-full` (= 11 @ h22) | [OK] Δ3注9 |
@@ -378,7 +404,7 @@ Figmaのinfoは**文字幅ぶんだけ使う (hug)** ので、PCでは短い商�
 | 器 | SP padding / 段間 | 20 / 12 | 20 / 12 | [OK] |
 | 器 | 幅 | 628 (2列で並べた注記レイアウト) | PC 1262 / SP 316 (カード内で全幅) | [仕様] 注15 |
 | 器 | 内側幅 (chipsが使える幅) | PC 580 / SP 310 | PC 1212 / SP **274** | [仕様] 注16 |
-| 器 | 枠の色 | #888675 | `border-border` = #858581 (canvas実測) | [DS案件] 注5 |
+| 器 | 枠の色 | #888675 | `border-border` = #858581 → 現 #888675 [解決 2026-08-09] (canvas実測) | [DS案件] 注5 |
 | 見出し | PC字送り | 16 / lh 1.5 (h24) | 16px / lh 25.6 | [OK] |
 | 見出し | SP字送り | 14 / lh 1.5 (h21) | 14px / lh 23.8 | [OK] |
 | 見出し | 文言 | お届け頻度を変更 | 同 | [OK] |
@@ -443,7 +469,7 @@ Figmaのinfoは**文字幅ぶんだけ使う (hug)** ので、PCでは短い商�
 |---|---|---|---|---|
 | EmptyCard | 面 | card #f4f3ed | `bg-card` = **#f4f3ed** (canvas実測) | [OK] |
 | EmptyCard | 枠の太さ / 角丸 | 1px / 8 | 1px / 8px | [OK] |
-| EmptyCard | 枠の色 | #888675 | `border-border` = **#858581** (canvas実測。R で修正) | [DS案件] 注5 |
+| EmptyCard | 枠の色 | #888675 | `border-border` = **#858581 → 現 #888675 [解決 2026-08-09]** (canvas実測。R で修正) | [DS案件] 注5 |
 | EmptyCard | 高さ | 144 | 146.80 | [OK] Δ2.8注18 |
 | EmptyCard | 上下padding | 32 | 32px | [OK] |
 | EmptyCard | 段間 (本文→ボタン) | 16 (y76 - 60) | 16px | [OK] |
@@ -539,4 +565,4 @@ Server Action 側ではなくここに置いたのは、Server Action 以外の�
 | Q8 | 旧文言の置き換え | Figmaの文言に合わせて3件変更 (次回スキップ→次回をスキップ / 頻度を変更→お届け頻度を変更 / 解約→解約する) | 他ページから同じキーを参照している箇所は無い (`account.*` のうちこの3件は本ページ専用) |
 | Q9 | 0件表示の計測入口 | `PREVIEW_SEED_SUBSCRIPTIONS_EMPTY=1` を追加 | ログイン済みかつ契約0件の状態はセッション無しでは到達できないため。フラグ未設定時の挙動は不変 |
 | Q10 (R) | 商品情報と価格のあいだの溝 | **0** (確定版どおり) | 確定版は行を thumb + 12 + 情報 + 価格で隙間なく分割していて、情報の右端と価格の左端が接する。長い商品名だと最終行が価格に寄る可能性がある (実測では和紅茶で 2.72px / 深煎りは折り返して 0px)。読みやすさを優先して 8px 程度の溝を入れる案もあるが、その場合 SP の商品情報が Figma より狭くなり折り返し行数が変わる |
-| Q11 (R) | DS Button `outline` の罫線色 | 触らない (C7-1レーンの担当) | カードと同じ「`border` に色クラスが無く `currentColor` に落ちる」問題が DS Button にもあり、罫線が `foreground` #5d5e61 で出ている (Figma / トークンは #888675 / #858581)。本ページのカード・パネル・空カードは R で `border-border` に是正したが、Button は C7-1 レーンの編集対象なので手を入れていない |
+| Q11 (R) | DS Button `outline` の罫線色 | 触らない (C7-1レーンの担当) | カードと同じ「`border` に色クラスが無く `currentColor` に落ちる」問題が DS Button にもあり、罫線が `foreground` #5d5e61 → 現 #464748 [解決 2026-08-09] で出ている (Figma / トークンは #888675 / #858581 → 現 #888675 [解決 2026-08-09])。本ページのカード・パネル・空カードは R で `border-border` に是正したが、Button は C7-1 レーンの編集対象なので手を入れていない |

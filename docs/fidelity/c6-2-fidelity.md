@@ -1,5 +1,31 @@
 # C6-2忠実度対比表 — マイページ (/ja/account)
 
+> **[DS トークン整合 2026-08-09 反映] 本表の色の行を読むときの注意**
+>
+> 本表は各レーンが計測した時点の記録である。その後 DS トークン整合タスク
+> (`3b670c9d-064c-8166`) で semantic 色トークンを **Figma R2 確定版の実在値**へ
+> 揃えたため、**下表の「旧実装値」で書かれた行は現在は Figma と一致している**
+> (行内には `→ 現 #xxxxxx [解決 2026-08-09]` を追記した)。
+> `[DS案件]` / `[要確認]` の判定が付いている色の行のうち、下表のトークンに
+> 該当するものは**解決済み**として読むこと。
+>
+> | トークン | 本表に出てくる旧実装値 | 現在の実装値 (= Figma) |
+> |---|---|---|
+> | `foreground` / `card-foreground` / `popover-foreground` | #5d5e61 (charcoal) | **#464748** (graphite) |
+> | `border` / `input` / `ring` | #858581 (ash) | **#888675** |
+> | `primary-foreground` | #ffffff (純白) | **#f9f8f4** |
+> | `muted` | #ebe9e0 (= `background` と同値) | **#dedccf** |
+> | `secondary` | #ffc202 / #ffc10d (金) | **#d5d3c0** (sand) |
+> | `destructive` | #b9525c | **#ae4751** (C6-1R で是正済み) |
+>
+> 実測での裏取り: Chromium (1440x900) + canvas `getImageData` で 10 ページを再計測し、
+> 上記の現在値がそのまま解決すること、罫線 `#888675` の外側対比 3.022:1、
+> `foreground` の対比 7.655:1 (background) / 8.376:1 (card)、ボタン角丸 8px、
+> 金額の円記号が半角 `¥` であることを確認 (console error 0 件)。
+> 既知の未達は `border` を `muted` 面の**内側**に引いた場合のみ (2.668:1)。
+> 実使用箇所は外側が `background` で 3.022:1 のため後退はない。
+
+
 - Figma SoT: file `AWLnI0XF07e8rScuxPYPc7`
   - section【R2: 確定版】`マイページ (トップ)` `8095:731`
   - PC 1440 `8095:733` / TitleRow `8095:735` / AccountIdentityLine `8095:738` /
@@ -80,7 +106,7 @@ SPはTitleBlock (`8095:796`) 1帯。実装は1ブロックにして内部gapで�
 | 「マイページ」 | line-height | 38.4 (1.2) / 38.4 | 52.8 (1.2) / 38.39 | [仕様] 注1 |
 | 「マイページ」 | font-weight | 300 / 300 | 300 / 300 | [OK] |
 | 「マイページ」 | letter-spacing | 0.64 (2%) / 0.64 | 0.88 (2%) / 0.64 | [OK] 比率一致 注1 |
-| 「マイページ」 | 色 | `foreground` #464748 (lab 30.10) | lab 39.88 = #5d5e61 | [DS案件] 注3 |
+| 「マイページ」 | 色 | `foreground` #464748 (lab 30.10) | lab 39.88 = #5d5e61 → 現 #464748 [解決 2026-08-09] | [DS案件] 注3 |
 | 識別行 | font-size / weight | 12 / 400 | 12 / 400 | [OK] |
 | 識別行 | line-height | 18 (1.5) | 21 (cjk 1.75) | [DS案件] 注2 |
 | 識別行 | letter-spacing | 0.6 (5%) | 0.6 | [OK] 完全一致 |

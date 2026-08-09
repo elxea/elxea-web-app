@@ -1,5 +1,31 @@
 # C9-1農家一覧 / お茶メニュー詳細 — 忠実度対比表 (Figma実測vs getComputedStyle)
 
+> **[DS トークン整合 2026-08-09 反映] 本表の色の行を読むときの注意**
+>
+> 本表は各レーンが計測した時点の記録である。その後 DS トークン整合タスク
+> (`3b670c9d-064c-8166`) で semantic 色トークンを **Figma R2 確定版の実在値**へ
+> 揃えたため、**下表の「旧実装値」で書かれた行は現在は Figma と一致している**
+> (行内には `→ 現 #xxxxxx [解決 2026-08-09]` を追記した)。
+> `[DS案件]` / `[要確認]` の判定が付いている色の行のうち、下表のトークンに
+> 該当するものは**解決済み**として読むこと。
+>
+> | トークン | 本表に出てくる旧実装値 | 現在の実装値 (= Figma) |
+> |---|---|---|
+> | `foreground` / `card-foreground` / `popover-foreground` | #5d5e61 (charcoal) | **#464748** (graphite) |
+> | `border` / `input` / `ring` | #858581 (ash) | **#888675** |
+> | `primary-foreground` | #ffffff (純白) | **#f9f8f4** |
+> | `muted` | #ebe9e0 (= `background` と同値) | **#dedccf** |
+> | `secondary` | #ffc202 / #ffc10d (金) | **#d5d3c0** (sand) |
+> | `destructive` | #b9525c | **#ae4751** (C6-1R で是正済み) |
+>
+> 実測での裏取り: Chromium (1440x900) + canvas `getImageData` で 10 ページを再計測し、
+> 上記の現在値がそのまま解決すること、罫線 `#888675` の外側対比 3.022:1、
+> `foreground` の対比 7.655:1 (background) / 8.376:1 (card)、ボタン角丸 8px、
+> 金額の円記号が半角 `¥` であることを確認 (console error 0 件)。
+> 既知の未達は `border` を `muted` 面の**内側**に引いた場合のみ (2.668:1)。
+> 実使用箇所は外側が `background` で 3.022:1 のため後退はない。
+
+
 - 対象ページ:
   - **農家一覧** `/ja/farmers`
   - **お茶メニュー詳細** `/ja/tea-menu/[slug]` (計測は `/ja/tea-menu/seed-tea-1`)
@@ -128,8 +154,8 @@ captionを使う方がR2リスト3画面で揃う (兄弟実装と同一)。
 | Chip間隔 | 8 (74→82) | **8** (`gap-2`) | 8 (66→74) | **8** | [OK] |
 | Chip角丸 | 全丸め | **全丸め** (`rounded-full`) | 全丸め | **全丸め** | [OK] |
 | 選択中Chip背景 | primary | **#464748** (= primary) | 同 | 同 | [OK] |
-| 選択中Chip文字色 | primary-foreground | #ffffff | 同 | 同 | [DS案件] 注12 |
-| 未選択Chip罫線 | 1px border | **1px** / #858581 | 同 | 同 | [DS案件] 注12 |
+| 選択中Chip文字色 | primary-foreground | #ffffff → 現 #f9f8f4 [解決 2026-08-09] | 同 | 同 | [DS案件] 注12 |
+| 未選択Chip罫線 | 1px border | **1px** / #858581 → 現 #888675 [解決 2026-08-09] | 同 | 同 | [DS案件] 注12 |
 | Chip font-size | 14相当 (h25) | **14** (`body-sm`) | 同 | **14** | [OK] |
 | SP横スクロール | あり | **あり** (`overflow-x-auto`) | — | — | [OK] |
 | 並び替えSelect | 180x44 (PCのみ) | 非表示 | — | — | [仕様] 注7 |
@@ -186,7 +212,7 @@ en「Browse by region」をmessagesに追記 (本レーンの追記のみ)。
 | ピル高さ | 48 | **48** | 48 | **48** | [OK] |
 | ピル角丸 | 全丸め | **全丸め** | 全丸め | **全丸め** | [OK] |
 | ピル内余白 (横) | 16 (text x16) | **16** (`px-4`) | 12 (text x12) | 16 | [粗] 注10 |
-| ピル罫線 | 1px | **1px** / #858581 | 1px | 1px | [DS案件] 注12 |
+| ピル罫線 | 1px | **1px** / #858581 → 現 #888675 [解決 2026-08-09] | 1px | 1px | [DS案件] 注12 |
 | 中央寄せ | あり (x576.5 / 1312中央) | **あり** (`justify-center`) | あり | **あり** | [OK] |
 | 文言 | 「さらに12件を表示」 | **「さらに2件を表示」** (残件数) | 同 | 同 | [OK] |
 
@@ -307,7 +333,7 @@ R2側を採用した (商品詳細と同じ見え方になる)。値が無い項
 | ボタン幅 | 88 (内容幅) | **90.56** (内容幅) | 358 (全幅) | **358** (全幅・実測 `fullWidth: true`) | [OK] |
 | ボタン内余白 | — | 8 / 16 | — | 8 / 16 | [OK] |
 | ボタン背景 | primary (塗り) | **#464748** (= primary) | 同 | 同 | [OK] |
-| ボタン文字色 | primary-foreground | #ffffff | 同 | 同 | [DS案件] 注12 |
+| ボタン文字色 | primary-foreground | #ffffff → 現 #f9f8f4 [解決 2026-08-09] | 同 | 同 | [DS案件] 注12 |
 | ボタン角丸 | — | 6 (`rounded-md`) | — | 6 | [OK] |
 | ボタン文言 | 「購入する」 | **同** (`teaMenu.buyNow`) | 同 | 同 | [OK] |
 | ボタン → 関連記事 | 32 (y0 h36 → y68) | **32** (`mt-8`) | 32 | **32** | [OK] |
@@ -335,10 +361,10 @@ Chromiumのcomputed colorは `oklch()` 文字列で返るため、canvasで1px�
 | `background` | #ebe9e0 | **#ebe9e0** | [OK] |
 | `primary` | #464748 | **#464748** | [OK] |
 | `muted-foreground` | #585854 | **#585854** | [OK] |
-| `foreground` | #464748 | **#5d5e61** | [DS案件] 注12 |
-| `primary-foreground` | #f9f8f4 | **#ffffff** | [DS案件] 注12 |
-| `border` | #888675 | **#858581** | [DS案件] 注12 |
-| `muted` | (背景と別値) | **#ebe9e0** (= `background` と同値) | [DS案件] 注12 |
+| `foreground` | #464748 | **#5d5e61 → 現 #464748 [解決 2026-08-09]** | [DS案件] 注12 |
+| `primary-foreground` | #f9f8f4 | **#ffffff** → 現 #f9f8f4 [解決 2026-08-09] | [DS案件] 注12 |
+| `border` | #888675 | **#858581 → 現 #888675 [解決 2026-08-09]** | [DS案件] 注12 |
+| `muted` | (背景と別値) | **#ebe9e0** (= `background` と同値) → 現 **#dedccf** (background と 1.133:1 で区別可) [解決 2026-08-09] | [DS案件] 注12 |
 | 字間 (overline) | — | 1.8 | [DS案件] 注13 |
 
 注12: `foreground` / `primary-foreground` / `border` / `muted` の4件は
@@ -407,7 +433,7 @@ Preview: https://elxea-web-panzeutog-setaka1103s-projects.vercel.app
 | スペック項目 | 品種 / 産地 / 収穫時期 / 内容量 (4/4) |
 | 淹れ方項目 | 温度 / 湯量 / 抽出時間 (3/3) |
 | 主要寸法 | hero gap **64** / 写真アスペクト **1.0** / info段間 **24/24/24** / 外余白 **64** / grid gap **32・48** — **ローカル実測と完全一致** |
-| 色 | `background` #ebe9e0 / `border` #858581 / 節見出し #464748 — **ローカル実測と完全一致** |
+| 色 | `background` #ebe9e0 / `border` #858581 → 現 #888675 [解決 2026-08-09] / 節見出し #464748 — **ローカル実測と完全一致** |
 
 **Previewには見本フラグ (`PREVIEW_SEED`) が無い**ため農家一覧は実データ2件のみが出る
 (2枚ともリンクあり = 実ドキュメントが存在)。これは正しい挙動で、

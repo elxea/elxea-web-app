@@ -1,5 +1,31 @@
 # C6-1忠実度対比表 — ログイン / ログイン完了 (roji)
 
+> **[DS トークン整合 2026-08-09 反映] 本表の色の行を読むときの注意**
+>
+> 本表は各レーンが計測した時点の記録である。その後 DS トークン整合タスク
+> (`3b670c9d-064c-8166`) で semantic 色トークンを **Figma R2 確定版の実在値**へ
+> 揃えたため、**下表の「旧実装値」で書かれた行は現在は Figma と一致している**
+> (行内には `→ 現 #xxxxxx [解決 2026-08-09]` を追記した)。
+> `[DS案件]` / `[要確認]` の判定が付いている色の行のうち、下表のトークンに
+> 該当するものは**解決済み**として読むこと。
+>
+> | トークン | 本表に出てくる旧実装値 | 現在の実装値 (= Figma) |
+> |---|---|---|
+> | `foreground` / `card-foreground` / `popover-foreground` | #5d5e61 (charcoal) | **#464748** (graphite) |
+> | `border` / `input` / `ring` | #858581 (ash) | **#888675** |
+> | `primary-foreground` | #ffffff (純白) | **#f9f8f4** |
+> | `muted` | #ebe9e0 (= `background` と同値) | **#dedccf** |
+> | `secondary` | #ffc202 / #ffc10d (金) | **#d5d3c0** (sand) |
+> | `destructive` | #b9525c | **#ae4751** (C6-1R で是正済み) |
+>
+> 実測での裏取り: Chromium (1440x900) + canvas `getImageData` で 10 ページを再計測し、
+> 上記の現在値がそのまま解決すること、罫線 `#888675` の外側対比 3.022:1、
+> `foreground` の対比 7.655:1 (background) / 8.376:1 (card)、ボタン角丸 8px、
+> 金額の円記号が半角 `¥` であることを確認 (console error 0 件)。
+> 既知の未達は `border` を `muted` 面の**内側**に引いた場合のみ (2.668:1)。
+> 実使用箇所は外側が `background` で 3.022:1 のため後退はない。
+
+
 - Figma SoT: file `AWLnI0XF07e8rScuxPYPc7`【R2: 確定版】
   - **ログイン** section `6702:8970`
     PC frame `6702:8971` / SP frame `6706:14444` / 状態枠 `6706:14468`
@@ -73,7 +99,7 @@ Reviewへ切り出している (末尾「要判断の3件」節)。
 | Auth Card | 節間gap (SP) | 20 (Header下端113 → Actions 133) | 20 (`gap-5`) | [OK] |
 | Auth Card | 角丸 | 12 (`radius-xl`) | 12 (`rounded-xl`) | [OK] |
 | Auth Card | 罫線幅 | 1 (`border-width-1`) | 1 (`border`) | [OK] |
-| Auth Card | 罫線色 | `#888675` (`border`) | `#858581` (`--color-border`) | [要判断] 注4 |
+| Auth Card | 罫線色 | `#888675` (`border`) | `#858581 → 現 #888675 [解決 2026-08-09]` (`--color-border`) | [要判断] 注4 |
 | Auth Card | 面色 | `#f4f3ed` (`card`) | `#f4f3ed` (`--color-card`) | [OK] 注1 |
 | Auth Card | 高さ (PC) | 438 | 450.80 | [仕様] 注5 |
 | Auth Card | 高さ (SP) | 409 | 422.00 | [仕様] 注5 |
@@ -119,17 +145,17 @@ Reviewへ切り出している (末尾「要判断の3件」節)。
 | btn1 / btn2 | 行高 | 20 (`leading/5`) | 20 | [OK] |
 | btn1 / btn2 | 影 | `0 1px 2px #0000001A` (`shadow-xs`) | `0 1px 2px rgb(0 0 0 / .05)` (`shadow-xs`) | [OK] 注6 |
 | btn1 (LINE) | 面色 | `#464748` (`primary`) | `#464748` (`variant=default`) | [OK] |
-| btn1 (LINE) | 文字色 | `#f9f8f4` (`primary-foreground`) | `#ffffff` | [OK] Δ微 / 注4 |
+| btn1 (LINE) | 文字色 | `#f9f8f4` (`primary-foreground`) | `#ffffff` → 現 #f9f8f4 [解決 2026-08-09] | [OK] Δ微 / 注4 |
 | btn1 (LINE) | ラベル | 「LINEでログイン」 | 同 (`t("lineButton")`) | [OK] |
 | btn1 (LINE) | アイコン | 無し | 無し (旧LINEブランドアイコンを撤去) | [仕様] 注7 |
-| btn2 (メール) | 面色 | `#d5d3c0` (`secondary`) | `#ffc202` (`--color-secondary`) | [要判断] 注1 |
+| btn2 (メール) | 面色 | `#d5d3c0` (`secondary`) | `#ffc202 → 現 #d5d3c0 [解決 2026-08-09]` (`--color-secondary`) | [要判断] 注1 |
 | btn2 (メール) | 文字色 | `#464748` (`secondary-foreground`) | `#464748` | [OK] |
 | btn2 (メール) | ラベル | 「メールアドレスでログイン」 | 同 (`t("shopifyButton")`) | [OK] |
 | btn2 (メール) | 遷移先 | — | `/api/auth/login?locale=ja` (既存OAuth配線を不改変) | [OK] |
 | Separator行 | 高さ | 100 | 100 (`h-25`) | [OK] |
 | Separator行 | 罫線の溝 | 12 (`space-3`) | 12 (`gap-3`) | [OK] |
 | Separator行 | 罫線高 | 1 | 1 (`Separator` = `h-px`) | [OK] |
-| Separator行 | 罫線色 | `#888675` (`border`) | `#858581` | [要判断] 注4 |
+| Separator行 | 罫線色 | `#888675` (`border`) | `#858581 → 現 #888675 [解決 2026-08-09]` | [要判断] 注4 |
 | Separator行 | 罫線幅 (PC) | 148 | 146.03 | [OK] |
 | Separator行 | 罫線幅 (SP) | 121 | 119.03 | [OK] |
 | 「または」 | font-size / 色 | 12 / `#585854` | 12 / `#585854` | [OK] |
@@ -186,7 +212,7 @@ Reviewへ切り出している (末尾「要判断の3件」節)。
 | Check Circle | 寸法 | 64 × 64 | 64 × 64 (`size-16`) | [OK] |
 | Check Circle | 角丸 | full (`radius-full`) | full (`rounded-full`) | [OK] |
 | Check Circle | 面色 | `#9ecbc0` (`success`) | `#9ecbc0` (`bg-success`) | [OK] |
-| Check Circle | 記号色 | `#f9f8f4` (`primary-foreground`) | `#ffffff` | [OK] Δ微 / 注4 |
+| Check Circle | 記号色 | `#f9f8f4` (`primary-foreground`) | `#ffffff` → 現 #f9f8f4 [解決 2026-08-09] | [OK] Δ微 / 注4 |
 | Check Circle | 記号 | テキスト「✓」27 × 36 (30px Bold) | lucide `Check` 32 × 32 / strokeWidth 3 | [仕様] 注9 |
 | Heading | gap (PC) | 8 | 8 (`md:gap-2`) | [OK] |
 | Heading | gap (SP) | 12 | 12 (`gap-3`) | [OK] |
@@ -208,9 +234,9 @@ Reviewへ切り出している (末尾「要判断の3件」節)。
 | Actions | 総高 (PC) | 88 (36 + 16 + 36) | **88.00** | [OK] |
 | Actions | 総高 (SP) | 84 (36 + 12 + 36) | **84.00** | [OK] |
 | Actions | gap (PC / SP) | 16 / 12 | 16 / 12 (`gap-3 md:gap-4`) | [OK] |
-| btn1 | 面色 / 文字色 | `#464748` / `#f9f8f4` | `#464748` / `#ffffff` | [OK] Δ微 |
+| btn1 | 面色 / 文字色 | `#464748` / `#f9f8f4` | `#464748` / `#ffffff` → 現 #f9f8f4 [解決 2026-08-09] | [OK] Δ微 |
 | btn1 | ラベル / 遷移先 | 「お茶を探しに行く」 | 同 / `/ja` (`Link href="/"`) | [OK] |
-| btn2 | 面色 | `#d5d3c0` (`secondary`) | `#ffc202` | [要判断] 注1 |
+| btn2 | 面色 | `#d5d3c0` (`secondary`) | `#ffc202 → 現 #d5d3c0 [解決 2026-08-09]` | [要判断] 注1 |
 | btn2 | ラベル / 挙動 | 「チャットで相談する」 | 同 / チャットパネルを開く (既存) | [OK] |
 | btn1 / btn2 | 高さ / padding / 影 | 36 / px16 py8 / shadow-xs | 同 | [OK] |
 | 登場アニメーション | — | Figmaに記載なし | motionでfade+スケール (静止状態は確定版と一致) | [仕様] 注10 |
@@ -229,7 +255,7 @@ Figma variableと `tokens/base.json` の実効値を突き合わせた結果、�
 | token | 実装 (rebase後の実測) | Figma variable | 状態 |
 |---|---|---|---|
 | `card` | `oklch(0.963 0.008 98.9)` = **#f4f3ed** | **#f4f3ed** | **[OK] 解消** — C5-1が `tokens/base.json` を是正 (旧 #d5d3c0) |
-| `secondary` | `oklch(0.846 0.173 85.6)` = **#ffc202** | **#d5d3c0** | [要判断] secondaryボタンが金色になる |
+| `secondary` | `oklch(0.846 0.173 85.6)` = **#ffc202 → 現 #d5d3c0 [解決 2026-08-09]** | **#d5d3c0** | [要判断] secondaryボタンが金色になる |
 
 - **`card`**: 着手時は #d5d3c0 (Figmaより3段暗い、Webflow由来のgray-40) だったが、C5-1レーンが
   同じ乖離をカート画面で検出してFigma実在値へ是正した (`tokens/base.json` の当該
@@ -341,7 +367,7 @@ Figmaは30px Boldのテキストグリフ「✓」。実装はアイコンをluc
 
 | # | 事項 | 実装の現状 | 推奨 |
 |---|---|---|---|
-| 1 | `--color-secondary` が #ffc202 (Figma #d5d3c0) | クラスは `bg-secondary` のまま | `tokens/base.json` をFigma値へ是正。`card` と同じ「1段ずれ」の疑いで、C5-1が `card` を直した続きに当たる。全ページ影響のため独立タスク化 |
+| 1 | `--color-secondary` が #ffc202 → 現 #d5d3c0 [解決 2026-08-09] (Figma #d5d3c0) | クラスは `bg-secondary` のまま | `tokens/base.json` をFigma値へ是正。`card` と同じ「1段ずれ」の疑いで、C5-1が `card` を直した続きに当たる。全ページ影響のため独立タスク化 |
 | 2 | 成功バナーの文字色 (Figma 1.47:1) | `success-foreground` に読み替え (7.66:1) | 実装の読み替えを承認or Figma側を修正して再凍結 |
 | 3 | LINE CTAのブランド緑・アイコン撤去 | 確定版どおりprimary / アイコン無し | 確定版どおりで確定 (ブランド緑を残すならFigmaに戻す) |
 

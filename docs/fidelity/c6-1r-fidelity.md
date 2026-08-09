@@ -1,5 +1,26 @@
 # C6-1R忠実度対比表 — `destructive` をFigma実在値へ戻す
 
+> **[追記 2026-08-09 / DS トークン整合タスク] 残っていた J1 / L2 は解消した**
+>
+> 本表の §2 で「本レーンでは直さない」とした残り 2 件 (J1 / L2 =
+> `text-destructive` × `bg-destructive/10` の淡い面 = 3.946:1) は、DS トークン
+> 整合タスク (`3b670c9d-064c-8166`) で **淡い塗り自体を撤去**して解消した。
+> トークンを暗くして Figma を破る案は採らず、注2 の推奨どおり表現側を変えている。
+>
+> - `components/chat/chat-message.tsx`: 評価ボタンの `bg-destructive/10` /
+>   `hover:bg-destructive/5` を撤去 (対称性のため primary 側の淡い塗りも撤去)。
+>   選択状態は隣の礼文ともう一方の disabled で伝わる
+> - `components/ui/{dropdown-menu,context-menu,menubar}.tsx`: destructive 項目の
+>   focus を `bg-destructive/10` + `text-destructive` から
+>   **`bg-destructive` + `text-destructive-foreground`** (べた塗り・反転) に変更。
+>   合成が無くなり 5.498:1 で AA 達成
+>
+> 撤去前の組合せを再計測すると **3.938:1** (canvas 実測 / 面 #e4d8d1) で、
+> 本表の 3.946 とほぼ一致する (oklab 混色の丸め差)。撤去後はこの組合せ自体が
+> 存在しない。なお `destructive` トークンの値 (#ae4751) は再ドリフトしておらず、
+> `__tests__/design-system/semantic-colors.test.ts` で機械的に固定した。
+
+
 対象: `tokens/base.json` の `destructive` トークンと、その全使用箇所。
 Figma: 【R2: 確定版】AuthErrorBanner `5344:3` (状態枠 `6706:14468`) / file `AWLnI0XF07e8rScuxPYPc7`
 親タスク: https://app.notion.com/p/3b570c9d064c81159806c3b9c8b0d74a

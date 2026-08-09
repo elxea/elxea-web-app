@@ -1,5 +1,31 @@
 # C4-4b忠実度対比表 — elxea Journal記事詳細 (本文完結 + 末尾のみ回遊)
 
+> **[DS トークン整合 2026-08-09 反映] 本表の色の行を読むときの注意**
+>
+> 本表は各レーンが計測した時点の記録である。その後 DS トークン整合タスク
+> (`3b670c9d-064c-8166`) で semantic 色トークンを **Figma R2 確定版の実在値**へ
+> 揃えたため、**下表の「旧実装値」で書かれた行は現在は Figma と一致している**
+> (行内には `→ 現 #xxxxxx [解決 2026-08-09]` を追記した)。
+> `[DS案件]` / `[要確認]` の判定が付いている色の行のうち、下表のトークンに
+> 該当するものは**解決済み**として読むこと。
+>
+> | トークン | 本表に出てくる旧実装値 | 現在の実装値 (= Figma) |
+> |---|---|---|
+> | `foreground` / `card-foreground` / `popover-foreground` | #5d5e61 (charcoal) | **#464748** (graphite) |
+> | `border` / `input` / `ring` | #858581 (ash) | **#888675** |
+> | `primary-foreground` | #ffffff (純白) | **#f9f8f4** |
+> | `muted` | #ebe9e0 (= `background` と同値) | **#dedccf** |
+> | `secondary` | #ffc202 / #ffc10d (金) | **#d5d3c0** (sand) |
+> | `destructive` | #b9525c | **#ae4751** (C6-1R で是正済み) |
+>
+> 実測での裏取り: Chromium (1440x900) + canvas `getImageData` で 10 ページを再計測し、
+> 上記の現在値がそのまま解決すること、罫線 `#888675` の外側対比 3.022:1、
+> `foreground` の対比 7.655:1 (background) / 8.376:1 (card)、ボタン角丸 8px、
+> 金額の円記号が半角 `¥` であることを確認 (console error 0 件)。
+> 既知の未達は `border` を `muted` 面の**内側**に引いた場合のみ (2.668:1)。
+> 実使用箇所は外側が `background` で 3.022:1 のため後退はない。
+
+
 - Figma SoT: file `AWLnI0XF07e8rScuxPYPc7`
   - elxea Journal詳細PC `8110:46893` / SP `8110:47043`
     (【R2: 確定版】本文完結 + 末尾のみ回遊 — 同梱セット文脈・執筆者クレジット)
@@ -103,7 +129,7 @@ production Sanity datasetのjournalドキュメントは **確定版のフィー
 | 写真枠 | 高さ | PC 432 / SP 250 | 432 / 250 | [OK] |
 | 写真枠 | アスペクト | PC 5:3 (720x432) / SP 3:2 (375x250) | `5 / 3` / `3 / 2` | [OK] |
 | 写真枠 | 角丸 | 0 | `border-radius: 0px` (`rounded-none`) | [OK] |
-| 写真枠 | 背景 | `--muted` (#dedccf / lab L≈88.2) | `bg-muted` (lab L 92.3) | [要確認] 注8 |
+| 写真枠 | 背景 | `--muted` (#dedccf / lab L≈88.2) | `bg-muted` (lab L 92.3) → 現 #dedccf / lab L 87.6 [解決 2026-08-09] | [要確認] 注8 |
 | 画像 | object-fit | 塗り (clip) | `cover` | [OK] |
 | キャプション | 位置 | 写真枠の左下に重ねる | `position: absolute` / `bottom 0` / `left 0` | [OK] |
 | キャプション | 左余白 | PC 16 / SP 12 | 16 / 12 (`p-3 lg:p-4`) | [OK] |

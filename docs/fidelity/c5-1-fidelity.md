@@ -1,5 +1,31 @@
 # C5-1忠実度対比表 — カート (/ja/cart)
 
+> **[DS トークン整合 2026-08-09 反映] 本表の色の行を読むときの注意**
+>
+> 本表は各レーンが計測した時点の記録である。その後 DS トークン整合タスク
+> (`3b670c9d-064c-8166`) で semantic 色トークンを **Figma R2 確定版の実在値**へ
+> 揃えたため、**下表の「旧実装値」で書かれた行は現在は Figma と一致している**
+> (行内には `→ 現 #xxxxxx [解決 2026-08-09]` を追記した)。
+> `[DS案件]` / `[要確認]` の判定が付いている色の行のうち、下表のトークンに
+> 該当するものは**解決済み**として読むこと。
+>
+> | トークン | 本表に出てくる旧実装値 | 現在の実装値 (= Figma) |
+> |---|---|---|
+> | `foreground` / `card-foreground` / `popover-foreground` | #5d5e61 (charcoal) | **#464748** (graphite) |
+> | `border` / `input` / `ring` | #858581 (ash) | **#888675** |
+> | `primary-foreground` | #ffffff (純白) | **#f9f8f4** |
+> | `muted` | #ebe9e0 (= `background` と同値) | **#dedccf** |
+> | `secondary` | #ffc202 / #ffc10d (金) | **#d5d3c0** (sand) |
+> | `destructive` | #b9525c | **#ae4751** (C6-1R で是正済み) |
+>
+> 実測での裏取り: Chromium (1440x900) + canvas `getImageData` で 10 ページを再計測し、
+> 上記の現在値がそのまま解決すること、罫線 `#888675` の外側対比 3.022:1、
+> `foreground` の対比 7.655:1 (background) / 8.376:1 (card)、ボタン角丸 8px、
+> 金額の円記号が半角 `¥` であることを確認 (console error 0 件)。
+> 既知の未達は `border` を `muted` 面の**内側**に引いた場合のみ (2.668:1)。
+> 実使用箇所は外側が `background` で 3.022:1 のため後退はない。
+
+
 - Figma SoT: file `AWLnI0XF07e8rScuxPYPc7`
   - section【R2: 確定版】`カート 変A（部品ベース）— PC/SP @/ja/cart` `6679:14041`
   - PC 1440 `6684:8698` / Content `6684:174` / CartHeader `6684:120` /
@@ -69,7 +95,7 @@ layout.gridが食い違う (PC margin 80 vs 64 / SP margin 20 vs 16)」と同一
 | 「カート」 | line-height | 52.8 (1.2) | 52.8 | [OK] |
 | 「カート」 | font-weight | 300 (Light) | 300 | [OK] |
 | 「カート」 | letter-spacing | -0.44 (-1%) | +0.88 (h1 tracking .02em) | [要確認] 注2 |
-| 「カート」 | 色 | `foreground` #464748 (lab 30.10) | lab 39.88 = #5d5e61 (`text-foreground`) | [要確認] 注16 |
+| 「カート」 | 色 | `foreground` #464748 (lab 30.10) | lab 39.88 = #5d5e61 → 現 #464748 [解決 2026-08-09] (`text-foreground`) | [要確認] 注16 |
 | リード | font-size / lh | 14 / 21 (1.5) | 14 / 21 | [OK] |
 | リード | letter-spacing | 0.7 (5%) | 0.64 | [OK] Δ0.06 |
 | リード | 色 | `muted-foreground` #585854 (lab 37.29) | lab 37.41 | [OK] Δ0.12 |
@@ -119,14 +145,14 @@ Figma値に合わせた。**共有トークンは動かしていない** (同種
 | 行間 (実効) | 1行目下端→2行目上端 | 24 + 1 + 24 = 49 | 24 + 1 + 24 = 49 | [OK] |
 | 写真 | 幅 / 高さ | 140 / 94 | 140 / 93.33 | [OK] Δ0.7 |
 | 写真 | アスペクト / 角丸 | 3:2 / 6 (`radius-md`) | `3 / 2` / 6px | [OK] |
-| 写真 | 枠背景 | `muted` #dedccf (lab 87.59) | lab 92.31 (`bg-muted`) | [要確認] 注6 |
+| 写真 | 枠背景 | `muted` #dedccf (lab 87.59) | lab 92.31 (`bg-muted`) → 現 #dedccf / lab 87.59 [解決 2026-08-09] | [要確認] 注6 |
 | info | 左端x | 160 (行内相対) | 160 (64→224) | [OK] |
 | info | 内gap | 8 | 8 | [OK] |
 | info | ブロック高 | 90 | 91.97 | [OK] Δ2.0 |
 | 商品名 | font-size / weight | 16 / 500 (`jp/h4`) | 16 / 500 | [OK] |
 | 商品名 | line-height | 24 (1.5) | 25.6 (cjk 1.6) | [OK] Δ1.6注7 |
 | 商品名 | letter-spacing | 0.32 (2%) | 0.48 (cjk 3%) | [OK] Δ0.16注7 |
-| 商品名 | 色 | `foreground` #464748 (lab 30.10) | lab 39.88 = #5d5e61 | [要確認] 注16 |
+| 商品名 | 色 | `foreground` #464748 (lab 30.10) | lab 39.88 = #5d5e61 → 現 #464748 [解決 2026-08-09] | [要確認] 注16 |
 | 内容量 | font-size / lh / weight | 14 / 25.2 (1.8) / 400 (`jp/body-sm`) | 14 / 25.2 / 400 | [OK] 完全一致 |
 | 内容量 | letter-spacing / 色 | 0.7 (5%) / `muted-foreground` | 0.56 / lab 37.41 | [OK] Δ0.14 |
 | 定期便 | font-size / lh | 14 / 25.2 | 14 / 25.2 | [OK] |
@@ -373,12 +399,12 @@ Next.js RSC prefetch** (Header / Footerが全ナビリンクをprefetchし、ブ
 | # | 事項 | 推奨 | 影響範囲 |
 |---|---|---|---|
 | Q1 | `.page-title` のletter-spacingがFigma display変数 (-1%) ではなくh1 cjk値 (+2%) になる | displayトークンのtrackingをFigmaに合わせるDS案件として別途起票 | `.page-title` を使う7ページ |
-| Q2 | `border` トークンの色度がFigma (#888675) と違う (コードは無彩色寄り #858581) | Figma値へ寄せる (DS案件) | 罫線を使う全画面 |
+| Q2 | `border` トークンの色度がFigma (#888675) と違う (コードは無彩色寄り #858581 → 現 #888675 [解決 2026-08-09]) | Figma値へ寄せる (DS案件) | 罫線を使う全画面 |
 | Q3 | 金額の `￥` が全角 (U+FFE5)。Figmaは半角 `¥` | `formatPrice` を `currencyDisplay: "narrowSymbol"` にすれば半角になる。サイト全域の表記変更なので判断を仰ぐ | 価格表示の全画面 |
 | Q4 | `--color-card` をFigma実在値 (#f4f3ed) に直した (注10)。AA未達の是正込み | この変更を承認 (承認されない場合はAA未達が戻るため代替案が必要) | `bg-card` 9箇所 |
 | Q5 | 空カートの文言をFigmaプレースホルダ「カートは空です」ではなく既存コピーのまま維持した | 既存コピー維持 (Figma側はレイアウト用の見本と解釈) | カートのみ |
 | Q6 | 数量 `-` を下限1で無効にし、0による暗黙削除をやめた (削除は「削除」ボタン経由) | この挙動 (破壊的操作を明示操作に寄せる) | カートのみ |
-| Q7 | 本文色 `foreground` がFigma (#464748) とコード (#5d5e61) でΔlab L 9.8食い違う。全R2ページが `text-foreground` でbaseのgraphite規則を打ち消している (注16) | 「`foreground` をFigma値へ寄せる」か「各ページの `text-foreground` を外す」かをDS案件として決める。本レーンは兄弟ページとの一貫性を優先し現状維持 | 本文テキストの全画面 |
+| Q7 | 本文色 `foreground` がFigma (#464748) とコード (#5d5e61 → 現 #464748 [解決 2026-08-09]) でΔlab L 9.8食い違う。全R2ページが `text-foreground` でbaseのgraphite規則を打ち消している (注16) | 「`foreground` をFigma値へ寄せる」か「各ページの `text-foreground` を外す」かをDS案件として決める。本レーンは兄弟ページとの一貫性を優先し現状維持 | 本文テキストの全画面 |
 
 ## 12. Vercel Preview での確認 (2026-08-08 22:36 JST)
 
