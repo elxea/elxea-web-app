@@ -19,7 +19,11 @@ import {
   AuthorSectionHead,
   type AuthorStat,
 } from "@/components/journal/author-detail";
-import { previewImageForKey, previewSeedEnabled } from "@/lib/preview-seed";
+import {
+  previewImageForKey,
+  previewSeedEnabled,
+  withSeedAuthorDetail,
+} from "@/lib/preview-seed";
 import { cn } from "@/lib/utils";
 
 /**
@@ -141,6 +145,12 @@ export default async function AuthorPage({
   }
 
   if (!author) notFound();
+
+  // Preview-only: production dataset の author は role / bio / website を
+  // どれも入力していないため、フラグが立っているときだけ未入力欄を見本で埋めて
+  // 確定版の縦リズムを実寸で確認できるようにする。フラグ未設定時は
+  // byte-identical (何も足さない)。
+  author = withSeedAuthorDetail(author);
 
   const written = articles ?? [];
 

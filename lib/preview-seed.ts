@@ -1121,3 +1121,43 @@ export function seedTastingNotes(): SeedTastingNote[] | null {
     imageUrl: previewImageForKey(`tasting-note-${i + 1}`),
   }));
 }
+
+// ---------------------------------------------------------------------------
+// 著者ページ (People 詳細テンプレ / C14-1)
+// ---------------------------------------------------------------------------
+
+type SeedAuthorDetail = {
+  role?: string;
+  bio?: string;
+  website?: string;
+};
+
+/**
+ * People 詳細テンプレの Head は 肩書 (role) / 紹介文 (bio) / 外部リンク
+ * (website) の 3 行を持つが、production dataset の author はこの 3 つを
+ * どれも入力していない。フラグが立っているときだけ見本で埋めて、
+ * 確定版の縦リズムを実寸で確認できるようにする。
+ */
+const SEED_AUTHOR_DETAIL = {
+  role: "茶師 ／ roji の畑まわりを担う",
+  bio: "静岡・本山の茶園で育つ。祖父の代から続く手摘みの畑を受け継ぎ、標高と霧が茶葉に何をするのかを毎年書きとめている。roji では本山・川根の便りと、季節ごとの淹れ方を担当。",
+  website: "https://example.invalid/authors/preview",
+} as const;
+
+/**
+ * 未入力の Head フィールドを見本で埋めた著者ドキュメントを返す。
+ * フラグ未設定なら入力をそのまま返す (production は完全に無影響)。
+ */
+export function withSeedAuthorDetail<T extends SeedAuthorDetail & { name: string }>(
+  author: T,
+): T {
+  if (!previewSeedEnabled()) return author;
+
+  const s = SEED_AUTHOR_DETAIL;
+  return {
+    ...author,
+    role: author.role || s.role,
+    bio: author.bio || s.bio,
+    website: author.website || s.website,
+  };
+}
