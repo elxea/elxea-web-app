@@ -445,18 +445,89 @@
   },
   "about": {
     "title": "About elxea",
-    "subtitle": "A new specialty tea experience connecting farmers and consumers",
-    "mission": "Our Mission",
-    "missionText": "elxea is a D2C brand that delivers specialty teas, carefully cultivated by tea farmers across Japan, directly to your doorstep. Through transparent transactions where you can see the faces of the producers, we create new value and experiences in tea.",
-    "story": "Our Story",
-    "storyText": "Japanese tea culture has a history spanning centuries, yet many remarkable tea farmers remain unknown to consumers. elxea was born to directly connect these farmers with consumers, offering rich experiences through tea.\n\nWe visit farms, deeply understand the local climate and production methods, and carefully select the highest quality tea leaves. Through our subscription service, we deliver seasonal teas and introduce you to the profound world of Japanese tea.",
-    "values": "Our Values",
-    "value1Title": "Transparency",
-    "value1Text": "We disclose all producer, origin, and production information. We deliver tea you can choose with confidence.",
-    "value2Title": "Sustainability",
-    "value2Text": "We support sustainable farming practices and contribute to the future of Japanese tea culture.",
-    "value3Title": "Quality",
-    "value3Text": "We handle only specialty-grade tea leaves and deliver them in optimal condition."
+    "subtitle": "Single-origin leaves from small tea gardens across Japan. What we have decided, and what we have deliberately left open.",
+    "overline": "ABOUT ELXEA",
+    "statementTitle": "From small tea gardens across Japan.",
+    "statementLead1": "elxea is a craft tea brand built on single-origin leaves, selected one garden at a time from small growers across Japan.",
+    "statementLead2": "This page sets out, in order, what we have decided and what we have left open.",
+    "us": {
+      "no": "01",
+      "short": "About us",
+      "title": "About us",
+      "body1": "elxea is a craft tea brand built on single-origin leaves from small growers across Japan. We work with three kinds of tea: green, oolong and black.",
+      "body2": "Every product comes from one garden, one cultivar and one harvest. So the same name can taste a little different from year to year. We do not treat that as a flaw.",
+      "imageAlt": "Tea leaves"
+    },
+    "origins": {
+      "overline": "ORIGINS",
+      "a1": "Honyama, Shizuoka",
+      "a2": "Yame, Fukuoka",
+      "a3": "Wazuka, Kyoto",
+      "a4": "Kirishima, Kagoshima"
+    },
+    "criteria": {
+      "no": "02",
+      "short": "How we choose",
+      "title": "How we choose — what we decide, and what we leave to you",
+      "decided": "What we decide",
+      "undecided": "What we leave open",
+      "d1": "We visit every garden ourselves",
+      "u1": "Water temperature and steeping time",
+      "d2": "One garden, one cultivar, one harvest",
+      "u2": "Where and when you drink it",
+      "d3": "Keeping the time from picking to delivery short",
+      "u3": "The order you try them in",
+      "note": "We publish our criteria as principles. Grades, purchase prices and minimum yields are not published."
+    },
+    "chapter": {
+      "overline": "NO RIGHT ANSWER",
+      "title": "We do not set a right answer.",
+      "body": "How you brew it, and when you drink it, are yours."
+    },
+    "how": {
+      "no": "03",
+      "short": "How it is made",
+      "title": "How it is made",
+      "s1Name": "Select",
+      "s1Body": "We select the leaves that were good that year, garden by garden.",
+      "s2Name": "Portion",
+      "s2Body": "We portion and pack them ourselves.",
+      "s3Name": "Deliver",
+      "s3Body": "We keep the time from picking to your hands as short as we can."
+    },
+    "makers": {
+      "no": "04",
+      "short": "The growers",
+      "title": "The growers",
+      "overline": "PRODUCER"
+    },
+    "attitude": {
+      "no": "05",
+      "short": "Living with tea",
+      "title": "Living with tea",
+      "s1Name": "Brew",
+      "s1Body": "We do not fix the water temperature or the steeping time. We only offer a guide.",
+      "s2Name": "Read",
+      "s2Body": "Each month we add one piece of reading about that month's leaves.",
+      "s3Name": "Change",
+      "s3Body": "If it does not suit you, change it next month. A subscription can be paused at any time."
+    },
+    "company": {
+      "no": "06",
+      "short": "Company",
+      "title": "Company",
+      "name": "Name",
+      "nameValue": "elxea Inc.",
+      "headOffice": "Head office",
+      "branchOffice": "Kyoto office",
+      "handles": "We handle",
+      "handlesValue": "Green tea / Oolong tea / Black tea",
+      "contact": "Contact"
+    },
+    "links": {
+      "products": "See all leaves →",
+      "journal": "Read the journal →"
+    }
   },
   "faq": {
     "title": "Frequently asked questions",
