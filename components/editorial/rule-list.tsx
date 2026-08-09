@@ -105,6 +105,15 @@ export type MetaRowProps = {
    * wide = 224 (利用規約 S4 7850:803)。
    */
   labelWidth?: "default" | "medium" | "wide";
+  /**
+   * SP での並び。
+   * - `row` (既定) — ラベル列を値の左に置く。既存の呼び出し (特商法 / 汎用ページ /
+   *   利用規約) はすべてこちら。
+   * - `stack` — ラベルを値の**上**に積む。About R2 の会社情報 (Figma SP 8121:1386 は
+   *   ラベル y+16 h18 → 値 y+38 h25 の縦積み) のように、値が長くて SP で 120px の
+   *   ラベル列を隣に置けない行で使う。
+   */
+  spLayout?: "row" | "stack";
   className?: string;
 };
 
@@ -113,13 +122,18 @@ export function MetaRow({
   children,
   divider = true,
   labelWidth = "default",
+  spLayout = "row",
   className,
 }: MetaRowProps) {
+  const stacked = spLayout === "stack";
   return (
     <div
       data-slot="meta-row"
+      data-sp-layout={spLayout}
       className={cn(
         "flex gap-4 pt-3 pb-4",
+        // SP だけ縦積みにする版。PC (md+) の見た目は row 版と同一に戻す。
+        stacked && "flex-wrap gap-y-1 pt-4 pb-2 md:flex-nowrap md:pt-3 md:pb-4",
         divider && "border-t border-border",
         className
       )}
@@ -130,6 +144,7 @@ export function MetaRow({
         className={cn(
           CAPTION,
           "w-30 shrink-0 text-muted-foreground",
+          stacked && "w-full md:w-auto",
           labelWidth === "wide"
             ? "md:w-56"
             : labelWidth === "medium"
@@ -139,7 +154,15 @@ export function MetaRow({
       >
         {label}
       </dt>
-      <dd className={cn(BODY_SM, "m-0 min-w-0 flex-1 text-foreground")}>{children}</dd>
+      <dd
+        className={cn(
+          BODY_SM,
+          "m-0 min-w-0 flex-1 text-foreground",
+          stacked && "basis-full md:basis-auto"
+        )}
+      >
+        {children}
+      </dd>
     </div>
   );
 }
@@ -154,34 +177,58 @@ export type CategoryIndexItem = { label: string; href: string };
 /**
  * roomy = FAQ 7848:530 (帯の高さ 128 / SP 行 64)
  * compact = 配送情報 7848:39261 (帯の高さ 96 / SP 行 56)
+ * chapters = About R2 8121:1272 (帯の高さ 208 = 2 段組 / SP 行 64)
  */
-export type CategoryIndexDensity = "roomy" | "compact";
+export type CategoryIndexDensity = "roomy" | "compact" | "chapters";
 
-const INDEX_PADDING: Record<CategoryIndexDensity, { pc: string; sp: string }> = {
-  roomy: { pc: "md:pt-12 md:pb-14", sp: "pt-8 pb-3" },
-  compact: { pc: "md:py-9", sp: "pt-4 pb-4" },
+const INDEX_PADDING: Record<
+  CategoryIndexDensity,
+  { pc: string; sp: string; rowGap: string }
+> = {
+  roomy: { pc: "md:pt-12 md:pb-14", sp: "pt-8 pb-3", rowGap: "md:gap-y-8" },
+  compact: { pc: "md:py-9", sp: "pt-4 pb-4", rowGap: "md:gap-y-8" },
+  /* Figma 8121:1272 実測: 上罫線 → 1 段目 48 / 段間 39 / 2 段目 → 下罫線 70。
+     spacing scale に丸めて 48 / 40 / 68 (帯 208px ちょうど)。SP は行ピッチ 64 で、
+     Figma の非対称 (上 31 / 下 7) は上下対称 20/20 に均す (Δ2px)。 */
+  chapters: { pc: "md:pt-12 md:pb-17", sp: "py-5", rowGap: "md:gap-y-10" },
 };
 
 export function CategoryIndex({
   items,
   density = "roomy",
+  perRow = 4,
   className,
   ...props
 }: {
   items: CategoryIndexItem[];
   density?: CategoryIndexDensity;
+  /**
+   * PC の 1 段あたりの項目数。既定 4 (FAQ / 配送情報 の 4 列)。
+   * About R2 の目次 (8121:1272) は列幅 304 + 溝 32 の 4 列グリッド上に **1 段 3 項目**
+   * だけを置く (x=64 / 400 / 736、4 列目は空)。列幅を保ったまま 3 項目で改段させたい
+   * ので、グリッドは 4 列のままにして段頭の項目に `col-start-1` を当てる。
+   */
+  perRow?: 3 | 4;
 } & React.ComponentProps<"nav">) {
   const padding = INDEX_PADDING[density];
   return (
     <nav
       data-slot="category-index"
       data-density={density}
+      data-per-row={perRow}
       className={cn("border-b border-border md:border-t", className)}
       {...props}
     >
-      <ul className={cn("md:grid md:grid-cols-4 md:gap-8", padding.pc)}>
-        {items.map((item) => (
-          <li key={item.href} className="border-t border-border md:border-t-0">
+      <ul className={cn("md:grid md:grid-cols-4 md:gap-x-8", padding.rowGap, padding.pc)}>
+        {items.map((item, i) => (
+          <li
+            key={item.href}
+            className={cn(
+              "border-t border-border md:border-t-0",
+              // 4 列グリッド上で 3 項目ごとに改段させる (列幅 304 を保つため)。
+              perRow === 3 && i % 3 === 0 && "md:col-start-1"
+            )}
+          >
             <Link
               href={item.href}
               className={cn(
@@ -280,33 +327,75 @@ export type ChapterBreakProps = {
   overline?: React.ReactNode;
   title: React.ReactNode;
   children?: React.ReactNode;
+  /**
+   * 帯の高さ。
+   * - `default` (既定) — 帯 192 (FAQ 7848:532 / 配送情報 7848:39508)。
+   * - `tall` — 帯 PC 320 / SP 288 (About R2 8121:1293 / 8121:1367)。
+   */
+  size?: "default" | "tall";
+  /**
+   * 中身の寄せ。既定は左 (既存の章切りはすべて左寄せ)。
+   * About R2 の章切りは Figma で中身が x=400 w=640 = **中央**に置かれている。
+   */
+  align?: "left" | "center";
   className?: string;
 };
 
-export function ChapterBreak({ overline, title, children, className }: ChapterBreakProps) {
+export function ChapterBreak({
+  overline,
+  title,
+  children,
+  size = "default",
+  align = "left",
+  className,
+}: ChapterBreakProps) {
+  const tall = size === "tall";
+  const centered = align === "center";
   return (
     <div
       data-slot="chapter-break"
+      data-size={size}
+      data-align={align}
       className={cn("bg-primary text-primary-foreground", className)}
     >
       {/* キッカーがある版 (FAQ 7848:532) は上余白 56、無い版 (配送情報 7848:39508) は 96。
-          どちらも帯の高さ 192 に収まる Figma 実測どおりの配分。 */}
-      <div className={cn("page-container pb-10", overline ? "pt-14" : "pt-24")}>
-        {overline ? (
-          <p className={cn(OVERLINE, "text-primary-foreground")}>{overline}</p>
-        ) : null}
-        <p
-          className={cn(
-            "[font:var(--typography-style-h3)] [letter-spacing:var(--typography-style-h3-tracking)]",
-            "text-primary-foreground",
-            overline && "mt-4"
-          )}
-        >
-          {title}
-        </p>
-        {children ? (
-          <p className={cn(BODY_SM, "mt-4 max-w-160 text-primary-foreground")}>{children}</p>
-        ) : null}
+          どちらも帯の高さ 192 に収まる Figma 実測どおりの配分。
+          tall は About R2 実測 (PC 上 96 / 下 103・SP 上 80 / 下 95) を spacing scale に
+          丸めた 96/104・80/96。 */}
+      <div
+        className={cn(
+          "page-container",
+          tall ? "pt-20 pb-24 lg:pt-24 lg:pb-26" : cn("pb-10", overline ? "pt-14" : "pt-24")
+        )}
+      >
+        {/* 中央寄せ版は Figma の内容幅 640 (= 40rem) で折り返す。 */}
+        <div className={cn(centered && "mx-auto max-w-160 text-center")}>
+          {overline ? (
+            <p className={cn(OVERLINE, "text-primary-foreground")}>{overline}</p>
+          ) : null}
+          <p
+            className={cn(
+              "[font:var(--typography-style-h3)] [letter-spacing:var(--typography-style-h3-tracking)]",
+              "text-primary-foreground",
+              // Figma 実測: default 16 / tall SP 24 · PC 32。
+              overline && (tall ? "mt-6 lg:mt-8" : "mt-4")
+            )}
+          >
+            {title}
+          </p>
+          {children ? (
+            <p
+              className={cn(
+                BODY_SM,
+                "text-primary-foreground",
+                tall ? "mt-5" : "mt-4",
+                !centered && "max-w-160"
+              )}
+            >
+              {children}
+            </p>
+          ) : null}
+        </div>
       </div>
     </div>
   );
@@ -510,24 +599,47 @@ export type StepRowProps = {
   step: React.ReactNode;
   name: React.ReactNode;
   children: React.ReactNode;
+  /**
+   * PC の列取り。
+   * - `default` (既定) — 特商法 7857:39713 の 番号 112 / 名前 336 / 説明 x448。
+   * - `wide` — About R2 8121:1297 / 8121:1524 の 番号 112 / 名前 448 / 説明 x624
+   *   (説明は残り 752 を使い切る)。行高も PC 96 (default は 70) になる。
+   */
+  layout?: "default" | "wide";
   className?: string;
 };
 
-export function StepRow({ step, name, children, className }: StepRowProps) {
+export function StepRow({ step, name, children, layout = "default", className }: StepRowProps) {
+  const wide = layout === "wide";
   return (
     <li
       data-slot="step-row"
+      data-layout={layout}
       className={cn(
         "flex flex-wrap items-start gap-x-4 gap-y-2 border-t border-border pt-5 pb-6",
         "md:flex-nowrap md:gap-x-0",
+        // Figma 実測 96 (上罫線 → 番号 24 / 行下 44)。
+        wide && "md:pt-6 md:pb-11",
         className
       )}
     >
       <span className={cn(BODY_SM, "w-12 shrink-0 text-muted-foreground md:w-28")}>{step}</span>
-      <span className={cn(H4, "min-w-0 flex-1 text-foreground md:w-84 md:flex-none")}>
+      <span
+        className={cn(
+          H4,
+          "min-w-0 flex-1 text-foreground md:flex-none",
+          wide ? "md:w-112" : "md:w-84"
+        )}
+      >
         {name}
       </span>
-      <span className={cn(BODY_SM, "basis-full text-foreground md:w-76 md:basis-auto")}>
+      <span
+        className={cn(
+          BODY_SM,
+          "basis-full text-foreground",
+          wide ? "md:min-w-0 md:flex-1 md:basis-auto" : "md:w-76 md:basis-auto"
+        )}
+      >
         {children}
       </span>
     </li>

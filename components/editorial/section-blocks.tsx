@@ -266,6 +266,53 @@ export function OpenFaqList({
 }
 
 /* -------------------------------------------------------------------------- */
+/* ValueCards — 中央寄せ 2 カラムの対比カード (Figma About R2 8121:1284)        */
+/* PC 2列 640 gap32 / 行ピッチ 144。SP 1列 343 / 行ピッチ 112。                  */
+/* -------------------------------------------------------------------------- */
+
+export type ValueCardItem = {
+  /** 「決めていること」「決めていないこと」のような区分ラベル。 */
+  title: React.ReactNode;
+  /** その区分の中身 1 行。 */
+  body: React.ReactNode;
+};
+
+/**
+ * 新規部品にした理由: 既存の対比系部品 (`PairRow` / `DefinitionRow` / `SpecBand`) は
+ * すべて**罫線つき・左寄せ**で、About R2 の ValueCard は**罫線なし・中央寄せ**の
+ * 独立カードだった (Figma 8121:1287 系。カード内 padding 16 / タイトル h24 →
+ * 本文 h21 の間 12 / カード高 PC 112・SP 96)。既存部品に `align="center"` と
+ * 「罫線を消す」を同時に足すと、罫線が骨格の一部になっている FAQ・配送情報・
+ * 特商法の行型まで意味が壊れるため、別部品として分けた。
+ */
+export function ValueCards({
+  items,
+  className,
+}: {
+  items: readonly ValueCardItem[];
+  className?: string;
+}) {
+  return (
+    <ul
+      data-slot="value-cards"
+      className={cn("grid grid-cols-1 gap-y-4 lg:grid-cols-2 lg:gap-x-8 lg:gap-y-8", className)}
+    >
+      {items.map((item, i) => (
+        <li
+          data-slot="value-card"
+          key={i}
+          /* Figma 実測: 内 padding 16、下だけ SP 24 / PC 40 (カード高 96 / 112)。 */
+          className="p-4 pb-6 text-center lg:pb-10"
+        >
+          <p className={cn(h4Class, "text-foreground")}>{item.title}</p>
+          <p className={cn(bodySmClass, "mt-3 text-muted-foreground")}>{item.body}</p>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
 /* StepCards — 番号つき 3 ステップ (Figma 8056:1594 / SP 8057:1774)             */
 /* PC 3列 416 gap32 / SP 縦積み。枠は muted 面。                                */
 /* -------------------------------------------------------------------------- */

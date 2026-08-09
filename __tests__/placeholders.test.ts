@@ -118,14 +118,16 @@ describe("PLACEHOLDERS レジストリ", () => {
     );
   });
 
-  it("法定表記 (tokushoho.*) の仮値は実在に見える住所・電話番号を含まない", () => {
-    // 特商法ページに出る住所・電話・責任者名の仮値は、guard をすり抜けても
-    // 読み手が一目で仮値と分かる必要がある。
+  it("会社の所在地・電話番号の仮値は実在に見える文字列を含まない", () => {
+    // 特商法ページ / About ページに出る住所・電話・責任者名の仮値は、guard を
+    // すり抜けても読み手が一目で仮値と分かる必要がある。
     // 検査対象は「まだ仮値のもの」だけ。実値に差し替えた (`confirmed`) エントリは
     // 本物の住所・電話番号になるため、ここで数字列を禁じてはいけない。
     // 「1 件以上あること」も要求しない (全件 confirmed = 正常な最終状態)。
     const legalPlaceholders = Object.entries(PLACEHOLDERS).filter(
-      ([id, entry]) => id.startsWith("tokushoho.") && entry.status === PLACEHOLDER_MARKER
+      ([id, entry]) =>
+        (id.startsWith("tokushoho.") || id.startsWith("about.")) &&
+        entry.status === PLACEHOLDER_MARKER
     );
 
     for (const [id, entry] of legalPlaceholders) {

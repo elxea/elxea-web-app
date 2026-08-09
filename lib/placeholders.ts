@@ -124,6 +124,29 @@ export const PLACEHOLDERS = {
     basis:
       "受信可能なアドレスであることの確認が未了 (Figma 凍結版の値をそのまま置いている)。MX / 受信テストが通れば `confirmed` にする",
   },
+
+  /* ---- About ページ (/ja/about) 会社情報 -------------------------------- */
+  "about.headOffice": {
+    surface: "About ページ 06 会社情報 (Figma 8121:1312 / SP 8121:1386)",
+    label: "本社",
+    // Figma 確定版は実在しそうな住所を置いているが、法人登記の所在地としては
+    // 確定していない (特商法ページ・利用規約とも値が食い違っている)。
+    // 一目で仮値と分かる文字列に置き換えて出す。
+    value: "（公開前に差し替え）本社所在地未確定",
+    status: PLACEHOLDER_MARKER,
+    owner: "Setaka (会社情報)",
+    basis:
+      "法人登記上の所在地。`tokushoho.address` と同一の値になるはずで、確定時は両方を同時に差し替える (現状は Figma / 利用規約 / 特商法の 3 か所で値が食い違っている)",
+  },
+  "about.branchOffice": {
+    surface: "About ページ 06 会社情報 (Figma 8121:1312 / SP 8121:1386)",
+    label: "京都事務所",
+    value: "（公開前に差し替え）京都事務所所在地未確定",
+    status: PLACEHOLDER_MARKER,
+    owner: "Setaka (会社情報)",
+    basis:
+      "第 2 拠点の所在地。そもそも公開するかどうか自体が未決 (公開しないなら本エントリを削除し、会社情報の行も落とす)",
+  },
 } as const satisfies Record<string, PlaceholderEntry>;
 
 export type PlaceholderId = keyof typeof PLACEHOLDERS;
