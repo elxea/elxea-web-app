@@ -3,6 +3,7 @@ import { useTranslations } from "next-intl";
 import { urlFor } from "@/sanity/lib/image";
 import { Link } from "@/i18n/navigation";
 import { ImagePlaceholder } from "@/components/ui/image-placeholder";
+import { formatNetWeight, type NetWeightValue } from "@/lib/format-net-weight";
 
 interface TeaSpecCardProps {
   tea: {
@@ -14,7 +15,8 @@ interface TeaSpecCardProps {
     variety: string;
     season: string;
     origin: string;
-    netWeight: number;
+    /** 実データは文字列 `"50g"` / schema どおりの数値 `50` の両方があり得る。 */
+    netWeight: NetWeightValue;
     photo?: { asset: object; alt?: string };
   };
 }
@@ -68,7 +70,7 @@ export function TeaSpecCard({ tea }: TeaSpecCardProps) {
         </div>
         <div className="flex justify-between">
           <dt className="text-muted-foreground">{t("netWeight")}</dt>
-          <dd className="text-right">{tea.netWeight}g</dd>
+          <dd className="text-right">{formatNetWeight(tea.netWeight)}</dd>
         </div>
       </dl>
 
