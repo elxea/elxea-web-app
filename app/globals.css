@@ -110,10 +110,20 @@ h6 { font: var(--typography-style-h6); }
   h1.hero-display { font: var(--typography-style-display); line-height: 1.2; }
 }
 
-/* Page-header title — content-index pages (collections / collection detail /
- * elxea-journal) and the R2 shared list pattern head (ListPageHead — products /
- * tea-menu / collections / journal) use the Figma PC page-title size
- * (44px = display token) at md+.
+/* Page-header title — every page whose main heading is a page title uses the
+ * Figma PC page-title size (44px = display token) at md+.
+ * Applied via the R2 shared list-pattern head (ListPageHead — products /
+ * tea-menu / collections / collection detail / journal / journal category /
+ * journal tag / elxea-journal / farmers / playlists / tasting-note) and, on
+ * detail / reading pages, by putting `.page-title` on the h1 directly
+ * (about / account / account subscriptions / cart / journal article /
+ * tea-menu detail / events / farmers detail / people detail / author /
+ * playlist detail).
+ * NOTE (2026-08-09): the list above used to name only 4 pages and had drifted;
+ * `.page-title` is the single lever for the "page main heading = PC 44 / SP 32"
+ * ruling, so the comment now matches the real call sites. Figma still carries
+ * older values (PC 52 / 32, SP 24) on several pages — that follow-up is tracked
+ * as All Tasks ID-7507 and is a designer-side change, not a code one.
  * Same unlayered-rule rationale as .hero-display above so it beats the h1{font}
  * shorthand and Tailwind utilities. Mobile keeps the base h1 (32px). */
 /* 字間は上の `.hero-display` の KNOWN GAP と同じ (項目2・保留中)。 */

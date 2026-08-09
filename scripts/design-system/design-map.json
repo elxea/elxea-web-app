@@ -869,7 +869,7 @@
       "figma_name": "この号に入っているお茶 (同梱セット文脈)",
       "code_path": "components/journal/article-blocks.tsx",
       "kind": "ds-component",
-      "notes": "ArticleBlock + ArticleProductRow。thumb PC 160 / SP 96、リンクのタップ域 49。Figma 注記の「ページ内モーダルで開く」は未実装 (通常遷移) — 意図的差分。SP は 8110:47072。"
+      "notes": "ArticleBlock + ArticleProductRow。thumb PC 160 / SP 96、リンクのタップ域 49。開き方は通常遷移が正 (Setaka 裁定 2026-08-08)。旧 Figma 注記「ページ内モーダルで開く」は廃止で、遷移方式の差分は残っていない (注記削除は designer レーン)。SP は 8110:47072。"
     },
     {
       "figma_node_id": "8110:46934",
