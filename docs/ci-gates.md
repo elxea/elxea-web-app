@@ -126,7 +126,12 @@ CIが渡すenv:
 |---|---|---|
 | `PREVIEW_SEED` | `1` | 見本データで実密度のままprerenderさせる |
 | `NEXT_PUBLIC_SANITY_PROJECT_ID` / `NEXT_PUBLIC_SANITY_DATASET` | 公開値 | secretではない。`e2e-tests` と同値 |
-| `SESSION_SECRET` | 使い捨ての固定文字列 | **credentialではない。** `lib/shopify/customer.ts` がmodule load時に空文字でhard-failし、`next build` が `/api/auth/logout` の "Collecting page data" で落ちるため、非空である必要だけがある。実値はVercelのproject env側 |
+| `SESSION_SECRET` | 使い捨ての固定文字列 (workflow全体の `env` で定義) | **credentialではない。** `lib/shopify/customer.ts` がmodule load時に空文字でhard-failするため、非空である必要だけがある。実値はVercelのproject env側 |
+
+`SESSION_SECRET` は `build` と `e2e-tests` の両方が必要とする (理由が違う):
+
+- `build`: `next build` が `/api/auth/logout` の "Collecting page data" で落ちる
+- `e2e-tests`: Playwrightの `webServer` が `pnpm dev` を起動し `process.env` を継承する。未設定だと **全ルートが500になりE2Eがまるごと落ちる** (run 31321859910の41 failureは全てこれが原因)
 
 ---
 

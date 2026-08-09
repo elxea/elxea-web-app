@@ -35,6 +35,18 @@ concurrency:
 
 env:
   NODE_VERSION: "22"
+  # NOT a credential — a throwaway string that only has to be non-empty.
+  # `lib/shopify/customer.ts` throws at module load when this is unset (unless
+  # NODE_ENV=test), and it is only ever used as a sha256 input for token
+  # encryption at runtime. Nothing in CI signs or verifies anything with it, and
+  # the real value lives in the Vercel project env.
+  #
+  # Needed by two jobs for different reasons:
+  #  - build: `next build` aborts at "Collecting page data" on /api/auth/logout.
+  #  - e2e-tests: the Playwright `webServer` runs `pnpm dev`, which inherits
+  #    process.env; without this every route 500s and the suite fails wholesale
+  #    (41 failures traced to this single cause on run 31321859910).
+  SESSION_SECRET: ci-build-only-placeholder-not-a-secret
 
 jobs:
   static-checks:
@@ -224,13 +236,7 @@ jobs:
           # Public (non-secret) Sanity coordinates, same values e2e-tests uses.
           NEXT_PUBLIC_SANITY_PROJECT_ID: 5s8ahx87
           NEXT_PUBLIC_SANITY_DATASET: production
-          # NOT a credential — a throwaway string that only has to be non-empty.
-          # lib/shopify/customer.ts hard-fails at module load without it (unless
-          # NODE_ENV=test), which aborts `next build` at "Collecting page data"
-          # on /api/auth/logout. It is used solely as a sha256 input for token
-          # encryption at runtime; nothing in a build signs or verifies anything
-          # with it. The real value lives in the Vercel project env.
-          SESSION_SECRET: ci-build-only-placeholder-not-a-secret
+          # SESSION_SECRET comes from the workflow-level `env` block.
 
   storybook-tests:
     name: storybook-tests
