@@ -1,138 +1,42 @@
-import type { Metadata } from "next";
-import { getTranslations } from "next-intl/server";
-import { getMembershipTier } from "@/lib/shopify/auth";
-import type { MembershipTier } from "@/lib/shopify/customer";
-import { Link } from "@/i18n/navigation";
-import { Button } from "@/components/ui/button";
+import { permanentRedirect } from "next/navigation";
+import { getLocale } from "next-intl/server";
 
-export async function generateMetadata(): Promise<Metadata> {
-  const t = await getTranslations("membership");
-  return {
-    title: t("title"),
-    description: t("description"),
-  };
-}
+import { getPathname } from "@/i18n/navigation";
 
-type PlanFeature = {
-  key: string;
-  tiers: MembershipTier[];
-};
-
-const PLAN_FEATURES: PlanFeature[] = [
-  { key: "featureBrowse", tiers: ["none", "standard", "premium"] },
-  { key: "featureJournal", tiers: ["none", "standard", "premium"] },
-  { key: "featureMemberContent", tiers: ["standard", "premium"] },
-  { key: "featureMemberEvents", tiers: ["standard", "premium"] },
-  { key: "featurePremiumContent", tiers: ["premium"] },
-  { key: "featurePriorityEvents", tiers: ["premium"] },
-  { key: "featureSpecialOffers", tiers: ["premium"] },
-];
-
-const TIERS: MembershipTier[] = ["none", "standard", "premium"];
-
+/**
+ * メンバーシップ /ja/membership → 定期便LP /ja/subscription へ恒久転送。
+ *
+ * ## なぜページを持たないのか (R2 の決定)
+ *
+ * メンバーシップは **R2 でページごと廃止**され、プラン選択が定期便LP の中に
+ * 畳まれた。Figma 側の根拠 (いずれも R2 確定版 定期便LP セクション `7609:2` 内):
+ *
+ * - `7973:42297` 節見出し「10. プラン選択 + 購入導線 (最下部のみ / メンバーシップ統合)」
+ * - `7973:42298` 「メンバーシップページ廃止 (決定 2026-08-08) に伴い、プラン選択を
+ *   LP 内に畳む。頻度 (毎月 / 隔月) と内容 (3種おまかせ / 好み指定) をこの一箇所で
+ *   選ばせ、価格 + 申し込みボタンを置く」
+ * - `7973:42290` 「メンバーシップページの『12ヶ月のリズム』をこちらへ移設し一本化」
+ * - `7973:42296` 「(FAQ は) メンバーシップ側 FAQ と重複しないようこちらを正本にする」
+ * - 実体として R2 確定版 LP に節が存在する: PC `8071:514` (1440x823) /
+ *   SP `8073:186` (375x761)「プラン選択 + 購入導線 (最下部のみ / メンバーシップ統合)」
+ *
+ * リポジトリ側でも同じ決定が既に記録されている。`playwright.config.ts` は
+ * `membership.spec.ts` を CI 除外し続ける理由を「会員ランク制度そのものが
+ * 『無し』に決定済 (2026/08/08)。仕様が消えたので復帰させず廃止候補として残置する」
+ * と書いている。旧実装が並べていた 3 ティア (フリー / スタンダード / プレミアム) の
+ * 比較表は、その消えた仕様そのものだった。
+ *
+ * ## なぜ削除ではなく転送なのか
+ *
+ * ルートを消すと既存の受信リンク (会員限定ゲートの導線・外部からのブックマーク) が
+ * 404 になる。R2 の行き先が定期便LP に一本化されている以上、正しい振る舞いは
+ * 「同じ意図の新しい行き先へ恒久転送」。`permanentRedirect` (308) を使うので
+ * 検索側にも統合が伝わる。ロケールは `getPathname` で解決するため
+ * `/en/membership` は `/en/subscription` に着く。
+ *
+ * @see docs/fidelity/c13-1-fidelity.md 忠実度対比表 (転送先 = LP のプラン選択節)
+ */
 export default async function MembershipPage() {
-  const t = await getTranslations("membership");
-  const currentTier = await getMembershipTier();
-
-  const tierConfig: Record<
-    MembershipTier,
-    { name: string; description: string; actionable: boolean }
-  > = {
-    none: {
-      name: t("free"),
-      description: t("freeDescription"),
-      actionable: false,
-    },
-    standard: {
-      name: t("standard"),
-      description: t("standardDescription"),
-      actionable: true,
-    },
-    premium: {
-      name: t("premium"),
-      description: t("premiumDescription"),
-      actionable: true,
-    },
-  };
-
-  return (
-    <div className="max-w-6xl mx-auto px-6 py-20">
-      <div className="text-center mb-16">
-        <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-4">
-          Plans
-        </p>
-        <h1 className="mb-6">{t("title")}</h1>
-        <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl mx-auto">{t("description")}</p>
-      </div>
-
-      {/* Plan cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
-        {TIERS.map((tier) => {
-          const config = tierConfig[tier];
-          const isCurrent = tier === currentTier;
-
-          return (
-            <div
-              key={tier}
-              className={`rounded-xl p-6 flex flex-col gap-5 bg-card ${
-                isCurrent
-                  ? "border-2 border-foreground"
-                  : "border border-border"
-              }`}
-            >
-              {/* Header */}
-              <div className="flex flex-col gap-2">
-                {isCurrent && (
-                  <span className="inline-flex w-fit rounded-full bg-muted text-foreground px-3 py-1 text-xs font-medium">
-                    {t("currentPlan")}
-                  </span>
-                )}
-                <h2 className="text-xl font-medium">{config.name}</h2>
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  {config.description}
-                </p>
-              </div>
-
-              {/* Perks */}
-              <ul className="flex-1 flex flex-col gap-3">
-                {PLAN_FEATURES.map((feature) => {
-                  const included = feature.tiers.includes(tier);
-                  return (
-                    <li
-                      key={feature.key}
-                      className={`text-sm flex items-start gap-2 ${
-                        included ? "text-foreground" : "text-muted-foreground"
-                      }`}
-                    >
-                      <span className="shrink-0 font-medium">
-                        {included ? "＋" : "－"}
-                      </span>
-                      <span className="flex-1">{t(feature.key)}</span>
-                    </li>
-                  );
-                })}
-              </ul>
-
-              {/* Action */}
-              {isCurrent ? (
-                <div className="flex justify-center px-4 py-2">
-                  <span className="text-sm font-medium text-muted-foreground">
-                    {t("currentPlan")}
-                  </span>
-                </div>
-              ) : config.actionable ? (
-                <Button variant="secondary" className="w-full rounded-lg bg-muted text-foreground hover:bg-muted/80 active:bg-muted/70" asChild>
-                  <Link href="/contact">{t("comingSoon")}</Link>
-                </Button>
-              ) : null}
-            </div>
-          );
-        })}
-      </div>
-
-      <p className="text-sm text-muted-foreground text-center">
-        {t("contactUs")}
-      </p>
-    </div>
-  );
+  const locale = await getLocale();
+  permanentRedirect(getPathname({ href: "/subscription", locale }));
 }

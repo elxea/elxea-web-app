@@ -876,6 +876,15 @@
     "stepOf": "{current} / {total}",
     "chatCta": "Record your experience →"
   },
+  "tastingNoteR2": {
+    "title": "Tasting Notes",
+    "lead": "The teas you have drunk, and a line about each. What comes next is decided here.",
+    "empty": "No notes yet. Once you have had a cup, you can keep a record of it here.",
+    "moodAgain": "Would brew again",
+    "moodMatched": "Good match",
+    "moodLogged": "Just a note",
+    "outroLink": "Looking for your next cup → the tea shelf"
+  },
   "shipping": {
     "title": "Delivery",
     "kicker": "DELIVERY",

@@ -4,11 +4,6 @@
       "count": 2
     }
   },
-  "app/[locale]/membership/page.tsx": {
-    "elxea-tokens/no-raw-colors": {
-      "count": 1
-    }
-  },
   "app/[locale]/people/[slug]/page.tsx": {
     "elxea-tokens/no-raw-colors": {
       "count": 1
@@ -19,7 +14,7 @@
       "count": 1
     }
   },
-  "app/[locale]/tasting-note/page.tsx": {
+  "app/[locale]/tasting-note/feedback/page.tsx": {
     "elxea-tokens/no-raw-colors": {
       "count": 1
     }

@@ -1057,3 +1057,67 @@ export function seedFarmerVoices(): SeedFarmerVoice[] {
     quote: voice.quote,
   }));
 }
+
+// ---------------------------------------------------------------------------
+// テイスティングノート (飲んだ記録) — /ja/tasting-note
+// ---------------------------------------------------------------------------
+
+export type SeedTastingNote = {
+  id: string;
+  date: string;
+  title: string;
+  note: string;
+  mood: "again" | "matched" | "logged";
+  imageUrl: string;
+};
+
+/**
+ * `/ja/tasting-note` の見本記録 (計測用)。
+ *
+ * 飲んだ記録のバックエンドはまだ無い (`lib/` に karte / diary のデータ源が存在しない)。
+ * 素のままでは一覧が空で、確定版の DiaryCard を実寸計測できないため見本を返す。
+ *
+ * - フラグ未設定時 (= production / Vercel Preview の既定) は `null` を返すので、
+ *   描画は見本導入前と同じ (実データが無ければ「まだ記録がありません」の 1 行)
+ * - 文言・日付・手ざわりは R2 確定版 `8105:1125` / `8105:1262` の見本表記を
+ *   そのまま写した (8月26日 焙じ茶 — 秋摘み / 8月19日 水出し煎茶 — 八女 /
+ *   8月11日 白茶 — 月光白 / 8月3日 ほうじ玄米茶)。チップ 3 種
+ *   (また淹れたい / 合っていた / 記録だけ) が 1 画面で全部測れる並びになっている
+ * - `href` は付けない。記録の詳細ルートは R2 に無く、見本から 404 に飛ばさない
+ */
+export function seedTastingNotes(): SeedTastingNote[] | null {
+  if (!previewSeedEnabled()) return null;
+
+  const rows: Omit<SeedTastingNote, "id" | "imageUrl">[] = [
+    {
+      date: "8月26日",
+      title: "焙じ茶 — 秋摘み",
+      note: "夜の読書と。二煎目の甘さが残る",
+      mood: "again",
+    },
+    {
+      date: "8月19日",
+      title: "水出し煎茶 — 八女",
+      note: "素麺のあとに。青い香りが立つ",
+      mood: "matched",
+    },
+    {
+      date: "8月11日",
+      title: "白茶 — 月光白",
+      note: "湯上がりに。何もしない時間の味",
+      mood: "logged",
+    },
+    {
+      date: "8月3日",
+      title: "ほうじ玄米茶",
+      note: "朝の仕事前に。香ばしさで目が覚める",
+      mood: "matched",
+    },
+  ];
+
+  return rows.map((row, i) => ({
+    ...row,
+    id: `${SEED_ID_PREFIX}tasting-note-${i + 1}`,
+    imageUrl: previewImageForKey(`tasting-note-${i + 1}`),
+  }));
+}

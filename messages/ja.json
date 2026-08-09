@@ -876,6 +876,15 @@
     "stepOf": "{current} / {total}",
     "chatCta": "体験を記録する →"
   },
+  "tastingNoteR2": {
+    "title": "テイスティングノート",
+    "lead": "飲んだお茶と、そのときのひとこと。次に届くお茶は、ここから決まります。",
+    "empty": "まだ記録がありません。お茶を飲んだら、ここに残していけます。",
+    "moodAgain": "また淹れたい",
+    "moodMatched": "合っていた",
+    "moodLogged": "記録だけ",
+    "outroLink": "次の一杯を探しに → 茶葉の棚へ"
+  },
   "shipping": {
     "title": "配送について",
     "kicker": "DELIVERY",
