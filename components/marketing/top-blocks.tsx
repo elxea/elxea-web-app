@@ -65,6 +65,18 @@ export type TopSectionHeadProps = {
   title?: string;
   /** 見出し下のリード 1 行 (導線ブロックのみ)。 */
   lead?: string;
+  /**
+   * SP ではキッカーを描かない。Figma SP 茶 (EC) `8109:46644` は head が
+   * 見出し「茶葉」1 本だけで、PC `8109:46597` の "TEA LEAVES" を持たない。
+   * 装飾の英字なので SP では DOM ごと落とす (a11y ツリーからも消える)。
+   */
+  overlineSpHidden?: boolean;
+  /**
+   * SP では 32px 見出しを描かない。Figma SP カテゴリ `8109:46629` は head が
+   * キッカー "CATEGORIES" だけで、PC `8109:46569` の見出しを持たない。
+   * 節の名前づけを失わないよう、見出しは `sr-only` で a11y ツリー / SEO に残す。
+   */
+  titleSpHidden?: boolean;
   className?: string;
 };
 
@@ -72,17 +84,35 @@ export function TopSectionHead({
   overline,
   title,
   lead,
+  overlineSpHidden,
+  titleSpHidden,
   className,
 }: TopSectionHeadProps) {
   return (
     <div data-slot="top-section-head" className={cn("flex flex-col", className)}>
-      <p className={cn(overlineClass, "text-muted-foreground")}>{overline}</p>
+      <p
+        className={cn(
+          overlineClass,
+          "text-muted-foreground",
+          overlineSpHidden && "hidden lg:block"
+        )}
+      >
+        {overline}
+      </p>
       {title ? (
         /* 体裁は h1 プリセット (32px)。Figma の節見出しは jp/h1 = 32 / lh 1.2 で
            ページ主見出し (44px display) の 1 段下。globals.css の unlayered な
            `h2 { font: … }` が utilities に勝つため、体裁は同ファイルの
            `h2[data-slot="top-section-title"]` 規則で当てる (section-title と同型)。 */
-        <h2 data-slot="top-section-title" className="mt-3">
+        <h2
+          data-slot="top-section-title"
+          className={cn(
+            /* キッカーを SP で落とす節では、見出しが head の先頭に来るので
+               キッカーとの間隔 12 も SP では持たせない。 */
+            overlineSpHidden ? "mt-0 lg:mt-3" : "mt-3",
+            titleSpHidden && "sr-only lg:not-sr-only"
+          )}
+        >
           {title}
         </h2>
       ) : null}
@@ -118,14 +148,20 @@ export function FeedList({
   return (
     <ul
       data-slot="feed-list"
-      className={cn("mt-4 flex flex-col gap-4 lg:mt-6 lg:gap-6", className)}
+      /* SP の行ピッチは Figma 実測 44 (8110:47189 の行 y42/86/130・各 h44)。
+         行枠そのものが 44 (= タップ域) なので SP では行間 gap を持たせない。
+         min-h 44 + gap 16 を積むとピッチ 60 になり Figma から外れる。
+         PC は行高 28 + gap 24 = ピッチ 52 (8110:2505/2508/2511)。 */
+      className={cn("mt-4 flex flex-col gap-0 lg:mt-6 lg:gap-6", className)}
     >
       {items.map((item) => (
         <li key={item.href + item.title}>
           <Link
             href={item.href}
-            /* SP の行枠は Figma 実測 44 = タップ域。PC は行高 28 のまま。 */
-            className="group flex min-h-11 flex-wrap items-baseline gap-x-8 gap-y-1 lg:min-h-0"
+            /* SP の行枠は Figma 実測 44 = タップ域。1 行を枠の中で上下中央に置く
+               (Figma SP も h44 の枠に 1 行だけを収めている)。PC は行高 28 のまま
+               タイトルとメタをベースラインで揃える。 */
+            className="group flex min-h-11 flex-wrap items-center gap-x-8 gap-y-1 lg:min-h-0 lg:items-baseline"
           >
             <span
               className={cn(
@@ -136,7 +172,16 @@ export function FeedList({
               {item.title}
             </span>
             {item.meta ? (
-              <span className={cn(captionClass, "text-muted-foreground")}>
+              /* Figma SP の行 (8110:47189) はタイトル 1 行だけで日付を持たない。
+                 SP で 2 行目に回すと行高が 44 を超えるので視覚上は落とすが、
+                 情報を失わないよう `sr-only` で a11y ツリー / クローラには残す。
+                 PC (8110:2507 等) はタイトル右に 32 の間隔で並べる。 */
+              <span
+                className={cn(
+                  captionClass,
+                  "sr-only text-muted-foreground lg:not-sr-only"
+                )}
+              >
                 {item.meta}
               </span>
             ) : null}
@@ -264,7 +309,9 @@ export function ChapterStatement({
           <p className={cn(overlineClass, "text-brand-sand")}>{overline}</p>
           <h2
             data-slot="top-section-title"
-            className="mt-5 text-primary-foreground"
+            /* キッカー→見出しは Figma 実測 24 (PC 8109:46593 y163.5 h17 →
+               8109:46594 y204.5 / SP 8109:46641 y126 h17 → 8109:46642 y167)。 */
+            className="mt-6 text-primary-foreground"
           >
             {title}
           </h2>
@@ -411,11 +458,14 @@ export function TopHero({
         {image}
       </div>
 
+      {/* 内側 3 段の間隔は SP 16 / PC 24。SP は Figma 8109:46623 の子で実測
+          (46624 h35 → 46625 y83 / 46625 h28 → 46626 y127 / 46626 h50 →
+          46627 y193 = いずれも 16)。PC は 8109:46560 側が 24 で一致済み。 */}
       <div className="mt-8 flex flex-col lg:order-1 lg:mt-0 lg:w-104 lg:shrink-0">
         <h1 className="hero-display">{title}</h1>
-        <p className={cn(bodyClass, "mt-6 text-foreground")}>{subtitle}</p>
-        <p className={cn(bodySmClass, "mt-6 text-muted-foreground")}>{lead}</p>
-        <div className="mt-6">
+        <p className={cn(bodyClass, "mt-4 text-foreground lg:mt-6")}>{subtitle}</p>
+        <p className={cn(bodySmClass, "mt-4 text-muted-foreground lg:mt-6")}>{lead}</p>
+        <div className="mt-4 lg:mt-6">
           <Link
             href={ctaHref}
             className={cn(

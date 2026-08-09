@@ -124,9 +124,11 @@ export default async function HomePage() {
         <SeasonalSection />
       </Suspense>
 
-      {/* Figma SP は上下 64 (8109:46644)。PC は他節と同じ 96。 */}
+      {/* Figma SP は上下 64 (8109:46644)。PC は他節と同じ 96。
+          SP の head は見出し「茶葉」1 本だけで、PC の キッカー "TEA LEAVES"
+          (8109:46598) を持たないので SP では出さない。 */}
       <TopSection className="py-16 lg:py-24">
-        <TopSectionHead overline="TEA LEAVES" title={t("teaTitle")} />
+        <TopSectionHead overline="TEA LEAVES" title={t("teaTitle")} overlineSpHidden />
         <Suspense fallback={<FeaturedProductsSkeleton />}>
           <FeaturedProducts />
         </Suspense>
@@ -326,6 +328,8 @@ function FeaturedProductsSkeleton() {
 
 /** Figma は PC 3 列 x 2 段 = 6 タイル (8109:46572 / 8109:46582)。 */
 const TOP_CATEGORY_COUNT = 6;
+/** Figma SP は 1 列 x 3 段 = 3 タイル (8109:46631 / 46634 / 46637)。 */
+const TOP_CATEGORY_COUNT_SP = 3;
 
 async function CategoriesSection() {
   const t = await getTranslations("homeR2");
@@ -338,18 +342,30 @@ async function CategoriesSection() {
     );
     if (collections.length === 0) return null;
 
-    /* Figma SP は上下 48 (8109:46629)。PC は 96。 */
+    /* Figma SP は上下 48 (8109:46629)。PC は 96。
+       SP の head はキッカー "CATEGORIES" (8109:46630) だけで、PC の 32px 見出し
+       (8109:46571) を持たない。タイルも SP は 3 枚 (節高 1037 =
+       48 + 17 + 24 + 284x3 + 24x2 + 48)。 */
     return (
       <TopSection className="py-12 lg:py-24">
-        <TopSectionHead overline="CATEGORIES" title={t("categoriesTitle")} />
+        <TopSectionHead
+          overline="CATEGORIES"
+          title={t("categoriesTitle")}
+          titleSpHidden
+        />
         <ActionTileGrid>
-          {collections.map((collection) => (
+          {collections.map((collection, i) => (
             <ActionTile
               key={collection.handle}
               href={`/collections/${collection.handle}`}
               image={collection.image?.url}
               imageAlt={collection.image?.altText || collection.title}
               label={collection.title}
+              /* 4 枚目以降は PC のみ。実データが 1 件なら 1 枚しか出ない
+                 (「データが無い節は出さない」方針と同じで、枠は作らない)。 */
+              className={
+                i >= TOP_CATEGORY_COUNT_SP ? "hidden lg:flex" : undefined
+              }
             />
           ))}
         </ActionTileGrid>
