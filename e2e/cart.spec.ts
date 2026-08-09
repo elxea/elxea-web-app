@@ -1,6 +1,11 @@
 import { test, expect } from "@playwright/test";
 
-import { addToCart, gotoNonEmptyCart, openPurchasableProduct } from "./support/preconditions";
+import {
+  STOREFRONT_CONFIGURED,
+  addToCart,
+  gotoNonEmptyCart,
+  openPurchasableProduct,
+} from "./support/preconditions";
 
 test.describe("Cart", () => {
   test("cart page shows empty state initially", async ({ page }) => {
@@ -76,7 +81,7 @@ test.describe("Checkout happy path", () => {
      * skip は `pnpm report:e2e-skips` で CI サマリに出るので不可視にはならない。
      */
     test.skip(
-      !process.env.SHOPIFY_STORE_DOMAIN || !process.env.SHOPIFY_STOREFRONT_ACCESS_TOKEN,
+      !STOREFRONT_CONFIGURED,
       "Shopify Storefront の資格情報 (SHOPIFY_STORE_DOMAIN / " +
         "SHOPIFY_STOREFRONT_ACCESS_TOKEN) が未設定 — 実カート書き込みと実チェックアウト " +
         "URL の到達性は見本データで代替できない",

@@ -21,6 +21,35 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 const ALLOW_SKIP = process.env.E2E_ALLOW_SKIP === "1";
 
 /**
+ * True when the Shopify Storefront API is reachable (both credentials present).
+ *
+ * 商品一覧・商品詳細・検索は資格情報が無くても見本カタログで動く
+ * (`lib/preview-seed-storefront.ts`)。**動かないのはその先** —
+ * カートへの書き込み (`cartCreate` / `cartLinesAdd`)、Shopify が発行する
+ * チェックアウト URL、そして SellingPlan (定期便) の存在。これらは実在の
+ * ストアに依存するので、見本データで代替すると「受け渡しが本当に成立するか」
+ * という検証そのものが消える。
+ */
+export const STOREFRONT_CONFIGURED = Boolean(
+  process.env.SHOPIFY_STORE_DOMAIN && process.env.SHOPIFY_STOREFRONT_ACCESS_TOKEN,
+);
+
+/**
+ * 定期便 (SellingPlan) を要求するテストの skip 理由。
+ *
+ * 見本カタログは `sellingPlanGroups: []` を意図的に持つ。SellingPlan だけ
+ * 見本で生やしても「定期購入」ボタンが出るところまでで、その先のカート書き込みは
+ * Shopify 実契約が無いと必ず失敗するため、途中で落ちるテストが増えるだけになる。
+ * CI に SellingPlan の fixture が無いことは docs/ci-gates.md と ci.yml の
+ * 「Report skipped tests」ステップが既に前提として書いている。
+ *
+ * 共有定数にしてあるのは、CI サマリでこれらが 1 原因としてまとまるため。
+ */
+export const SELLING_PLAN_SKIP_REASON =
+  "Shopify Storefront の資格情報が未設定 — 定期便 (SellingPlan) の商品は実ストアにしか無く、" +
+  "見本カタログ (PREVIEW_SEED_STOREFRONT) は sellingPlanGroups を意図的に空にしている";
+
+/**
  * Fails the test with a precondition message, or — only when `E2E_ALLOW_SKIP=1`
  * — records an explicit, annotated skip.
  */

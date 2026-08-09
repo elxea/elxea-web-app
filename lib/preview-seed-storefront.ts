@@ -57,6 +57,13 @@ type SeedSpec = {
   price: string;
   compareAt?: string;
   description: string;
+  /**
+   * 日本語 + 英語の両方を入れる。実 Shopify の商品も英語タグを持ち、
+   * ストアフロント検索は `q=tea` のような英語語でヒットする
+   * (e2e/search.spec.ts「search results show count or products」が
+   * まさに `q=tea` を投げる)。日本語だけにすると見本カタログでは 0 件になり、
+   * 「検索が動いている」ことを確認できなくなる。
+   */
   tags: string[];
   variety: string;
   teaCategory: string;
@@ -80,7 +87,7 @@ const SEED_SPECS: SeedSpec[] = [
     price: "1800",
     description:
       "静岡・本山の単一茶園から。朝の霧が育てた、青くやわらかな一番茶です。湯温は少し落として、香りを立たせてください。",
-    tags: ["煎茶", "静岡", "一番茶"],
+    tags: ["煎茶", "静岡", "一番茶", "tea", "green tea", "sencha"],
     variety: "やぶきた",
     teaCategory: "緑茶",
     taste: "やわらかな旨み",
@@ -94,7 +101,7 @@ const SEED_SPECS: SeedSpec[] = [
     compareAt: "2400",
     description:
       "京都・和束の在来種。渋みの角を落とした、水色の淡い煎茶。二煎目から甘みが出ます。",
-    tags: ["煎茶", "京都", "在来"],
+    tags: ["煎茶", "京都", "在来", "tea", "green tea", "sencha"],
     variety: "在来",
     teaCategory: "緑茶",
     taste: "淡い甘み",
@@ -107,7 +114,7 @@ const SEED_SPECS: SeedSpec[] = [
     price: "1200",
     description:
       "福岡・八女の茎を強めに焙じました。夜に飲んでも重くならない、香ばしさだけのお茶です。",
-    tags: ["ほうじ茶", "福岡", "茎茶"],
+    tags: ["ほうじ茶", "福岡", "茎茶", "tea", "roasted tea", "hojicha"],
     variety: "やぶきた",
     teaCategory: "緑茶",
     taste: "香ばしい",
@@ -120,7 +127,7 @@ const SEED_SPECS: SeedSpec[] = [
     price: "2400",
     description:
       "鹿児島・霧島の紅茶。渋みが立たないので、砂糖も牛乳も要りません。冷やしても濁りません。",
-    tags: ["和紅茶", "鹿児島"],
+    tags: ["和紅茶", "鹿児島", "tea", "black tea", "wakoucha"],
     variety: "べにふうき",
     teaCategory: "紅茶",
     taste: "まるい甘み",
@@ -133,7 +140,7 @@ const SEED_SPECS: SeedSpec[] = [
     price: "3600",
     description:
       "被覆栽培の玉露。低温で長く出して、少量を舌にのせてください。旨みの輪郭がはっきりします。",
-    tags: ["玉露", "京都"],
+    tags: ["玉露", "京都", "tea", "green tea", "gyokuro"],
     variety: "あさひ",
     teaCategory: "緑茶",
     taste: "濃い旨み",
@@ -146,7 +153,7 @@ const SEED_SPECS: SeedSpec[] = [
     price: "1600",
     description:
       "夏摘みの二番茶。渋みをそのまま活かして、氷水で出すお茶に向いています。",
-    tags: ["煎茶", "静岡", "二番茶"],
+    tags: ["煎茶", "静岡", "二番茶", "tea", "green tea", "sencha"],
     variety: "やぶきた",
     teaCategory: "緑茶",
     taste: "きりりとした渋み",
@@ -164,8 +171,15 @@ function buildProduct(spec: SeedSpec, index: number): Product {
     height: 1067,
   };
 
-  // 最後の 1 件だけ売り切れにして、在庫バッジの描画経路も見本で通る状態にする。
-  const availableForSale = index !== SEED_SPECS.length - 1;
+  /* 1 件だけ売り切れにして在庫バッジの描画経路も見本で通す。
+   *
+   * ただし **createdAt が最も古い 1 件** を選ぶ。商品一覧の既定は
+   * 新着順 (CREATED_AT / reverse) なので、最新の 1 件を売り切れにすると
+   * 一覧の先頭カードが売り切れ商品になり、「一覧の最初の商品を開いて
+   * バリアントを選ぶ」系の e2e (product.spec.ts「variant selector appears
+   * when product has variants」) が disabled ボタンを掴んで固まる。
+   * 一番古い = 既定順で最後尾なので、先頭は必ず購入可能な商品になる。 */
+  const availableForSale = index !== 0;
 
   const variant = (size: string, amount: string, suffix: string) => ({
     id: `${SEED_ID_PREFIX}variant-${spec.handle}-${suffix}`,

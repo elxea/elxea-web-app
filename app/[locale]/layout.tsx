@@ -89,7 +89,18 @@ export default async function LocaleLayout({
   }
 
   return (
-    <html lang={locale}>
+    /* suppressHydrationWarning は <html> の**属性だけ**に効く (子要素には及ばない)。
+     * 下の Typekit ローダーは hydration より前に
+     * `document.documentElement.className += " wf-loading"` を実行するので、
+     * サーバ HTML の `class` (無し) とクライアントの `class=" wf-loading"` が
+     * 必ず食い違う。React はこれを毎ページで hydration mismatch として報告し、
+     * dev では**エラーオーバーレイが常時開く**。オーバーレイは自前の
+     * <footer data-nextjs-error-overlay-footer> を持つため
+     * `page.locator("footer")` が 2 件に解決して e2e が strict mode 違反で落ちる
+     * (mobile.spec.ts「footer is accessible on mobile」で実測)。
+     * next-themes 等と同じ、外部スクリプトが <html> のクラスを書き換える定型
+     * ケースなのでここで抑制する。 */
+    <html lang={locale} suppressHydrationWarning>
       <head>
         {/* Adobe Fonts (Typekit kit fwg7gtf) — loaded via the official async JS
          * embed. The kit is configured as JS-only: the CSS endpoint

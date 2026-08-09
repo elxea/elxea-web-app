@@ -20,6 +20,8 @@
 
 import { test, expect, type APIRequestContext, type Page } from "@playwright/test";
 
+import { SELLING_PLAN_SKIP_REASON, STOREFRONT_CONFIGURED } from "./support/preconditions";
+
 // ─── ヘルパー: Admin API が利用可能かチェック ─────────────────────────────
 
 /**
@@ -369,6 +371,11 @@ test.describe("サブスクリプション フロー シミュレーション", 
   test("フロー 1: 定期購入商品選択 → カートへ追加 → チェックアウト URL 生成", async ({
     page,
   }) => {
+    /* SellingPlan を持つ実商品が必要。見本カタログ (PREVIEW_SEED_STOREFRONT) は
+     * sellingPlanGroups を意図的に空にしているので、資格情報が無い環境では
+     * 商品詳細を 5 枚たどって 30 秒の予算を使い切るだけになる (実測 2026-08-09)。 */
+    test.skip(!STOREFRONT_CONFIGURED, SELLING_PLAN_SKIP_REASON);
+
     // ステップ1: 商品一覧ページから定期便対応商品を探す
     await page.goto("/ja/products");
 
