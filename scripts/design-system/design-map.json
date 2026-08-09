@@ -323,7 +323,7 @@
       "figma_name": "ArticleFigure (Proposed)",
       "code_path": "components/sanity/portable-text.tsx",
       "kind": "ds-component",
-      "notes": "記事図版 + キャプション。PortableText の image シリアライザ内で figure/figcaption として描画 (inline 定義部品の規約に従い定義ファイルを code_path とする)。"
+      "notes": "記事図版 + キャプション。PortableText の image シリアライザ内で figure/figcaption として描画 (inline 定義部品の規約に従い定義ファイルを code_path とする)。 C9-1R: 各ブロックに last:mb-0 を追加し、最終ブロックの下マージンが節の外へ漏れるのを止めた (お茶メニュー詳細SP 80→64 / 農家詳細 64→48)。ラッパは足していない (呼び出し側が直下子セレクタで縦リズムを組むため)。"
     },
     {
       "figma_node_id": "6857:311",
