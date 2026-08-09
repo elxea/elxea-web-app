@@ -142,6 +142,33 @@ const nextConfig: NextConfig = {
         destination: "/ja/legal/terms",
         permanent: true,
       },
+      /* C13-1: メンバーシップ → 定期便LP の恒久統合。
+       *
+       * メンバーシップは R2 でページごと廃止された (決定 2026-08-08)。根拠は R2 確定版
+       * 定期便LP の節 `7973:42297` / `7973:42298`「メンバーシップページ廃止 (決定
+       * 2026-08-08) に伴い、プラン選択を LP 内に畳む」と、実体としての節
+       * PC `8071:514` / SP `8073:186`「プラン選択 + 購入導線 (最下部のみ /
+       * メンバーシップ統合)」。リポジトリ側にも同じ決定が
+       * `playwright.config.ts`「会員ランク制度そのものが『無し』に決定済 (2026/08/08)」
+       * として記録されている。
+       *
+       * ページ側の `permanentRedirect()` ではなく本ブロックで転送するのは、
+       * App Router がシェルを流し始めたあとの redirect を 200 + クライアント遷移に
+       * 畳んでしまい 308 にならないため (実測: /ja/membership が 200 を返した)。
+       * URL 統合は検索側にも伝える必要があるので、Webflow 移行と同じ
+       * `redirects()` (308) に載せる。
+       *
+       * `/en/*` は middleware が先に 301 で `/ja/*` へ送るため ja だけで足りる。 */
+      {
+        source: "/ja/membership",
+        destination: "/ja/subscription",
+        permanent: true,
+      },
+      {
+        source: "/membership",
+        destination: "/ja/subscription",
+        permanent: true,
+      },
     ];
   },
   async headers() {

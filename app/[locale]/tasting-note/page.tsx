@@ -82,8 +82,14 @@ export default async function TastingNotePage() {
       />
 
       {records.length > 0 ? (
+        /* 読み枠は R2 の TastingNotes ブロック幅 896 に合わせる (`max-w-224`)。
+           お茶カルテ R2 は Main 1440 を TastingNotes 896 + Sidebar 384 に割って
+           いて、カード自体は 896。単独ページでサイドバーが無いからといって
+           コンテンツ幅 1312 まで伸ばすと、ひとこと 1 行に対して本文カラムが
+           1016 になりカードの体裁が R2 から外れる。見出し (PageTitle) 側は
+           R2 でも全幅 1312 なので、そちらは伸ばしたままにする。 */
         <TastingNoteList
-          className="mt-8 lg:mt-12"
+          className="mt-8 max-w-224 lg:mt-12"
           records={records}
           moodLabels={moodLabels}
         />

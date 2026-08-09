@@ -153,9 +153,9 @@
     {
       "figma_node_id": "6951:126",
       "figma_name": "MembershipPlanCard",
-      "code_path": "app/[locale]/membership/page.tsx",
+      "code_path": "next.config.ts",
       "kind": "ds-component",
-      "notes": "inline (TIERS.map, tier ごとに構成)。専用 component 無し。"
+      "notes": "R2 でメンバーシップはページごと廃止 (決定 2026-08-08 / R2 確定版 定期便LP の 7973:42298)。3 ティア比較カードは仕様そのものが消えた (playwright.config.ts 「会員ランク制度そのものが『無し』に決定済」)。/ja/membership は next.config.ts の redirects() で 308 → /ja/subscription。プラン選択の後継は R2 LP の節 8071:514 (PC) / 8073:186 (SP)。C13-1 で是正。"
     },
     {
       "figma_node_id": "6956:18179",
@@ -1304,6 +1304,34 @@
       "code_path": "app/[locale]/about/page.tsx",
       "kind": "ds-component",
       "notes": "body-sm のリンク 2 本。PC は 12 列グリッドの col1-4 / col5-8 (x64 / x512 = 実測どおり)、SP は縦積みピッチ 40 (8121:1404)。"
+    },
+    {
+      "figma_node_id": "8105:1125",
+      "figma_name": "TastingNotes (飲んだ記録 / EC テイスティングノート統合) — PC",
+      "code_path": "components/karte/tasting-notes.tsx",
+      "kind": "ds-component",
+      "notes": "R2 確定版 お茶カルテ 8105:1116 内のブロック (896x652)。テイスティングノート単独の R2 フレームは全数走査で不在 (Structure DB の Figma 6728:120 は旧 elxea 変A)。よって本ノードが /ja/tasting-note の正本。SP は 8105:1262。カード 8105:1127 / 写真 8105:1128 / チップ 8105:1133 (塗り) と 8105:1149 (線)。"
+    },
+    {
+      "figma_node_id": "8105:1262",
+      "figma_name": "飲んだ記録 — SP",
+      "code_path": "components/karte/tasting-notes.tsx",
+      "kind": "ds-component",
+      "notes": "SP 343x718。PC と DOM を共有し grid の明示配置で「ひとこと」の行だけ移す (SP は写真の下に 全幅 311 / PC は銘柄の下 col2 row2)。同じ文字列を hidden で二重に描かないため。カード 8105:1264 / 写真 64 / チップ pad 12-16。"
+    },
+    {
+      "figma_node_id": "8105:1120",
+      "figma_name": "お茶カルテ PageTitle (キッカー + 主見出し + リード)",
+      "code_path": "app/[locale]/tasting-note/page.tsx",
+      "kind": "ds-component",
+      "notes": "共有 ListPageHead に載せた。主見出しは全体裁定どおり PC 44 (display) / SP 32 で、Figma ノードの PC 32 とは意図的に違う (マイページ R2 の AccountTitleBlock と同じ扱い)。キッカー・リードは DS の overline 12 / caption 12 で Figma の 14 とは差がある (共有部品なので本レーンでは変えない)。SP は 8105:1251。"
+    },
+    {
+      "figma_node_id": "8105:1200",
+      "figma_name": "お茶カルテ 茶葉導線 (次の一杯を探しに → 茶葉の棚へ)",
+      "code_path": "app/[locale]/tasting-note/page.tsx",
+      "kind": "ds-component",
+      "notes": "中央寄せの静かな 1 本 (body 16 / lh 28)。SP 8105:1330 は link 枠が h48 なのでタップ域 48 を min-h-12 で確保する。"
     }
   ],
   "unmapped_figma_nodes": [
