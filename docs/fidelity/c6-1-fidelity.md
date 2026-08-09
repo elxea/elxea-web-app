@@ -212,7 +212,8 @@ Reviewへ切り出している (末尾「要判断の3件」節)。
 | Check Circle | 寸法 | 64 × 64 | 64 × 64 (`size-16`) | [OK] |
 | Check Circle | 角丸 | full (`radius-full`) | full (`rounded-full`) | [OK] |
 | Check Circle | 面色 | `#9ecbc0` (`success`) | `#9ecbc0` (`bg-success`) | [OK] |
-| Check Circle | 記号色 | `#f9f8f4` (`primary-foreground`) | `#ffffff` → 現 #f9f8f4 [解決 2026-08-09] | [OK] Δ微 / 注4 |
+| Check Circle | 記号色 | `#f9f8f4` (`primary-foreground`) | ~~`#f9f8f4`~~ → **`#464748`** (`success-foreground`) [C17-1で是正] | [仕様] 注11 |
+| ✓ / 円 | **非テキスト対比** (WCAG 1.4.11 = 3:1) | Figmaは白抜き = **1.681:1** (未達) | **5.213:1** (C17-1で是正) | [OK] 注11 |
 | Check Circle | 記号 | テキスト「✓」27 × 36 (30px Bold) | lucide `Check` 32 × 32 / strokeWidth 3 | [仕様] 注9 |
 | Heading | gap (PC) | 8 | 8 (`md:gap-2`) | [OK] |
 | Heading | gap (SP) | 12 | 12 (`gap-3`) | [OK] |
@@ -348,6 +349,24 @@ Figma側を直すか実装の読み替えを承認するかはReviewへ。
 C6-1Rで `destructive` をFigma実在値 #ae4751 (= `oklch(0.537 0.135 17)`) に戻し、
 対比 **4.521:1** = AA合格にした。詳細と全使用箇所のbefore/afterは
 `docs/fidelity/c6-1r-fidelity.md`。
+
+### 注11 — 完了マークの✓を濃色にした (C17-1で是正)【仕様】
+
+Figmaの指定は白抜き (`primary-foreground` = `#f9f8f4`) だが、円 (`success` = `#9ecbc0`)
+の上での非テキスト対比は **1.681:1** で、WCAG 1.4.11の3:1に届かない。この✓は
+「連携が完了した」という状態を伝える唯一の図なので装飾例外に当たらない。
+記号色を対の意味色 `success-foreground` (`#464748`) に変え、**5.213:1** にした。
+円の色・寸法 (64) ・角丸 (full) ・✓の図形サイズ (32) ・太さ (strokeWidth 3) は
+すべて不変で、変えたのは記号色だけ。
+
+同じ理由でFigmaから外した先例が注8 (成功バナーの文字色を `success` → `success-foreground`)
+で、**同じ対の色**を使うことで整合させている。測定は同一ビルド上で記号色を旧値に
+描き替えたbefore / after比較で、色はscreenshot → canvas `getImageData` から取得した。
+詳細は `docs/fidelity/c17-1-fidelity.md` の3節。
+
+なお裁定文の「1.786:1」は記号色を純白 `#ffffff` として計算した値で、
+`primary-foreground` がDSトークン整合 (2026-08-09) で `#f9f8f4` に直っているため
+実際の修正前の値は1.681:1だった (どちらも3:1未達である点は同じ)。
 
 ### 注9 — 完了マークの記号はlucideアイコンに置換【仕様】
 

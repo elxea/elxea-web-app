@@ -214,6 +214,16 @@ Figmaの `jp/h4` はlh 1.5 / 2%。**日本語の文字組みトークンはSetak
 | 行合計 | font-size / weight / lh | 14 / 500 / 21 | 14 / 500 / 23.8 | [OK] Δ2.8注7 |
 | CartItemSP | 1行目の高さ | 137 (+ gap24 + 罫線1 = 162) | 168.16 (padding 24 + 罫線1込み) | [OK] Δ6注9 |
 | Divider | 太さ / 色 | 1 / `border` | 1 / `divide-border` | [OK] / 色は注5 |
+| Stepper minus/plus | 視覚サイズ | 24 x 24 (`6906:335`) | **24.00 x 24.00** (SP 375実測 / C17-1後も不変) | [OK] |
+| Stepper minus/plus | **タップ域** | Figmaに枠なし (WCAG 2.5.5 = 44) | 24 → **44 x 45** (C17-1で擬似要素方式に拡張) | [OK] 注17 |
+| Stepper数値 | `pointer-events` | — | `none` (C17-1。44の枠と重なる両端6pxを素通しさせる) | [OK] 注17 |
+| 「削除」 | 中央が押せるか | — | true (ステッパの拡張で奪われていない) | [OK] |
+
+注17 (C17-1で追加): 数量ステッパのタップ域が24しかなくWCAG 2.5.5 (44) 未達だった。
+**見た目 (視覚サイズ・罫線・角丸・塗り) はFigmaの24のまま**、`::before` を44x44にして
+当たり判定だけ広げた (PCは `lg:before:hidden` でFigmaどおり24)。視覚枠の外側6pxを
+クリックしてplus / minusのhandlerに届くことを実動確認済み。実測値・走査方法・
+数値スパンの重なりの扱いは `docs/fidelity/c17-1-fidelity.md` の2節。
 
 注8: SPも `1fr` + `auto` の3列で、infoは 列2+列3を跨ぐ。列3は価格列 (`auto`) で
 Figma 47に対し59.45 (注3と同じ全角 `￥` 由来)。info実幅は170.55+16+59.45 = 246
