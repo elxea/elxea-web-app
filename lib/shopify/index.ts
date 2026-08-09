@@ -1,4 +1,10 @@
-import { shopifyFetch } from "./client";
+import { shopifyFetch, storefrontConfigured } from "./client";
+import {
+  previewSeedStorefrontEnabled,
+  seedProductByHandle,
+  seedProductCatalogue,
+  seedSearchProducts,
+} from "@/lib/preview-seed-storefront";
 import {
   GET_PRODUCTS_QUERY,
   GET_PRODUCT_BY_HANDLE_QUERY,
@@ -138,6 +144,25 @@ function reshapeProduct(raw: Record<string, unknown>): Product {
   };
 }
 
+/**
+ * True when the seeded catalogue should stand in for the Storefront API.
+ *
+ * Requires BOTH the opt-in flag and the absence of credentials, so a configured
+ * store never silently serves dummy products. See
+ * `lib/preview-seed-storefront.ts` for the full rationale.
+ */
+function useSeededStorefront(): boolean {
+  return !storefrontConfigured() && previewSeedStorefrontEnabled();
+}
+
+/** Empty `pageInfo`, for seeded results (there is no cursor to page through). */
+const SEED_PAGE_INFO = {
+  hasNextPage: false,
+  hasPreviousPage: false,
+  startCursor: null,
+  endCursor: null,
+};
+
 // Products
 export async function getProducts(options?: {
   first?: number;
@@ -145,6 +170,23 @@ export async function getProducts(options?: {
   sortKey?: string;
   reverse?: boolean;
 }) {
+  if (useSeededStorefront()) {
+    const all = seedProductCatalogue();
+    const sorted =
+      options?.sortKey === "PRICE"
+        ? [...all].sort(
+            (a, b) =>
+              Number(a.priceRange.minVariantPrice.amount) -
+              Number(b.priceRange.minVariantPrice.amount),
+          )
+        : [...all].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    if (options?.reverse) sorted.reverse();
+    return {
+      products: sorted.slice(0, options?.first ?? sorted.length),
+      pageInfo: SEED_PAGE_INFO,
+    };
+  }
+
   const data = await shopifyFetch<{
     products: ShopifyConnection<Record<string, unknown>>;
   }>({
@@ -160,6 +202,11 @@ export async function getProducts(options?: {
 }
 
 export async function getProductByHandle(handle: string) {
+  // Returns null for an unknown handle, so the page reaches `notFound()` and
+  // answers 404 instead of the soft-404 "商品を読み込めませんでした" it used to
+  // render when the Storefront call threw.
+  if (useSeededStorefront()) return seedProductByHandle(handle);
+
   const data = await shopifyFetch<{ product: Record<string, unknown> | null }>({
     query: GET_PRODUCT_BY_HANDLE_QUERY,
     variables: { handle },
@@ -210,6 +257,15 @@ export async function searchProducts(
   query: string,
   options?: { first?: number; after?: string }
 ) {
+  if (useSeededStorefront()) {
+    const hits = seedSearchProducts(query);
+    return {
+      products: hits.slice(0, options?.first ?? hits.length),
+      totalCount: hits.length,
+      pageInfo: SEED_PAGE_INFO,
+    };
+  }
+
   const data = await shopifyFetch<{
     search: ShopifyConnection<Record<string, unknown>> & { totalCount: number };
   }>({
