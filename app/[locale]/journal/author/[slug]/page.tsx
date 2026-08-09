@@ -10,8 +10,8 @@ import {
 import { urlFor } from "@/sanity/lib/image";
 import { Breadcrumb } from "@/components/seo/breadcrumb";
 import { bodySmClass } from "@/components/editorial/rule-list";
+import { CatalogGrid } from "@/components/catalog/catalog-list";
 import { ArticleCard } from "@/components/journal/article-card";
-import { JournalGrid } from "@/components/journal/journal-list";
 import {
   AuthorHead,
   AuthorSection,
@@ -228,7 +228,11 @@ export default async function AuthorPage({
         <AuthorSection>
           <AuthorSectionHead overline="ARTICLES" title={t("authorArticles")} />
           <AuthorSectionBody>
-            <JournalGrid>
+            {/* グリッドは People 詳細テンプレの札列 (PC 3 列 416 / gap-x 32 —
+                Figma 7822:37492 / 37496 / 37500 の x=64 / 512 / 960) と
+                R2 共通リストパターンの SP 2 列が一致する `CatalogGrid` を使う。
+                サイドバーが無い節なので一覧の 2 列 (452) ではなく 3 列が正。 */}
+            <CatalogGrid>
               {visible.map((article) => (
                 <ArticleCard
                   key={article._id}
@@ -236,7 +240,7 @@ export default async function AuthorPage({
                   memberOnlyLabel={tCommon("memberOnly")}
                 />
               ))}
-            </JournalGrid>
+            </CatalogGrid>
           </AuthorSectionBody>
         </AuthorSection>
       ) : null}
