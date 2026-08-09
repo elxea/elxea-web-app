@@ -56,7 +56,15 @@ export default async function ProductsPage({
 
   return (
     <Section spacing="none" className="pt-6 pb-16 lg:pb-28">
-      <Breadcrumb items={[{ label: bt("home"), href: "/" }, { label: tc("products") }]} />
+      {/* パンくず → PageHead は Figma PC 48 (R2 共通リストパターン)。共有
+          `Breadcrumb` の既定 `mb-8` (32) は他 10 ページ超が使うので変えず、
+          R2 リスト 3 画面 (商品一覧 / お茶メニュー一覧 / 農家一覧) だけ PC を
+          48 にする。SP は Figma フレームにパンくずが無いので 32 を維持。
+          C9-1 注2 の 16px 差を閉じる。 */}
+      <Breadcrumb
+        className="lg:mb-12"
+        items={[{ label: bt("home"), href: "/" }, { label: tc("products") }]}
+      />
 
       <ListPageHead
         overline="ALL PRODUCTS"

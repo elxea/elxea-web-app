@@ -86,7 +86,13 @@ export default async function FarmersPage({
 
   return (
     <Section spacing="none" className="pt-6 pb-16 lg:pb-28">
-      <Breadcrumb items={[{ label: bt("home"), href: "/" }, { label: tc("farmers") }]} />
+      {/* パンくず → PageHead は Figma PC 48 (R2 共通リストパターン)。既定
+          `mb-8` (32) は共有部品なので変えず、R2 リスト 3 画面だけ PC を 48 に
+          する (商品一覧と同じ扱い・C9-1 注2)。 */}
+      <Breadcrumb
+        className="lg:mb-12"
+        items={[{ label: bt("home"), href: "/" }, { label: tc("farmers") }]}
+      />
 
       <ListPageHead overline="FARMERS" title={t("heading")} lead={t("lead")} />
 

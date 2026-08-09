@@ -50,7 +50,12 @@ export type ListPageHeadProps = {
 
 export function ListPageHead({ overline, title, lead, className }: ListPageHeadProps) {
   return (
-    <div data-slot="list-page-head" className={cn("flex flex-col gap-3", className)}>
+    /* 段間は R2 共通リストパターンの実測どおり BP で分ける (SP 8 / PC 12)。
+       Figma: PC 8061:1785 は キッカー→見出し 12・見出し→リード 12、
+       SP 8062:2008 / 8063:2377 はどちらも 8。C9-1 注3 / C12-1 / C13-1 が
+       同じ「SP 8 に対して実装 12」を [粗] として記録していたのを閉じる
+       (R2リスト系の全画面が同じ値になるので画面ごとの分岐は作らない)。 */
+    <div data-slot="list-page-head" className={cn("flex flex-col gap-2 lg:gap-3", className)}>
       <p className={cn(overlineClass, "text-muted-foreground")}>{overline}</p>
       {/* R2 共通リストパターンの PageHead 見出しは h1 プリセット (32px) ではなく
           ページタイトル級。Figma 8061:1787「商品一覧」= w212 h73 で、束ねられた
@@ -228,7 +233,10 @@ export function MoreRow({
         href={href}
         className={cn(
           bodySmClass,
-          "flex h-12 items-center rounded-full border border-border px-4 text-foreground",
+          /* 左右内余白は Figma 実測どおり BP で分ける (SP 12 / PC 16)。
+             Figma PC 8061:2008 / 8063:2182 は text x16、SP 8063:2420 は x12。
+             C9-1 注10 が [粗] として残していた 4px 差を閉じる。 */
+          "flex h-12 items-center rounded-full border border-border px-3 text-foreground lg:px-4",
           "transition-colors hover:bg-muted"
         )}
       >
