@@ -431,6 +431,32 @@ dl[data-slot="spec-band"][data-emphasis="true"] > [data-slot="spec-item"] > dd {
 }
 
 @layer base {
+  /* Border color — no `* { border-color: … }` rule here on purpose.
+   *
+   * Stock shadcn/ui ships a preflight override
+   *   @layer base { * { @apply border-border outline-ring/50; } }
+   * so that a bare `border` utility (which in Tailwind v4 sets *width only*)
+   * picks up the `border` token instead of the CSS initial value
+   * `currentColor`. This project does not carry that rule, and that is the
+   * decision — not an oversight:
+   *
+   *   - Every screen under app/** already writes the color explicitly
+   *     (`border border-border`), so a global default would make the
+   *     established house style redundant and ambiguous to read.
+   *   - A `*` selector redefines what `currentColor` means for every element
+   *     on the page, including embedded/third-party markup we do not own.
+   *   - Being explicit is machine-checkable with zero debt, which the
+   *     `elxea-tokens/no-colorless-border` ESLint rule now enforces at
+   *     error level across app/**, components/** and stories/**.
+   *
+   * So: do NOT add the shadcn reset back. If a border needs a color, name the
+   * token on the element. If it genuinely wants the text color, write
+   * `border-current` so the intent is reviewable.
+   * Background: 罫線色の総点検 (TASK ID-7561). Before that task the missing
+   * reset was silently painting 罫線 in the body text color (#464748 graphite)
+   * instead of the `border` token (#888675) wherever a color class was absent
+   * — measured on /ja/cart (Button outline) and in 52 DS call sites. */
+
   /* Heading color — no rule here on purpose.
    *
    * Until 2026-08-09 this block carried

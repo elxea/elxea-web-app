@@ -14,7 +14,7 @@ export const Default: Story = {
   render: () => (
     <ResizablePanelGroup
       direction="horizontal"
-      className="max-w-md rounded-lg border md:min-w-[450px]"
+      className="max-w-md rounded-lg border border-border md:min-w-[450px]"
     >
       <ResizablePanel defaultSize={50}>
         <div className="flex h-[200px] items-center justify-center p-6">
@@ -35,7 +35,7 @@ export const Vertical: Story = {
   render: () => (
     <ResizablePanelGroup
       direction="vertical"
-      className="max-w-md rounded-lg border md:min-w-[450px]"
+      className="max-w-md rounded-lg border border-border md:min-w-[450px]"
     >
       <ResizablePanel defaultSize={50}>
         <div className="flex h-[100px] items-center justify-center p-6">
@@ -56,7 +56,7 @@ export const ThreePanels: Story = {
   render: () => (
     <ResizablePanelGroup
       direction="horizontal"
-      className="max-w-md rounded-lg border md:min-w-[450px]"
+      className="max-w-md rounded-lg border border-border md:min-w-[450px]"
     >
       <ResizablePanel defaultSize={25}>
         <div className="flex h-[200px] items-center justify-center p-6">

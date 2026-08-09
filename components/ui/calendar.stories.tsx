@@ -19,7 +19,7 @@ export const Default: Story = {
         mode="single"
         selected={date}
         onSelect={setDate}
-        className="rounded-md border"
+        className="rounded-md border border-border"
       />
     );
   },
@@ -37,7 +37,7 @@ export const Range: Story = {
         selected={range}
         onSelect={(r) => setRange(r ?? { from: undefined, to: undefined })}
         numberOfMonths={2}
-        className="rounded-md border"
+        className="rounded-md border border-border"
       />
     );
   },
