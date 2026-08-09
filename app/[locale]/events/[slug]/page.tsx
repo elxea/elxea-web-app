@@ -210,13 +210,14 @@ export default async function EventPage({
                   <EventBodyHeading>{t("detailsHeading")}</EventBodyHeading>
                   {event.description && (
                     // Figma 6661:13492 / 6664:8170 の本文は 16px。共有の
-                    // PortableText は段落を `text-sm` + `mb-4` で描くので、
-                    // **このページ枠の中だけ** 16px に上げ、最後の段落の下
-                    // マージンを落として節の gap 16 を Figma どおりにする
-                    // (共有部品側を変えると journal / farmers / playlists に
-                    // 波及するため触らない。記事本文の縦リズムは C4-1 で
-                    // 確定した DS 側の leading をそのまま使う)。
-                    <div className="prose-custom [&_p]:text-base [&>*:last-child]:mb-0">
+                    // PortableText は段落を `text-sm` で描くので、**このページ枠の
+                    // 中だけ** 16px に上げる (記事本文の leading は C4-1 で確定した
+                    // DS 側をそのまま使う)。
+                    // 最終ブロックの下マージン落とし (`[&>*:last-child]:mb-0`) は
+                    // C9-1R で共有シリアライザ側 (`last:mb-0`) に移したので削除した。
+                    // 同じ漏れが農家詳細・プレイリスト・お茶メニュー詳細にもあったため、
+                    // ページごとに貼るのをやめて 1 箇所で閉じている。
+                    <div className="prose-custom [&_p]:text-base">
                       <PortableText value={event.description} />
                     </div>
                   )}
