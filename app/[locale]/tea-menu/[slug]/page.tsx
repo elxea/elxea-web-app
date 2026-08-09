@@ -247,7 +247,11 @@ export default async function TeaMenuDetailPage({
         <PageSection>
           <SectionHead overline="HOW TO BREW" title={t("brewingGuide")} />
           <SectionBody>
-            <SpecBand items={brewItems} />
+            {/* 変A は値を大きく見せ SP は縦積みにする造作。専用部品を作らず
+                `SpecBand` の emphasis variant で寄せる (Boss 裁定 2026-08-09・
+                c9-1 注1h / 確認事項2)。枠線つきボックスは採らない (R2 の
+                スペック帯と同じ罫線 1 本の系統を維持する)。 */}
+            <SpecBand items={brewItems} emphasis />
           </SectionBody>
         </PageSection>
       ) : null}

@@ -353,6 +353,20 @@ h1.auth-card-title[data-emphasis="strong"] {
   }
 }
 
+/* スペック帯の emphasis variant (`SpecBand emphasis`) — お茶メニュー詳細の
+ * 淹れ方ガイド (変A 6654:13259 / SP 6656:7969) は「値を大きく見せる」造作で、
+ * 値の実測が 16〜18 相当 (text 高 24)。DS に 18px の style プリセットは無いので
+ * size トークン `--typography-size-lg` (1.125rem = 18) を参照する。
+ * Unlayered なのは値の要素が `bodySmClass`
+ * (= `[font:var(--typography-style-body-sm)]` utility) を持ち、`font:`
+ * ショートハンドが font-size を含むため utilities では上書き順を制御できないから
+ * (`.page-title` / `auth-card-title` と同じ理由)。詳細度 (0,3,3) は utilities
+ * (0,1,0) に十分勝つ。生 px は書かない。既定 (emphasis なし) には当たらないので
+ * 商品詳細・定期便 LP のスペック帯は不変。 */
+dl[data-slot="spec-band"][data-emphasis="true"] > [data-slot="spec-item"] > dd {
+  font-size: var(--typography-size-lg);
+}
+
 :root {
   /* Third-party brand colors */
   --brand-line: #06C755;

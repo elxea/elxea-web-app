@@ -118,18 +118,41 @@ export function SectionNote({ className, ...props }: React.ComponentProps<"p">) 
 
 export type SpecItem = { term: React.ReactNode; value: React.ReactNode };
 
+/**
+ * `emphasis` — 値を 1 段大きく見せ、SP を縦積みにする variant。
+ *
+ * お茶メニュー詳細の淹れ方ガイド (変A `6654:13259` / SP `6656:7969`) は
+ * 「値を大きく見せる」造作で、R2 に対応部品が無い。C9-1 は `SpecBand` を
+ * そのまま再利用したため値の強調 (18 → 14) と SP の縦積みが落ちていた
+ * (c9-1 対比表 注1h / 確認事項2)。**新規部品を作らず既存部品の variant で
+ * 対処する** Boss 裁定 (2026-08-09) に従い、prop 1 個で切り替える。
+ *
+ * 値の 18px は `--typography-size-lg` (= 1.125rem) を参照する。18px の style
+ * プリセットは DS に無く、`bodySmClass` が `font:` ショートハンドで font-size
+ * を含むため utilities では上書き順を制御できない。よって globals.css の
+ * unlayered 規則 `dl[data-slot="spec-band"][data-emphasis="true"] … dd` で
+ * font-size だけを差し替える (`.page-title` / `auth-card-title` と同じ作法・
+ * 生 px は書かない)。既定 (emphasis なし) の描画は不変なので、商品詳細・
+ * 定期便 LP には波及しない。
+ */
 export function SpecBand({
   items,
+  emphasis = false,
   className,
 }: {
   items: readonly SpecItem[];
+  emphasis?: boolean;
   className?: string;
 }) {
   return (
     <dl
       data-slot="spec-band"
+      data-emphasis={emphasis ? "true" : undefined}
       className={cn(
-        "grid grid-cols-2 gap-x-4 gap-y-4 border-t border-border pt-4",
+        "grid gap-x-4 gap-y-4 border-t border-border pt-4",
+        /* SP は既定 2 列 / emphasis は縦積み (変A SP は全幅 358 の縦積み)。
+           PC は 4 列グリッドのまま (淹れ方の 3 項目は 3 列を使う)。 */
+        emphasis ? "grid-cols-1" : "grid-cols-2",
         "lg:grid-cols-4 lg:gap-x-8 lg:pt-8",
         className
       )}
