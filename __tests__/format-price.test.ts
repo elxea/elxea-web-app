@@ -12,6 +12,7 @@
 import { describe, expect, it } from "vitest";
 
 import { formatPrice } from "@/lib/utils";
+import { formatPrice as formatPriceFromModule } from "@/lib/format-price";
 
 const FULLWIDTH_YEN = "￥";
 const HALFWIDTH_YEN = "¥";
@@ -39,5 +40,15 @@ describe("formatPrice", () => {
     // 記号は ICU 依存なので字形は問わず、金額部分だけを検査する
     expect(formatPrice("12.34", "USD")).toContain("12.34");
     expect(formatPrice("12.34", "USD")).not.toContain(FULLWIDTH_YEN);
+  });
+
+  /**
+   * メール文面 (`lib/email/subscription-reminder.ts` / `lib/email/dunning.ts`)
+   * は以前このロジックを各ファイルに複製していて、`Intl` 既定の全角 `￥` が
+   * 出ていた。共通実装に統合したので「別実装が再び生えない」ことを固定する
+   * (`@/lib/utils` は `@/lib/format-price` の再輸出であり同一関数)。
+   */
+  it("lib/utils の再輸出と lib/format-price は同一実装", () => {
+    expect(formatPrice).toBe(formatPriceFromModule);
   });
 });

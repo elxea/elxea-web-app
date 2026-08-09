@@ -1,5 +1,7 @@
 import { Resend } from "resend";
 
+import { formatPrice } from "@/lib/format-price";
+
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "no-reply@elxea.com";
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://elxea.com";
@@ -17,12 +19,9 @@ type DunningEmailData = {
   }[];
 };
 
-function formatPrice(amount: string, currencyCode: string): string {
-  return new Intl.NumberFormat("ja-JP", {
-    style: "currency",
-    currency: currencyCode,
-  }).format(parseFloat(amount));
-}
+/* 金額整形は `lib/format-price.ts` の共通実装を使う (旧: このファイルに複製が
+   あり、`Intl` 既定の全角 `￥` が出ていた。Web 側は DS レーンで半角 `¥` に
+   是正済みで、メール文面だけ残っていた差分を閉じる)。 */
 
 function buildTextEmail(data: DunningEmailData): string {
   const itemsList = data.items

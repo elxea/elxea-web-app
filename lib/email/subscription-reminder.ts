@@ -1,5 +1,7 @@
 import { Resend } from "resend";
 
+import { formatPrice } from "@/lib/format-price";
+
 let _resend: Resend | null = null;
 
 function getResend(): Resend {
@@ -29,12 +31,8 @@ type SubscriptionReminderData = {
   deliveryInterval: string;
 };
 
-function formatPrice(amount: string, currencyCode: string): string {
-  return new Intl.NumberFormat("ja-JP", {
-    style: "currency",
-    currency: currencyCode,
-  }).format(parseFloat(amount));
-}
+/* 金額整形は `lib/format-price.ts` の共通実装を使う (旧: このファイルに複製が
+   あり、`Intl` 既定の全角 `￥` が出ていた。dunning.ts と同じ是正)。 */
 
 function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString("ja-JP", {

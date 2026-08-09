@@ -252,7 +252,11 @@ const teaMenus = [
     season: "2026年 春",
     origin: "静岡県牧之原市",
     productNumber: 1,
-    netWeight: "50g",
+    // `teaMenu.netWeight` は schema 上 `type: "number"` (「内容量（g）」= 単位は
+    // schema 側が持つ) なので数値で投入する。表示側の正規化
+    // (`lib/format-net-weight.ts`) は Studio 手入力で文字列が再発しうるため
+    // 恒久で維持する (C9-1R Boss 裁定 2026-08-09)。
+    netWeight: 50,
     description: block("春の一番茶を丁寧に蒸し上げた深蒸し煎茶。甘みと旨味のバランスに優れ、毎日の一杯に最適です。"),
     brewingGuide: {
       temperature: "75℃",
@@ -272,7 +276,7 @@ const teaMenus = [
     season: "2026年 春",
     origin: "京都府宇治市",
     productNumber: 2,
-    netWeight: "30g",
+    netWeight: 30,
     description: block("20日間以上の被覆栽培で育てた宇治玉露。濃厚な旨味と覆い香が特徴です。少量のぬるめのお湯でじっくりと。"),
     brewingGuide: {
       temperature: "55℃",
@@ -292,7 +296,7 @@ const teaMenus = [
     season: "通年",
     origin: "石川県加賀市",
     productNumber: 3,
-    netWeight: "60g",
+    netWeight: 60,
     description: block("茎を丁寧に焙じた加賀棒茶。香ばしさのなかに甘みがあり、カフェインが少ないので夜のリラックスタイムにもおすすめです。"),
     brewingGuide: {
       temperature: "95℃",
