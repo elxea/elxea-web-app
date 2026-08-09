@@ -24,6 +24,7 @@ import {
   SpecBand,
   type SpecItem,
 } from "@/components/editorial/section-blocks";
+import { formatNetWeight, type NetWeightValue } from "@/lib/format-net-weight";
 import { seedTeaMenuDetail } from "@/lib/preview-seed";
 import { cn } from "@/lib/utils";
 
@@ -69,7 +70,8 @@ type TeaMenu = {
   variety?: string;
   origin?: string;
   season?: string;
-  netWeight?: string | number;
+  /** 実データは文字列 `"50g"` / schema どおりの数値 `50` の両方があり得る。 */
+  netWeight?: NetWeightValue;
   photo?: { asset: object; alt?: string };
   imageUrl?: string;
   description?: string | PortableTextBlock[];
@@ -159,11 +161,9 @@ export default async function TeaMenuDetailPage({
     { term: t("season"), value: tea.season },
     {
       term: t("netWeight"),
-      // 内容量は数値のみで入ることがあるので単位はここで足す (変A は「50g」)。
-      value:
-        tea.netWeight === undefined || tea.netWeight === null || tea.netWeight === ""
-          ? undefined
-          : `${tea.netWeight}g`,
+      // 内容量は数値 `50` と文字列 `"50g"` の両方が実データに入っている。
+      // 単位付けは `formatNetWeight` に集約する (素で `g` を足すと `50gg`)。
+      value: formatNetWeight(tea.netWeight),
     },
   ]);
 
