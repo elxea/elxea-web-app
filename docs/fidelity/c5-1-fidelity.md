@@ -328,7 +328,8 @@ body foregroundではない」という理由で `h1..h6 { color: var(--color-br
 | 文言 | 内容 | 「カートは空です」 | 「まだカートは空です。気になるお茶を、探しにいきましょう。」 | [仕様] 注14 |
 | ボタン | 高さ | 36 | 36 (`Button` 既定size = h-9) | [OK] |
 | ボタン | padding | 16 / 8 (`px-4` / `py-2`) | 16 / 8 | [OK] |
-| ボタン | 背景 / border | `background` #ebe9e0 (lab 92.27) / 1 | lab 92.31 / 1 | [OK] |
+| ボタン | 背景 / border幅 | `background` #ebe9e0 (lab 92.27) / 1 | lab 92.31 / 1 | [OK] |
+| ボタン | **border色** | **`border` #888675** | **#464748 → 現 #888675** [解決2026-08-09 / 実測] | [OK] 注17 |
 | ボタン | 角丸 | 8 (`radius-lg`) | 6 (`rounded-md`) | [要確認] 注15 |
 | ボタン | 影 | `shadow-xs` (0 1 2 / 10%) | `rgba(0,0,0,0.05) 0 1px 2px` | [OK] Δ不透明度 注15 |
 | ボタン | 文字 | 14 / 500 | 14 / 500 | [OK] (色は 注16) |
@@ -347,6 +348,17 @@ lh 20) 束縛だが、実装の文言は日本語1文なのでeditorialの `jp/b
 `components/ui/button.tsx` は全variant `rounded-md` (6)。DS全域の差分なので本レーンでは
 動かさない (`known_gaps` の `gap-radius-binding`「Tailwindのrounded-* がトークンに
 束縛されていない」と同根)。影は `elevation.shadow` の不透明度2系統問題 (`conflicts[c-07]`)。
+
+注17 [追記2026-08-09 / 罫線色の総点検TASK ID-7561]: **本レーンはborderの「幅」だけ
+測って「色」を測っていなかったため、罫線が本文色で描かれていたのを見逃していた**。
+DS Buttonの `outline` variantが `dark:border-input` しか持たずlightでは色クラスが
+無く、Tailwind v4の `border` は幅だけなのでCSS初期値の `currentColor` = `foreground`
+(#464748) で描かれていた。総点検でDS側に `border-input` (= `border` と同値 #888675) を
+明示して解決。**この行を足したのは「幅の行だけあって色の行が無い」表が同じ見逃しを
+再生産するため**。実測手順: Chromium 1440x900 / 375x812で `/ja/cart` を開き、
+`getComputedStyle(el).borderTopColor` の文字列 (Chromiumは `lab(30.0515 …)` を返す) を
+canvasの `fillStyle` に渡して1px塗り、`getImageData` でsRGBバイトを読む。
+修正前 #464748 (4辺) → 修正後 **#888675** (4辺)。文字列パースはしていない。
 
 ## 8. 状態網羅 (機能の実動確認)
 
