@@ -107,13 +107,19 @@ export function TopSectionHead({
         <h2
           data-slot="top-section-title"
           className={cn(
-            /* キッカーを SP で落とす節では、見出しが head の先頭に来るので
-               キッカーとの間隔 12 も SP では持たせない。 */
-            overlineSpHidden ? "mt-0 lg:mt-3" : "mt-3",
-            titleSpHidden && "sr-only lg:not-sr-only"
+            /* キッカーを SP で落とす節では見出しが head の先頭に来るので、
+               キッカーとの間隔 12 も SP では持たせない。
+               見出しを SP で落とす節では h2 の高さが 0 になるので同じく 0。 */
+            overlineSpHidden || titleSpHidden ? "mt-0 lg:mt-3" : "mt-3"
           )}
         >
-          {title}
+          {/* 可視化の切替は内側の span に持たせる。Tailwind の `not-sr-only` は
+              `margin: 0` を含むので h2 に直接当てると PC の間隔 12 が消える。 */}
+          {titleSpHidden ? (
+            <span className="sr-only lg:not-sr-only">{title}</span>
+          ) : (
+            title
+          )}
         </h2>
       ) : null}
       {lead ? (

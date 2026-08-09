@@ -173,6 +173,52 @@ const EXTRACT = () => {
   const sectionTitle = q('[data-slot="top-section-title"]');
   const container = q(".page-container");
 
+  /* C8-1R 追加計測 ------------------------------------------------------- */
+
+  /** 隣接 2 要素の視覚的な隙間 (前の要素の下端 → 次の要素の上端)。 */
+  const gapBetween = (a, b) => {
+    if (!a || !b) return null;
+    const ra = a.getBoundingClientRect();
+    const rb = b.getBoundingClientRect();
+    return Math.round((rb.top - ra.bottom) * 100) / 100;
+  };
+  /** display:none / sr-only (幅 1px の clip) を「視覚上出ていない」と判定する。 */
+  const visually = (el) => {
+    if (!el) return null;
+    const s = cs(el);
+    const r = el.getBoundingClientRect();
+    return {
+      display: s.display,
+      position: s.position,
+      w: Math.round(r.width * 100) / 100,
+      h: Math.round(r.height * 100) / 100,
+      shown: s.display !== "none" && r.width > 2 && r.height > 2,
+    };
+  };
+
+  /** 一報リストの行ピッチ (行 n の上端 → 行 n+1 の上端)。 */
+  const feedRows = qa('[data-slot="feed-list"] li').map((li) => {
+    const r = li.getBoundingClientRect();
+    return { top: Math.round(r.top * 100) / 100, h: Math.round(r.height * 100) / 100 };
+  });
+  const feedPitches = feedRows
+    .slice(1)
+    .map((r, i) => Math.round((r.top - feedRows[i].top) * 100) / 100);
+
+  /** Hero 内側 3 段の間隔 (見出し→副題→リード→CTA)。 */
+  const heroSubtitle = heroH1?.nextElementSibling ?? null;
+  const heroLead = heroSubtitle?.nextElementSibling ?? null;
+  const heroCtaWrap = heroLead?.nextElementSibling ?? null;
+
+  /** 節ごとの head 可視性 (SP でキッカー / 見出しを落とす節の検証用)。 */
+  const heads = qa('[data-slot="top-section-head"]').map((head) => ({
+    overlineText: (head.querySelector("p")?.textContent ?? "").trim(),
+    overline: visually(head.querySelector("p")),
+    titleText: (head.querySelector('[data-slot="top-section-title"]')?.textContent ?? "").trim(),
+    title: visually(head.querySelector('[data-slot="top-section-title"]')),
+    titleMt: cs(head.querySelector('[data-slot="top-section-title"]'))?.marginTop ?? null,
+  }));
+
   return {
     viewport: { w: window.innerWidth, h: window.innerHeight },
     container: { box: box(container), pad: pad(container) },
@@ -184,8 +230,20 @@ const EXTRACT = () => {
       cta: { ...type(heroCta), box: box(heroCta), radius: cs(heroCta)?.borderTopLeftRadius, border: cs(heroCta)?.borderTopColor, padX: cs(heroCta)?.paddingLeft, minH: cs(heroCta)?.minHeight },
       subtitle: type(heroH1?.nextElementSibling),
       lead: type(heroH1?.nextElementSibling?.nextElementSibling),
+      /* 内側 3 段の間隔。marginTop (指定値) と rect 実測の両方を出す。 */
+      innerGaps: {
+        titleToSubtitle: gapBetween(heroH1, heroSubtitle),
+        subtitleToLead: gapBetween(heroSubtitle, heroLead),
+        leadToCta: gapBetween(heroLead, heroCtaWrap),
+        mt: [
+          cs(heroSubtitle)?.marginTop ?? null,
+          cs(heroLead)?.marginTop ?? null,
+          cs(heroCtaWrap)?.marginTop ?? null,
+        ],
+      },
     },
     sections,
+    heads,
     overline: type(overline),
     sectionTitle: { ...type(sectionTitle), box: box(sectionTitle) },
     feed: {
@@ -196,7 +254,10 @@ const EXTRACT = () => {
       rowBox: box(feedLink),
       title: type(feedTitle),
       meta: type(feedMeta),
+      metaVisually: visually(feedMeta),
       rows: qa('[data-slot="feed-list"] li').length,
+      rowBoxes: feedRows,
+      pitches: feedPitches,
     },
     productGrid: grid
       ? {
@@ -215,6 +276,9 @@ const EXTRACT = () => {
           rowGap: cs(tileGrid).rowGap,
           marginTop: cs(tileGrid).marginTop,
           tiles: qa('[data-slot="action-tile"]').length,
+          visibleTiles: qa('[data-slot="action-tile"]').filter(
+            (t) => cs(t).display !== "none"
+          ).length,
           imgBox: box(tileImg),
           imgAspect: cs(tileImg)?.aspectRatio,
           gap: cs(q('[data-slot="action-tile"]'))?.rowGap,
@@ -253,6 +317,9 @@ const EXTRACT = () => {
           overline: type(chapterOverline),
           title: type(chapterTitle),
           body: type(chapterBody),
+          titleMt: cs(chapterTitle)?.marginTop ?? null,
+          overlineToTitle: gapBetween(chapterOverline, chapterTitle),
+          titleToBody: gapBetween(chapterTitle, chapterBody),
         }
       : null,
     guide: guide
