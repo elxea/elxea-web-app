@@ -329,7 +329,28 @@ leadに幅制約を持たないことに由来する。**商品一覧 / お茶�
 
 ---
 
-## 9. 参照元
+## 9. rebase後の再計測 (差分0件)
+
+並行5レーンのためorigin先端が進んだ状態でrebaseし (design-mapの追記衝突を両追記で解消)、
+**同一ハーネスで再計測して機械比較した**。
+
+| 項目 | 結果 |
+|---|---|
+| 比較したキー数 | 1,305 |
+| 差分のあったキー | **2** (いずれも計測サーバのポート番号を含むURL文字列のみ) |
+| 寸法・色・グリッド・節構成の差分 | **0件** |
+| HTTPステータス (6パターン) | 200 / 200 / 200 / 200 / 200 / 200 |
+| console error / warning / pageerror | 0件 (requestfailed 264はすべてRSC prefetch) |
+
+rebase前 `/tmp/c12-measure.json` / rebase後 `/tmp/c12-measure-rebased.json`。
+
+他レーンとの共存も確認した:
+- `08dcd21` (C14-1) が**著者ページの記事グリッドを独立に「People詳細テンプレの3列416」へ是正**していた。
+  本レーンがSTORIES節で `CatalogGrid` (PC 3列416) を採ったのと同じ結論に別レーンが到達しており、相互に裏取りになっている。
+- design-mapは両レーンの追記が共存 (**192 entries / 重複node id 0**)。
+- 全7ゲートをrebase後に再実行して通過。
+
+## 10. 参照元
 
 - Figma file: `AWLnI0XF07e8rScuxPYPc7`
   - People詳細テンプレsection `7822:37212` / PC `7822:37213` / SP `7823:37542`
