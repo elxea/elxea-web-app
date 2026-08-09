@@ -67,6 +67,17 @@ export function CatalogToolbar({
 
   const current = activeChip ?? chips[0]?.value;
 
+  /**
+   * チップ列を持たない呼び出し (コレクション詳細 — コレクション自体が絞り込みの
+   * 結果なのでチップは二重の facet になる) では、残る中身が並び替え Select だけに
+   * なる。Select は Figma どおり PC 限定 (`hidden lg:block`) なので、SP では
+   * Toolbar の中身が空になり `mt-8` 分の幽霊余白が残ってしまう。チップが無いときは
+   * 枠ごと PC 限定にして SP で場所を取らないようにする。
+   * 既存の呼び出しは全て非空のチップ列を渡すため、描画は一切変わらない。
+   */
+  const chipless = chips.length === 0;
+  if (chipless && sortOptions.length === 0) return null;
+
   const hrefWith = React.useCallback(
     (key: string, value: string | undefined) => {
       const params = new URLSearchParams(searchParams.toString());
@@ -83,8 +94,13 @@ export function CatalogToolbar({
   return (
     <div
       data-slot="catalog-toolbar"
-      className={cn("flex items-center justify-between gap-4", className)}
+      className={cn(
+        "items-center justify-between gap-4",
+        chipless ? "hidden justify-end lg:flex" : "flex",
+        className
+      )}
     >
+      {chipless ? null : (
       <div
         data-slot="catalog-chips"
         role="group"
@@ -132,6 +148,7 @@ export function CatalogToolbar({
           );
         })}
       </div>
+      )}
 
       {sortOptions.length > 0 ? (
         <NativeSelect
