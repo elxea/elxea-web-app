@@ -10,16 +10,22 @@
  * (group「elxea 定期便プラン」/ 毎月・2ヶ月ごと・3ヶ月ごと / 初回 1,880 円・継続 2,280 円) に合わせている。
  */
 
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import * as Sentry from "@sentry/nextjs";
 
 import type { Money, Product, SellingPlan, SellingPlanGroup } from "@/lib/shopify/types";
 import {
   findMonthlySellingPlanId,
+  findMonthlySellingPlanIds,
   formatMoneyJa,
   hasFirstDeliveryDiscount,
   monthlyPriceLabel,
   resolveMonthlyPlanPricing,
 } from "@/lib/subscription-pricing";
+
+// 曖昧検知の観測先。実際の Sentry へ送らずに「上がったか」だけを検証する。
+vi.mock("@sentry/nextjs", () => ({ captureMessage: vi.fn() }));
 
 const jpy = (amount: string): Money => ({ amount, currencyCode: "JPY" });
 
@@ -126,6 +132,71 @@ describe("findMonthlySellingPlanId", () => {
 
   it("group が空なら null", () => {
     expect(findMonthlySellingPlanId([])).toBeNull();
+  });
+});
+
+describe("毎月プランが複数該当したときの曖昧検知", () => {
+  /** 同一 group に毎月お届け相当のプランが 2 件ある (店舗がプランを増やしたときに起きる)。 */
+  const SECOND_MONTHLY_ID = "gid://shopify/SellingPlan/9999999999";
+  const AMBIGUOUS_GROUPS: SellingPlanGroup[] = [
+    group([
+      plan({
+        id: MONTHLY_ID,
+        name: "毎月お届け",
+        deliveryPolicy: { interval: "MONTH", intervalCount: 1 },
+      }),
+      plan({
+        id: SECOND_MONTHLY_ID,
+        name: "毎月お届け (お試し)",
+        deliveryPolicy: { interval: "MONTH", intervalCount: 1 },
+      }),
+    ]),
+  ];
+
+  let warnSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    vi.mocked(Sentry.captureMessage).mockClear();
+    warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    warnSpy.mockRestore();
+  });
+
+  it("該当する id を出現順で全件返す", () => {
+    expect(findMonthlySellingPlanIds(AMBIGUOUS_GROUPS)).toEqual([MONTHLY_ID, SECOND_MONTHLY_ID]);
+  });
+
+  it("複数該当でも表示は据え置き (出現順の先頭を返す) = 挙動の後退が無い", () => {
+    expect(findMonthlySellingPlanId(AMBIGUOUS_GROUPS)).toBe(MONTHLY_ID);
+  });
+
+  it("複数該当を Sentry の warning として上げ、該当 id と採用 id を添える", () => {
+    findMonthlySellingPlanId(AMBIGUOUS_GROUPS);
+
+    expect(Sentry.captureMessage).toHaveBeenCalledTimes(1);
+    const [message, context] = vi.mocked(Sentry.captureMessage).mock.calls[0];
+    expect(message).toMatch(/monthly selling plans/i);
+    expect(context).toMatchObject({
+      level: "warning",
+      extra: {
+        matchedSellingPlanIds: [MONTHLY_ID, SECOND_MONTHLY_ID],
+        usedSellingPlanId: MONTHLY_ID,
+      },
+    });
+    expect(warnSpy).toHaveBeenCalled();
+  });
+
+  it("該当が 1 件のときは警告を上げない (正常系をノイズにしない)", () => {
+    expect(findMonthlySellingPlanId(REAL_GROUPS)).toBe(MONTHLY_ID);
+    expect(Sentry.captureMessage).not.toHaveBeenCalled();
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it("該当が 0 件のときも警告を上げない", () => {
+    expect(findMonthlySellingPlanId([])).toBeNull();
+    expect(Sentry.captureMessage).not.toHaveBeenCalled();
   });
 });
 

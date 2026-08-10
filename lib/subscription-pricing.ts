@@ -14,6 +14,12 @@
  * かつ `intervalCount = 1`) で特定する。プラン名は店舗側で自由に変えられるので
  * 表示値の導出根拠にできない。該当プランが無ければ `null` を返す (推測しない)。
  *
+ * 該当が **2 件以上** あるとどれの価格を出すかを配送間隔だけでは決められない。
+ * 表示は出現順の先頭で据え置き (画面を空にする方が損失が大きい) にしつつ、
+ * Sentry へ warning を上げて曖昧さを可視化する。無警告で先頭を採ると、店舗側が
+ * 毎月プランを増やした瞬間に「意図しないプランの価格が出ている」ことに誰も
+ * 気づけない (表示価格の不当表示に直結する)。
+ *
  * ## 初回価格と継続価格
  *
  * Shopify の `sellingPlanAllocations.priceAdjustments` は請求サイクルごとの調整の
@@ -24,6 +30,8 @@
  *
  * @see docs/placeholders.md 「差し替え一覧」#2
  */
+
+import * as Sentry from "@sentry/nextjs";
 
 import type { Money, Product } from "@/lib/shopify/types";
 
@@ -43,24 +51,63 @@ export type MonthlyPlanPricing = {
 type ProductLike = Pick<Product, "sellingPlanGroups" | "variants">;
 
 /**
- * 毎月お届けプランの id。該当が無ければ `null`。
+ * 毎月お届けと見なせるプランの id を、出現順ですべて返す。
  *
  * 単発購入プラン (`deliveryPolicy` が固定日ポリシー) は `interval` を持たないため
  * 自然に除外される。
+ *
+ * 「先頭 1 件」ではなく全件を返すのは、該当が複数あるという事実を
+ * {@link findMonthlySellingPlanId} が検知して警告できるようにするため。
  */
-export function findMonthlySellingPlanId(
+export function findMonthlySellingPlanIds(
   groups: ProductLike["sellingPlanGroups"]
-): string | null {
+): string[] {
+  const ids: string[] = [];
   for (const group of groups) {
     for (const plan of group.sellingPlans) {
       const policy = plan.deliveryPolicy;
       if (!policy) continue;
       if (policy.interval === MONTHLY_INTERVAL && policy.intervalCount === MONTHLY_INTERVAL_COUNT) {
-        return plan.id;
+        ids.push(plan.id);
       }
     }
   }
-  return null;
+  return ids;
+}
+
+/**
+ * 毎月お届けプランの id。該当が無ければ `null`。
+ *
+ * 該当が複数あるときは**出現順の先頭**を返す (表示を止めない)。同時に Sentry へ
+ * warning を上げ、「配送間隔だけではプランを一意に決められない状態」を運用側が
+ * 検知できるようにする。ここで黙って先頭を採ると、店舗が毎月プランを増やしたときに
+ * 意図しないプランの価格が表示され続けても誰も気づけない。
+ */
+export function findMonthlySellingPlanId(
+  groups: ProductLike["sellingPlanGroups"]
+): string | null {
+  const ids = findMonthlySellingPlanIds(groups);
+  if (ids.length === 0) return null;
+  if (ids.length > 1) reportAmbiguousMonthlyPlans(ids);
+  return ids[0];
+}
+
+/**
+ * 毎月プランが複数該当したことを記録する。価格表示は変えない (観測だけ足す)。
+ *
+ * 意図的に de-dup していない。曖昧な状態が続く限り毎回上がるのが正しく、
+ * 抑制すると「直ったのか、抑制されているだけか」が区別できなくなる。
+ */
+function reportAmbiguousMonthlyPlans(ids: readonly string[]): void {
+  console.warn(
+    `[subscription-pricing] 毎月お届けプランが ${ids.length} 件該当しました。先頭を採用します:`,
+    ids
+  );
+  Sentry.captureMessage("Multiple monthly selling plans matched; first one was used", {
+    level: "warning",
+    tags: { module: "subscription-pricing" },
+    extra: { matchedSellingPlanIds: [...ids], usedSellingPlanId: ids[0] },
+  });
 }
 
 /**

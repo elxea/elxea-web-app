@@ -24,18 +24,18 @@ import {
  *
  * 規約と同じく法的文書のため、英訳は実装側で創作しない (日本語正文のみ)。
  *
- * ！重要 — 公開前に実値の確認が必要
- * 法定表記の一部 (所在地 / 電話番号 / 運営統括責任者氏名 / 問い合わせメール) は
- * まだ事業側の確定を待っている。特商法 第11条の表示義務を満たさないため、
- * **この値のまま公開してはならない**。
+ * 本ページの法定表記 (運営統括責任者 / 所在地 / 電話番号 / メール) は 2026-08-10 に
+ * 実値へ差し替え済み (`status: "confirmed"`)。値の SoT は Notion の Corporate Info DB で、
+ * 利用規約 S4 (7850:799) にあった所在地の不一致も同じレジストリ参照に寄せて解消した。
+ * 以後もここに直書きせず `lib/placeholders.ts` 経由でのみ読むこと (SoT を二重化しない)。
  *
- * 仮値は本ファイルに直書きせず `lib/placeholders.ts` のレジストリに集約し、
- * `PLACEHOLDER_MARKER` を付けている。マーカーが残ったまま production 相当の
- * 環境でビルド / テストすると機械的に落ちる (詳細は lib/placeholders.ts)。
- * 差し替え台帳は `docs/placeholders.md`。
+ * 未確定として残っているのは `subscription.firstDeliveryDate` (定期便LP の初回お届け日)
+ * の 1 件だけで、本ページには出ない。ただし `PLACEHOLDER_MARKER` が 1 件でも残る間は
+ * production 相当のビルド / テストが機械的に落ちる設計なので、サイト全体の公開には
+ * その 1 件の解消が必要 (詳細は lib/placeholders.ts / 台帳 `docs/placeholders.md`)。
  *
- * また利用規約 S4 (7850:799) は所在地に別の値を載せており不一致がある。
- * どちらを正とするかは事業側の確認事項 (台帳の Open items に記載)。
+ * S4 の受付時間は仮値扱いにしていないが、特商法 第11条は実際に連絡が取れる窓口の記載を
+ * 求めるため、その時間帯で受電できるかの確認は未了 (台帳の Open items 3)。
  */
 
 const OPERATIONS_MANAGER = placeholderValue("tokushoho.operationsManager");

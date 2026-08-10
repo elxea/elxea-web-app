@@ -729,7 +729,6 @@
     "success": "お問い合わせをお預かりしました。担当より2営業日以内にご返信いたします。",
     "error": "うまく送信できませんでした。お手数ですが、もう一度お試しください。",
     "emailDirect": "メールでのお問い合わせ",
-    "emailAddress": "info@elxea.com",
     "responseTime": "通常2営業日以内にご返信いたします。"
   },
   "shippingInfo": {
