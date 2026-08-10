@@ -93,3 +93,8 @@ scripts/design-system/snapshots/change-manifest.json
 
 # C16-1 計測ハーネス (成果物ではない・$HANDOFF_DIR に退避)
 c16-*.mjs
+
+# design-kit の一回限りの出力ダンプ (生成経路はリポ内に無く、d91ae04 の WIP コミットで誤混入)。
+# 正本は scripts/design-system/design-kit.generated.json (pnpm generate:design-kit で機械生成)。
+# 追跡すると design-kit の第3のコピーとして stale 化するため追跡しない。
+.designkit-out.json
