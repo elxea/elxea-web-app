@@ -71,7 +71,7 @@ curl -X POST "https://<store>.myshopify.com/admin/api/2025-04/graphql.json" \
 
 **注意 (対象契約の網羅)**: `getSubscriptionContracts` / `getBillingAttempts` は
 connectionを最後のページまで走査する (2026-08-10是正。それまでは先頭20件のみで、
-21件目以降のACTIVE契約が課金されないまま無音だった)。安全上限 (50件×100ページ) に
+21件目以降のACTIVE契約が課金されないまま無音だった)。安全上限 (25件×100ページ) に
 達した場合は打ち切らずエラーにするため、`checked` が実件数より少ないまま200が返ることはない。
 
 **注意 (A7の24時間)**: リトライ間隔 `RETRY_INTERVAL_HOURS` (24h) は実時間を待たずに検証できない。
@@ -136,16 +136,20 @@ cancelSubscription(accessToken, contractId)
 
 ## 既知の制約 (テスト設計に影響するもの)
 
-- **`getSubscriptionContracts` はページングしていない**。`SUBSCRIPTION_CONTRACTS_QUERY` の
-  `$first` 既定値は20で、`pageInfo.hasNextPage` を見て次ページを取る処理が無い
-  (`lib/shopify/subscription-admin.ts`)。自前cronが唯一の課金主体である以上、
-  **ACTIVE契約が21件以上になると21件目以降が永久に課金されない**。
-  本番運用前に是正が必要。テストでも「ACTIVE契約21件以上」の母数では成立しない前提で組む。
-- `getBillingAttempts` も同様に先頭20件のみ。督促の失敗回数カウントは
-  課金日近傍の窓で絞っているため通常は足りるが、境界では取りこぼしうる。
-- `/api/cron/billing` のunit testは0件。e2e (`e2e/subscription-*.spec.ts`) は
-  Selling Plan商品 / `CRON_SECRET` / Admin権限が無いと `test.skip` になるため、
-  **緑でも何も検証していない状態になりうる**。skip件数を必ず確認する。
+- **\[解消済2026-08-10\] ページング欠落**。`getSubscriptionContracts` / `getBillingAttempts` は
+  `pageInfo.hasNextPage` を辿って全ページを取得する (`lib/shopify/subscription-admin.ts`)。
+  是正前は先頭20件のみで、**ACTIVE契約が21件以上になると21件目以降が永久に無音で未課金**だった。
+  1ページ25件・上限100ページで、上限やcursor不整合に当たった場合は打ち切らず例外にする
+  (部分結果を成功として返さない)。連続ページ取得でAdmin APIのcost制限に当たった場合のみ
+  指数バックオフで再試行する。したがって「ACTIVE契約21件以上」の母数でもテストは成立する。
+- `SUBSCRIPTION_CONTRACTS_QUERY` の各契約の `lines(first: 10)` は**未ページング**。
+  11明細以上の契約では明細が切れる。課金の実行自体には影響しないが、督促メールの
+  明細一覧が欠ける (テスト契約は10明細以内で組む)。
+- `/api/cron/billing` のunit testは19件 (`__tests__/billing-cron-action.test.ts` /
+  `__tests__/subscription-admin-pagination.test.ts`)。`countRecentFailures` /
+  `isReadyForRetry` の24時間境界と `action` 判定の全分岐をここで押さえている。
+  e2e (`e2e/subscription-*.spec.ts`) はSelling Plan商品 / `CRON_SECRET` / Admin権限が
+  無いと `test.skip` になるため、**緑でも何も検証していない状態になりうる**。skip件数を必ず確認する。
 
 ## 注意事項
 
