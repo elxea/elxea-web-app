@@ -29,6 +29,8 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import { placeholderValue } from "@/lib/placeholders";
+
 const ROOT = join(__dirname, "..");
 
 const read = (relative: string) => readFileSync(join(ROOT, relative), "utf-8");
@@ -131,6 +133,60 @@ describe("特商法ページ 群 IV (定期便の契約条件)", () => {
 
   it("解約の主たる導線がマイページである旨が書かれている (起草 AC-5)", () => {
     expect(page).toContain("マイページ（アカウント）から、いつでもお客様ご自身で停止・解約");
+  });
+});
+
+describe("解約・変更の受付期限の統一", () => {
+  /**
+   * 受付期限を書いてよい唯一の言い方 (確定値 2026-08-11)。
+   * 正本は `lib/placeholders.ts` の `tokushoho.subscriptionCancelCutoff`。
+   */
+  const CONFIRMED = "次回のご請求日の前日";
+
+  /**
+   * 差し戻された古い言い方。定期便LP FAQ が「発送日の3日前まで」、
+   * リマインドメールが「お届け日の3日前まで」と、特商法ページ (請求日基準) と
+   * 別基準のまま残っていた。基準が割れること自体が法12条の観点で問題になるので固定する。
+   *
+   * 発送リードタイム側の「お届け予定日の3日前に発送します」は解約期限とは別の事実なので
+   * 対象にしない (末尾が「まで」の期限表現だけを禁止する)。
+   */
+  const BANNED_VARIANTS = ["発送日の3日前まで", "お届け日の3日前まで"] as const;
+
+  /** 受付期限が出るユーザー向け文字列の置き場。 */
+  const CUTOFF_SURFACES = [
+    "messages/ja.json",
+    "messages/en.json",
+    "app/[locale]/legal/tokushoho/page.tsx",
+    "lib/email/subscription-reminder.ts",
+  ] as const;
+
+  it.each(CUTOFF_SURFACES)("%s に古い期限表記が残っていない", (relative) => {
+    const text = read(relative);
+    const found = BANNED_VARIANTS.filter((variant) => text.includes(variant));
+    expect(found, `${relative}: 解約・変更の受付期限が確定値と食い違う`).toEqual([]);
+  });
+
+  it("特商法ページの受付期限が確定値になっている", () => {
+    expect(read("app/[locale]/legal/tokushoho/page.tsx")).toContain("SUB_CANCEL_CUTOFF");
+    expect(placeholderValue("tokushoho.subscriptionCancelCutoff")).toBe(CONFIRMED);
+  });
+
+  it("定期便LP の FAQ も同じ基準になっている", () => {
+    // 実際に描画されている名前空間は `subscriptionR2`
+    // (`app/[locale]/subscription/page.tsx` / `app/[locale]/page.tsx`)。
+    for (const relative of ["messages/ja.json", "messages/en.json"] as const) {
+      const catalog = JSON.parse(read(relative));
+      expect(catalog.subscriptionR2.faqA1, `${relative}: FAQ の期限が確定値でない`).toContain(
+        CONFIRMED
+      );
+    }
+  });
+
+  it("リマインドメールが期限を直書きせず正本から読んでいる", () => {
+    const source = read("lib/email/subscription-reminder.ts");
+    expect(source).toContain('placeholderValue("tokushoho.subscriptionCancelCutoff")');
+    expect(source).not.toContain(CONFIRMED);
   });
 });
 
