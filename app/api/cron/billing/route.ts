@@ -9,6 +9,11 @@ import {
   updateSubscriptionContract,
 } from "@/lib/shopify/subscription-admin";
 import { sendDunningEmail } from "@/lib/email/dunning";
+import {
+  notifyBillingCronFatal,
+  notifyBillingRunFailures,
+  notifySubscriptionPaused,
+} from "@/lib/line/monitoring-alerts";
 
 /**
  * Cron-triggered billing processor with dunning (retry) logic.
@@ -196,10 +201,43 @@ export async function GET(request: NextRequest) {
 
     console.log(`[Billing Cron] Summary:`, JSON.stringify(summary));
 
+    // 運営宛の監視通知。Sentry は「記録」で、こちらは「その場で気づく」ための経路。
+    // 失敗が 1 件でもあれば run 単位で 1 通だけ送る (契約ごとに送ると失敗が並んだ
+    // 日に通知が溢れて読まれなくなる)。PAUSE は個別に送るのでここには数えない。
+    const failureTotal = summary.failed + summary.retry_failed + summary.errors;
+    if (failureTotal > 0) {
+      // `.catch` は保険。monitoring-alerts は例外を外に出さないが、この await は
+      // 外側の try の内側にあるため、万一漏れると「通知の失敗」が「cron の失敗」
+      // (500 + 異常終了通知) に化ける。その化学変化をここで断つ。
+      await notifyBillingRunFailures({
+        due: summary.due,
+        failed: summary.failed,
+        retryFailed: summary.retry_failed,
+        errors: summary.errors,
+        contractIds: results
+          .filter(
+            (r) =>
+              r.action === "failed" ||
+              r.action === "retry_failed" ||
+              r.action === "error"
+          )
+          .map((r) => r.contractId),
+      }).catch((notifyError) =>
+        console.error("[Billing Cron] 監視通知の送出に失敗しました:", notifyError)
+      );
+    }
+
     return NextResponse.json({ ...summary, results });
   } catch (error) {
     Sentry.captureException(error, { tags: { cron: "billing" } });
     console.error("[Billing Cron] Fatal error:", error);
+    // 「今日の課金が走っていない」ことは記録だけでは気づけないので運営へ push。
+    // notify 側は例外を外に出さないので、この通知が 500 応答を妨げることはない。
+    await notifyBillingCronFatal({
+      message: error instanceof Error ? error.message : "Unknown error",
+    }).catch((notifyError) =>
+      console.error("[Billing Cron] 異常終了通知の送出に失敗しました:", notifyError)
+    );
     return NextResponse.json(
       { error: "Billing cron failed" },
       { status: 500 }
@@ -309,6 +347,18 @@ async function handleMaxRetriesExceeded(
 
     // Send final dunning email
     await sendDunningNotification(contract.id, MAX_RETRY_ATTEMPTS, true);
+
+    // 契約が止まったことは運営が個別に把握すべき状態変化なので、run 集約とは別に送る
+    // (顧客への最終案内より後に置く。運営通知が顧客対応を遅らせない順序)。
+    // `.catch` は保険。ここは try の内側なので、通知が漏れると停止に成功した契約が
+    // action=error として申告されてしまう (実態と申告のずれ = この route が 2026-08 に
+    // 直したのと同じ種類の欠陥)。
+    await notifySubscriptionPaused({
+      contractId: contract.id,
+      failureCount: MAX_RETRY_ATTEMPTS,
+    }).catch((notifyError) =>
+      console.error("[Billing Cron] 契約停止通知の送出に失敗しました:", notifyError)
+    );
 
     return {
       contractId: contract.id,

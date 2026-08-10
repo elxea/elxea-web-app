@@ -8,8 +8,6 @@
  *   LINE_ADMIN_USER_ID        - LINE user ID of the admin to push to
  */
 
-const LINE_CHANNEL_ACCESS_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN || "";
-const LINE_ADMIN_USER_ID = process.env.LINE_ADMIN_USER_ID || "";
 const LINE_PUSH_API = "https://api.line.me/v2/bot/message/push";
 
 export type LineNotifyPayload = {
@@ -27,7 +25,16 @@ export async function sendLineNotify({
   body,
   level = "info",
 }: LineNotifyPayload): Promise<void> {
-  if (!LINE_CHANNEL_ACCESS_TOKEN || !LINE_ADMIN_USER_ID) {
+  // Read the credentials per call, not once at module load. Two reasons:
+  //   1. On Vercel these are injected per deployment/invocation; a module-level
+  //      snapshot taken during cold start of a build-time import can be empty
+  //      while the runtime value is present.
+  //   2. A module-level snapshot makes the "not configured" branch untestable
+  //      without resetting the module registry.
+  const accessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN || "";
+  const adminUserId = process.env.LINE_ADMIN_USER_ID || "";
+
+  if (!accessToken || !adminUserId) {
     console.warn("[LINE Notify] Credentials not configured, skipping notification.");
     return;
   }
@@ -40,10 +47,10 @@ export async function sendLineNotify({
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${LINE_CHANNEL_ACCESS_TOKEN}`,
+        Authorization: `Bearer ${accessToken}`,
       },
       body: JSON.stringify({
-        to: LINE_ADMIN_USER_ID,
+        to: adminUserId,
         messages: [{ type: "text", text }],
       }),
     });
