@@ -118,8 +118,14 @@ function attemptsPage(nodes: unknown[], pageInfo: PageInfo) {
 
 const CONTRACT_GID = "gid://shopify/SubscriptionContract/4242";
 
+/** Shopify returns HTTP 200 with a THROTTLED GraphQL error, not a 429. */
+function throttledBody() {
+  return { errors: [{ message: "Throttled" }] };
+}
+
 beforeEach(() => {
   vi.spyOn(console, "error").mockImplementation(() => {});
+  vi.spyOn(console, "warn").mockImplementation(() => {});
 });
 
 afterEach(() => {
@@ -231,6 +237,46 @@ describe("getSubscriptionContracts のページング", () => {
       /cursor did not advance/
     );
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("THROTTLED は同じページを再試行して回復する (ページング特有のバースト対策)", async () => {
+    stubFetch((call) =>
+      call === 0
+        ? throttledBody()
+        : contractsPage([contractNode(1), contractNode(2)], {
+            hasNextPage: false,
+            endCursor: null,
+          })
+    );
+
+    const contracts = await getSubscriptionContracts("ACTIVE", {
+      throttleDelayMs: 0,
+    });
+
+    expect(contracts).toHaveLength(2);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    // 再試行は同じページ (after=null) を撃ち直す。ページを飛ばさない
+    expect(requestBody(0).variables.after).toBeNull();
+    expect(requestBody(1).variables.after).toBeNull();
+  });
+
+  it("THROTTLED が再試行上限を超えたら例外 (部分結果を返さない)", async () => {
+    stubFetch(() => throttledBody());
+
+    await expect(
+      getSubscriptionContracts("ACTIVE", { throttleDelayMs: 0 })
+    ).rejects.toThrow(/Throttled/);
+    // 初回 + 3 回の再試行
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+  });
+
+  it("throttle 以外のエラーは再試行せず即座に投げる", async () => {
+    stubFetch(() => ({ errors: [{ message: "Access denied" }] }));
+
+    await expect(
+      getSubscriptionContracts("ACTIVE", { throttleDelayMs: 0 })
+    ).rejects.toThrow(/Access denied/);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("pageInfo を含まない応答は例外を投げる (1 ページで黙って打ち切らない)", async () => {

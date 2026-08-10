@@ -42,17 +42,21 @@ function flattenEdges<T>(connection: {
 // ─── Cursor pagination for Admin API connections ─────────────────────
 
 /**
- * Nodes fetched per request. Shopify's connections accept up to 250, but this
- * query selects nested `lines(first: 10)` per contract, and the Admin API's
- * calculated query cost scales with the requested node count. 50 keeps a single
- * page comfortably inside the cost bucket while cutting the number of round
- * trips 2.5x versus the old `$first: Int = 20` default.
+ * Nodes fetched per request. Shopify's connections accept up to 250, but the
+ * Admin API throttles on *requested* query cost, and the contracts query nests
+ * `lines(first: 10)` per contract — so a page of N contracts requests roughly
+ * N x 11 points against a 1,000-point bucket that refills at 100/s. 25 keeps one
+ * page near 275 points, so several pages can be walked back-to-back without the
+ * burst outrunning the bucket. Raising this trades throttle headroom for round
+ * trips; it is not free.
+ *
+ * Ref: https://shopify.dev/docs/api/usage/rate-limits
  */
-export const ADMIN_CONNECTION_PAGE_SIZE = 50;
+export const ADMIN_CONNECTION_PAGE_SIZE = 25;
 
 /**
  * Safety cap on the number of pages a single call will walk
- * (50 x 100 = 5,000 nodes).
+ * (25 x 100 = 2,500 nodes).
  *
  * The cap exists to bound a broken server response, not to bound real data. It
  * is therefore a **hard error, not a silent stop**: returning the first N pages
@@ -71,18 +75,40 @@ type GraphQLConnection<TNode> = {
   pageInfo?: { hasNextPage: boolean; endCursor: string | null };
 };
 
+/**
+ * How many times one page is re-requested after a throttle before giving up,
+ * and the base backoff. Walking pages sends a burst of cost-bearing requests, so
+ * `THROTTLED` here is an expected, retryable condition — unlike the structural
+ * failures below, which are bugs and must surface immediately. Waiting is also
+ * the documented remedy: the bucket refills at a fixed rate.
+ */
+const ADMIN_THROTTLE_RETRIES = 3;
+const ADMIN_THROTTLE_BASE_DELAY_MS = 1000;
+
 /** Per-call overrides for paginated getters. Defaults are the constants above. */
 export type PaginationOptions = {
   pageSize?: number;
   maxPages?: number;
+  /** Base backoff for throttle retries. 0 disables waiting (tests). */
+  throttleDelayMs?: number;
 };
+
+function isThrottleError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /throttl/i.test(message) || message.includes("429");
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 /**
  * Walk every page of a Relay-style Admin API connection and return all nodes.
  *
  * Fails loudly instead of truncating on any of: a missing connection/`pageInfo`,
  * `hasNextPage: true` with no `endCursor`, a cursor that does not advance
- * (server-side pagination loop), or exhausting `maxPages`.
+ * (server-side pagination loop), or exhausting `maxPages`. Throttling is the one
+ * error retried, with exponential backoff.
  */
 async function fetchAllPages<TData, TNode>({
   query,
@@ -91,6 +117,7 @@ async function fetchAllPages<TData, TNode>({
   selectConnection,
   pageSize = ADMIN_CONNECTION_PAGE_SIZE,
   maxPages = ADMIN_CONNECTION_MAX_PAGES,
+  throttleDelayMs = ADMIN_THROTTLE_BASE_DELAY_MS,
 }: {
   query: string;
   variables?: Record<string, unknown>;
@@ -103,11 +130,29 @@ async function fetchAllPages<TData, TNode>({
   const seenCursors = new Set<string>();
   let after: string | null = null;
 
+  /** One page, retrying only on throttle. */
+  const fetchPage = async (page: number): Promise<TData> => {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await adminFetch<TData>({
+          query,
+          variables: { ...variables, first: pageSize, after },
+        });
+      } catch (error) {
+        if (!isThrottleError(error) || attempt >= ADMIN_THROTTLE_RETRIES) {
+          throw error;
+        }
+        console.warn(
+          `[${label}] throttled on page ${page} (attempt ${attempt + 1}/` +
+            `${ADMIN_THROTTLE_RETRIES + 1}), backing off`
+        );
+        await sleep(throttleDelayMs * 2 ** attempt);
+      }
+    }
+  };
+
   for (let page = 1; page <= maxPages; page++) {
-    const data = await adminFetch<TData>({
-      query,
-      variables: { ...variables, first: pageSize, after },
-    });
+    const data = await fetchPage(page);
 
     const connection = selectConnection(data);
     if (!connection) {
