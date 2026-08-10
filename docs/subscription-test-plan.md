@@ -145,8 +145,8 @@ cancelSubscription(accessToken, contractId)
 - `SUBSCRIPTION_CONTRACTS_QUERY` の各契約の `lines(first: 10)` は**未ページング**。
   11明細以上の契約では明細が切れる。課金の実行自体には影響しないが、督促メールの
   明細一覧が欠ける (テスト契約は10明細以内で組む)。
-- `/api/cron/billing` のunit testは19件 (`__tests__/billing-cron-action.test.ts` /
-  `__tests__/subscription-admin-pagination.test.ts`)。`countRecentFailures` /
+- `/api/cron/billing` 周辺のunit testは22件 (`__tests__/billing-cron-action.test.ts` 9件 /
+  `__tests__/subscription-admin-pagination.test.ts` 13件)。`countRecentFailures` /
   `isReadyForRetry` の24時間境界と `action` 判定の全分岐をここで押さえている。
   e2e (`e2e/subscription-*.spec.ts`) はSelling Plan商品 / `CRON_SECRET` / Admin権限が
   無いと `test.skip` になるため、**緑でも何も検証していない状態になりうる**。skip件数を必ず確認する。
