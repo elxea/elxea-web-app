@@ -30,9 +30,42 @@ const CRON_SECRET = process.env.CRON_SECRET || "";
 const MAX_RETRY_ATTEMPTS = 3;
 const RETRY_INTERVAL_HOURS = 24;
 
+/**
+ * Outcome of one contract in one cron run.
+ *
+ * `action` is the machine-readable verdict and must never overstate the result:
+ * a charge that came back with an `errorCode` is `failed` / `retry_failed`, and
+ * one Shopify has only *accepted* (asynchronous, `ready: false`) is `pending` —
+ * not `billed`. Until 2026-08 a failed charge was reported as `billed`/`retried`
+ * with the failure buried in `detail`, so every monitor reading `action` (and the
+ * `billed` count in the summary) saw a successful run while nothing was charged.
+ *
+ *  - `billed`       first charge confirmed complete
+ *  - `retried`      retry charge confirmed complete
+ *  - `pending`      attempt accepted by Shopify, outcome not yet known; the real
+ *                   result arrives on the subscription_billing_attempts/success
+ *                   | failure webhook (app/api/subscription/webhook)
+ *  - `failed`       first charge returned an errorCode
+ *  - `retry_failed` retry charge returned an errorCode
+ *  - `paused`       retry budget exhausted, contract paused
+ *  - `waiting`      inside the retry interval, nothing attempted
+ *  - `skipped`      not billable (no billing date)
+ *  - `error`        unexpected exception while processing
+ */
+type BillingAction =
+  | "billed"
+  | "retried"
+  | "pending"
+  | "failed"
+  | "retry_failed"
+  | "paused"
+  | "waiting"
+  | "skipped"
+  | "error";
+
 type BillingResult = {
   contractId: string;
-  action: "billed" | "retried" | "paused" | "waiting" | "skipped" | "error";
+  action: BillingAction;
   attemptNumber?: number;
   detail?: string;
 };
@@ -144,14 +177,21 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    const count = (action: BillingAction) =>
+      results.filter((r) => r.action === action).length;
+
     const summary = {
       checked: contracts.length,
       due: dueContracts.length,
-      billed: results.filter((r) => r.action === "billed").length,
-      retried: results.filter((r) => r.action === "retried").length,
-      paused: results.filter((r) => r.action === "paused").length,
-      waiting: results.filter((r) => r.action === "waiting").length,
-      errors: results.filter((r) => r.action === "error").length,
+      billed: count("billed"),
+      retried: count("retried"),
+      pending: count("pending"),
+      failed: count("failed"),
+      retry_failed: count("retry_failed"),
+      paused: count("paused"),
+      waiting: count("waiting"),
+      skipped: count("skipped"),
+      errors: count("error"),
     };
 
     console.log(`[Billing Cron] Summary:`, JSON.stringify(summary));
@@ -216,6 +256,7 @@ async function performBillingAttempt(
   // Idempotency key: contractId + billing date + attempt number
   const idempotencyKey = `${contract.id}-${contract.nextBillingDate}-attempt${attemptNumber}`;
 
+  const isRetry = attemptNumber > 1;
   const attempt = await createBillingAttempt(contract.id, idempotencyKey);
 
   if (attempt.errorCode) {
@@ -228,15 +269,28 @@ async function performBillingAttempt(
 
     return {
       contractId: contract.id,
-      action: attemptNumber === 1 ? "billed" : "retried",
+      action: isRetry ? "retry_failed" : "failed",
       attemptNumber,
       detail: `Failed: ${attempt.errorMessage ?? attempt.errorCode}`,
     };
   }
 
+  // No errorCode, but Shopify processes billing attempts asynchronously and
+  // returns `ready: false` while the charge is still in flight. That is not a
+  // completed charge, so it must not be counted as one — the definitive result
+  // arrives on the subscription_billing_attempts/success|failure webhook.
+  if (!attempt.ready) {
+    return {
+      contractId: contract.id,
+      action: "pending",
+      attemptNumber,
+      detail: `Accepted, awaiting result (attempt ${attempt.id})`,
+    };
+  }
+
   return {
     contractId: contract.id,
-    action: attemptNumber === 1 ? "billed" : "retried",
+    action: isRetry ? "retried" : "billed",
     attemptNumber,
     detail: "Success",
   };

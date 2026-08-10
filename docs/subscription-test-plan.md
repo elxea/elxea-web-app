@@ -57,14 +57,22 @@ curl -X POST "https://<store>.myshopify.com/admin/api/2025-04/graphql.json" \
 | A1 | テストストアにMONTH/1のSelling Plan商品を用意 | `createSellingPlanGroup` / `addProductsToSellingPlanGroup` | `/ja/subscription` にプランが出る (Selling Plan商品が無いとe2eが全skipになる) |
 | A2 | テスト顧客で契約を1件作る (1回目の課金) | 申込導線 (`/ja/subscription`) | 契約がACTIVE、`nextBillingDate` が1ヶ月後 |
 | A3 | 契約の `nextBillingDate` を昨日に書き換える | `updateSubscriptionContract(contractId, { nextBillingDate })` | 取得し直して過去日になっている |
-| A4 | cronを手で叩く | `curl -H "Authorization: Bearer $CRON_SECRET" <base>/api/cron/billing` | レスポンスに `billed: 1` / `action: "billed"` / `attemptNumber: 1`、かつ `detail: "Success"` |
+| A4 | cronを手で叩く | `curl -H "Authorization: Bearer $CRON_SECRET" <base>/api/cron/billing` | `action` が `"billed"` (即時完了) または `"pending"` (Shopifyが受理・結果待ち) のどちらかで、`attemptNumber: 1`。`"failed"` が返ったら課金は起きていない |
 | A5 | 2回目が成立したことの裏取り (4点) | Admin API + Shopify管理画面 + Firestore | (a) `subscriptionBillingAttempts` が1件増える (b) Shopifyに新規注文が立つ (c) 契約の `nextBillingDate` が1サイクル前進 (d) webhook `SUBSCRIPTION_BILLING_ATTEMPTS_SUCCESS` が `/api/subscription/webhook` に届きFirestoreに記録される |
 | A6 | A3-A5をもう1回 (3回目) | 同上 | 冪等キーが `-attempt1` で同じでも `nextBillingDate` が変わるため別キーになり、二重課金にならないことを同時に確認できる |
 | A7 | 失敗系: 決済が通らないテストカードで契約を作りA3-A4を3回繰り返す | 同上 | 1回目 `errorCode` あり → 24時間未経過なら `action: "waiting"` → 3回失敗で `action: "paused"` + 契約PAUSED + 督促メール (**実送信はSetaka承認後。それまでdry-run**) |
 
-**注意 (A4のレスポンス解釈)**: 現行実装は課金試行が失敗しても `action` を `"billed"` /
-`"retried"` と返し、失敗は `detail` にのみ現れる (`route.ts` の `performBillingAttempt`)。
-`action` だけを見て成否を判定しないこと。判定は `detail` が `"Success"` であることで行う。
+**注意 (A4のレスポンス解釈)**: `action` は成否をそのまま表す (2026-08-10是正)。
+`errorCode` が返った試行は `"failed"` (初回) / `"retry_failed"` (リトライ)、
+`errorCode` なしで `ready: false` (Shopifyが受理しただけで課金は非同期に進行中) は `"pending"`、
+完了が確定したときだけ `"billed"` / `"retried"`。summaryの `billed` にも失敗・未確定は混ざらない。
+`"pending"` の確定結果はwebhook (`subscription_billing_attempts/success|failure`) 側で観測する
+(A5(d) と同じ経路)。
+
+**注意 (対象契約の網羅)**: `getSubscriptionContracts` / `getBillingAttempts` は
+connectionを最後のページまで走査する (2026-08-10是正。それまでは先頭20件のみで、
+21件目以降のACTIVE契約が課金されないまま無音だった)。安全上限 (50件×100ページ) に
+達した場合は打ち切らずエラーにするため、`checked` が実件数より少ないまま200が返ることはない。
 
 **注意 (A7の24時間)**: リトライ間隔 `RETRY_INTERVAL_HOURS` (24h) は実時間を待たずに検証できない。
 `countRecentFailures` / `isReadyForRetry` は純関数なので、待つのではなく **unit testで押さえるのが正しい**

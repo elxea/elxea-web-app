@@ -39,6 +39,124 @@ function flattenEdges<T>(connection: {
   return connection.edges.map((edge) => edge.node);
 }
 
+// ─── Cursor pagination for Admin API connections ─────────────────────
+
+/**
+ * Nodes fetched per request. Shopify's connections accept up to 250, but this
+ * query selects nested `lines(first: 10)` per contract, and the Admin API's
+ * calculated query cost scales with the requested node count. 50 keeps a single
+ * page comfortably inside the cost bucket while cutting the number of round
+ * trips 2.5x versus the old `$first: Int = 20` default.
+ */
+export const ADMIN_CONNECTION_PAGE_SIZE = 50;
+
+/**
+ * Safety cap on the number of pages a single call will walk
+ * (50 x 100 = 5,000 nodes).
+ *
+ * The cap exists to bound a broken server response, not to bound real data. It
+ * is therefore a **hard error, not a silent stop**: returning the first N pages
+ * of a connection that still says `hasNextPage: true` is exactly the failure
+ * this pagination was added to remove (contracts past the first page were never
+ * billed and nothing reported it). A loud 500 from the cron — captured by Sentry
+ * — is recoverable; a quiet partial run is not.
+ */
+export const ADMIN_CONNECTION_MAX_PAGES = 100;
+
+type GraphQLConnection<TNode> = {
+  edges: { node: TNode }[];
+  // Optional in the type on purpose: a query that forgets to select `pageInfo`
+  // compiles fine and would otherwise page exactly once, reintroducing the bug.
+  // Absence is checked at runtime and raised.
+  pageInfo?: { hasNextPage: boolean; endCursor: string | null };
+};
+
+/** Per-call overrides for paginated getters. Defaults are the constants above. */
+export type PaginationOptions = {
+  pageSize?: number;
+  maxPages?: number;
+};
+
+/**
+ * Walk every page of a Relay-style Admin API connection and return all nodes.
+ *
+ * Fails loudly instead of truncating on any of: a missing connection/`pageInfo`,
+ * `hasNextPage: true` with no `endCursor`, a cursor that does not advance
+ * (server-side pagination loop), or exhausting `maxPages`.
+ */
+async function fetchAllPages<TData, TNode>({
+  query,
+  variables,
+  label,
+  selectConnection,
+  pageSize = ADMIN_CONNECTION_PAGE_SIZE,
+  maxPages = ADMIN_CONNECTION_MAX_PAGES,
+}: {
+  query: string;
+  variables?: Record<string, unknown>;
+  label: string;
+  selectConnection: (
+    data: TData
+  ) => GraphQLConnection<TNode> | null | undefined;
+} & PaginationOptions): Promise<TNode[]> {
+  const nodes: TNode[] = [];
+  const seenCursors = new Set<string>();
+  let after: string | null = null;
+
+  for (let page = 1; page <= maxPages; page++) {
+    const data = await adminFetch<TData>({
+      query,
+      variables: { ...variables, first: pageSize, after },
+    });
+
+    const connection = selectConnection(data);
+    if (!connection) {
+      throw new Error(
+        `${label}: page ${page} response did not contain the expected connection`
+      );
+    }
+
+    for (const edge of connection.edges) {
+      nodes.push(edge.node);
+    }
+
+    const pageInfo = connection.pageInfo;
+    if (!pageInfo) {
+      throw new Error(
+        `${label}: connection has no pageInfo — the query must select ` +
+          `pageInfo { hasNextPage endCursor } for pagination to terminate correctly`
+      );
+    }
+
+    if (!pageInfo.hasNextPage) {
+      return nodes;
+    }
+
+    if (!pageInfo.endCursor) {
+      throw new Error(
+        `${label}: hasNextPage is true but endCursor is null on page ${page} ` +
+          `(${nodes.length} nodes collected) — refusing to return a truncated result`
+      );
+    }
+
+    if (seenCursors.has(pageInfo.endCursor)) {
+      throw new Error(
+        `${label}: pagination cursor did not advance on page ${page} ` +
+          `(${nodes.length} nodes collected) — aborting to avoid an infinite loop`
+      );
+    }
+
+    seenCursors.add(pageInfo.endCursor);
+    after = pageInfo.endCursor;
+  }
+
+  throw new Error(
+    `${label}: exceeded the pagination safety cap of ${maxPages} pages ` +
+      `x ${pageSize} nodes (${nodes.length} collected, more pages remain) — ` +
+      `refusing to return a truncated result`
+  );
+}
+
 function flattenSellingPlanGroup(
   raw: Record<string, unknown>
 ): AdminSellingPlanGroup {
@@ -179,24 +297,31 @@ export async function getSellingPlanGroups(): Promise<AdminSellingPlanGroup[]> {
 
 /**
  * List subscription contracts, optionally filtered by status.
+ *
+ * Walks **every** page of the connection. Before this was paginated the caller
+ * silently received only the first 20 contracts, so the 21st ACTIVE contract
+ * onward was never picked up by the billing cron.
  */
 export async function getSubscriptionContracts(
-  status?: SubscriptionContractStatus
+  status?: SubscriptionContractStatus,
+  options: PaginationOptions = {}
 ): Promise<SubscriptionContract[]> {
   const queryFilter = status ? `status:${status}` : undefined;
 
-  const data = await adminFetch<{
-    subscriptionContracts: {
-      edges: { node: Record<string, unknown> }[];
-    };
-  }>({
+  const nodes = await fetchAllPages<
+    {
+      subscriptionContracts: GraphQLConnection<Record<string, unknown>> | null;
+    },
+    Record<string, unknown>
+  >({
     query: SUBSCRIPTION_CONTRACTS_QUERY,
     variables: { query: queryFilter },
+    label: `subscriptionContracts${status ? ` (status:${status})` : ""}`,
+    selectConnection: (data) => data.subscriptionContracts,
+    ...options,
   });
 
-  return data.subscriptionContracts.edges.map((edge) =>
-    flattenContract(edge.node)
-  );
+  return nodes.map((node) => flattenContract(node));
 }
 
 /**
@@ -217,22 +342,29 @@ export async function getSubscriptionContract(
 
 /**
  * Get billing attempts for a subscription contract.
+ *
+ * Walks every page. The dunning logic counts failed attempts to decide whether
+ * to retry or pause, so a truncated list under-counts failures and can retry a
+ * contract past its retry budget.
  */
 export async function getBillingAttempts(
-  contractId: string
+  contractId: string,
+  options: PaginationOptions = {}
 ): Promise<BillingAttempt[]> {
-  const data = await adminFetch<{
-    subscriptionContract: {
-      billingAttempts: {
-        edges: { node: BillingAttempt }[];
-      };
-    };
-  }>({
+  return fetchAllPages<
+    {
+      subscriptionContract: {
+        billingAttempts: GraphQLConnection<BillingAttempt> | null;
+      } | null;
+    },
+    BillingAttempt
+  >({
     query: SUBSCRIPTION_BILLING_ATTEMPTS_QUERY,
     variables: { contractId },
+    label: `subscriptionContract.billingAttempts (${contractId})`,
+    selectConnection: (data) => data.subscriptionContract?.billingAttempts,
+    ...options,
   });
-
-  return flattenEdges(data.subscriptionContract.billingAttempts);
 }
 
 // ─── Billing operations ─────────────────────────────────────────────
