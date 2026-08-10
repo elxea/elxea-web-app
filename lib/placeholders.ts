@@ -138,7 +138,12 @@ export const PLACEHOLDERS = {
    *
    * 確定した 4 項目 (送料無料 / 初回1,880円・継続2,280円 / 初回発送は5営業日以内 /
    * 解約はマイページ主) はページ側に直接書いている (Setaka 確定 2026-08-11)。
-   * ここに残るのは Shopify の設定・実測に依存して事業側の確定を待つ 5 件だけ。
+   *
+   * 当初 5 件を登録したが、うち 3 件 (初回 / 2回目以降の課金タイミング・解約の受付期限・
+   * マイページで変更できる項目) は本番 Shopify とマイページ実装を読めば決まる「事実」で、
+   * 事実確認調査 (https://app.notion.com/p/3b870c9d064c8132b9daf9088fc5df7b) の実測値で
+   * confirmed 化した (2026-08-11)。ここに仮値として残るのは、決済ゲートウェイの構成が
+   * 未完了で値そのものが存在しない決済手段の 1 件だけ。
    */
   "tokushoho.subscriptionPaymentMethods": {
     surface: "特商法ページ S2 記載事項 IV-4 お支払い方法と時期",
@@ -152,38 +157,40 @@ export const PLACEHOLDERS = {
   "tokushoho.subscriptionFirstChargeTiming": {
     surface: "特商法ページ S2 記載事項 IV-4 お支払い方法と時期",
     label: "初回課金のタイミング",
-    value: "（公開前に差し替え）初回の課金タイミング",
-    status: PLACEHOLDER_MARKER,
-    owner: "Setaka (事業判断) / Shopify 設定",
+    value: "ご注文の確定時",
+    status: "confirmed",
+    owner: "Setaka (法定表記)",
     basis:
-      "特定商取引法 第11条2号。Shopify の selling plan の billing policy から確定する。起草 IV-4 / 未確定 U-3 — https://app.notion.com/p/3b870c9d064c8173b866f824f95f36fa",
+      "特定商取引法 第11条2号。事実確認調査で本番 Shopify の selling plan の billing policy (月単位 / 間隔 1・2・3 / 基準日なし) と実在契約から実測確定 (2026-08-11 JST) — https://app.notion.com/p/3b870c9d064c8132b9daf9088fc5df7b。初回はチェックアウト完了 (注文確定) 時点で課金される。起草 IV-4 / 未確定 U-3 — https://app.notion.com/p/3b870c9d064c8173b866f824f95f36fa",
   },
   "tokushoho.subscriptionRecurringChargeTiming": {
     surface: "特商法ページ S2 記載事項 IV-4 お支払い方法と時期",
     label: "2回目以降の課金のタイミング",
-    value: "（公開前に差し替え）2回目以降の課金タイミング",
-    status: PLACEHOLDER_MARKER,
-    owner: "Setaka (事業判断) / Shopify 設定",
+    value:
+      "お申し込み日を起点として、お選びいただいた間隔ごとに巡ってくる同じ日付（当日の午前中）",
+    status: "confirmed",
+    owner: "Setaka (法定表記)",
     basis:
-      "特定商取引法 第11条2号。Shopify の selling plan の billing policy から確定する。起草 IV-4 / 未確定 U-3 — https://app.notion.com/p/3b870c9d064c8173b866f824f95f36fa",
+      "特定商取引法 第11条2号。事実確認調査で実測確定 (2026-08-11 JST) — https://app.notion.com/p/3b870c9d064c8132b9daf9088fc5df7b。billing policy は基準日 (anchors) 未設定なので月初などの固定日ではなく加入日基準の応当日で回る。実際の引き落としは `app/api/cron/billing/route.ts` の cron (vercel.json: 毎日 00:00 UTC = 09:00 JST) が「次回課金日 ≦ 現在時刻」の契約に対して行うため、顧客案内は「当日の午前中」とする。起草 IV-4 / 未確定 U-3 — https://app.notion.com/p/3b870c9d064c8173b866f824f95f36fa",
   },
   "tokushoho.subscriptionCancelCutoff": {
     surface: "特商法ページ S2 記載事項 IV-6 停止・解約の方法",
     label: "解約・変更の受付期限",
-    value: "（公開前に差し替え）受付期限",
-    status: PLACEHOLDER_MARKER,
-    owner: "Setaka (事業判断) / Shopify 実測",
+    value: "次回のご請求日の前日",
+    status: "confirmed",
+    owner: "Setaka (法定表記)",
     basis:
-      "解約の申出に期限があるならその期限の表示が必要 (消費者庁ガイドライン別添9 2(2)⑥)。Shopify で解約がどの回から反映されるかを実測して差し替える。定期便LP の FAQ が「発送日の3日前まで」と書いているが、この値は未実測で根拠がないため確定扱いにしない (差し替え時は LP 側も同じ値に合わせる)。起草 IV-6 / 未確定 U-5 — https://app.notion.com/p/3b870c9d064c8173b866f824f95f36fa",
+      "解約の申出に期限があるならその期限の表示が必要 (消費者庁ガイドライン別添9 2(2)⑥)。事実確認調査で実測確定 (2026-08-11 JST) — https://app.notion.com/p/3b870c9d064c8132b9daf9088fc5df7b。技術的な限界は「次回課金日の当日 09:00 JST の cron 実行まで」(解約・停止・スキップは顧客アカウント API を即時呼び出す実装) だが、限界値をそのまま案内すると当日朝の操作が課金と競合するため、調査レポートの推奨どおり余裕を持たせて「前日まで」を顧客向けの受付期限とする。定期便LP の FAQ は「発送日の3日前まで」と別基準のままなので、LP 側の表示不一致は G-4 系の表示是正で別途そろえる (本エントリの値が特商法ページの正)。起草 IV-6 / 未確定 U-5 — https://app.notion.com/p/3b870c9d064c8173b866f824f95f36fa",
   },
   "tokushoho.subscriptionEditableFields": {
     surface: "特商法ページ S2 記載事項 IV-9 お申し込み内容の変更",
     label: "マイページで変更できる項目",
-    value: "（公開前に差し替え）マイページで変更できる項目",
-    status: PLACEHOLDER_MARKER,
-    owner: "Setaka (事業判断) / Shopify Customer Account 実測",
+    value:
+      "次回お届け分のスキップ、お届け間隔の変更、一時停止、再開、解約",
+    status: "confirmed",
+    owner: "Setaka (法定表記)",
     basis:
-      "Shopify Customer Account の実機で変更できる項目を確認して列挙する (変更できない項目を「変更できる」と書くと不実表示になる)。お届け頻度の変更はマイページで実装済み (`changeDeliveryFrequencyAction`)。起草 IV-9 / 未確定 U-6 — https://app.notion.com/p/3b870c9d064c8173b866f824f95f36fa",
+      "変更できない項目を「変更できる」と書くと不実表示になる。事実確認調査で実測確定 (2026-08-11 JST) — https://app.notion.com/p/3b870c9d064c8132b9daf9088fc5df7b。マイページ (`components/account/subscription-actions.tsx` / `app/[locale]/account/subscriptions/page.tsx`) のボタンはこの 5 種のみで、お届け先住所・数量・お支払い方法・商品の変更画面はアカウント配下に存在しない (商品変更のサーバー処理は未接続)。よって IV-9 の文面もこの 5 種だけを「マイページでできる」と書き、それ以外はお問い合わせ窓口に寄せている。起草 IV-9 / 未確定 U-6 — https://app.notion.com/p/3b870c9d064c8173b866f824f95f36fa",
   },
 
   /* ---- About ページ (/ja/about) 会社情報 -------------------------------- */
