@@ -18,7 +18,9 @@ function getResend(): Resend {
 }
 
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "no-reply@elxea.com";
-const TO_EMAIL = process.env.CONTACT_TO_EMAIL || "support@elxea.com";
+// 既定の受信先は info@ に統一 (Setaka 確定 2026-08-11)。画面に出す問い合わせ先と
+// 実際の受信箱が別アドレスだと、返信元と案内先が食い違う。
+const TO_EMAIL = process.env.CONTACT_TO_EMAIL || "info@elxea.com";
 const BUSINESS_TO_EMAIL = process.env.CONTACT_BUSINESS_TO_EMAIL || "info@elxea.com";
 
 /**

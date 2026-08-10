@@ -56,6 +56,12 @@ import { cn } from "@/lib/utils";
  */
 
 const ADDRESS = placeholderValue("tokushoho.address");
+/**
+ * お問い合わせ先も特商法ページと同じレジストリから読む。以前ここだけ別アドレス
+ * (support@) を直書きしており、特商法ページ / お問い合わせページと表示アドレスが
+ * 食い違っていた (2026-08-11 に info@ へ統一)。
+ */
+const EMAIL = placeholderValue("tokushoho.email");
 
 /** 全 8 項。文言は R1 実装 (`app/[locale]/legal/privacy/page.tsx`) の正本を移設。 */
 const CLAUSES: {
@@ -152,7 +158,7 @@ const META = [
 const BUSINESS = [
   { label: "事業者名", value: "株式会社elxea / elxea Inc." },
   { label: "所在地", value: ADDRESS },
-  { label: "お問い合わせ", value: "support@elxea.com" },
+  { label: "お問い合わせ", value: EMAIL },
   { label: "改定履歴", value: "2026年3月1日 制定" },
 ];
 

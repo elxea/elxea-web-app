@@ -130,6 +130,62 @@ export const PLACEHOLDERS = {
       "Corporate Info DB の「代表メールアドレス（一般問い合わせ用）」(Category=Contact / 最終確認日あり) が SoT — https://www.notion.so/fc8c353f9650453c9707ae0a806ae484 (取得 2026-08-10 JST)。roji は層 2 のサービスでサイト運営主体は elxea なので、hello@roji.jp ではなく受信実績のある法人公式アドレスを表に出す (Boss 裁定 2026-08-10)",
   },
 
+  /* ---- 特商法ページ IV 定期便 (継続課金の契約条件) ---------------------- */
+  /*
+   * 2026-08-11 に追加。定期便の契約条件は法11条・施行規則23条の表示事項なので、
+   * 値が確定していない項目を「書かない」で済ませられない (欠落そのものが違反)。
+   * そこで文面は先に置き、埋まっていない値だけを仮値ガードに載せて公開を止める。
+   *
+   * 確定した 4 項目 (送料無料 / 初回1,880円・継続2,280円 / 初回発送は5営業日以内 /
+   * 解約はマイページ主) はページ側に直接書いている (Setaka 確定 2026-08-11)。
+   * ここに残るのは Shopify の設定・実測に依存して事業側の確定を待つ 5 件だけ。
+   */
+  "tokushoho.subscriptionPaymentMethods": {
+    surface: "特商法ページ S2 記載事項 IV-4 お支払い方法と時期",
+    label: "定期便で利用できる決済手段",
+    value: "（公開前に差し替え）ご利用いただける決済手段",
+    status: PLACEHOLDER_MARKER,
+    owner: "Setaka (事業判断) / Shopify 設定",
+    basis:
+      "特定商取引法 第11条2号。単発販売の「クレジットカード、コンビニ決済、銀行振込、代金引換」を流用してはいけない (継続課金で使える手段は Shopify の subscription 対応決済に依存する)。Shopify の対応決済を実測して差し替える。起草 IV-4 / 未確定 U-2 — https://app.notion.com/p/3b870c9d064c8173b866f824f95f36fa",
+  },
+  "tokushoho.subscriptionFirstChargeTiming": {
+    surface: "特商法ページ S2 記載事項 IV-4 お支払い方法と時期",
+    label: "初回課金のタイミング",
+    value: "（公開前に差し替え）初回の課金タイミング",
+    status: PLACEHOLDER_MARKER,
+    owner: "Setaka (事業判断) / Shopify 設定",
+    basis:
+      "特定商取引法 第11条2号。Shopify の selling plan の billing policy から確定する。起草 IV-4 / 未確定 U-3 — https://app.notion.com/p/3b870c9d064c8173b866f824f95f36fa",
+  },
+  "tokushoho.subscriptionRecurringChargeTiming": {
+    surface: "特商法ページ S2 記載事項 IV-4 お支払い方法と時期",
+    label: "2回目以降の課金のタイミング",
+    value: "（公開前に差し替え）2回目以降の課金タイミング",
+    status: PLACEHOLDER_MARKER,
+    owner: "Setaka (事業判断) / Shopify 設定",
+    basis:
+      "特定商取引法 第11条2号。Shopify の selling plan の billing policy から確定する。起草 IV-4 / 未確定 U-3 — https://app.notion.com/p/3b870c9d064c8173b866f824f95f36fa",
+  },
+  "tokushoho.subscriptionCancelCutoff": {
+    surface: "特商法ページ S2 記載事項 IV-6 停止・解約の方法",
+    label: "解約・変更の受付期限",
+    value: "（公開前に差し替え）受付期限",
+    status: PLACEHOLDER_MARKER,
+    owner: "Setaka (事業判断) / Shopify 実測",
+    basis:
+      "解約の申出に期限があるならその期限の表示が必要 (消費者庁ガイドライン別添9 2(2)⑥)。Shopify で解約がどの回から反映されるかを実測して差し替える。定期便LP の FAQ が「発送日の3日前まで」と書いているが、この値は未実測で根拠がないため確定扱いにしない (差し替え時は LP 側も同じ値に合わせる)。起草 IV-6 / 未確定 U-5 — https://app.notion.com/p/3b870c9d064c8173b866f824f95f36fa",
+  },
+  "tokushoho.subscriptionEditableFields": {
+    surface: "特商法ページ S2 記載事項 IV-9 お申し込み内容の変更",
+    label: "マイページで変更できる項目",
+    value: "（公開前に差し替え）マイページで変更できる項目",
+    status: PLACEHOLDER_MARKER,
+    owner: "Setaka (事業判断) / Shopify Customer Account 実測",
+    basis:
+      "Shopify Customer Account の実機で変更できる項目を確認して列挙する (変更できない項目を「変更できる」と書くと不実表示になる)。お届け頻度の変更はマイページで実装済み (`changeDeliveryFrequencyAction`)。起草 IV-9 / 未確定 U-6 — https://app.notion.com/p/3b870c9d064c8173b866f824f95f36fa",
+  },
+
   /* ---- About ページ (/ja/about) 会社情報 -------------------------------- */
   "about.headOffice": {
     surface: "About ページ 06 会社情報 (Figma 8121:1312 / SP 8121:1386)",

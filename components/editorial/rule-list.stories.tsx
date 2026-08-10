@@ -157,7 +157,7 @@ export const Definition_Rows: Story = {
   args: { question: "", summary: "" },
   render: () => (
     <dl className="border-b border-border">
-      <DefinitionRow term="通常のご注文">ご注文から2〜4日以内に発送します。</DefinitionRow>
+      <DefinitionRow term="通常のご注文">ご注文から5営業日以内に発送します。</DefinitionRow>
       <DefinitionRow term="定期便">お届け予定日の3日前に発送します。</DefinitionRow>
       <DefinitionRow term="年末年始・大型連休">
         発送をお休みします。前後は数日いただきます。

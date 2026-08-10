@@ -63,7 +63,9 @@ export function OrganizationJsonLd() {
     sameAs: [],
     contactPoint: {
       "@type": "ContactPoint",
-      email: "support@elxea.com",
+      // 表示用の問い合わせ先は info@ に統一 (Setaka 確定 2026-08-11)。特商法ページ /
+      // プライバシーポリシー / お問い合わせページと同じアドレスを出す。
+      email: "info@elxea.com",
       contactType: "customer service",
       availableLanguage: ["Japanese", "English"],
     },
