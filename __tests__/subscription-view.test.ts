@@ -1,15 +1,23 @@
 import { describe, expect, it } from "vitest";
 
+import type {
+  AdminSellingPlan,
+  AdminSellingPlanGroup,
+  SellingPlanInterval,
+} from "@/lib/shopify/admin-types";
 import type { SubscriptionContract } from "@/lib/shopify/customer";
 import {
-  FREQUENCY_OPTIONS,
+  FALLBACK_FREQUENCY_OPTIONS,
   canManageSubscription,
+  deriveFrequencyOptions,
+  frequencyOptionKey,
   intervalLabelKey,
   isSameFrequency,
   sortSubscriptionCards,
   subscriptionNoteKey,
   subscriptionStatusKind,
   subscriptionStatusLabelKey,
+  toFrequencyOption,
   toSubscriptionCardView,
 } from "@/lib/subscription-view";
 
@@ -83,27 +91,151 @@ describe("label keys", () => {
   });
 });
 
-describe("FREQUENCY_OPTIONS / isSameFrequency", () => {
-  it("carries the five chips of the confirmed design in order", () => {
-    expect(FREQUENCY_OPTIONS.map((o) => o.labelKey)).toEqual([
-      "frequencyEveryWeek",
-      "frequencyEvery2Weeks",
-      "frequencyEveryMonth",
-      "frequencyEvery2Months",
-      "frequencyEvery3Months",
-    ]);
+/**
+ * ストアに実在する selling plan (2026-08-11 時点): 毎月 / 2ヶ月ごと / 3ヶ月ごと の
+ * 3 プラン。毎週・隔週のプランは **存在しない**。
+ *
+ * ここを正として FALLBACK_FREQUENCY_OPTIONS を固定する。Shopify 側でプランを
+ * 増減したらこのテストが落ちるので、フォールバック一覧と訳文キーを揃えて直すまで
+ * 通らない (存在しない頻度を画面に並べる事故の再発防止)。
+ */
+const REAL_SHOPIFY_FREQUENCIES: { interval: SellingPlanInterval; intervalCount: number }[] =
+  [
+    { interval: "MONTH", intervalCount: 1 },
+    { interval: "MONTH", intervalCount: 2 },
+    { interval: "MONTH", intervalCount: 3 },
+  ];
+
+function sellingPlan(
+  interval: SellingPlanInterval,
+  intervalCount: number,
+  id = `${interval}-${intervalCount}`
+): AdminSellingPlan {
+  return {
+    id: `gid://shopify/SellingPlan/${id}`,
+    name: id,
+    description: null,
+    options: [],
+    position: null,
+    billingPolicy: { interval, intervalCount },
+    deliveryPolicy: { interval, intervalCount },
+    pricingPolicies: [],
+  };
+}
+
+function planGroup(sellingPlans: AdminSellingPlan[]): AdminSellingPlanGroup {
+  return {
+    id: "gid://shopify/SellingPlanGroup/1",
+    name: "Subscription",
+    merchantCode: null,
+    options: [],
+    summary: null,
+    productsCount: null,
+    sellingPlans,
+  };
+}
+
+describe("FALLBACK_FREQUENCY_OPTIONS", () => {
+  it("matches the selling plans that actually exist in Shopify", () => {
+    expect(
+      FALLBACK_FREQUENCY_OPTIONS.map(({ interval, intervalCount }) => ({
+        interval,
+        intervalCount,
+      }))
+    ).toEqual(REAL_SHOPIFY_FREQUENCIES);
+  });
+
+  it("offers no weekly or bi-weekly plan (they do not exist in Shopify)", () => {
+    expect(FALLBACK_FREQUENCY_OPTIONS.some((o) => o.interval === "WEEK")).toBe(false);
   });
 
   it("only ever offers intervals the Server Action accepts", () => {
-    for (const option of FREQUENCY_OPTIONS) {
-      expect(["WEEK", "MONTH"]).toContain(option.interval);
+    for (const option of FALLBACK_FREQUENCY_OPTIONS) {
+      expect(["DAY", "WEEK", "MONTH", "YEAR"]).toContain(option.interval);
       expect(option.intervalCount).toBeGreaterThanOrEqual(1);
       expect(option.intervalCount).toBeLessThanOrEqual(12);
     }
   });
 
+  it("labels the real plans with their own wording, not the generic one", () => {
+    expect(FALLBACK_FREQUENCY_OPTIONS.map((o) => o.labelKey)).toEqual([
+      "frequencyEveryMonth",
+      "frequencyEvery2Months",
+      "frequencyEvery3Months",
+    ]);
+  });
+});
+
+describe("deriveFrequencyOptions", () => {
+  it("derives exactly the plans Shopify reports", () => {
+    const options = deriveFrequencyOptions([
+      planGroup([
+        sellingPlan("MONTH", 1),
+        sellingPlan("MONTH", 2),
+        sellingPlan("MONTH", 3),
+      ]),
+    ]);
+    expect(
+      options.map(({ interval, intervalCount }) => ({ interval, intervalCount }))
+    ).toEqual(REAL_SHOPIFY_FREQUENCIES);
+  });
+
+  it("dedupes the same frequency offered by several groups", () => {
+    const options = deriveFrequencyOptions([
+      planGroup([sellingPlan("MONTH", 1, "a")]),
+      planGroup([sellingPlan("MONTH", 1, "b"), sellingPlan("MONTH", 3, "c")]),
+    ]);
+    expect(options.map(frequencyOptionKey)).toEqual(["MONTH-1", "MONTH-3"]);
+  });
+
+  it("sorts by interval length then count", () => {
+    const options = deriveFrequencyOptions([
+      planGroup([
+        sellingPlan("YEAR", 1),
+        sellingPlan("MONTH", 3),
+        sellingPlan("WEEK", 2),
+        sellingPlan("MONTH", 1),
+        sellingPlan("DAY", 10),
+      ]),
+    ]);
+    expect(options.map(frequencyOptionKey)).toEqual([
+      "DAY-10",
+      "WEEK-2",
+      "MONTH-1",
+      "MONTH-3",
+      "YEAR-1",
+    ]);
+  });
+
+  it("skips plans with no recurring delivery policy (one-time purchase)", () => {
+    const oneTime = sellingPlan("MONTH", 1, "one-time");
+    (oneTime as { deliveryPolicy: unknown }).deliveryPolicy = {};
+
+    const options = deriveFrequencyOptions([planGroup([oneTime, sellingPlan("MONTH", 2)])]);
+    expect(options.map(frequencyOptionKey)).toEqual(["MONTH-2"]);
+  });
+
+  it("returns nothing when the store has no selling plan group", () => {
+    expect(deriveFrequencyOptions([])).toEqual([]);
+  });
+});
+
+describe("toFrequencyOption", () => {
+  it("falls back to the generic label with a count for unseen frequencies", () => {
+    expect(toFrequencyOption("MONTH", 4)).toEqual({
+      labelKey: "intervalMonth",
+      labelValues: { count: 4 },
+      interval: "MONTH",
+      intervalCount: 4,
+    });
+    expect(toFrequencyOption("DAY", 10).labelKey).toBe("intervalDay");
+    expect(toFrequencyOption("YEAR", 1).labelKey).toBe("intervalYear");
+  });
+});
+
+describe("isSameFrequency", () => {
   it("detects the currently contracted frequency", () => {
-    const monthly = FREQUENCY_OPTIONS[2];
+    const monthly = toFrequencyOption("MONTH", 1);
     expect(isSameFrequency(monthly, "MONTH", 1)).toBe(true);
     expect(isSameFrequency(monthly, "month", 1)).toBe(true);
     expect(isSameFrequency(monthly, "MONTH", 2)).toBe(false);
@@ -111,9 +243,9 @@ describe("FREQUENCY_OPTIONS / isSameFrequency", () => {
   });
 
   it("treats missing frequency data as 'not current' rather than matching", () => {
-    const weekly = FREQUENCY_OPTIONS[0];
-    expect(isSameFrequency(weekly, undefined, undefined)).toBe(false);
-    expect(isSameFrequency(weekly, "WEEK", undefined)).toBe(false);
+    const monthly = toFrequencyOption("MONTH", 1);
+    expect(isSameFrequency(monthly, undefined, undefined)).toBe(false);
+    expect(isSameFrequency(monthly, "MONTH", undefined)).toBe(false);
   });
 });
 

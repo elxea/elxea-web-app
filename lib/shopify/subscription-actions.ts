@@ -10,6 +10,8 @@ import {
   isSubscriptionContractGid,
 } from "./customer";
 import { updateSubscriptionContract, changeSubscriptionLineItem } from "./subscription-admin";
+import { getAvailableFrequencyOptions } from "@/lib/subscription-frequencies.server";
+
 import type { SellingPlanInterval } from "./admin-types";
 
 type ActionResult = { success: boolean; error?: string };
@@ -104,6 +106,18 @@ export async function changeDeliveryFrequencyAction(
   }
   if (!Number.isInteger(intervalCount) || intervalCount < 1 || intervalCount > 12) {
     return { success: false, error: "Invalid interval count" };
+  }
+
+  // 実在する selling plan に無い頻度は受けない。古い画面や作られたリクエストが
+  // ストアに無いプランへ契約を移すのを防ぐ (画面側の絞り込みだけに頼らない)。
+  const available = await getAvailableFrequencyOptions();
+  if (
+    !available.some(
+      (option) =>
+        option.interval === interval && option.intervalCount === intervalCount
+    )
+  ) {
+    return { success: false, error: "Unsupported delivery frequency" };
   }
 
   // Authenticate the caller and prove they own this contract before touching

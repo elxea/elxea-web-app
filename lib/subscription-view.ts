@@ -1,3 +1,7 @@
+import type {
+  AdminSellingPlanGroup,
+  SellingPlanInterval,
+} from "@/lib/shopify/admin-types";
 import type { SubscriptionContract } from "@/lib/shopify/customer";
 
 /**
@@ -78,23 +82,108 @@ export function intervalLabelKey(interval: string): string {
 }
 
 /**
- * 頻度変更の選択肢 (Figma 6719:14708 の chips 5 個と同じ順序・同じ内容)。
- * 毎週 / 隔週 / 毎月 / 隔月 / 3ヶ月ごと。
+ * 頻度変更の選択肢。
+ *
+ * 中身は **Shopify に実在する selling plan から導出** する
+ * (`lib/subscription-frequencies.server.ts`)。画面側に並べる頻度をハードコード
+ * すると、実在しないプラン (以前並んでいた毎週 / 隔週) を顧客に見せてしまい、
+ * 選んだ時点で必ず失敗する経路ができるため、ここには「導出の仕組み」だけを置く。
+ *
+ * Figma 6719:14708 の chips は 5 個描かれているが、これは当時の想定で、
+ * ストアの実プランは 3 個 (毎月 / 2ヶ月ごと / 3ヶ月ごと)。実データを正とする。
  */
 export type FrequencyOption = {
-  /** messages のキー (account.frequency*)。 */
+  /** messages のキー (account.*)。 */
   labelKey: string;
-  interval: "WEEK" | "MONTH";
+  /** labelKey が {count} を取る汎用キーのときだけ渡す値。 */
+  labelValues?: { count: number };
+  interval: SellingPlanInterval;
   intervalCount: number;
 };
 
-export const FREQUENCY_OPTIONS: readonly FrequencyOption[] = [
-  { labelKey: "frequencyEveryWeek", interval: "WEEK", intervalCount: 1 },
-  { labelKey: "frequencyEvery2Weeks", interval: "WEEK", intervalCount: 2 },
-  { labelKey: "frequencyEveryMonth", interval: "MONTH", intervalCount: 1 },
-  { labelKey: "frequencyEvery2Months", interval: "MONTH", intervalCount: 2 },
-  { labelKey: "frequencyEvery3Months", interval: "MONTH", intervalCount: 3 },
+/**
+ * 実在プランに対して用意してある固有の訳文。ここに無い頻度 (Shopify に新しい
+ * プランが増えたとき) は `intervalLabelKey` の汎用キー + {count} で描く。
+ */
+const CURATED_FREQUENCY_LABEL_KEYS: Record<string, string> = {
+  "WEEK-1": "frequencyEveryWeek",
+  "WEEK-2": "frequencyEvery2Weeks",
+  "MONTH-1": "frequencyEveryMonth",
+  "MONTH-2": "frequencyEvery2Months",
+  "MONTH-3": "frequencyEvery3Months",
+};
+
+/** 選択肢の一意キー。labelKey は汎用キーだと重複しうるので描画 key には使わない。 */
+export function frequencyOptionKey(option: {
+  interval: string;
+  intervalCount: number;
+}): string {
+  return `${option.interval}-${option.intervalCount}`;
+}
+
+/** interval + count 1 組を、訳文キー付きの選択肢に変換する。 */
+export function toFrequencyOption(
+  interval: SellingPlanInterval,
+  intervalCount: number
+): FrequencyOption {
+  const curated = CURATED_FREQUENCY_LABEL_KEYS[`${interval}-${intervalCount}`];
+  if (curated) return { labelKey: curated, interval, intervalCount };
+  return {
+    labelKey: intervalLabelKey(interval),
+    labelValues: { count: intervalCount },
+    interval,
+    intervalCount,
+  };
+}
+
+/**
+ * Shopify に実在する 3 プラン。Admin API が読めないとき
+ * (認証情報の無いローカル / preview ビルド / 一時的な失敗) のフォールバックで、
+ * `__tests__/subscription-view.test.ts` が実プランに固定している。
+ * プランが増減したらテストが落ち、ここを直すまで通らない。
+ */
+export const FALLBACK_FREQUENCY_OPTIONS: readonly FrequencyOption[] = [
+  toFrequencyOption("MONTH", 1),
+  toFrequencyOption("MONTH", 2),
+  toFrequencyOption("MONTH", 3),
 ] as const;
+
+const INTERVAL_ORDER: Record<SellingPlanInterval, number> = {
+  DAY: 0,
+  WEEK: 1,
+  MONTH: 2,
+  YEAR: 3,
+};
+
+/**
+ * selling plan group から、重複を除いた「実在する頻度」を短い順に取り出す。
+ * 純粋関数なので Shopify を叩かずに単体テストできる。
+ */
+export function deriveFrequencyOptions(
+  groups: AdminSellingPlanGroup[]
+): FrequencyOption[] {
+  const seen = new Map<string, FrequencyOption>();
+
+  for (const group of groups) {
+    for (const plan of group.sellingPlans ?? []) {
+      const policy = plan.deliveryPolicy;
+      // 単発購入プランには recurring な deliveryPolicy が無い。
+      if (!policy?.interval || typeof policy.intervalCount !== "number") continue;
+      if (!Number.isInteger(policy.intervalCount) || policy.intervalCount < 1) continue;
+      if (!(policy.interval in INTERVAL_ORDER)) continue;
+
+      const option = toFrequencyOption(policy.interval, policy.intervalCount);
+      const key = frequencyOptionKey(option);
+      if (!seen.has(key)) seen.set(key, option);
+    }
+  }
+
+  return [...seen.values()].sort(
+    (a, b) =>
+      INTERVAL_ORDER[a.interval] - INTERVAL_ORDER[b.interval] ||
+      a.intervalCount - b.intervalCount
+  );
+}
 
 /** いま契約している頻度と同じ選択肢か。大文字小文字の揺れを吸収する。 */
 export function isSameFrequency(

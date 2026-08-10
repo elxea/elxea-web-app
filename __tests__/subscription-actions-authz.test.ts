@@ -51,11 +51,13 @@ vi.mock("@/lib/shopify/customer", async () => {
 
 const updateSubscriptionContractMock = vi.fn();
 const changeSubscriptionLineItemMock = vi.fn();
+const getSellingPlanGroupsMock = vi.fn();
 vi.mock("@/lib/shopify/subscription-admin", () => ({
   updateSubscriptionContract: (...args: unknown[]) =>
     updateSubscriptionContractMock(...args),
   changeSubscriptionLineItem: (...args: unknown[]) =>
     changeSubscriptionLineItemMock(...args),
+  getSellingPlanGroups: (...args: unknown[]) => getSellingPlanGroupsMock(...args),
 }));
 
 import {
@@ -87,6 +89,17 @@ beforeEach(() => {
   updateSubscriptionContractMock.mockResolvedValue({ id: OWN_CONTRACT, status: "ACTIVE" });
   changeSubscriptionLineItemMock.mockResolvedValue({ id: OWN_CONTRACT, status: "ACTIVE" });
   skipNextBillingCycleMock.mockResolvedValue({ success: true });
+  // ストアに実在する selling plan (毎月 / 2ヶ月ごと / 3ヶ月ごと)。
+  // 頻度変更はこの実データに含まれる頻度しか受け付けない。
+  getSellingPlanGroupsMock.mockResolvedValue([
+    {
+      sellingPlans: [
+        { deliveryPolicy: { interval: "MONTH", intervalCount: 1 } },
+        { deliveryPolicy: { interval: "MONTH", intervalCount: 2 } },
+        { deliveryPolicy: { interval: "MONTH", intervalCount: 3 } },
+      ],
+    },
+  ]);
 });
 
 describe("changeDeliveryFrequencyAction — 所有者照合", () => {
@@ -143,7 +156,7 @@ describe("changeDeliveryFrequencyAction — 所有者照合", () => {
   it("proceeds for the owner, verifying with the session token first", async () => {
     verifyOwnershipMock.mockResolvedValue(true);
 
-    const result = await changeDeliveryFrequencyAction(OWN_CONTRACT, "WEEK", 2);
+    const result = await changeDeliveryFrequencyAction(OWN_CONTRACT, "MONTH", 2);
 
     expect(result).toEqual({ success: true });
     expect(verifyOwnershipMock).toHaveBeenCalledWith(
@@ -152,9 +165,22 @@ describe("changeDeliveryFrequencyAction — 所有者照合", () => {
     );
     expect(updateSubscriptionContractMock).toHaveBeenCalledTimes(1);
     expect(updateSubscriptionContractMock).toHaveBeenCalledWith(OWN_CONTRACT, {
-      deliveryPolicy: { interval: "WEEK", intervalCount: 2 },
-      billingPolicy: { interval: "WEEK", intervalCount: 2 },
+      deliveryPolicy: { interval: "MONTH", intervalCount: 2 },
+      billingPolicy: { interval: "MONTH", intervalCount: 2 },
     });
+  });
+
+  it("rejects a frequency the store does not actually sell", async () => {
+    verifyOwnershipMock.mockResolvedValue(true);
+
+    // 毎週 / 隔週は Shopify に selling plan が無い。画面が古くても、あるいは
+    // リクエストを直接作られても、実在しない頻度で契約を書き換えさせない。
+    const weekly = await changeDeliveryFrequencyAction(OWN_CONTRACT, "WEEK", 1);
+    const biWeekly = await changeDeliveryFrequencyAction(OWN_CONTRACT, "WEEK", 2);
+
+    expect(weekly).toEqual({ success: false, error: "Unsupported delivery frequency" });
+    expect(biWeekly).toEqual({ success: false, error: "Unsupported delivery frequency" });
+    expect(updateSubscriptionContractMock).not.toHaveBeenCalled();
   });
 
   it("still validates the interval payload before authorizing", async () => {

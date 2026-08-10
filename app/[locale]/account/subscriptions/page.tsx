@@ -23,14 +23,16 @@ import { Link } from "@/i18n/navigation";
 import { seedSubscriptionContracts } from "@/lib/preview-seed";
 import { getCustomerFromSession, getSubscriptionsFromSession } from "@/lib/shopify/auth";
 import type { SubscriptionContract } from "@/lib/shopify/customer";
+import { getAvailableFrequencyOptions } from "@/lib/subscription-frequencies.server";
 import {
-  FREQUENCY_OPTIONS,
   canManageSubscription,
+  frequencyOptionKey,
   intervalLabelKey,
   sortSubscriptionCards,
   subscriptionNoteKey,
   subscriptionStatusLabelKey,
   toSubscriptionCardView,
+  type FrequencyOption,
   type SubscriptionCardView,
 } from "@/lib/subscription-view";
 import { cn, formatPrice } from "@/lib/utils";
@@ -104,6 +106,10 @@ export default async function SubscriptionsPage() {
 
   const cards = sortSubscriptionCards(contracts.map(toSubscriptionCardView));
 
+  // 選べる頻度は Shopify に実在する selling plan から読む。画面側で並べる頻度を
+  // 決め打ちすると、存在しないプランを提示して顧客の変更操作が必ず失敗する。
+  const frequencyOptions = await getAvailableFrequencyOptions();
+
   const labels: SubscriptionActionLabels = {
     skipNext: t("skipNext"),
     changeFrequency: t("changeFrequency"),
@@ -120,7 +126,10 @@ export default async function SubscriptionsPage() {
     frequencyChangeError: t("frequencyChangeError"),
     previewNotice: t("previewNotice"),
     frequencyOptionLabels: Object.fromEntries(
-      FREQUENCY_OPTIONS.map((option) => [option.labelKey, t(option.labelKey)])
+      frequencyOptions.map((option) => [
+        frequencyOptionKey(option),
+        t(option.labelKey, option.labelValues),
+      ])
     ),
   };
 
@@ -150,6 +159,7 @@ export default async function SubscriptionsPage() {
                 locale={locale}
                 t={t}
                 labels={labels}
+                frequencyOptions={frequencyOptions}
                 preview={Boolean(seeded)}
               />
             ))}
@@ -168,12 +178,14 @@ function SubscriptionContractCard({
   locale,
   t,
   labels,
+  frequencyOptions,
   preview,
 }: {
   card: SubscriptionCardView;
   locale: string;
   t: Translate;
   labels: SubscriptionActionLabels;
+  frequencyOptions: FrequencyOption[];
   preview: boolean;
 }) {
   const statusLabel = t(subscriptionStatusLabelKey(card.kind));
@@ -242,6 +254,7 @@ function SubscriptionContractCard({
           kind={card.kind === "active" ? "active" : "paused"}
           currentInterval={card.interval}
           currentIntervalCount={card.intervalCount}
+          frequencyOptions={frequencyOptions}
           labels={labels}
           preview={preview}
         />

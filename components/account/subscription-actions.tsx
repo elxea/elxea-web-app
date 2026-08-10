@@ -12,7 +12,7 @@ import {
 } from "@/components/account/subscription-parts";
 import { Button } from "@/components/ui/button";
 import {
-  FREQUENCY_OPTIONS,
+  frequencyOptionKey,
   isSameFrequency,
   type FrequencyOption,
 } from "@/lib/subscription-view";
@@ -67,6 +67,7 @@ export function SubscriptionActions({
   kind,
   currentInterval,
   currentIntervalCount,
+  frequencyOptions,
   labels,
   preview = false,
 }: {
@@ -75,6 +76,12 @@ export function SubscriptionActions({
   kind: "active" | "paused";
   currentInterval?: string;
   currentIntervalCount?: number;
+  /**
+   * 選べるお届け頻度。Shopify に実在する selling plan からサーバ側で導出した
+   * ものだけを受ける (`lib/subscription-frequencies.server.ts`)。ここで固定の
+   * 一覧を持たないのが要点で、実在しないプランを提示して必ず失敗させないため。
+   */
+  frequencyOptions: FrequencyOption[];
   labels: SubscriptionActionLabels;
   /**
    * 計測用の見本 (PREVIEW_SEED=1) のとき true。見本の契約は Shopify に存在しない
@@ -98,6 +105,15 @@ export function SubscriptionActions({
     resetMessages();
     setOpenPanel((current) => (current === next ? null : next));
   }
+
+  /**
+   * 切り替え先が 1 つも無い (ストアのプランが 1 種類だけ / 読めなかった) ときは
+   * 「お届け頻度を変更」を出さない。押しても現在値しか並ばないパネルが開くだけで、
+   * 顧客には行き止まりに見えるため。
+   */
+  const canChangeFrequency = frequencyOptions.some(
+    (option) => !isSameFrequency(option, currentInterval, currentIntervalCount)
+  );
 
   function handleAction(action: "pause" | "activate" | "cancel" | "skip") {
     resetMessages();
@@ -178,14 +194,16 @@ export function SubscriptionActions({
             >
               {labels.pauseSubscription}
             </Button>
-            <Button
-              variant="outline"
-              disabled={isPending}
-              aria-expanded={openPanel === "frequency"}
-              onClick={() => togglePanel("frequency")}
-            >
-              {labels.changeFrequency}
-            </Button>
+            {canChangeFrequency ? (
+              <Button
+                variant="outline"
+                disabled={isPending}
+                aria-expanded={openPanel === "frequency"}
+                onClick={() => togglePanel("frequency")}
+              >
+                {labels.changeFrequency}
+              </Button>
+            ) : null}
             <Button
               variant="destructive"
               disabled={isPending}
@@ -207,7 +225,7 @@ export function SubscriptionActions({
         <SubscriptionPanel title={labels.changeFrequency}>
           <SubscriptionPanelHint>{labels.selectFrequency}</SubscriptionPanelHint>
           <SubscriptionActionRow>
-            {FREQUENCY_OPTIONS.map((option) => {
+            {frequencyOptions.map((option) => {
               const isCurrent = isSameFrequency(
                 option,
                 currentInterval,
@@ -215,7 +233,7 @@ export function SubscriptionActions({
               );
               return (
                 <Button
-                  key={option.labelKey}
+                  key={frequencyOptionKey(option)}
                   /* 確定版の chips は 5 個すべて塗りなし (ghost)。いま契約している
                      頻度をどう示すかは確定版に指定が無いので、塗り (primary) +
                      `aria-pressed` で示す (押せないだけだと画面上でどれが現在値か
@@ -227,7 +245,7 @@ export function SubscriptionActions({
                   disabled={isPending || isCurrent}
                   onClick={() => handleFrequencyChange(option)}
                 >
-                  {labels.frequencyOptionLabels[option.labelKey]}
+                  {labels.frequencyOptionLabels[frequencyOptionKey(option)]}
                 </Button>
               );
             })}
