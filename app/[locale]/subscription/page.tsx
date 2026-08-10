@@ -18,6 +18,7 @@ import {
   TripleColumn,
 } from "@/components/editorial/section-blocks";
 import { placeholderValue } from "@/lib/placeholders";
+import { monthlyPriceLabel } from "@/lib/subscription-pricing";
 import { cn } from "@/lib/utils";
 
 /**
@@ -36,11 +37,12 @@ import { cn } from "@/lib/utils";
  * - FAQ         アコーディオンなし・開いたまま          → `OpenFaqList`
  * - 申し込み    中央 528 幅・CTA 1 個                   → `max-w-132 mx-auto`
  *
- * ！公開前に実値の確認が必要 — 初回お届け日と月額はまだ事業側の確定待ち。
- * 値は `lib/placeholders.ts` のレジストリに集約して `PLACEHOLDER_MARKER` を付けている
- * (messages/*.json 側は `{firstDelivery}` / `{monthlyPrice}` の差し込み口だけを持つ)。
- * マーカーが残ったまま production 相当でビルド / テストすると機械的に落ちる。
- * 差し替え台帳は `docs/placeholders.md`。
+ * 値の出どころ (messages/*.json は `{firstDelivery}` / `{monthlyPrice}` の差し込み口だけを持つ):
+ * - **月額**: Shopify の selling plan が SoT。`lib/subscription-pricing.ts` が
+ *   毎月お届けプランの継続価格を導出する (定数は置かない)
+ * - **初回お届け日**: まだ事業側の確定待ち。Shopify の締日 (cutoff) / 起算日 (anchors) が
+ *   未設定で導出できないため `lib/placeholders.ts` の仮当て値のまま。マーカーが残る間は
+ *   production 相当のビルド / テストが機械的に落ちる。台帳は `docs/placeholders.md`
  */
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -50,9 +52,17 @@ export async function generateMetadata(): Promise<Metadata> {
 
 const PLAN_ANCHOR = "plan";
 
-/** 事業側の確定待ちの仮当て値 (差し替え手順は lib/placeholders.ts)。 */
+/**
+ * 事業側の確定待ちの仮当て値 (差し替え手順は lib/placeholders.ts)。
+ *
+ * 月額はここには無い。Shopify の selling plan を SoT にして毎リクエスト導出する
+ * (`lib/subscription-pricing.ts`)。定数だと Shopify 側の価格改定が画面に出ず、
+ * 表示額と請求額が食い違う。
+ */
 const FIRST_DELIVERY = placeholderValue("subscription.firstDeliveryDate");
-const MONTHLY_PRICE = placeholderValue("subscription.monthlyPrice");
+
+/** 定期便商品を示す Shopify タグ。店舗側の表記は大文字始まり (`Subscription`)。 */
+const SUBSCRIPTION_TAG = "subscription";
 
 export default async function SubscriptionLPPage() {
   const t = await getTranslations("subscriptionR2");
@@ -64,7 +74,12 @@ export default async function SubscriptionLPPage() {
   try {
     const { getProductByHandle } = await import("@/lib/shopify");
     const res = await getProducts({ first: 20 });
-    const candidate = res.products.find((p) => p.tags?.includes("subscription")) ?? null;
+    // タグは大小文字を区別せず照合する。店舗の実タグは `Subscription` で、
+    // 完全一致だと定期便商品が 1 件も引けず月額が出なくなる。
+    const candidate =
+      res.products.find((p) =>
+        p.tags?.some((tag) => tag.toLowerCase() === SUBSCRIPTION_TAG)
+      ) ?? null;
     subscriptionProduct = candidate;
     if (candidate) {
       const full = await getProductByHandle(candidate.handle);
@@ -74,6 +89,10 @@ export default async function SubscriptionLPPage() {
     subscriptionProduct = null;
     detail = null;
   }
+
+  // 月額 = 毎月お届けプランの継続価格 (初回特別価格ではない)。導出できないときは
+  // 数字を出さず「準備中」の文言に落とす (古い定数を出すより安全)。
+  const MONTHLY_PRICE = monthlyPriceLabel(detail) ?? t("monthlyPriceUnavailable");
 
   const boxItems = [1, 2, 3].map((n) => ({
     title: t(`box${n}Title`),
@@ -96,7 +115,8 @@ export default async function SubscriptionLPPage() {
     value: t(`month${i + 1}Value`),
   }));
 
-  // 初回お届け日 / 月額は仮当て値。文言は messages 側、値は placeholders 側が持つ。
+  // 初回お届け日は仮当て値 (Shopify に締日・起算日が無く導出不能)。文言は messages 側、
+  // 値は placeholders 側が持つ。
   const firstDeliveryRibbon = t("firstDeliveryRibbon", { firstDelivery: FIRST_DELIVERY });
 
   const priceItems = [1, 2, 3, 4].map((n) => ({

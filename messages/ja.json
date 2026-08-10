@@ -1269,6 +1269,7 @@
     "nextMonthBody": "10月は、佐賀・嬉野の釜炒り茶から始まる3種。焙煎の浅い順に並べて箱に入れます。気に入った1種だけを翌月に増やすこともできます。",
     "price1Term": "月額",
     "price1Value": "{monthlyPrice}（税込・送料込み）",
+    "monthlyPriceUnavailable": "価格は準備中です",
     "price2Term": "お届け頻度",
     "price2Value": "毎月 / 隔月から選べます",
     "price3Term": "含まれるもの",

@@ -10,6 +10,7 @@ import {
   Overline,
   bodySmClass,
 } from "@/components/editorial/rule-list";
+import { placeholderValue } from "@/lib/placeholders";
 
 /**
  * 利用規約 — Figma 確定レイアウト `Common / Layouts` section 7848:39101
@@ -197,8 +198,11 @@ const META = [
 
 const BUSINESS = [
   { label: "事業者名", value: "株式会社elxea / elxea Inc." },
-  { label: "所在地", value: "東京都千代田区平河町2-5-3 Nagatacho GRID 5F" },
-  { label: "お問い合わせ", value: "info@elxea.com" },
+  // 所在地・お問い合わせ先はここに直書きしない。特商法ページ / プライバシーポリシー /
+  // About と同じレジストリ (SoT は Notion Corporate Info DB) を参照する。
+  // 直書きだと本ページだけ郵便番号が無いなど表記が食い違う (2026-08-10 に解消)。
+  { label: "所在地", value: placeholderValue("tokushoho.address") },
+  { label: "お問い合わせ", value: placeholderValue("tokushoho.email") },
   { label: "改定履歴", value: "2026年8月5日 改定　／　2026年4月1日 制定" },
 ];
 

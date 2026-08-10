@@ -3,6 +3,7 @@
 - 対象プロダクト: roji (elxea)
 - 仮値のSoT: `lib/placeholders.ts` (このファイルは読み手向けの台帳。値の正本はコード側)
 - 作成: 2026-08-09 JST / elxea-developer
+- 最終更新: 2026-08-10 JST / elxea-developer (法人情報6件を実値化・月額をShopify配線に置換)
 
 ## 一言で
 
@@ -11,14 +12,28 @@
 
 ## 結論・状態
 
-未確定8件。すべて `lib/placeholders.ts` に集約済みで、`VERCEL_ENV=production` の
-ビルドとテストは8件が残っている間は必ず失敗する。dev / Previewは失敗しない。
+**8件のうち7件が解決済み。残り1件は `subscription.firstDeliveryDate` (初回お届け日) だけ。**
+
+- **法人情報6件** = NotionのCorporate Info DBの登録値で実値化し `confirmed` にした
+  (2026-08-10)。所在地が3通りあった不一致も、Corporate Info DBを唯一のSoTとして
+  利用規約ページを含む4か所すべて同じ値を参照する形に寄せて解消した
+- **月額** = 仮値の定数を**廃止**し、Shopifyのselling planから毎リクエスト導出する
+  配線に置き換えた (`lib/subscription-pricing.ts`)。レジストリからエントリを削除済み
+- **初回お届け日** = 導出不能で未解決。Shopify側に締日 (cutoff) と起算日 (anchors) が
+  設定されていないため計算できない (下記「初回お届け日が出せない理由」)
+
+未解決1件が残っている間、`VERCEL_ENV=production` のビルドは設計どおり失敗する
+(dev / Previewは失敗しない)。
 
 ## Ask
 
-**判断 (Tier 2 / Setaka)** — 下表の8件の実値。とくに法定表記4件とAbout会社情報の本社所在地は
-公開ブロッカー。併せて「利用規約・特商法・AboutのFigmaで所在地が3通りある」不一致
-(Open items 1) の正を決めてほしい。
+**判断 (Tier 2 / Setaka)** — 次の2点。
+
+1. **Shopifyに定期便の締日と発送スケジュールを設定するか** (初回お届け日の公開ブロッカー。
+   設定されれば計算式で自動表示になり、この仮値は恒久的に消える)
+2. **月額の表示が `1,800円` → `2,280円` に変わる**点の確認。Shopifyの実データが
+   継続2,280円 / 初回1,880円 で、仮値の1,800円 はどちらでもなかった (下記
+   「月額はShopifyのどの値か」)
 
 ---
 
@@ -30,64 +45,125 @@ flowchart LR
   B --> C{"未確定 0 件?"}
   C -- いいえ --> D["本番ビルド失敗<br/>validate:placeholders exit 1"]
   C -- はい --> E["本番ビルド通過<br/>公開可"]
-  A --> F["定期便LP<br/>/ja/subscription"]
-  A --> G["特商法ページ<br/>/ja/legal/tokushoho"]
-  A --> H["Aboutページ<br/>/ja/about"]
+  F["Notion Corporate Info DB<br/>法人情報のSoT"] --> B
+  G["Shopify selling plan<br/>価格のSoT"] --> H["lib/subscription-pricing.ts<br/>月額を毎回導出 (定数なし)"]
+  H --> I["定期便LP<br/>/ja/subscription"]
+  A --> I
+  A --> J["特商法 / プライバシー / 利用規約"]
+  A --> K["Aboutページ"]
 ```
 
 ## 差し替え一覧
 
-| # | 対象 (id) | 出る場所 | 現在の仮値 | 差し替え担当 | 差し替え先の根拠 | 状態 |
+| # | 対象 (id) | 出る場所 | 値 | 差し替え担当 | 値の根拠 (SoT) | 状態 |
 |---|---|---|---|---|---|---|
-| 1 | `subscription.firstDeliveryDate` | 定期便LP S2 DateRibbon (Figma 8071:126) | `9月10日（木）` | Setaka (事業判断) | Shopify定期便selling planの締日・発送曜日。確定後は定数ではなく計算式に置き換える | 未確定 |
-| 2 | `subscription.monthlyPrice` | 定期便LP料金SpecBand (8071:462) / 申し込みブロック (8071:514) | `1,800円` | Setaka (価格決定) | Shopify定期便商品 (tag: `subscription`) のselling plan価格がSoT。確定後は本定数を消し `detail.sellingPlanGroups` の実価格を描画 | 未確定 |
-| 3 | `tokushoho.operationsManager` | 特商法ページS1販売者 (7856:932) | `（公開前に差し替え）運営統括責任者 氏名未確定` | Setaka (法定表記) | 特定商取引法 第11条。法人登記上の代表者氏名 | 未確定 (公開ブロッカー) |
-| 4 | `tokushoho.address` | 特商法ページS1販売者 (7856:932) / プライバシーポリシーS4事業者情報 | `（公開前に差し替え）所在地未確定` | Setaka (法定表記) | 特定商取引法 第11条。法人登記上の所在地 | 未確定 (公開ブロッカー) |
-| 5 | `tokushoho.phone` | 特商法ページS1販売者 + S4窓口 (7857:39763) | `（公開前に差し替え）電話番号未確定` | Setaka (法定表記) | 特定商取引法 第11条。実際に受電できる番号のみ記載可 (受付時間と整合させる) | 未確定 (公開ブロッカー) |
-| 6 | `tokushoho.email` | 特商法ページS1販売者 + S4窓口 / お問い合わせS1メタ「メール」(8109:46669) | `hello@roji.jp` | Setaka (法定表記) | Figma凍結版の値をそのまま置いている。MX / 受信テストが通れば `confirmed` にする | 未確定 (受信確認待ち) |
-| 7 | `about.headOffice` | AboutページS6会社情報「本社」(8121:1312 / SP 8121:1386) | `（公開前に差し替え）本社所在地未確定` | Setaka (会社情報) | 法人登記上の所在地。`tokushoho.address` と同一値になるはずで、確定時は両方を同時に差し替える | 未確定 (公開ブロッカー) |
-| 8 | `about.branchOffice` | AboutページS6会社情報「京都事務所」(8121:1312 / SP 8121:1386) | `（公開前に差し替え）京都事務所所在地未確定` | Setaka (会社情報) | 第2拠点の所在地。**公開するかどうか自体が未決** (公開しないなら本エントリを削除し会社情報の行も落とす) | 未確定 |
+| 1 | `subscription.firstDeliveryDate` | 定期便LP S2 DateRibbon (Figma 8071:126) | `9月10日（木）` (仮) | Setaka (事業判断) | Shopify定期便selling planの締日 (cutoff)・起算日 (anchors)。**2026-08-10時点で未設定のため導出不能** | 未確定 (公開ブロッカー) |
+| 2 | ~~`subscription.monthlyPrice`~~ (レジストリから削除) | 定期便LP料金SpecBand (8071:462) / 申し込みブロック (8071:514) | Shopifyから導出 (実測: 継続 `2,280円`) | — (自動) | Shopify定期便商品 (tag: `Subscription`) の毎月お届けプランの継続価格。`lib/subscription-pricing.ts` が導出 | 差し替え済 (2026-08-10 / 定数廃止・実データ配線) |
+| 3 | `tokushoho.operationsManager` | 特商法ページS1販売者 (7856:932) | 代表者氏名 | Setaka (法定表記) | Corporate Info DB「代表者氏名」(Basic)。特定商取引法 第11条 | 差し替え済 (2026-08-10) |
+| 4 | `tokushoho.address` | 特商法ページS1販売者 (7856:932) / プライバシーポリシーS4 / 利用規約S4事業者情報 | 本社所在地 (郵便番号つき) | Setaka (法定表記) | Corporate Info DB「本社住所」(Address)。特定商取引法 第11条 | 差し替え済 (2026-08-10) |
+| 5 | `tokushoho.phone` | 特商法ページS1販売者 + S4窓口 (7857:39763) | 代表電話 | Setaka (法定表記) | Corporate Info DB「代表電話」(Contact)。特定商取引法 第11条 | 差し替え済 (2026-08-10) |
+| 6 | `tokushoho.email` | 特商法ページS1販売者 + S4窓口 / お問い合わせS1メタ / About / 利用規約S4 (8109:46669) | 法人代表メールアドレス | Setaka (法定表記) | Corporate Info DB「代表メールアドレス（一般問い合わせ用）」(Contact / 最終確認日あり) | 差し替え済 (2026-08-10) |
+| 7 | `about.headOffice` | AboutページS6会社情報「本社」(8121:1312 / SP 8121:1386) | #4と同一値 | Setaka (会社情報) | Corporate Info DB「本社住所」。#4と同時に差し替えた | 差し替え済 (2026-08-10) |
+| 8 | `about.branchOffice` | AboutページS6会社情報「京都事務所」(8121:1312 / SP 8121:1386) | 京都倉庫兼事務所の所在地 | Setaka (会社情報) | Corporate Info DB「京都倉庫住所」(Address)。**記載する**判断 (2026-08-10) | 差し替え済 (2026-08-10) |
 
-法定表記 (#3-#5) と会社情報の所在地 (#7-#8) は実在の住所・電話番号・個人名に見えない文字列にしてある。万一ガードを
-すり抜けても読み手が一目で仮値と分かる状態を保つため、単体テストで次を機械的に強制している。
+実値そのものは本ファイルに写さない (二重SoTを作らないため)。値は
+`lib/placeholders.ts` とNotionのCorporate Info DB
+(https://www.notion.so/fc8c353f9650453c9707ae0a806ae484) を見ること。
+
+#8 (京都事務所) は「載せる」で確定したが、非公開に転じる判断はいつでも可能。
+その場合は `lib/placeholders.ts` の `about.branchOffice` エントリと
+`app/[locale]/about/page.tsx` の会社情報の行を落とす (画面ラベルは倉庫兼事務所のため
+「京都事務所」のまま)。
+
+仮値がまだ残っているエントリ (#1) は、実在の住所・電話番号・個人名に見えない文字列に
+してある。万一ガードをすり抜けても読み手が一目で仮値と分かる状態を保つため、
+単体テストが `tokushoho.*` / `about.*` の**未確定エントリだけ**に次を強制している
+(実値に差し替えた `confirmed` エントリは本物の住所・電話番号になるので対象外)。
 
 - `（公開前に差し替え）` を含むこと
 - 郵便番号・電話番号・番地の形をした数字列 (`\d{3}-?\d{4}` / `\d{2,4}-\d{2,4}-\d{3,4}` / `\d+-\d+-\d+`) を含まないこと
 
+## 初回お届け日が出せない理由 (#1)
+
+「今申し込むと初回はN月N日」は、Shopifyの定期便プランに**締日 (cutoff)** と
+**起算日 (anchors)** が設定されていて初めて計算できる。2026-08-10に本番ストアの
+Admin APIを実測した結果、selling plan group「elxea定期便プラン」の3プラン
+(毎月 / 2ヶ月ごと / 3ヶ月ごと) はすべて次の状態だった。
+
+| 項目 | 実測値 | 意味 |
+|---|---|---|
+| `deliveryPolicy.anchors` | `[]` | 毎月の起算日 (何日お届け) が未設定 |
+| `deliveryPolicy.cutoff` | `null` | 締日 (何日までの申し込みが今サイクル) が未設定 |
+| `deliveryPolicy.preAnchorBehavior` | `ASAP` | 起算日が無いので「注文後すぐ」扱い |
+
+つまりShopify上は「注文したらすぐ発送、その後1ヶ月ごと」でしかなく、暦日は決まって
+いない。日付を出すには (a) Shopifyに締日・起算日を設定する か (b) 発送リードタイムを
+事業側で決めて表示ルールにする かのどちらかが必要で、いずれも事業判断。
+**勝手に本番Shopifyの設定を作ることはしない**ため、この1件は仮値のまま残した。
+
+なお締日・起算日は **Admin APIにしか無い** (Storefront APIの
+`SellingPlanRecurringDeliveryPolicy` は `interval` / `intervalCount` のみ)。
+設定後に画面へ出す際は、公開LPからAdmin APIを叩かない配線 (ビルド時取得・
+metafield化・キャッシュ付きサーバ側取得のいずれか) を選ぶこと。
+
+## 月額はShopifyのどの値か (#2)
+
+定数を廃止し `lib/subscription-pricing.ts` が導出する。導出規則は3つ。
+
+1. **プランの特定はプラン名ではなく配送間隔で行う** (`deliveryPolicy.interval = MONTH`
+   かつ `intervalCount = 1`)。プラン名は店舗側で自由に変えられるので表示値の根拠にできない
+2. **出すのは継続価格** (`sellingPlanAllocations.priceAdjustments` の末尾の
+   `perDeliveryPrice`)。初回特別価格を「月額」として出すと2回目以降の請求額と食い違う
+3. **導出できないときは数字を出さない** — 毎月プランが無い / allocationが無い /
+   金額が数値として読めない場合は `null` を返し、画面は
+   `subscriptionR2.monthlyPriceUnavailable` の文言 (`価格は準備中です`) に落ちる。
+   古い定数を出すより安全側に倒す
+
+2026-08-10の本番ストア実測値: 初回1,880円 / 継続2,280円 (税込)。
+**仮値の `1,800円` はどちらでもなかった**ため、LPの表示額は `2,280円` に変わる。
+LP本文は初回特別価格に触れていないので、初回1,880円を打ち出すかは別途コピーの判断
+(Open items 6)。
+
+商品タグの照合は**大小文字を区別しない**。店舗の実タグは `Subscription` で、
+完全一致だと定期便商品が1件も引けず月額が出なかった (2026-08-10に修正)。
+
 ## 差し替え手順 (実値が決まったとき)
 
 1. `lib/placeholders.ts` の該当エントリの `value` を実値にする
-2. 同エントリの `status` を `"confirmed"` にする
+2. 同エントリの `status` を `"confirmed"` にし、`basis` にSoT (どのDBのどの項目か + 取得日) を書く
 3. 本ファイルの該当行の「状態」を `差し替え済 (YYYY-MM-DD)` にする
 4. `VERCEL_ENV=production pnpm validate:placeholders` と `ROJI_PLACEHOLDER_GUARD=error pnpm test` を通す
-5. #1 / #2は定数のままにせず、Shopify実データ配線に置き換える (根拠列参照)
+5. 外部システムに値のSoTがあるもの (価格・在庫・配送日) は定数にせず配線に置き換える (#2が実例)
+
+法人情報を差し替えるときは **NotionのCorporate Info DBを唯一のSoTとする**。
+Figmaの凍結版や他ページの記載から値を拾って「確定」扱いにしないこと
+(2026-08-10まで所在地の表記が3通りに分かれていた原因がこれ)。
 
 ## 仮値が本番に出ない仕組み
 
 | 層 | 実体 | 発火条件 | 落ち方 |
 |---|---|---|---|
-| ビルドゲート (本番の実ブロック) | `scripts/check-placeholders.ts` (`pnpm validate:placeholders`、`pnpm build` の `next build` 前段) | `VERCEL_ENV=production` または `ROJI_PLACEHOLDER_GUARD=error` | 検出した id・ラベル・仮値・担当を列挙して exit 1 |
-| テスト (公開前チェック) | `__tests__/placeholders.test.ts` | `ROJI_PLACEHOLDER_GUARD=error` の明示指定のみ | 未解決 id 一覧との差分を出して fail |
+| ビルドゲート (本番の実ブロック) | `scripts/check-placeholders.ts` (`pnpm validate:placeholders`、`pnpm build` の `next build` 前段) | `VERCEL_ENV=production` または `ROJI_PLACEHOLDER_GUARD=error` | 検出したid・ラベル・仮値・担当を列挙してexit 1 |
+| テスト (公開前チェック) | `__tests__/placeholders.test.ts` | `ROJI_PLACEHOLDER_GUARD=error` の明示指定のみ | 未解決id一覧との差分を出してfail |
 
-いずれも dev / Preview では発火しない (ビルドは一覧を WARN 表示して通過、テストは skip)。
+いずれもdev / Previewでは発火しない (ビルドは一覧をWARN表示して通過、テストはskip)。
 
-判定は Vercel が自動注入する `VERCEL_ENV=production` を見る。`NODE_ENV` は見ない
-(`next build` はローカルでも `NODE_ENV=production` になり、それで判定すると Preview 用
+判定はVercelが自動注入する `VERCEL_ENV=production` を見る。`NODE_ENV` は見ない
+(`next build` はローカルでも `NODE_ENV=production` になり、それで判定するとPreview用
 ビルドまで落ちてしまうため)。
 
-テスト側だけ `VERCEL_ENV` で発火させていない理由: vitest は `.env.local` を process.env に
+テスト側だけ `VERCEL_ENV` で発火させていない理由: vitestは `.env.local` をprocess.envに
 読み込むため、手元の `.env.local` が `VERCEL_ENV="production"` を持っていると通常の
 `pnpm test` が落ちてしまう (このリポジトリの手元環境が実際にそうだった)。ビルドゲート側は
-dotenv を読まない素の node プロセスなので、この影響を受けない。
+dotenvを読まない素のnodeプロセスなので、この影響を受けない。
 
 ```bash
-# 仮値が残っている状態で落ちることの確認
-VERCEL_ENV=production pnpm build            # exit 1 (next build に到達しない)
-ROJI_PLACEHOLDER_GUARD=error pnpm test      # fail
+# 未解決1件 (初回お届け日) が残っている現状 — 設計どおり落ちる
+VERCEL_ENV=production pnpm validate:placeholders   # exit 1 / 残り 1 件を列挙
+ROJI_PLACEHOLDER_GUARD=error pnpm test             # 「公開ゲート」1 件だけ fail
 
-# 差し替え後に通ることの確認 (status を confirmed にしてから)
-VERCEL_ENV=production pnpm build            # exit 0
-ROJI_PLACEHOLDER_GUARD=error pnpm test      # pass
+# 通常のテストは全件 pass (作業を止めない)
+pnpm test                                          # pass
 ```
 
 ## 仮値投入でレイアウトが崩れていないか (実測)
@@ -97,68 +173,81 @@ PC 1440x900・SP 375x812 / 2026-08-09 JST。`getBoundingClientRect` の実測値
 
 ### 定期便LP (/ja/subscription)
 
-仮値を messages のインライン直書きからレジストリ差し込みに移しただけで、**表示文字列は
-1 文字も変えていない**。よって DateRibbon の実測値は C3-2R 忠実度対比表と一致する。
+仮値をmessagesのインライン直書きからレジストリ差し込みに移しただけで、**表示文字列は
+1文字も変えていない**。よってDateRibbonの実測値はC3-2R忠実度対比表と一致する。
 
-| 項目 | C3-2R 記録値 | 今回の実測 | Δ | 判定 |
+| 項目 | C3-2R記録値 | 今回の実測 | Δ | 判定 |
 |---|---|---|---|---|
-| DateRibbon 高さ (PC 1440) | 49.19 | 49.19 | 0 | [OK] |
-| DateRibbon 幅 (PC 1440) | 1312 | 1312 | 0 | [OK] |
-| DateRibbon 高さ (SP 375・2 行折返し) | 74.38 | 74.38 | 0 | [OK] |
+| DateRibbon高さ (PC 1440) | 49.19 | 49.19 | 0 | [OK] |
+| DateRibbon幅 (PC 1440) | 1312 | 1312 | 0 | [OK] |
+| DateRibbon高さ (SP 375・2行折返し) | 74.38 | 74.38 | 0 | [OK] |
 | 横スクロール (PC / SP) | なし | なし | 0 | [OK] |
+
+初回お届け日は文字列を変えていないので、この実測は2026-08-10の差し替え後も有効。
+月額は `1,800円` (6文字) → `2,280円` (6文字) で桁数が変わらないため行送りに影響しない。
 
 ### 特商法ページ (/ja/legal/tokushoho)
 
 こちらは仮値の文字列自体を「（公開前に差し替え）…」に変えたため、行高を変更前の文字列と
-同一レイアウト文脈で比較した (同じ行を clone して旧文字列を入れ、高さだけ測る)。
+同一レイアウト文脈で比較した (同じ行をcloneして旧文字列を入れ、高さだけ測る)。
 
-| 行 | PC 変更前 → 変更後 | PC Δ | SP 変更前 → 変更後 | SP Δ |
+| 行 | PC変更前 → 変更後 | PC Δ | SP変更前 → 変更後 | SP Δ |
 |---|---|---|---|---|
-| 運営統括責任者 | 53.19 → 53.19 | 0 | 53.19 → 78.38 | +25.19 (1 行増) |
-| 所在地 | 53.19 → 53.19 | 0 | 78.38 → 78.38 | 0 (旧値も 2 行) |
-| 連絡先 | 53.19 → 53.19 | 0 | 78.38 → 78.38 | 0 (旧値も 2 行) |
-| 電話 (S4 窓口) | 53.19 → 53.19 | 0 | 53.19 → 78.38 | +25.19 (1 行増) |
+| 運営統括責任者 | 53.19 → 53.19 | 0 | 53.19 → 78.38 | +25.19 (1行増) |
+| 所在地 | 53.19 → 53.19 | 0 | 78.38 → 78.38 | 0 (旧値も2行) |
+| 連絡先 | 53.19 → 53.19 | 0 | 78.38 → 78.38 | 0 (旧値も2行) |
+| 電話 (S4窓口) | 53.19 → 53.19 | 0 | 53.19 → 78.38 | +25.19 (1行増) |
 
-### Vercel Preview での裏取り
-
-同じ計測を Vercel Preview (`https://elxea-web-3vgnfc1qo-setaka1103s-projects.vercel.app`,
-2026-08-09 JST) に対しても実行し、dev 計測と全項目一致を確認した
-(DateRibbon PC 49.19 / SP 74.38、特商法 MetaRow PC 53.19 / SP 53.19-78.38、横スクロールなし)。
-`/ja/subscription` と `/ja/legal/tokushoho` はいずれも HTTP 200。
-
-この Preview ビルドが通ったこと自体が「Preview では仮値ガードが発火しない」実機確認になる
-(Vercel は Preview に `VERCEL_ENV=preview` を注入するため)。
-
-判定: PC は全行 Δ0。SP は 2 行が 1 行分 (25.19px) 高くなるが、`MetaRow` の値列は
+2026-08-10に実値へ差し替えたことで、SPで2行になっていた行の一部は1行に戻る
+(仮値の「（公開前に差し替え）…」より実値の方が短い行がある)。`MetaRow` の値列は
 `min-w-0 flex-1` で折り返す設計 (`components/editorial/rule-list.tsx`) のため、
-はみ出し・切れ・重なりは発生しない。横スクロールも PC / SP どちらも発生なし
-(`documentElement.scrollWidth` = `clientWidth`)。実値に差し替えれば行高は実値の長さで決まる。
+行数がどちらに転んでも はみ出し・切れ・重なりは発生しない。
+
+### Vercel Previewでの裏取り
+
+同じ計測をVercel Preview (`https://elxea-web-3vgnfc1qo-setaka1103s-projects.vercel.app`,
+2026-08-09 JST) に対しても実行し、dev計測と全項目一致を確認した
+(DateRibbon PC 49.19 / SP 74.38、特商法MetaRow PC 53.19 / SP 53.19-78.38、横スクロールなし)。
+`/ja/subscription` と `/ja/legal/tokushoho` はいずれもHTTP 200。
+
+このPreviewビルドが通ったこと自体が「Previewでは仮値ガードが発火しない」実機確認になる
+(VercelはPreviewに `VERCEL_ENV=preview` を注入するため)。
 
 ## Open items (仮値ではなく、要判断の不一致)
 
-1. **所在地の不一致 (3通り)** — 利用規約S4 (`app/[locale]/legal/terms/page.tsx`) は所在地に
-   実値らしい文字列を載せているが、特商法ページは仮値。さらにAbout確定版のFigma
-   (8121:1312) は東京と京都の2拠点を実値らしい文字列で載せている。どれを正とするか未決。
-   本タスクでは利用規約側もFigmaの値も採用していない (未検証の値を「確定」と扱わないため、
-   About側は `about.headOffice` / `about.branchOffice` の仮値で出す)。決まり次第、
-   3か所が同じSoTを参照する形に寄せる。
+1. ~~**所在地の不一致 (3通り)**~~ — **解消 (2026-08-10)**。NotionのCorporate Info DBを
+   唯一のSoTとし、特商法ページ / プライバシーポリシー / About / 利用規約の4か所すべてが
+   `tokushoho.address` を参照する形にした (利用規約は郵便番号なしの直書きだったのを
+   レジストリ参照に置換)。Figma凍結版の表記は採用していない。
 2. **お届け月の表記** — 定期便LPの `nextMonthChip` / `nextMonthBody` / `month*Value` は
    月次で入れ替わる編集コンテンツで、今回の仮値集約の対象外。運用時に誰がいつ更新するか
    (Sanityへ移すか、Shopify metafieldにするか) が未決。
 3. **受付時間** — 特商法ページS4の `平日 11:00–17:00（土日祝を除く）` は仮値扱いにして
-   いないが、電話番号 (#5) の確定と同時に実運用と合っているか確認が必要。
-4. **問い合わせ先メールの不一致** — About確定版のFigmaは `info@elxea.com`、特商法/お問い合わせは
-   `hello@roji.jp` (#6)。Aboutは重複SoTを作らないため #6 (`tokushoho.email`) を参照している。
-   ブランド名がrojiに寄る文脈でどちらを表に出すか未決。
+   いない。電話番号 (#5) が実値になったので、**この受付時間で実際に受電できるか**の
+   確認が必要 (特定商取引法 第11条は実際に連絡が取れる窓口の記載を求める)。
+4. ~~**問い合わせ先メールの不一致**~~ — **解消 (2026-08-10)**。rojiは層2のサービスで
+   サイト運営主体はelxea法人であるため、法人の代表メールアドレス (Corporate Info DB
+   に受信実績あり) を表に出す方針で確定した。`hello@roji.jp` は採用しない。
 5. **産地タイルの写真が未撮影** — About確定版の産地4タイル (8121:1409) はFigma上も
    「プレースホルダ / 撮影後差替」の指定で、実装も `ImagePlaceholder` が出る。**仮値ガードの
    対象外** (画面に文字列として出る値ではなく、未入稿が一目で分かる状態なので公開を機械的に
    止める必要がない)。撮影・入稿の担当と時期は未決。
+6. **初回特別価格をLPで打ち出すか** — Shopifyの定期便商品は初回1,880円 / 継続2,280円
+   だが、LP本文は初回価格に触れていない (月額として継続価格だけを出す)。初回価格を
+   前面に出すならコピーとレイアウトの追加が必要。`hasFirstDeliveryDiscount()` で
+   初回と継続が違う事実は取得できる状態にしてある。
+7. **定期便商品が3種あり最初の1件だけを見ている** — 実ストアには緑茶 / 烏龍茶 / 紅茶の
+   3商品が同じselling plan groupに属しており、LPはタグ一致の**最初の1件**の価格を出す。
+   3商品とも同価格なので現状は表示に差が出ないが、価格が分かれたら「どの商品の月額か」の
+   決定が必要。
 
 ## 参照元
 
 - `lib/placeholders.ts` (仮値のSoT)
-- `scripts/check-placeholders.ts` / `__tests__/placeholders.test.ts` (ガード)
-- `app/[locale]/subscription/page.tsx` / `app/[locale]/legal/tokushoho/page.tsx` (参照側)
-- `messages/ja.json` / `messages/en.json` の `subscriptionR2` (差し込み口 `{firstDelivery}` / `{monthlyPrice}`)
+- `lib/subscription-pricing.ts` (月額の導出。Shopify selling planがSoT)
+- `scripts/check-placeholders.ts` / `__tests__/placeholders.test.ts` / `__tests__/subscription-pricing.test.ts` (ガードと導出のテスト)
+- `app/[locale]/subscription/page.tsx` / `app/[locale]/legal/tokushoho/page.tsx` / `app/[locale]/legal/terms/page.tsx` / `app/[locale]/legal/privacy/page.tsx` / `app/[locale]/about/page.tsx` / `app/[locale]/contact/page.tsx` (参照側)
+- `messages/ja.json` / `messages/en.json` の `subscriptionR2` (差し込み口 `{firstDelivery}` / `{monthlyPrice}` と `monthlyPriceUnavailable`)
+- Notion Corporate Info DB — https://www.notion.so/fc8c353f9650453c9707ae0a806ae484 (法人情報のSoT / 取得2026-08-10 JST)
+- Shopify Admin API `sellingPlanGroups` (締日・起算日の実測 / 2026-08-10 JST)
 - 特定商取引法 第11条 (通信販売の広告表示義務)

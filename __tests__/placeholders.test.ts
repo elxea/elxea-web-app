@@ -113,9 +113,15 @@ describe("PLACEHOLDERS レジストリ", () => {
   });
 
   it("placeholderValue がレジストリの value を返す", () => {
-    expect(placeholderValue("subscription.monthlyPrice")).toBe(
-      PLACEHOLDERS["subscription.monthlyPrice"].value
+    expect(placeholderValue("subscription.firstDeliveryDate")).toBe(
+      PLACEHOLDERS["subscription.firstDeliveryDate"].value
     );
+  });
+
+  it("月額はレジストリに置かない (Shopify の selling plan が SoT)", () => {
+    // 定数に戻すと Shopify 側の価格改定が画面に反映されず、表示額と請求額が
+    // 食い違う。導出は lib/subscription-pricing.ts が行う。
+    expect(Object.keys(PLACEHOLDERS)).not.toContain("subscription.monthlyPrice");
   });
 
   it("会社の所在地・電話番号の仮値は実在に見える文字列を含まない", () => {

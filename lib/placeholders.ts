@@ -3,7 +3,7 @@
  *
  * ## なぜ 1 か所に集めるのか
  *
- * 事業側の確定を待っている値 (初回お届け日 / 月額 / 法定表記の住所・電話・責任者名) を
+ * 事業側の確定を待っている値 (初回お届け日など) を
  * 各ページや messages/*.json に直書きすると、
  *
  * - どれが確定値でどれが仮値か区別できない
@@ -65,6 +65,16 @@ export type PlaceholderEntry = {
  *
  * 法定表記 (`tokushoho.*`) の仮値は **実在の住所・電話番号・個人名に見えない文字列**に
  * すること。万一 guard をすり抜けても、読み手が一目で仮値と分かる状態を保つ。
+ * (`status: "confirmed"` に差し替えた後は実値そのものなのでこの制約の対象外。
+ * 単体テストも仮値のエントリだけを検査する)
+ *
+ * 法人情報 (`tokushoho.*` / `about.*`) の実値の SoT は Notion の Corporate Info DB
+ * (https://www.notion.so/fc8c353f9650453c9707ae0a806ae484)。ここに無い値を
+ * Figma や他ページの記載から拾って「確定」扱いにしないこと (2026-08-10 まで
+ * 利用規約 / 特商法 / About Figma の 3 か所で所在地の表記が食い違っていた)。
+ *
+ * 月額 (旧 `subscription.monthlyPrice`) は本レジストリから外した。Shopify の
+ * selling plan を SoT にして `lib/subscription-pricing.ts` が導出する。
  */
 export const PLACEHOLDERS = {
   /* ---- 定期便LP (/ja/subscription) ------------------------------------- */
@@ -77,77 +87,67 @@ export const PLACEHOLDERS = {
     status: PLACEHOLDER_MARKER,
     owner: "Setaka (事業判断)",
     basis:
-      "Shopify の定期便 selling plan の初回発送サイクル確定後に決まる。締日と発送曜日が確定したら「今申し込むと初回は N 月 N 日」を計算式に置き換える (定数のままにしない)",
-  },
-  "subscription.monthlyPrice": {
-    surface: "定期便LP 料金SpecBand (Figma 8071:462) / 申し込みブロック (8071:514)",
-    label: "月額",
-    value: "1,800円",
-    status: PLACEHOLDER_MARKER,
-    owner: "Setaka (価格決定)",
-    basis:
-      "Shopify 定期便商品 (tag: subscription) の selling plan 価格が SoT。確定後は本定数を消し、`detail.sellingPlanGroups` の実価格を描画する",
+      "Shopify の定期便 selling plan の締日 (cutoff) と起算日 (anchors) から「今申し込むと初回は N 月 N 日」を導出する設計だが、2026-08-10 時点の本番ストアは selling plan group「elxea 定期便プラン」の全 3 プランが anchors=[] / cutoff=null / preAnchorBehavior=ASAP で、締日・発送曜日が未設定のため導出できない。Shopify 側にこれらを設定する (= 事業判断) まで仮値のまま。設定後は定数を消し計算式にする",
   },
 
   /* ---- 特定商取引法ページ (/ja/legal/tokushoho) ------------------------ */
   "tokushoho.operationsManager": {
     surface: "特商法ページ S1 販売者 (Figma 7856:932)",
     label: "運営統括責任者",
-    value: "（公開前に差し替え）運営統括責任者 氏名未確定",
-    status: PLACEHOLDER_MARKER,
+    value: "温世堅",
+    status: "confirmed",
     owner: "Setaka (法定表記)",
-    basis: "特定商取引法 第11条の表示義務。法人登記の代表者氏名を記載する",
+    basis:
+      "特定商取引法 第11条の表示義務。Corporate Info DB の「代表者氏名」(Category=Basic) が SoT — https://www.notion.so/fc8c353f9650453c9707ae0a806ae484 (取得 2026-08-10 JST)",
   },
   "tokushoho.address": {
     surface:
       "特商法ページ S1 販売者 (Figma 7856:932) / プライバシーポリシー S4 事業者情報 (Figma 不在・利用規約 7850:803 から導出)",
     label: "所在地",
-    value: "（公開前に差し替え）所在地未確定",
-    status: PLACEHOLDER_MARKER,
+    value: "〒102-0093 東京都千代田区平河町2-5-3 Nagatacho GRID 5F",
+    status: "confirmed",
     owner: "Setaka (法定表記)",
     basis:
-      "特定商取引法 第11条。法人登記上の所在地。利用規約 S4 (app/[locale]/legal/terms/page.tsx) が別の所在地を載せており不一致 — どちらを正とするか要確認",
+      "特定商取引法 第11条。Corporate Info DB の「本社住所」(Category=Address) が SoT — https://www.notion.so/fc8c353f9650453c9707ae0a806ae484 (取得 2026-08-10 JST)。`about.headOffice` と同一値 (同時差し替え済み)",
   },
   "tokushoho.phone": {
     surface: "特商法ページ S1 販売者 + S4 お問い合わせ窓口 (Figma 7857:39763)",
     label: "電話番号",
-    value: "（公開前に差し替え）電話番号未確定",
-    status: PLACEHOLDER_MARKER,
+    value: "075-205-1615",
+    status: "confirmed",
     owner: "Setaka (法定表記)",
-    basis: "特定商取引法 第11条。実際に受電できる番号のみ記載可 (受付時間と整合させる)",
+    basis:
+      "特定商取引法 第11条。Corporate Info DB の「代表電話」(Category=Contact) が SoT — https://www.notion.so/fc8c353f9650453c9707ae0a806ae484 (取得 2026-08-10 JST)",
   },
   "tokushoho.email": {
     surface:
       "特商法ページ S1 販売者 + S4 お問い合わせ窓口 / お問い合わせ S1 メタ「メール」(Figma 8109:46669 は value をダミーアドレスと明記)",
     label: "メールアドレス",
-    value: "hello@roji.jp",
-    status: PLACEHOLDER_MARKER,
+    value: "info@elxea.com",
+    status: "confirmed",
     owner: "Setaka (法定表記)",
     basis:
-      "受信可能なアドレスであることの確認が未了 (Figma 凍結版の値をそのまま置いている)。MX / 受信テストが通れば `confirmed` にする",
+      "Corporate Info DB の「代表メールアドレス（一般問い合わせ用）」(Category=Contact / 最終確認日あり) が SoT — https://www.notion.so/fc8c353f9650453c9707ae0a806ae484 (取得 2026-08-10 JST)。roji は層 2 のサービスでサイト運営主体は elxea なので、hello@roji.jp ではなく受信実績のある法人公式アドレスを表に出す (Boss 裁定 2026-08-10)",
   },
 
   /* ---- About ページ (/ja/about) 会社情報 -------------------------------- */
   "about.headOffice": {
     surface: "About ページ 06 会社情報 (Figma 8121:1312 / SP 8121:1386)",
     label: "本社",
-    // Figma 確定版は実在しそうな住所を置いているが、法人登記の所在地としては
-    // 確定していない (特商法ページ・利用規約とも値が食い違っている)。
-    // 一目で仮値と分かる文字列に置き換えて出す。
-    value: "（公開前に差し替え）本社所在地未確定",
-    status: PLACEHOLDER_MARKER,
+    value: "〒102-0093 東京都千代田区平河町2-5-3 Nagatacho GRID 5F",
+    status: "confirmed",
     owner: "Setaka (会社情報)",
     basis:
-      "法人登記上の所在地。`tokushoho.address` と同一の値になるはずで、確定時は両方を同時に差し替える (現状は Figma / 利用規約 / 特商法の 3 か所で値が食い違っている)",
+      "Corporate Info DB の「本社住所」(Category=Address) が SoT — https://www.notion.so/fc8c353f9650453c9707ae0a806ae484 (取得 2026-08-10 JST)。`tokushoho.address` と同一値で同時に差し替えた。利用規約 S4 / About の Figma が持っていた別表記は採用しない (Corporate Info DB を唯一の正とする)",
   },
   "about.branchOffice": {
     surface: "About ページ 06 会社情報 (Figma 8121:1312 / SP 8121:1386)",
     label: "京都事務所",
-    value: "（公開前に差し替え）京都事務所所在地未確定",
-    status: PLACEHOLDER_MARKER,
+    value: "〒601-8014 京都府京都市南区東九条河西町43",
+    status: "confirmed",
     owner: "Setaka (会社情報)",
     basis:
-      "第 2 拠点の所在地。そもそも公開するかどうか自体が未決 (公開しないなら本エントリを削除し、会社情報の行も落とす)",
+      "Corporate Info DB の「京都倉庫住所」(Category=Address) が SoT — https://www.notion.so/fc8c353f9650453c9707ae0a806ae484 (取得 2026-08-10 JST)。Boss 裁定 2026-08-10 で「記載する」に決定。倉庫兼事務所のため画面ラベルは「京都事務所」のまま。非公開に転じる場合は本エントリと About 会社情報の行を落とす (Setaka が後から判断可能)",
   },
 } as const satisfies Record<string, PlaceholderEntry>;
 

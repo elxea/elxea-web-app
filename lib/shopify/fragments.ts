@@ -108,6 +108,17 @@ export const PRODUCT_FRAGMENT = /* GraphQL */ `
                   name
                   value
                 }
+                # 「毎月お届け」プランを名前ではなく配送間隔で特定するために引く
+                # (プラン名は店舗側で自由に変えられるので表示値の導出根拠にできない)。
+                # Storefront API が公開するのは interval / intervalCount まで。
+                # 締日 (cutoff) と起算日 (anchors) は Admin API 側にしかないため、
+                # 「初回お届け日」はここからは導出できない (docs/placeholders.md #1)。
+                deliveryPolicy {
+                  ... on SellingPlanRecurringDeliveryPolicy {
+                    interval
+                    intervalCount
+                  }
+                }
                 priceAdjustments {
                   adjustmentValue {
                     ... on SellingPlanPercentagePriceAdjustment {
