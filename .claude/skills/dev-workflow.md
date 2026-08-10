@@ -106,7 +106,6 @@ EVIDENCE: fidelity:<結果ファイルの絶対パス>:<FAIL 件数>   # 忠実�
 | https://app.notion.com/p/3b570c9d064c818fbee6f1dbeab63702 | roji Dev Ops Spec v1（本カードの正本） |
 | https://www.notion.so/39070c9d064c8148b983f9004c85fc3d | Design Ops Spec（デザイン側の正本） |
 | `CLAUDE.md` | 本リポのSoT方針・忠実度ゲート・承認済み仕様差分の表 |
-| `docs/design-ops-spec.md` | Design Ops Specのコード側ミラー（stale。冒頭のSoT上書き注記を必ず読む） |
 | `.claude/skills/design-tokens.md` | トークンの編集・ビルド・検証 |
 | `.claude/skills/figma-sync.md` | Figma ⇄ コード同期の実務 |
 | `.claude/skills/visual-qa.md` | ビジュアル品質チェックリスト |

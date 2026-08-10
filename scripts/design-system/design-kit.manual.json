@@ -475,8 +475,8 @@
     {
       "id": "NN-02",
       "rule": "コードを読むときは必ず `git show origin/main:<path>` を使う。作業ツリーの内容を根拠にしない。",
-      "why": "elxea-web-app の作業ツリーは origin/main より古いことがある。docs/design-ops-spec.md は main=v14 / 作業ツリー=v4 で、どちらも stale (正本は Notion v18)。",
-      "verified_at": "2026-07-31"
+      "why": "elxea-web-app の作業ツリーは origin/main より古いことがある。デザイン方法論の正本は Notion の Design Ops Spec のみで、リポ内にミラーは置かない (旧 docs/design-ops-spec.md は v14 書き出しのまま stale だったため 2026-08-10 に削除済み)。",
+      "verified_at": "2026-08-10"
     },
     {
       "id": "NN-03",
@@ -939,12 +939,12 @@
     }
   ],
   "spec_refs": {
-    "design_ops_spec_v18": "https://www.notion.so/39070c9d064c8148b983f9004c85fc3d",
+    "design_ops_spec": "https://www.notion.so/39070c9d064c8148b983f9004c85fc3d (Notion 正本。版は本文の「版数・変更履歴」を参照)",
     "elxea_custom_token_spec": "https://www.notion.so/36970c9d064c813fb7abdc9e3403c14c (tokens/elxea-custom.json の $meta.spec が指す先。本セッションでは未読)",
     "elxea_visual_identity": "https://www.notion.so/circl/Visual-Identity-f87f290633774500bc2294a94ed66296 (tokens/elxea-custom.json の $meta.brand-source。本セッションでは未読)",
     "elxea_brand_context_skill": "/Users/setaka/github/elxea/agents/_shared/skills/elxea-brand-context/SKILL.md",
     "figma_file": "https://www.figma.com/design/AWLnI0XF07e8rScuxPYPc7/",
-    "stale_do_not_read": "リポの docs/design-ops-spec.md (main=v14 / 作業ツリー=v4)。正本は上記 Notion v18。"
+    "mirror_policy": "Design Ops Spec のコード側ミラーは置かない。旧 docs/design-ops-spec.md は 2026-08-10 に削除済み (v14 書き出しで stale・二重正本の温床だったため)。方法論は上記 design_ops_spec の Notion ページを読む。"
   },
   "annotations": {
     "tokens": {
@@ -1472,9 +1472,9 @@
       },
       "methodology": {
         "type": "notion_spec",
-        "name": "Design Ops Spec v18",
+        "name": "Design Ops Spec",
         "url": "https://www.notion.so/39070c9d064c8148b983f9004c85fc3d",
-        "note": "方法論の正本。本 kit は原則を複製しない。リポの docs/design-ops-spec.md は stale (main=v14 / 作業ツリー=v4) なので読まない。"
+        "note": "方法論の正本 (Notion)。本 kit は原則を複製しない。コード側ミラーは置かない方針 (旧 docs/design-ops-spec.md は 2026-08-10 に削除済み)。SoT の向きは案件単位で宣言され、roji は Figma が正本 (Setaka 宣言 2026-08-08・Spec v21 で本文へ反映済み)。"
       }
     }
   }
