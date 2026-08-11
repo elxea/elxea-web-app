@@ -42,6 +42,15 @@ export type TrackSearchParams = {
   query: string;
 };
 
+export type TrackAudioPlayParams = {
+  /** 記事 slug 等、音声が載っているコンテンツの ID */
+  contentId: string;
+  /** 楽曲プレイリストかインタビューか */
+  kind: "track" | "interview";
+  /** 曲名など。プレイリストの何曲目を鳴らしたかを残すために使う */
+  title?: string;
+};
+
 /**
  * Send a behavior event to the server. Fire-and-forget.
  */
@@ -123,5 +132,21 @@ export function trackFavoriteAdd(params: TrackFavoriteAddParams): void {
 export function trackSearch(params: TrackSearchParams): void {
   sendEvent("search", {
     query: params.query,
+  }).catch(() => {});
+}
+
+/**
+ * Track the start of in-article audio playback (W3-4).
+ *
+ * 記事内プレイヤーの再生開始だけを送る。BGM (サイト常駐の環境音) は対象外で、
+ * 「この記事の音を聴こうと思った」という意思のある行動だけを残す。
+ * 一時停止・再開・シークは送らない — 1 再生で何十件も積むと、他の行動と
+ * 比べたときの重みが壊れるため。
+ */
+export function trackAudioPlay(params: TrackAudioPlayParams): void {
+  sendEvent("audio_play", {
+    contentId: params.contentId,
+    buttonLabel: `audio_${params.kind}`,
+    ...(params.title ? { query: params.title } : {}),
   }).catch(() => {});
 }

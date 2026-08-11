@@ -21,6 +21,7 @@ import {
   captionClass,
   overlineClass,
 } from "@/components/editorial/rule-list";
+import { AudioBlock } from "@/components/journal/audio-block";
 import { AuthorByline } from "@/components/journal/author-byline";
 import { AuthorProfile } from "@/components/journal/author-profile";
 import {
@@ -171,6 +172,21 @@ export default async function ArticlePage({
       ).filter((p): p is NonNullable<typeof p> => Boolean(p))
     : [];
 
+  // AudioBlock / AudioPlayer / TrackRow / MiniPlayer が使う文言。client 側では
+  // `getTranslations` を呼べないので、ここでまとめて解決して渡す。
+  const audioLabels = {
+    play: t("audioPlay"),
+    pause: t("audioPause"),
+    loading: t("audioLoading"),
+    seek: t("audioSeek"),
+    error: t("audioError"),
+    close: t("audioClose"),
+    nowPlaying: t("audioNowPlaying"),
+    trackListLabel: t("audioTrackList"),
+    externalNote: t("audioExternalNote"),
+    interviewNote: t("audioInterviewNote"),
+  };
+
   const author = article.author as ArticleAuthor | undefined;
   const authorAvatar = author?.image?.asset
     ? urlFor(author.image).width(64).height(64).url()
@@ -298,7 +314,25 @@ export default async function ArticlePage({
                 </div>
               )}
 
-              {/* 動画・音声 */}
+              {/* 記事の音声 — サイト内で鳴らす (Setaka 確定 2026-08-11)。
+                  `audioUrl` は「この記事の音源」なので、楽曲用ではなく
+                  インタビュー用の AudioBlock (Figma 8174:63) で出す。楽曲用の
+                  ジャケット + 曲リスト版はプレイリスト側 (tracks を持つ) の器で、
+                  記事スキーマは曲配列を持たないため。BGM とは自動で排他になる。 */}
+              {article.audioUrl && (
+                <AudioBlock
+                  variant="interview"
+                  contentId={slug}
+                  src={article.audioUrl}
+                  kicker={t("audioInterviewLabel")}
+                  title={article.title}
+                  meta={author ? t("writtenBy") + ": " + author.name : undefined}
+                  labels={audioLabels}
+                />
+              )}
+
+              {/* 動画などの外部リンク。音声は上の AudioBlock で鳴らすので、
+                  ここは「サイト内で再生しない外部メディア」への導線に絞る。 */}
               {article.audioVideoUrl && (
                 <div className="mt-6 rounded-lg border border-border p-4">
                   <p className={cn(overlineClass, "text-muted-foreground")}>{t("media")}</p>
