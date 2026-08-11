@@ -4,6 +4,8 @@ import { getLocale, getTranslations } from "next-intl/server";
 
 import { getClient } from "@/sanity/lib/client";
 import {
+  ARTICLES_BY_CATEGORY_ASC_QUERY,
+  ARTICLES_BY_CATEGORY_COUNT_QUERY,
   ARTICLES_BY_CATEGORY_QUERY,
   CATEGORIES_WITH_COUNTS_QUERY,
 } from "@/sanity/lib/queries";
@@ -20,6 +22,11 @@ import { ArticleRail, JournalGrid, JournalLayout } from "@/components/journal/jo
  * (8083:4073) の「◯◯を、もっと見る →」の降り先として必要なため、同じ確定版の
  * タグページ (8082:3855) と同一骨格で実装している (チップ列がカテゴリになる
  * だけの差)。タグページとの違いは下部のタグマップを置かないこと。
+ *
+ * 取得は `?show=` 連動のサーバサイド範囲取得 (A4)。以前は `[0...60]` 固定だった
+ * ため、1 カテゴリに 61 件以上あると残りへ到達できなかった。古い順は
+ * `[...list].reverse()` では取得した窓の中しか反転できないので、Sanity 側で
+ * 昇順に並べたクエリを使う。
  */
 
 /** Figma の記事グリッドは 2 列 x 3 段 = 6 件 (8082:3883 と同じ)。 */
@@ -91,16 +98,22 @@ export default async function CategoryPage({
 
   const client = getClient();
 
+  const sort = query.sort === "oldest" ? "oldest" : "newest";
+  const show = Math.max(PAGE_SIZE, Number(query.show) || PAGE_SIZE);
+
   let rawCategories: CategoryItem[] = [];
   let articles: ArticleItem[] = [];
+  let total = 0;
   try {
-    [rawCategories, articles] = await Promise.all([
+    [rawCategories, articles, total] = await Promise.all([
       client.fetch(CATEGORIES_WITH_COUNTS_QUERY, { language: locale }),
-      client.fetch(ARTICLES_BY_CATEGORY_QUERY, {
+      client.fetch(
+        sort === "oldest" ? ARTICLES_BY_CATEGORY_ASC_QUERY : ARTICLES_BY_CATEGORY_QUERY,
+        { language: locale, categorySlug: slug, start: 0, end: show }
+      ),
+      client.fetch(ARTICLES_BY_CATEGORY_COUNT_QUERY, {
         language: locale,
         categorySlug: slug,
-        start: 0,
-        end: 60,
       }),
     ]);
   } catch {
@@ -118,13 +131,11 @@ export default async function CategoryPage({
   const category = categories.find((c) => c.slug.current === slug);
   if (!category) notFound();
 
+  // 並び順は Sanity 側で確定済み (昇順 / 降順のクエリを使い分けている)。
   const list = articles ?? [];
-  const sort = query.sort === "oldest" ? "oldest" : "newest";
-  const ordered = sort === "oldest" ? [...list].reverse() : list;
-
-  const show = Math.max(PAGE_SIZE, Number(query.show) || PAGE_SIZE);
-  const visible = ordered.slice(0, show);
-  const remaining = ordered.length - visible.length;
+  const visible = list.slice(0, show);
+  // 残件は取得した窓ではなく総件数から出す (窓で判断すると窓の外に到達できない)。
+  const remaining = Math.max(0, total - visible.length);
 
   const hrefWith = (extra: Record<string, string>) => {
     const usp = new URLSearchParams();

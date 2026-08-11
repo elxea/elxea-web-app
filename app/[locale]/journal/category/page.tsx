@@ -2,7 +2,11 @@ import type { Metadata } from "next";
 import { getLocale, getTranslations } from "next-intl/server";
 
 import { getClient } from "@/sanity/lib/client";
-import { ARTICLES_QUERY, CATEGORIES_WITH_COUNTS_QUERY } from "@/sanity/lib/queries";
+import {
+  ARTICLES_BY_CATEGORY_QUERY,
+  ARTICLES_QUERY,
+  CATEGORIES_WITH_COUNTS_QUERY,
+} from "@/sanity/lib/queries";
 import { Breadcrumb } from "@/components/seo/breadcrumb";
 import { Section } from "@/components/layout/container";
 import { CatalogToolbar } from "@/components/catalog/catalog-toolbar";
@@ -23,6 +27,12 @@ import { CategoryShelf, StackPageHead } from "@/components/journal/journal-list"
  * - CategoryShelf      pad-top64 → ShelfHead h44 → PC40/SP24 → カード → PC40/SP24
  *                      → もっと見る (h42 ≒ タップ域44)
  * - ShelfCards         PC 3列416 gap-x32 / SP 1列343 (全幅)
+ *
+ * 取得はカテゴリごとの個別クエリ (A4)。以前は全記事を `[0...60]` で引いて
+ * メモリ上で棚に振り分けていたため、記事が 60 件を超えると「12本」と件数は
+ * 出ているのにカードが 1 枚も無い棚が生まれ、そのまま `return null` で棚ごと
+ * 消えていた (棚消失)。棚に出すのは各カテゴリ先頭 3 件だけなので、
+ * カテゴリごとに 3 件だけ引けば件数と中身が食い違わない。
  */
 
 /** Figma の棚は PC 3 枚 (8083:4089)。SP は 1 枚だけ見せる (8083:4232)。 */
@@ -64,13 +74,15 @@ export default async function JournalCategoryIndexPage() {
   const tCommon = await getTranslations("common");
   const tl = await getTranslations("catalog");
 
+  const client = getClient();
+
   let rawCategories: CategoryItem[] = [];
-  let rawArticles: ArticleItem[] = [];
+  let newestArticles: ArticleItem[] = [];
   try {
-    const client = getClient();
-    [rawCategories, rawArticles] = await Promise.all([
+    [rawCategories, newestArticles] = await Promise.all([
       client.fetch(CATEGORIES_WITH_COUNTS_QUERY, { language: locale }),
-      client.fetch(ARTICLES_QUERY, { language: locale, start: 0, end: 60 }),
+      // 「最終更新」に使う最新 1 件だけ。全件を引く必要はない。
+      client.fetch(ARTICLES_QUERY, { language: locale, start: 0, end: 1 }),
     ]);
   } catch {
     return (
@@ -91,16 +103,32 @@ export default async function JournalCategoryIndexPage() {
     })
     .filter((cat) => cat.count > 0);
 
-  const articles = rawArticles ?? [];
-
-  // 「最終更新」は記事の公開日の最大値。記事が無ければ出さない。
-  const latest = articles
-    .map((a) => a.publishedAt)
-    .filter(Boolean)
-    .sort()
-    .at(-1);
+  // 「最終更新」は最新記事の公開日。記事が無ければ出さない。
+  const latest = (newestArticles ?? [])[0]?.publishedAt;
 
   const total = categories.reduce((sum, cat) => sum + cat.count, 0);
+
+  // 棚ごとに先頭 3 件だけを引く。カテゴリ数ぶんの並列クエリになるが、
+  // 1 本あたり 3 件と軽く、全件取得と違って件数と中身が必ず一致する。
+  let shelves: ArticleItem[][] = [];
+  try {
+    shelves = await Promise.all(
+      categories.map((cat) =>
+        client.fetch(ARTICLES_BY_CATEGORY_QUERY, {
+          language: locale,
+          categorySlug: cat.slug.current,
+          start: 0,
+          end: SHELF_SIZE,
+        })
+      )
+    );
+  } catch {
+    return (
+      <Section spacing="none" className="pt-6 pb-16 lg:pb-28">
+        <p className="text-sm text-muted-foreground">{t("loadError")}</p>
+      </Section>
+    );
+  }
 
   const meta = [
     t("categoryStackMeta", { count: categories.length, total }),
@@ -143,10 +171,8 @@ export default async function JournalCategoryIndexPage() {
       {categories.length === 0 ? (
         <p className="mt-8 text-sm text-muted-foreground lg:mt-12">{t("empty")}</p>
       ) : (
-        categories.map((cat) => {
-          const shelf = articles
-            .filter((a) => a.category?.slug?.current === cat.slug.current)
-            .slice(0, SHELF_SIZE);
+        categories.map((cat, catIndex) => {
+          const shelf = shelves[catIndex] ?? [];
           if (shelf.length === 0) return null;
           return (
             <CategoryShelf
