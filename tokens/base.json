@@ -13,11 +13,12 @@
         "$description": "gray-100 (#5d5e61) — Webflow text-color"
       },
       "card": {
-        "$value": "oklch(0.863 0.026 102.0)",
-        "$description": "gray-40 (#d5d3c0) — Webflow card_bg-color"
+        "$value": "oklch(0.963 0.008 98.9)",
+        "$description": "#f4f3ed — off-white。Figma `mode/card` の実測値 (file AWLnI0XF07e8rScuxPYPc7 / node 8172:280 Modal・8171:299 BookmarkButton を get_variable_defs = #f4f3ed)。2026-08-11 に sand #d5d3c0 (Webflow card_bg-color) から是正。W5 で secondary を Figma 正の sand に直した結果 card と secondary が同値になり、押下面・選択面が親面と区別できなくなっていた (モーダルフッターの outline pill 押下 / ブックマーク済み面)。原則 Figma 準拠。card と secondary のコントラストは 1.36:1 で状態差が視認できる。"
       },
       "card-foreground": {
-        "$value": "oklch(0.482 0.005 271.3)"
+        "$value": "oklch(0.482 0.005 271.3)",
+        "$description": "gray-100 (#5d5e61) — charcoal。card を #f4f3ed へ是正した結果コントラストは 5.83:1 (旧 sand 面では 4.29:1) となり WCAG AA Normal 4.5:1 を通過するため値は据え置く。"
       },
       "popover": {
         "$value": "oklch(0.933 0.012 96.4)",
