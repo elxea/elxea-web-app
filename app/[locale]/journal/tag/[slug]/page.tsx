@@ -20,6 +20,7 @@ import {
   JournalLayout,
   TagMap,
 } from "@/components/journal/journal-list";
+import { getPopularArticles, orderByPopularity } from "@/lib/journal/popular-articles";
 
 /**
  * ジャーナル:タグ — Figma【R2: 確定版】統一ナビ (一覧R2と同一チップ列) +
@@ -153,7 +154,9 @@ export default async function TagPage({
     })),
   ];
 
-  const railPopular = list
+  // A10: 「人気の記事」を実際の閲覧数順にする (以前は窓の先頭 5 件)。
+  // 実データが薄い / 取得できないときは従来どおり先頭 5 件に倒す。
+  const railPopular = orderByPopularity(list, await getPopularArticles(RAIL_SIZE))
     .slice(0, RAIL_SIZE)
     .map((a) => ({ label: a.title, href: `/journal/${a.slug.current}` }));
 

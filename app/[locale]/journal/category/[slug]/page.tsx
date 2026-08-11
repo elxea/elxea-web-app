@@ -15,6 +15,7 @@ import { CatalogToolbar } from "@/components/catalog/catalog-toolbar";
 import { ListPageHead, MoreRow } from "@/components/catalog/catalog-list";
 import { ArticleCard } from "@/components/journal/article-card";
 import { ArticleRail, JournalGrid, JournalLayout } from "@/components/journal/journal-list";
+import { getPopularArticles, orderByPopularity } from "@/lib/journal/popular-articles";
 
 /**
  * ジャーナル:カテゴリ (単一) — Figma【R2: 確定版】の「統一ナビ (一覧R2と同一
@@ -151,7 +152,10 @@ export default async function CategoryPage({
       })),
   ];
 
-  const railPopular = list
+  // A10: 「人気の記事」を実際の閲覧数順にする。以前は取得した窓の先頭 5 件を
+  // そのまま出しており、人気でも何でもなかった。実データが薄い / 取得できない
+  // ときは従来どおり先頭 5 件に倒す。
+  const railPopular = orderByPopularity(list, await getPopularArticles(RAIL_SIZE))
     .slice(0, RAIL_SIZE)
     .map((a) => ({ label: a.title, href: `/journal/${a.slug.current}` }));
 
