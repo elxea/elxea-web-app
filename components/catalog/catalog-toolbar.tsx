@@ -16,7 +16,10 @@ import { cn } from "@/lib/utils";
  *
  * Figma 実測 (px) → 実装:
  * - Chip: 高さ 44 (`h-11`) / 全丸め / gap 8 (`gap-2`)
- *   PC padding 16x8 (`lg:px-4 lg:py-2`) / SP padding 12x12 (`px-3 py-3`)
+ *   padding 16x8 (`px-4 py-2`) — PC / SP 共通。
+ *   W4 で標準化した DS Chip Module (8171:269) が正本。旧凍結ノードの SP 値
+ *   12x12 は Chip Module 化以前の値なので採らない。高さ 44 は padding ではなく
+ *   `h-11` が担保しているため、padding 変更でタップ域は縮まない。
  * - 選択中は塗り (primary / primary-foreground)、未選択は 1px 罫線 (border)
  * - SP は横スクロール (Figma "Chips (横スクロール)")、PC は Select 180x44 が右端
  *
@@ -162,7 +165,7 @@ export function CatalogToolbar({
           const selected = chip.value === current;
           const chipClass = cn(
             bodySmClass,
-            "flex h-11 shrink-0 items-center rounded-full px-3 py-3 whitespace-nowrap lg:px-4 lg:py-2",
+            "flex h-11 shrink-0 items-center rounded-full px-4 py-2 whitespace-nowrap",
             selected
               ? "bg-primary text-primary-foreground"
               : "border border-border text-foreground hover:bg-muted"
@@ -238,7 +241,15 @@ export function CatalogToolbar({
           aria-label={sortLabel}
           value={activeSort ?? sortOptions[0]?.value}
           onChange={(event) => router.push(hrefWith("sort", event.target.value))}
-          className="hidden h-11 w-45 shrink-0 rounded-full lg:block"
+          /**
+           * PC 限定は「外枠ごと」消す。`hidden` を `<select>` 側に置くと、
+           * NativeSelect の外枠 div (chevron は absolute なので中身幅 0) が
+           * フロー要素として SP に残り、Toolbar の `flex gap-4` を 1 つ分 (16px)
+           * 食う。その結果チップ列の右端が画面右端まで届かなかった
+           * (SP 375 で x=359 止まり)。
+           */
+          wrapperClassName="hidden shrink-0 lg:block"
+          className="h-11 w-45 rounded-full"
         >
           {sortOptions.map((option) => (
             <NativeSelectOption key={option.value} value={option.value}>
