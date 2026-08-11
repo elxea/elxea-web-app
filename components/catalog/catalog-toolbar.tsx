@@ -20,6 +20,14 @@ import { cn } from "@/lib/utils";
  * - 選択中は塗り (primary / primary-foreground)、未選択は 1px 罫線 (border)
  * - SP は横スクロール (Figma "Chips (横スクロール)")、PC は Select 180x44 が右端
  *
+ * SP の並び替え (意図的な Figma 差分):
+ * Figma の SP フレームには Select が無いが、以前の実装は `hidden lg:block` を
+ * `<select>` 自体に当てていたため、SP では並び替えが一切できず、かつ
+ * NativeSelect のラッパ (相対配置 + シェブロン絶対配置) だけが残って
+ * シェブロンが浮く状態だった。SP でも並び替えは使えるべき機能なので、
+ * 「PC は右端に横並び / SP はチップ列の下に右寄せで 1 段落とす」に変える
+ * (見た目は PC と同じ DS の NativeSelect をそのまま使い、追加の意匠は足さない)。
+ *
  * 絞り込み・並び替えの状態は URL クエリに載せる (`?category=` / `?sort=`)。
  * 戻る・共有・SSR いずれでも同じ結果になるようにするため、クライアント state に
  * 閉じ込めない。
@@ -76,7 +84,10 @@ export function CatalogToolbar({
   return (
     <div
       data-slot="catalog-toolbar"
-      className={cn("flex items-center justify-between gap-4", className)}
+      className={cn(
+        "flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between",
+        className
+      )}
     >
       <div
         data-slot="catalog-chips"
@@ -125,19 +136,24 @@ export function CatalogToolbar({
       </div>
 
       {sortOptions.length > 0 ? (
-        <NativeSelect
-          data-slot="catalog-sort"
-          aria-label={sortLabel}
-          value={activeSort ?? sortOptions[0]?.value}
-          onChange={(event) => router.push(hrefWith("sort", event.target.value))}
-          className="hidden h-11 w-45 shrink-0 rounded-full lg:block"
-        >
-          {sortOptions.map((option) => (
-            <NativeSelectOption key={option.value} value={option.value}>
-              {option.label}
-            </NativeSelectOption>
-          ))}
-        </NativeSelect>
+        // SP はチップ列の下に右寄せ (self-end)、PC は従来どおり右端に横並び。
+        // NativeSelect 自身はラッパ div を持つため、配置は外側の div で行う
+        // (以前のように `hidden` を select に当てるとラッパのシェブロンだけが残る)。
+        <div className="shrink-0 self-end lg:self-auto">
+          <NativeSelect
+            data-slot="catalog-sort"
+            aria-label={sortLabel}
+            value={activeSort ?? sortOptions[0]?.value}
+            onChange={(event) => router.push(hrefWith("sort", event.target.value))}
+            className="h-11 w-45 rounded-full"
+          >
+            {sortOptions.map((option) => (
+              <NativeSelectOption key={option.value} value={option.value}>
+                {option.label}
+              </NativeSelectOption>
+            ))}
+          </NativeSelect>
+        </div>
       ) : null}
     </div>
   );
