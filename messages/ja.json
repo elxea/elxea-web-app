@@ -49,6 +49,19 @@
   "cart": {
     "subtitle": "Items in your cart"
   },
+  "audio": {
+    "statePlay": "再生",
+    "statePause": "停止",
+    "stateLoading": "読み込み中",
+    "stateRetry": "再試行",
+    "ariaPlay": "BGM を再生する",
+    "ariaPause": "BGM を停止する",
+    "ariaLoading": "BGM を読み込んでいます",
+    "ariaError": "BGM を再生できませんでした。押すともう一度試します",
+    "noteDefault": "自然の音とともに",
+    "noteBlocked": "画面を押すと音が出ます",
+    "noteUnavailable": "いま音を再生できません"
+  },
   "home": {
     "tagline": "Single-Origin Japanese Tea",
     "hero": "日本各地の小規模茶農家から厳選した、シングルオリジンのクラフトティー。いつもの一杯に、静かなきらめきを。",

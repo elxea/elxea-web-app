@@ -50,6 +50,15 @@ html.lenis, html.lenis body {
   html {
     scroll-behavior: auto;
   }
+
+  /* A9: BGM 再生中の回転 (`animate-spin-slow`) と読み込み中の点滅
+   * (`animate-pulse`) は「動きを減らす」設定の利用者には流さない。
+   * 状態は文言 (再生中 / 読み込み中 …) でも伝えているので、動きを止めても
+   * 情報は失われない。 */
+  .animate-spin-slow,
+  .animate-pulse {
+    animation: none;
+  }
 }
 
 /* Adobe Fonts (Typekit ID: fwg7gtf) — loaded via async JS embed in layout.tsx
