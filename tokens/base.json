@@ -34,11 +34,12 @@
         "$value": "oklch(1 0 0)"
       },
       "secondary": {
-        "$value": "oklch(0.846 0.173 85.6)",
-        "$description": "Gold (#ffc200) — Webflow secondary-color"
+        "$value": "oklch(0.863 0.026 102.0)",
+        "$description": "gray-40 (#d5d3c0) — sand。Figma `mode/secondary` の実測値 (file AWLnI0XF07e8rScuxPYPc7 / node 8171:269・8171:299 を get_variable_defs = #d5d3c0)。2026-08-11 に Gold (#ffc200) から是正。旧値は Webflow の secondary-color をそのまま持ち込んだもので、Figma の mode コレクションと意味が反転していた (Figma で gold は accent 専用)。原則 Figma 準拠。tokens/elxea-custom.json の color.light.secondary と一致。"
       },
       "secondary-foreground": {
-        "$value": "oklch(0.397 0.002 247.9)"
+        "$value": "oklch(0.397 0.002 247.9)",
+        "$description": "gray-120 (#464748) — graphite。Figma `foreground` と同値なので値は据え置き。sand 面上のコントラストは 6.17:1 で WCAG AA Normal (4.5:1) 通過 — gold 時代の 5.75:1 より改善する。"
       },
       "muted": {
         "$value": "oklch(0.933 0.012 96.4)",
