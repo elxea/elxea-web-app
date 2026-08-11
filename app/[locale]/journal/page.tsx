@@ -17,8 +17,8 @@ import { Breadcrumb } from "@/components/seo/breadcrumb";
 import { Section } from "@/components/layout/container";
 import { CatalogToolbar } from "@/components/catalog/catalog-toolbar";
 import { ListPageHead, MoreRow } from "@/components/catalog/catalog-list";
-import { ImageCard } from "@/components/ui/image-card";
 import { ArticleCard } from "@/components/journal/article-card";
+import { JournalGridSkeleton } from "@/components/journal/journal-skeleton";
 import {
   ArticleRail,
   HeroFeature,
@@ -118,27 +118,10 @@ export default async function JournalPage({
 
       <ListPageHead overline="JOURNAL" title={t("title")} lead={t("description")} />
 
-      <Suspense fallback={<JournalSkeleton />}>
+      <Suspense fallback={<JournalGridSkeleton count={PAGE_SIZE} className="mt-8 lg:mt-12" />}>
         <JournalContent params={params} />
       </Suspense>
     </Section>
-  );
-}
-
-function JournalSkeleton() {
-  return (
-    <JournalGrid className="mt-8 lg:mt-12">
-      {Array.from({ length: PAGE_SIZE }).map((_, i) => (
-        <div key={i} className="flex animate-pulse flex-col gap-4">
-          <ImageCard />
-          <div className="space-y-1.5">
-            <div className="h-3 w-16 bg-muted" />
-            <div className="h-4 w-3/4 bg-muted" />
-            <div className="h-3 w-full bg-muted" />
-          </div>
-        </div>
-      ))}
-    </JournalGrid>
   );
 }
 
@@ -241,7 +224,11 @@ async function JournalContent({ params }: { params: SearchParams }) {
 
   const popularArticles = await popularArticlesPromise;
 
-  const featured = showsFeatured
+  // A7: 記事が 1 件しかないときに特集へ吸い上げると、一覧グリッドが空になり
+  // 「記事がありません」が出ていた (実際には 1 件あるのに)。総件数が 1 なら
+  // 特集枠は出さず、その 1 件をグリッドに出す。
+  const canFeature = showsFeatured && (total ?? 0) > 1;
+  const featured = canFeature
     ? ((featuredArticles ?? [])[0] ?? (newestArticles ?? [])[0])
     : undefined;
 

@@ -102,6 +102,8 @@ export default async function TagPage({
 
   const client = getClient();
 
+  // A7: 障害を notFound() に握り潰さない (本物の 404 と区別がつかず Sentry にも
+  // 上がらないため)。取得失敗は他ページと同じ loadError 表示に倒す。
   let tag: { _id: string; title: string; slug: { current: string } } | null = null;
   let articles: ArticleItem[] = [];
   let tags: TagItem[] = [];
@@ -119,9 +121,17 @@ export default async function TagPage({
       client.fetch(CATEGORIES_QUERY),
     ]);
   } catch {
-    notFound();
+    return (
+      <Section spacing="none" className="pt-6 pb-16 lg:pb-28">
+        <Breadcrumb
+          items={[{ label: bt("home"), href: "/" }, { label: t("title"), href: "/journal" }]}
+        />
+        <p className="mt-8 text-sm text-muted-foreground lg:mt-12">{t("loadError")}</p>
+      </Section>
+    );
   }
 
+  // 取得は成功したがタグが無い = 本物の 404。
   if (!tag) notFound();
 
   const list = articles ?? [];

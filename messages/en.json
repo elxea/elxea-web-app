@@ -125,6 +125,7 @@
     "categoryArchiveDescription": "Stories about {name}",
     "empty": "No articles yet.",
     "loadError": "Could not load articles.",
+    "loading": "Loading articles",
     "writtenBy": "Written by",
     "relatedArticles": "Related Articles",
     "media": "Video / Audio",

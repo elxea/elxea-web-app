@@ -97,6 +97,9 @@ export default async function CategoryPage({
   const sort = query.sort === "oldest" ? "oldest" : "newest";
   const show = Math.max(PAGE_SIZE, Number(query.show) || PAGE_SIZE);
 
+  // A7: 障害を notFound() に握り潰すと「本物の 404」と区別がつかず、Sentry にも
+  // 上がらないまま「カテゴリが消えた」ように見える。取得失敗は他ページと同じ
+  // loadError 表示にし、404 は「取得できたがカテゴリが無い」場合だけに絞る。
   let rawCategories: CategoryItem[] = [];
   let articles: ArticleItem[] = [];
   let total = 0;
@@ -113,7 +116,18 @@ export default async function CategoryPage({
       }),
     ]);
   } catch {
-    notFound();
+    return (
+      <Section spacing="none" className="pt-6 pb-16 lg:pb-28">
+        <Breadcrumb
+          items={[
+            { label: bt("home"), href: "/" },
+            { label: t("title"), href: "/journal" },
+            { label: t("categories"), href: "/journal/category" },
+          ]}
+        />
+        <p className="mt-8 text-sm text-muted-foreground lg:mt-12">{t("loadError")}</p>
+      </Section>
+    );
   }
 
   const seen = new Set<string>();

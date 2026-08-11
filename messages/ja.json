@@ -125,6 +125,7 @@
     "categoryArchiveDescription": "「{name}」にまつわるストーリー",
     "empty": "最初の記事を準備しています。もう少しお待ちください。",
     "loadError": "記事を読み込めませんでした。時間をおいて、もう一度お試しください。",
+    "loading": "記事を読み込んでいます",
     "writtenBy": "執筆",
     "relatedArticles": "関連する記事",
     "media": "動画 / 音声",
