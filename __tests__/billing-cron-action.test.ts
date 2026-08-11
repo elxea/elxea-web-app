@@ -253,7 +253,9 @@ describe("既存の督促フローが壊れていないこと", () => {
   });
 
   it("失敗が上限に達していたら契約を PAUSED にして action=paused", async () => {
-    // 3 件とも countRecentFailures の集計窓 (課金日の -24h 〜 +96h) の内側に置く
+    // 3 件とも analyzeBillingCycle の集計窓 (課金日の -24h 以降) の内側に置く
+    // (窓の上限は 2026-08-11 に撤去。判定窓そのものの試験は
+    //  __tests__/billing-cron-dunning-window.test.ts が持つ)
     getBillingAttemptsMock.mockResolvedValue([
       failedAttempt(hoursAgo(1)),
       failedAttempt(hoursAgo(10)),

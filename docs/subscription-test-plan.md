@@ -151,9 +151,20 @@ cancelSubscription(accessToken, contractId)
 - `SUBSCRIPTION_CONTRACTS_QUERY` の各契約の `lines(first: 10)` は**未ページング**。
   11明細以上の契約では明細が切れる。課金の実行自体には影響しないが、督促メールの
   明細一覧が欠ける (テスト契約は10明細以内で組む)。
-- `/api/cron/billing` 周辺のunit testは22件 (`__tests__/billing-cron-action.test.ts` 9件 /
-  `__tests__/subscription-admin-pagination.test.ts` 13件)。`countRecentFailures` /
+- **\[解消済2026-08-11\] 督促の判定窓**。失敗の集計窓は `nextBillingDate -24h 〜 +96h` 固定で、
+  **失敗した契約の `nextBillingDate` は前進しない**ため請求日から96hを過ぎた契約は
+  `failureCount` が常に0と評価された。リトライ上限に永久に到達せず契約が一時停止されず、
+  毎日「初回試行」として再課金と督促メールが繰り返された (実例: 契約25318162590、請求日04-19に
+  対し07-12にも試行)。是正後は窓の上限を撤去し `請求日 -24h 以降のこの周期の試行履歴` を基準に
+  数える (`lib/shopify/billing-dunning.ts` の `analyzeBillingCycle`)。したがって
+  「請求日から数日〜数か月経った失敗契約」の母数でもテストは成立し、上限到達で必ずPAUSEに入る。
+  判断がつかない場合 (この周期で課金済み / 試行が結果待ち / 失敗の時刻が読めない) は
+  課金しない側に倒し `action: "skipped"` を返す。
+- `/api/cron/billing` 周辺のunit testは42件 (`__tests__/billing-cron-action.test.ts` 9件 /
+  `__tests__/billing-cron-dunning-window.test.ts` 20件 /
+  `__tests__/subscription-admin-pagination.test.ts` 13件)。`analyzeBillingCycle` の集計窓 /
   `isReadyForRetry` の24時間境界と `action` 判定の全分岐をここで押さえている。
+  監視通知の文面・送出条件は `__tests__/billing-cron-line-notify.test.ts` 16件が別に持つ。
   e2e (`e2e/subscription-*.spec.ts`) はSelling Plan商品 / `CRON_SECRET` / Admin権限が
   無いと `test.skip` になるため、**緑でも何も検証していない状態になりうる**。skip件数を必ず確認する。
 

@@ -14,26 +14,36 @@ import {
   notifyBillingRunFailures,
   notifySubscriptionPaused,
 } from "@/lib/line/monitoring-alerts";
+import {
+  analyzeBillingCycle,
+  isReadyForRetry,
+  isStaleInFlight,
+  MAX_RETRY_ATTEMPTS,
+} from "@/lib/shopify/billing-dunning";
 
 /**
  * Cron-triggered billing processor with dunning (retry) logic.
  *
  * Flow:
  * 1. Find ACTIVE contracts with nextBillingDate <= today
- * 2. For each, check recent billing attempts to determine retry state
- * 3. If no prior failures for this billing cycle: create initial billing attempt
- * 4. If prior failures exist and enough time has passed (24h intervals): retry
- * 5. After 3 total failures: pause the contract and notify customer
+ * 2. For each, check this cycle's billing attempts to determine retry state
+ * 3. If the cycle is already charged or an attempt is still in flight: do nothing
+ * 4. If no prior failures for this billing cycle: create initial billing attempt
+ * 5. If prior failures exist and enough time has passed (24h intervals): retry
+ * 6. After 3 total failures: pause the contract and notify customer
  *
  * Retry schedule: initial attempt, then +24h, +48h, +72h (max 3 retries)
+ *
+ * 「この周期の試行」の切り出しは `lib/shopify/billing-dunning.ts` の
+ * `analyzeBillingCycle` が持つ。失敗の集計窓に上限を置くと、失敗中に前進しない
+ * `nextBillingDate` のせいで古い契約の失敗が数え落とされ、上限到達も一時停止も
+ * 起きず毎日再課金と督促メールが続く (2026-08-11 の障害)。窓の根拠は同ファイル参照。
  *
  * Expected to be called by Vercel Cron (vercel.json) daily.
  * Protected by CRON_SECRET header check.
  */
 
 const CRON_SECRET = process.env.CRON_SECRET || "";
-const MAX_RETRY_ATTEMPTS = 3;
-const RETRY_INTERVAL_HOURS = 24;
 
 /**
  * Outcome of one contract in one cron run.
@@ -74,45 +84,6 @@ type BillingResult = {
   attemptNumber?: number;
   detail?: string;
 };
-
-/**
- * Count recent failed billing attempts for a given billing date.
- * Only counts attempts created within the dunning window (MAX_RETRY_ATTEMPTS * RETRY_INTERVAL_HOURS)
- * that have an error code, to isolate failures for the current billing cycle.
- */
-function countRecentFailures(
-  attempts: { id: string; createdAt: string; errorCode: string | null; errorMessage: string | null }[],
-  billingDate: string
-): { failureCount: number; lastFailureAt: Date | null } {
-  const billingDateMs = new Date(billingDate).getTime();
-  // Look at attempts within the dunning window from the billing date
-  const windowMs = (MAX_RETRY_ATTEMPTS + 1) * RETRY_INTERVAL_HOURS * 60 * 60 * 1000;
-
-  const recentFailures = attempts.filter((a) => {
-    if (!a.errorCode) return false;
-    const attemptMs = new Date(a.createdAt).getTime();
-    // Must be after billing date (or same day) and within the retry window
-    return attemptMs >= billingDateMs - 24 * 60 * 60 * 1000 && attemptMs <= billingDateMs + windowMs;
-  });
-
-  const sorted = recentFailures.sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  );
-
-  return {
-    failureCount: recentFailures.length,
-    lastFailureAt: sorted.length > 0 ? new Date(sorted[0]!.createdAt) : null,
-  };
-}
-
-/**
- * Check if enough time has passed since the last failure to retry.
- */
-function isReadyForRetry(lastFailureAt: Date, now: Date): boolean {
-  const hoursSinceFailure =
-    (now.getTime() - lastFailureAt.getTime()) / (1000 * 60 * 60);
-  return hoursSinceFailure >= RETRY_INTERVAL_HOURS;
-}
 
 /**
  * Timing-safe comparison of the incoming Authorization header against the
@@ -257,33 +228,86 @@ async function processContract(
     };
   }
 
-  // Get existing billing attempts to check retry state
+  // この周期の試行履歴から現在地を出す。判定は lib/shopify/billing-dunning に閉じている
+  // (窓の設計と、そこを間違えたときに何が起きたかは同ファイルの冒頭を参照)。
   const attempts = await getBillingAttempts(contract.id);
-  const { failureCount, lastFailureAt } = countRecentFailures(
-    attempts,
-    contract.nextBillingDate
-  );
+  const cycle = analyzeBillingCycle(attempts, contract.nextBillingDate);
 
-  // Case 1: Max retries exceeded -- pause the contract
-  if (failureCount >= MAX_RETRY_ATTEMPTS) {
+  // Case 0: 請求日が日時として読めない。判定の基準が無いので課金しない。
+  if (!cycle.billingDateValid) {
+    Sentry.captureMessage("[Billing Cron] Unparseable nextBillingDate", {
+      level: "warning",
+      tags: { cron: "billing", phase: "cycle-analysis" },
+      extra: { contractId: contract.id, nextBillingDate: contract.nextBillingDate },
+    });
+    return {
+      contractId: contract.id,
+      action: "skipped",
+      detail: `Unparseable billing date: ${contract.nextBillingDate}`,
+    };
+  }
+
+  // Case 1: この周期の課金は既に完了している。二重課金しない。
+  // (成功していれば Shopify 側で nextBillingDate が前進するので通常ここには来ないが、
+  //  前進が遅れている間に cron が回っても課金を重ねないための歯止め)
+  if (cycle.completedAt) {
+    return {
+      contractId: contract.id,
+      action: "skipped",
+      detail: `Already charged for this cycle at ${cycle.completedAt.toISOString()}`,
+    };
+  }
+
+  // Case 2: 試行が結果待ち。成否が確定するまで課金しない (確定は webhook 経由)。
+  if (cycle.inFlightAt) {
+    // 待ち続けるだけだと無音で課金が止まるので、長すぎる滞留は運営に見えるようにする。
+    if (isStaleInFlight(cycle.inFlightAt, now)) {
+      Sentry.captureMessage("[Billing Cron] Billing attempt stuck in flight", {
+        level: "warning",
+        tags: { cron: "billing", phase: "in-flight" },
+        extra: {
+          contractId: contract.id,
+          inFlightSince: cycle.inFlightAt.toISOString(),
+        },
+      });
+    }
+    return {
+      contractId: contract.id,
+      action: "skipped",
+      detail: `Attempt still processing since ${cycle.inFlightAt.toISOString()}`,
+    };
+  }
+
+  // Case 3: リトライ上限に到達 -- 契約を一時停止する。
+  // 窓に上限が無いので、請求日から何日経っていても失敗は数え落とされずここに入る。
+  if (cycle.failureCount >= MAX_RETRY_ATTEMPTS) {
     return handleMaxRetriesExceeded(contract);
   }
 
-  // Case 2: Has previous failures, check if ready to retry
-  if (failureCount > 0 && lastFailureAt) {
-    if (!isReadyForRetry(lastFailureAt, now)) {
+  // Case 4: 失敗はあるが時刻が読めない。間隔を判断できないので課金しない。
+  if (cycle.failureCount > 0 && !cycle.lastFailureAt) {
+    return {
+      contractId: contract.id,
+      action: "skipped",
+      attemptNumber: cycle.failureCount,
+      detail: `Cannot determine retry timing (${cycle.failureCount} failures with unreadable timestamps)`,
+    };
+  }
+
+  // Case 5: 失敗あり。リトライ間隔を満たしていれば再試行する。
+  if (cycle.failureCount > 0 && cycle.lastFailureAt) {
+    if (!isReadyForRetry(cycle.lastFailureAt, now)) {
       return {
         contractId: contract.id,
         action: "waiting",
-        attemptNumber: failureCount,
-        detail: `Waiting for retry interval (${failureCount} failures, last at ${lastFailureAt.toISOString()})`,
+        attemptNumber: cycle.failureCount,
+        detail: `Waiting for retry interval (${cycle.failureCount} failures, last at ${cycle.lastFailureAt.toISOString()})`,
       };
     }
-    // Ready to retry
-    return performBillingAttempt(contract, failureCount + 1);
+    return performBillingAttempt(contract, cycle.failureCount + 1);
   }
 
-  // Case 3: First attempt
+  // Case 6: この周期の初回試行
   return performBillingAttempt(contract, 1);
 }
 
