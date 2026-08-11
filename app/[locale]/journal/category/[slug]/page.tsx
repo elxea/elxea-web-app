@@ -4,6 +4,8 @@ import { getLocale, getTranslations } from "next-intl/server";
 
 import { getClient } from "@/sanity/lib/client";
 import {
+  ARTICLES_BY_CATEGORY_ASC_QUERY,
+  ARTICLES_BY_CATEGORY_COUNT_QUERY,
   ARTICLES_BY_CATEGORY_QUERY,
   CATEGORIES_WITH_COUNTS_QUERY,
 } from "@/sanity/lib/queries";
@@ -91,16 +93,22 @@ export default async function CategoryPage({
 
   const client = getClient();
 
+  const sort = query.sort === "oldest" ? "oldest" : "newest";
+  const show = Math.max(PAGE_SIZE, Number(query.show) || PAGE_SIZE);
+
   let rawCategories: CategoryItem[] = [];
   let articles: ArticleItem[] = [];
+  let total = 0;
   try {
-    [rawCategories, articles] = await Promise.all([
+    [rawCategories, articles, total] = await Promise.all([
       client.fetch(CATEGORIES_WITH_COUNTS_QUERY, { language: locale }),
-      client.fetch(ARTICLES_BY_CATEGORY_QUERY, {
+      client.fetch(
+        sort === "oldest" ? ARTICLES_BY_CATEGORY_ASC_QUERY : ARTICLES_BY_CATEGORY_QUERY,
+        { language: locale, categorySlug: slug, start: 0, end: show }
+      ),
+      client.fetch(ARTICLES_BY_CATEGORY_COUNT_QUERY, {
         language: locale,
         categorySlug: slug,
-        start: 0,
-        end: 60,
       }),
     ]);
   } catch {
@@ -118,13 +126,11 @@ export default async function CategoryPage({
   const category = categories.find((c) => c.slug.current === slug);
   if (!category) notFound();
 
+  // 並び順は Sanity 側で確定済み (昇順 / 降順のクエリを使い分けている)。
   const list = articles ?? [];
-  const sort = query.sort === "oldest" ? "oldest" : "newest";
-  const ordered = sort === "oldest" ? [...list].reverse() : list;
-
-  const show = Math.max(PAGE_SIZE, Number(query.show) || PAGE_SIZE);
-  const visible = ordered.slice(0, show);
-  const remaining = ordered.length - visible.length;
+  const visible = list.slice(0, show);
+  // 残件は取得した窓ではなく総件数から出す (窓で判断すると窓の外に到達できない)。
+  const remaining = Math.max(0, total - visible.length);
 
   const hrefWith = (extra: Record<string, string>) => {
     const usp = new URLSearchParams();

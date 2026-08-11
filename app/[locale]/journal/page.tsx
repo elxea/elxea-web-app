@@ -3,7 +3,16 @@ import { Suspense } from "react";
 import { getLocale, getTranslations } from "next-intl/server";
 
 import { getClient } from "@/sanity/lib/client";
-import { ARTICLES_QUERY, CATEGORIES_QUERY } from "@/sanity/lib/queries";
+import {
+  ARTICLES_ASC_QUERY,
+  ARTICLES_BY_CATEGORY_ASC_QUERY,
+  ARTICLES_BY_CATEGORY_COUNT_QUERY,
+  ARTICLES_BY_CATEGORY_QUERY,
+  ARTICLES_COUNT_QUERY,
+  ARTICLES_QUERY,
+  CATEGORIES_WITH_COUNTS_QUERY,
+  FEATURED_ARTICLES_QUERY,
+} from "@/sanity/lib/queries";
 import { Breadcrumb } from "@/components/seo/breadcrumb";
 import { Section } from "@/components/layout/container";
 import { CatalogToolbar } from "@/components/catalog/catalog-toolbar";
@@ -34,6 +43,12 @@ import { getRecommendedArticles } from "@/lib/recommendations/content-engine";
  * 絞り込み (`?category=`) / 並び替え (`?sort=`) / 表示件数 (`?show=`) は URL に
  * 載せる。既定の並びは「おすすめ順」で、ログイン中は行動ログに基づく
  * パーソナライズ (`getRecommendedArticles`) が効く。
+ *
+ * 取得は `?show=` 連動のサーバサイド範囲取得 (A4)。以前は `[0...60]` 固定で
+ * 全件を引き、絞り込み・並び替え・件数判定をすべてメモリ上で行っていたため、
+ * 61 件目以降は一覧からもカテゴリ導線からも到達不能だった (sitemap や直リンクでは
+ * 開けるので SEO には載るのに一覧に出ない「幽霊記事」になる)。
+ * 「もっと見る」を出すかどうかは取得した窓ではなく総件数 (count) で決める。
  */
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -50,6 +65,14 @@ const PAGE_SIZE = 6;
 
 /** サイドバー「人気の記事」の件数 (Figma 8073:45005 は 5 行)。 */
 const RAIL_SIZE = 5;
+
+/**
+ * おすすめ順のときにパーソナライズへ渡す候補の最小数。
+ * `getRecommendedArticles` は渡した集合を並べ替えるだけなので、候補が表示件数
+ * ぴったりだと「今表示中の 6 件を並べ替える」だけになり推薦にならない。
+ * 従来の固定 60 件取得と同じ広さを候補プールとして確保する。
+ */
+const RECOMMEND_POOL = 60;
 
 type SearchParams = { category?: string; sort?: string; show?: string };
 
@@ -124,65 +147,104 @@ async function JournalContent({ params }: { params: SearchParams }) {
   const tCommon = await getTranslations("common");
   const tl = await getTranslations("catalog");
 
-  let rawArticles: ArticleItem[];
-  let rawCategories: { _id: string; title: string; slug: { current: string } }[];
+  const client = getClient();
+  const sort = params.sort === "oldest" || params.sort === "newest" ? params.sort : "recommended";
+  const show = Math.max(PAGE_SIZE, Number(params.show) || PAGE_SIZE);
+
+  // 1) チップ (カテゴリ) は記事の取得窓ではなく Sanity 側の件数で決める。
+  //    以前は「取得した 60 件に現れたカテゴリ」だけを出していたため、61 件目
+  //    以降にしか記事が無いカテゴリはチップごと消えていた。
+  let rawCategories: { _id: string; title: string; slug: { current: string }; count: number }[];
   try {
-    const client = getClient();
-    [rawCategories, rawArticles] = await Promise.all([
-      client.fetch(CATEGORIES_QUERY),
-      client.fetch(ARTICLES_QUERY, { language: locale, start: 0, end: 60 }),
+    rawCategories = await client.fetch(CATEGORIES_WITH_COUNTS_QUERY, { language: locale });
+  } catch {
+    return <p className={"mt-8 text-sm text-muted-foreground lg:mt-12"}>{t("loadError")}</p>;
+  }
+
+  // Sanity は ja/en で同名カテゴリが並ぶことがあるので slug で重複を落とす。
+  const seen = new Set<string>();
+  const categories = (rawCategories ?? [])
+    .filter((cat) => {
+      const key = cat.slug?.current;
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .filter((cat) => cat.count > 0);
+
+  const chips = [
+    { value: "all", label: tl("all") },
+    ...categories.map((c) => ({ value: c.slug.current, label: c.title })),
+  ];
+  const activeCategory =
+    params.category && categories.some((c) => c.slug.current === params.category)
+      ? params.category
+      : "all";
+
+  // 2) 特集枠は「編集判断で指定」(Figma 8073:44991)。Sanity の featured フラグを
+  //    唯一の根拠にし、無ければ最新記事を充てる。絞り込み中は出さない
+  //    (絞り込み結果と特集が食い違うため)。特集は一覧の窓の外にあり得るので
+  //    専用クエリで引く。
+  const showsFeatured = activeCategory === "all";
+
+  // 一覧から特集 1 件を抜くぶん、窓を 1 件多く取る。
+  const fetchEnd =
+    sort === "recommended"
+      ? Math.max(show + (showsFeatured ? 1 : 0), RECOMMEND_POOL)
+      : show + (showsFeatured ? 1 : 0);
+
+  const listQuery =
+    activeCategory === "all"
+      ? sort === "oldest"
+        ? ARTICLES_ASC_QUERY
+        : ARTICLES_QUERY
+      : sort === "oldest"
+        ? ARTICLES_BY_CATEGORY_ASC_QUERY
+        : ARTICLES_BY_CATEGORY_QUERY;
+
+  const listParams =
+    activeCategory === "all"
+      ? { language: locale, start: 0, end: fetchEnd }
+      : { language: locale, categorySlug: activeCategory, start: 0, end: fetchEnd };
+
+  let windowArticles: ArticleItem[];
+  let featuredArticles: ArticleItem[];
+  let newestArticles: ArticleItem[];
+  let total: number;
+  try {
+    [windowArticles, featuredArticles, newestArticles, total] = await Promise.all([
+      client.fetch(listQuery, listParams),
+      // 特集候補 (最大 4 件・新しい順)。ヒーローとサイドバーの並びに使う。
+      // 絞り込み中もサイドバーは全体の並びを出すので常に引く。
+      client.fetch(FEATURED_ARTICLES_QUERY, { language: locale }),
+      // サイドバー「人気の記事」の穴埋め用の最新記事。
+      client.fetch(ARTICLES_QUERY, { language: locale, start: 0, end: RAIL_SIZE }),
+      activeCategory === "all"
+        ? client.fetch(ARTICLES_COUNT_QUERY, { language: locale })
+        : client.fetch(ARTICLES_BY_CATEGORY_COUNT_QUERY, {
+            language: locale,
+            categorySlug: activeCategory,
+          }),
     ]);
   } catch {
     return <p className={"mt-8 text-sm text-muted-foreground lg:mt-12"}>{t("loadError")}</p>;
   }
 
-  const articles = rawArticles ?? [];
-  if (articles.length === 0) {
+  if ((total ?? 0) === 0) {
     return <p className="mt-8 text-sm text-muted-foreground lg:mt-12">{t("empty")}</p>;
   }
 
-  // Sanity は ja/en で同名カテゴリが並ぶことがあるので slug で重複を落とす。
-  const seen = new Set<string>();
-  const categories = (rawCategories ?? []).filter((cat) => {
-    const key = cat.slug?.current;
-    if (!key || seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
+  const featured = showsFeatured
+    ? ((featuredArticles ?? [])[0] ?? (newestArticles ?? [])[0])
+    : undefined;
 
-  const sort = params.sort === "oldest" || params.sort === "newest" ? params.sort : "recommended";
-
-  const categorySlugs = new Set(
-    articles.map((a) => a.category?.slug?.current).filter(Boolean) as string[]
-  );
-  const chips = [
-    { value: "all", label: tl("all") },
-    ...categories
-      .filter((c) => categorySlugs.has(c.slug.current))
-      .map((c) => ({ value: c.slug.current, label: c.title })),
-  ];
-  const activeCategory =
-    params.category && categorySlugs.has(params.category) ? params.category : "all";
-
-  // 特集枠は「編集判断で指定」(Figma 8073:44991)。Sanity の featured フラグを
-  // 唯一の根拠にし、無ければ最新記事を充てる。絞り込み中は出さない
-  // (絞り込み結果と特集が食い違うため)。
-  const featured =
-    activeCategory === "all"
-      ? (articles.find((a) => a.featured) ?? articles[0])
-      : undefined;
-
-  const pool = articles.filter((a) => a._id !== featured?._id);
-  const filtered =
-    activeCategory === "all"
-      ? pool
-      : pool.filter((a) => a.category?.slug?.current === activeCategory);
+  // 3) 一覧本体。特集に使った 1 件は一覧から落とす。
+  const filtered = (windowArticles ?? []).filter((a) => a._id !== featured?._id);
 
   // 並び替え。既定 (おすすめ順) のときだけパーソナライズを通す。
+  // 新着順・古い順は Sanity 側で並べてから切り出しているので、ここでは触らない。
   let ordered = filtered;
-  if (sort === "oldest") {
-    ordered = [...filtered].reverse();
-  } else if (sort === "recommended") {
+  if (sort === "recommended") {
     let customerId: string | null = null;
     try {
       const auth = await requireAuth();
@@ -193,9 +255,10 @@ async function JournalContent({ params }: { params: SearchParams }) {
     ordered = await getRecommendedArticles({ customerId, rawArticles: filtered });
   }
 
-  const show = Math.max(PAGE_SIZE, Number(params.show) || PAGE_SIZE);
   const visible = ordered.slice(0, show);
-  const remaining = ordered.length - visible.length;
+  // 残件は「取得した窓」ではなく総件数から出す。窓で判断すると窓の外の記事に
+  // 永久に到達できない (= 従来の 60 件上限)。
+  const remaining = Math.max(0, (total ?? 0) - (featured ? 1 : 0) - visible.length);
 
   const query = (extra: Record<string, string>) => {
     const usp = new URLSearchParams();
@@ -206,9 +269,15 @@ async function JournalContent({ params }: { params: SearchParams }) {
     return qs ? `/journal?${qs}` : "/journal";
   };
 
-  const railPopular = articles
-    .filter((a) => a.featured)
-    .concat(articles.filter((a) => !a.featured))
+  // サイドバーは「特集記事が先・残りは新しい順」(A10 の本来の人気順化は別スコープ)。
+  // 一覧の取得窓とは独立に引いているので、絞り込み中もサイト全体の並びを保つ。
+  const railSeen = new Set<string>();
+  const railPopular = [...(featuredArticles ?? []), ...(newestArticles ?? [])]
+    .filter((a) => {
+      if (!a?.slug?.current || railSeen.has(a._id)) return false;
+      railSeen.add(a._id);
+      return true;
+    })
     .slice(0, RAIL_SIZE)
     .map((a) => ({ label: a.title, href: `/journal/${a.slug.current}` }));
 

@@ -1,8 +1,12 @@
 import { groq } from "next-sanity";
 
 // Articles
-export const ARTICLES_QUERY = groq`
-  *[_type == "article" && language == $language] | order(publishedAt desc) [$start...$end] {
+/**
+ * 一覧カード 1 枚を描くのに必要なフィールド。
+ * 昇順・降順・カテゴリ絞り込みで同じ形を返すため 1 か所に置く
+ * (GROQ の `order()` は引数を取れないので、並び順ごとにクエリを分けている)。
+ */
+const ARTICLE_LIST_FIELDS = groq`
     _id,
     title,
     slug,
@@ -20,29 +24,43 @@ export const ARTICLES_QUERY = groq`
     category->{title, slug},
     tags[]->{_id, title, slug},
     author->{name, slug, image}
+`;
+
+export const ARTICLES_QUERY = groq`
+  *[_type == "article" && language == $language] | order(publishedAt desc) [$start...$end] {
+    ${ARTICLE_LIST_FIELDS}
+  }
+`;
+
+/** 古い順。`[...list].reverse()` はページングした窓の中しか反転できないため。 */
+export const ARTICLES_ASC_QUERY = groq`
+  *[_type == "article" && language == $language] | order(publishedAt asc) [$start...$end] {
+    ${ARTICLE_LIST_FIELDS}
   }
 `;
 
 export const ARTICLES_BY_CATEGORY_QUERY = groq`
   *[_type == "article" && language == $language && category->slug.current == $categorySlug] | order(publishedAt desc) [$start...$end] {
-    _id,
-    title,
-    slug,
-    excerpt,
-    thumbnail,
-    mainImage,
-    publishedAt,
-    memberOnly,
-    requiredTier,
-    featured,
-    orderNumber,
-    contentPersona,
-    depthLevel,
-    targetLayer,
-    category->{title, slug},
-    tags[]->{_id, title, slug},
-    author->{name, slug, image}
+    ${ARTICLE_LIST_FIELDS}
   }
+`;
+
+export const ARTICLES_BY_CATEGORY_ASC_QUERY = groq`
+  *[_type == "article" && language == $language && category->slug.current == $categorySlug] | order(publishedAt asc) [$start...$end] {
+    ${ARTICLE_LIST_FIELDS}
+  }
+`;
+
+/**
+ * 総件数。「もっと見る」を出すかどうかは取得した窓ではなく総数で決める
+ * (窓だけで判断すると、窓の外にある記事に永久に到達できなくなる)。
+ */
+export const ARTICLES_COUNT_QUERY = groq`
+  count(*[_type == "article" && language == $language])
+`;
+
+export const ARTICLES_BY_CATEGORY_COUNT_QUERY = groq`
+  count(*[_type == "article" && language == $language && category->slug.current == $categorySlug])
 `;
 
 export const FEATURED_ARTICLES_QUERY = groq`
