@@ -1,6 +1,6 @@
 import { Section } from "@/components/layout/container";
 import { ImageCard } from "@/components/ui/image-card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { SkeletonBar } from "@/components/ui/skeleton-bar";
 import { cn } from "@/lib/utils";
 
 import { JournalGrid, JournalLayout } from "./journal-list";
@@ -17,7 +17,44 @@ import { JournalGrid, JournalLayout } from "./journal-list";
  * レイアウトが入れ替わらないので、読み込み完了時に画面が飛ばない。
  */
 
-/** 一覧グリッドの骨組み。Figma の 2 列 x 3 段 = 6 枚に合わせる。 */
+/**
+ * ArticleCardSkeleton — Figma `ArticleCardSkeleton (Module)` 8173:254。
+ *
+ * ArticleCard (5483:15) と同じ寸法にして、読込完了時のレイアウトシフトを
+ * 起こさないことが目的。矩形はすべて SkeletonBar (Figma 8179:347) で、
+ * 手描きの矩形も金色の accent も使わない。
+ *
+ * Figma 実測 (394 幅カード) → 実装:
+ * - 写真 → 情報の gap 16      → `gap-4`
+ * - 写真 aspect 3/2 (394x263) → `ImageCard` (既定 3/2) + 面は mode/muted
+ * - 情報 5 行 / 行間 8        → `gap-2`
+ *   14x96 / 18x394 (全幅) / 14x394 (全幅) / 14x280 / 12x160
+ *   → h-3.5 w-24 / h-4.5 w-full / h-3.5 w-full / h-3.5 w-[71%] / h-3 w-2/5
+ */
+export function ArticleCardSkeleton({ className }: { className?: string }) {
+  return (
+    <div
+      data-slot="article-card-skeleton"
+      aria-hidden="true"
+      className={cn("flex flex-col gap-4", className)}
+    >
+      {/* ImageCard の既定面は muted。placeholder として空のまま置く。 */}
+      <ImageCard className="animate-pulse" />
+      <div className="flex flex-col gap-2">
+        <SkeletonBar className="h-3.5 w-24" />
+        <SkeletonBar className="h-4.5 w-full" />
+        <SkeletonBar className="h-3.5 w-full" />
+        <SkeletonBar className="h-3.5 w-[71%]" />
+        <SkeletonBar className="h-3 w-2/5" />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * 一覧グリッドの骨組み。Figma の注記「表示は 6 枚を上限とし、それ以上は出さない」
+ * に従う (待ち時間の見た目を実際の件数より豪華にしない)。
+ */
 export function JournalGridSkeleton({
   count = 6,
   className,
@@ -27,15 +64,8 @@ export function JournalGridSkeleton({
 }) {
   return (
     <JournalGrid className={className} aria-hidden="true">
-      {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className="flex animate-pulse flex-col gap-4">
-          <ImageCard />
-          <div className="space-y-1.5">
-            <Skeleton className="h-3 w-16" />
-            <Skeleton className="h-4 w-3/4" />
-            <Skeleton className="h-3 w-full" />
-          </div>
-        </div>
+      {Array.from({ length: Math.min(count, 6) }).map((_, i) => (
+        <ArticleCardSkeleton key={i} />
       ))}
     </JournalGrid>
   );
@@ -45,9 +75,9 @@ export function JournalGridSkeleton({
 function PageHeadSkeleton() {
   return (
     <div className="flex animate-pulse flex-col gap-3" aria-hidden="true">
-      <Skeleton className="h-3 w-24" />
-      <Skeleton className="h-10 w-2/3" />
-      <Skeleton className="h-3 w-full max-w-160" />
+      <SkeletonBar className="h-3 w-24" />
+      <SkeletonBar className="h-10 w-2/3" />
+      <SkeletonBar className="h-3 w-full max-w-160" />
     </div>
   );
 }
@@ -59,10 +89,10 @@ function RailSkeleton() {
       className="order-3 mt-8 animate-pulse px-4 lg:col-start-2 lg:row-start-1 lg:mt-0 lg:w-86"
       aria-hidden="true"
     >
-      <Skeleton className="h-3 w-20" />
+      <SkeletonBar className="h-3 w-20" />
       <div className="mt-2 space-y-3">
         {Array.from({ length: 5 }).map((_, i) => (
-          <Skeleton key={i} className="h-4 w-full" />
+          <SkeletonBar key={i} className="h-4 w-full" />
         ))}
       </div>
     </aside>
@@ -109,11 +139,11 @@ export function ArticlePageSkeleton({ loadingLabel }: { loadingLabel: string }) 
         <span role="status" aria-live="polite" className="sr-only">
           {loadingLabel}
         </span>
-        <Skeleton className="h-3 w-48" aria-hidden="true" />
+        <SkeletonBar className="h-3 w-48" />
         <div className="mt-6 space-y-4" aria-hidden="true">
-          <Skeleton className="h-3 w-20" />
-          <Skeleton className="h-10 w-full" />
-          <Skeleton className="h-4 w-40" />
+          <SkeletonBar className="h-3 w-20" />
+          <SkeletonBar className="h-10 w-full" />
+          <SkeletonBar className="h-4 w-40" />
         </div>
         <div className="mt-6 -mx-4 lg:-mx-10" aria-hidden="true">
           <ImageCard
@@ -123,7 +153,7 @@ export function ArticlePageSkeleton({ loadingLabel }: { loadingLabel: string }) 
         </div>
         <div className="mt-6 space-y-3" aria-hidden="true">
           {Array.from({ length: 8 }).map((_, i) => (
-            <Skeleton key={i} className={cn("h-4", i % 4 === 3 ? "w-2/3" : "w-full")} />
+            <SkeletonBar key={i} className={cn("h-4", i % 4 === 3 ? "w-2/3" : "w-full")} />
           ))}
         </div>
       </div>

@@ -173,6 +173,14 @@ h1.contact-title {
   letter-spacing: var(--typography-style-h4-tracking);
 }
 
+/* 空状態の見出し (Figma EmptyState 8173:298) は h4 プリセット (16px / 500)。
+ * 文書構造としては見出しではなく本文なので要素は p のままにし、体裁だけ揃える。 */
+:lang(ja) p[data-slot="empty-state-title"],
+:lang(en) p[data-slot="empty-state-title"] {
+  font: var(--typography-style-h4);
+  letter-spacing: var(--typography-style-h4-tracking);
+}
+
 /* ページ内モーダルの見出し (Figma Modal 8172:280)。SP は h4 (16px / 500)、
  * PC は h3 (20px / 400) と Figma でサイズが切り替わるので、単純縮小ではなく
  * ブレークポイントで組み替える。Radix の DialogTitle は h2 を描画するため

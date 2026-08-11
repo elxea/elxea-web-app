@@ -9,7 +9,10 @@ import {
   ARTICLES_BY_CATEGORY_QUERY,
   CATEGORIES_WITH_COUNTS_QUERY,
 } from "@/sanity/lib/queries";
+import { Link } from "@/i18n/navigation";
 import { Breadcrumb } from "@/components/seo/breadcrumb";
+import { EmptyState } from "@/components/ui/empty-state";
+import { pillClass } from "@/components/ui/pill-button";
 import { Section } from "@/components/layout/container";
 import { CatalogToolbar } from "@/components/catalog/catalog-toolbar";
 import { ListPageHead, MoreRow } from "@/components/catalog/catalog-list";
@@ -213,7 +216,21 @@ export default async function CategoryPage({
 
       <JournalLayout className="mt-8 lg:mt-12">
         {visible.length === 0 ? (
-          <p className="order-1 text-sm text-muted-foreground">{t("empty")}</p>
+          <div className="order-1">
+            {/* 絞り込みの結果として 0 件。障害 (loadError) とは必ず出し分ける
+                — こちらは再試行ではなく絞り込みの解除を促す
+                (Figma EmptyState 8173:298 の注記)。 */}
+            <EmptyState
+              count={t("emptyFilteredCount")}
+              title={t("emptyFilteredTitle")}
+              body={t("emptyFilteredBody")}
+              action={
+                <Link href="/journal" className={pillClass("outline")}>
+                  {t("emptyFilteredAction")}
+                </Link>
+              }
+            />
+          </div>
         ) : (
           <JournalGrid>
             {visible.map((article) => (
