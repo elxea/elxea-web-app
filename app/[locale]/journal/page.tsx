@@ -29,6 +29,7 @@ import { urlFor } from "@/sanity/lib/image";
 import { previewSeedEnabled, previewImageForKey } from "@/lib/preview-seed";
 import { requireAuth } from "@/lib/firebase/auth-guard";
 import { getRecommendedArticles } from "@/lib/recommendations/content-engine";
+import { getPopularArticles, orderByPopularity } from "@/lib/journal/popular-articles";
 
 /**
  * ジャーナル一覧 — Figma【R2: 確定版】共通リストパターン整合 + 特集枠 +
@@ -189,6 +190,10 @@ async function JournalContent({ params }: { params: SearchParams }) {
       ? { language: locale, start: 0, end: fetchEnd }
       : { language: locale, categorySlug: activeCategory, start: 0, end: fetchEnd };
 
+  // 人気の記事は全ユーザー共通の集計なので、記事の取得と並べて引く
+  // (失敗しても空配列が返るだけで一覧の描画は止まらない)。
+  const popularArticlesPromise = getPopularArticles(RAIL_SIZE);
+
   let windowArticles: ArticleItem[];
   let featuredArticles: ArticleItem[];
   let newestArticles: ArticleItem[];
@@ -215,6 +220,8 @@ async function JournalContent({ params }: { params: SearchParams }) {
   if ((total ?? 0) === 0) {
     return <p className="mt-8 text-sm text-muted-foreground lg:mt-12">{t("empty")}</p>;
   }
+
+  const popularArticles = await popularArticlesPromise;
 
   // A7: 記事が 1 件しかないときに特集へ吸い上げると、一覧グリッドが空になり
   // 「記事がありません」が出ていた (実際には 1 件あるのに)。総件数が 1 なら
@@ -255,15 +262,17 @@ async function JournalContent({ params }: { params: SearchParams }) {
     return qs ? `/journal?${qs}` : "/journal";
   };
 
-  // サイドバーは「特集記事が先・残りは新しい順」(A10 の本来の人気順化は別スコープ)。
+  // サイドバー「人気の記事」(A10)。行動ログ (Firestore) の閲覧数を集計して
+  // 実際に読まれた順に並べる。実データが薄い / 取得できないときは従来どおり
+  // 「特集記事が先・残りは新しい順」に倒す (getPopularArticles は投げない)。
   // 一覧の取得窓とは独立に引いているので、絞り込み中もサイト全体の並びを保つ。
   const railSeen = new Set<string>();
-  const railPopular = [...(featuredArticles ?? []), ...(newestArticles ?? [])]
-    .filter((a) => {
-      if (!a?.slug?.current || railSeen.has(a._id)) return false;
-      railSeen.add(a._id);
-      return true;
-    })
+  const railCandidates = [...(featuredArticles ?? []), ...(newestArticles ?? [])].filter((a) => {
+    if (!a?.slug?.current || railSeen.has(a._id)) return false;
+    railSeen.add(a._id);
+    return true;
+  });
+  const railPopular = orderByPopularity(railCandidates, popularArticles)
     .slice(0, RAIL_SIZE)
     .map((a) => ({ label: a.title, href: `/journal/${a.slug.current}` }));
 
