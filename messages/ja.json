@@ -106,7 +106,12 @@
     "placeholder": "お茶やキーワードで探す",
     "noResults": "「{q}」に合うお茶は見つかりませんでした。別のキーワードでお試しください。",
     "results": "{count} 件のお茶が見つかりました",
-    "loadError": "うまく検索できませんでした。時間をおいて、もう一度お試しください。"
+    "loadError": "うまく検索できませんでした。時間をおいて、もう一度お試しください。",
+    "productsHeading": "お茶",
+    "articlesHeading": "記事",
+    "articleResults": "{count} 件の記事が見つかりました",
+    "browseJournal": "ジャーナルの記事一覧を見る",
+    "partialLoadError": "一部の検索結果を読み込めませんでした。時間をおいて、もう一度お試しください。"
   },
   "journal": {
     "title": "ジャーナル",
