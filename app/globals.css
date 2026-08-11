@@ -208,6 +208,24 @@ h1.auth-card-title[data-emphasis="strong"] {
   letter-spacing: var(--typography-style-h4-tracking);
 }
 
+/* ページ内モーダルの見出し (Figma Modal 8172:280)。SP は h4 (16px / 500)、
+ * PC は h3 (20px / 400) と Figma でサイズが切り替わるので、単純縮小ではなく
+ * ブレークポイントで組み替える。Radix の DialogTitle は h2 を描画するため
+ * セレクタは h2。Unlayered な理由・`:lang()` 前置の理由は catalog-card-title と
+ * 同じ (globals.css の素の `h2 { font: … }` に Tailwind utilities が勝てない)。 */
+:lang(ja) h2[data-slot="modal-title"],
+:lang(en) h2[data-slot="modal-title"] {
+  font: var(--typography-style-h4);
+  letter-spacing: var(--typography-style-h4-tracking);
+}
+@media (min-width: 64rem) {
+  :lang(ja) h2[data-slot="modal-title"],
+  :lang(en) h2[data-slot="modal-title"] {
+    font: var(--typography-style-h3);
+    letter-spacing: var(--typography-style-h3-tracking);
+  }
+}
+
 /* R2 ジャーナル一覧の ArticleCard (8073:45001) は見出し行高 21 = body-sm
  * (14px / 1.5) プリセット。体裁だけ body-sm に揃える。Unlayered な理由・
  * `:lang()` 前置の理由は上の catalog-card-title と同じ。値は body-sm トークン
@@ -512,6 +530,36 @@ dl[data-slot="spec-band"][data-emphasis="true"] > [data-slot="spec-item"] > dd {
   --overlay-foreground-muted: oklch(0.75 0.01 60);
   --overlay-border: oklch(1 0.02 60 / 0.4);
 
+  /* ページ内モーダルのスクリム — Figma `mode/overlay-scrim` (Modal Module
+   * 8172:280 の注記「スクリムを全面に敷き、クリックで閉じる」)。
+   * 上の `--overlay` (ヒーロー写真に敷く黒 15%) とは用途が別なので混ぜない。
+   * 値は brand graphite の 62%。生の rgba を書かず既存トークンから混色するので、
+   * graphite が動けばスクリムも一緒に動く (単一正本)。 */
+  --overlay-scrim: color-mix(in oklab, var(--color-brand-graphite) 62%, transparent);
+
+  /* 押下 (active) 面 — Figma `color/state/graphite-pressed` (#35363a
+   * = oklch(0.333 0.007 274.8))。Pill solid の active だけに使う。
+   * graphite (#464748) より 1 段暗く、hover の charcoal (#5d5e61) と合わせて
+   * 「明るく浮く → 暗く沈む」の押し込み方向を作る。ブランドランプ外の状態専用色
+   * なので brand-* には入れない。 */
+  --graphite-pressed: oklch(0.333 0.007 274.8);
+
+  /* 名前付き z レイヤー。SoT は `tokens/elxea-custom.json` の `z-index`
+   * (sticky 1020 / fixed 1030 / overlay 1040 / modal 1050)。Style Dictionary の
+   * source は `tokens/base.json` だけなのでこのグループは dist/tokens.css に
+   * 出てこない。ここは SoT の写しであって値を決める場所ではない
+   * (`--page-margin` が layout.grid.margin の写しなのと同じ扱い)。 */
+  --z-sticky: 1020;
+  --z-overlay: 1040;
+  --z-modal: 1050;
+
+  /* ページ内モーダルの影 — Figma Modal 8172:280 実測
+   * `0px 12px 40px 0px rgba(69,71,71,0.18)`。#454747 は graphite (#464748) の
+   * 実質同値なので、色はトークンから混色して作る (生 rgba を残さない)。
+   * dist/tokens.css の elevation.shadow.* は汎用 5 段で、モーダル専用のこの
+   * 深さを持たないため独立させる。 */
+  --elevation-shadow-modal: 0 12px 40px 0 color-mix(in oklab, var(--color-brand-graphite) 18%, transparent);
+
   --sidebar: hsl(0 0% 98%);
   --sidebar-foreground: hsl(240 5.3% 26.1%);
   --sidebar-primary: hsl(240 5.9% 10%);
@@ -536,6 +584,8 @@ dl[data-slot="spec-band"][data-emphasis="true"] > [data-slot="spec-item"] > dd {
 @theme inline {
   --color-brand-line: var(--brand-line);
   --color-overlay: var(--overlay);
+  --color-overlay-scrim: var(--overlay-scrim);
+  --color-graphite-pressed: var(--graphite-pressed);
   --color-overlay-foreground: var(--overlay-foreground);
   --color-overlay-foreground-muted: var(--overlay-foreground-muted);
   --color-overlay-border: var(--overlay-border);
