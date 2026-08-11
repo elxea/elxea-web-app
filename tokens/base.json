@@ -43,8 +43,8 @@
         "$description": "gray-120 (#464748) — graphite。Figma `foreground` と同値なので値は据え置き。sand 面上のコントラストは 6.17:1 で WCAG AA Normal (4.5:1) 通過 — gold 時代の 5.75:1 より改善する。"
       },
       "muted": {
-        "$value": "oklch(0.933 0.012 96.4)",
-        "$description": "gray-20 (#ebe9e0) — muted surface"
+        "$value": "oklch(0.893 0.018 99.0)",
+        "$description": "#dedccf — cream と sand の中間。Figma `mode/muted` の実測値 (file AWLnI0XF07e8rScuxPYPc7 / node 8171:286 Button・Pill Module を get_variable_defs = #dedccf)。2026-08-11 に cream #ebe9e0 から是正。旧値は `background` と完全同値でコントラスト 1.0000:1 となり、cream 背景の上で `hover:bg-muted` / `disabled:bg-muted` が一切見えなかった (Wave 6 で B2 SoundCloud リンク hover 不可視の真因と特定)。原則 Figma 準拠。是正後 background とのコントラストは 1.1325:1 で面の差が視認でき、muted-foreground (#585854) を載せたときは 5.19:1 で WCAG AA Normal (4.5:1) を通過する。tokens/elxea-custom.json の color.light.muted と完全一致。"
       },
       "muted-foreground": {
         "$value": "oklch(0.460 0.006 106.6)",
