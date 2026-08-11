@@ -178,7 +178,10 @@
     "emptyFilteredCount": "該当 0 件",
     "emptyFilteredTitle": "この絞り込みに合う読みものはまだありません",
     "emptyFilteredBody": "別のカテゴリを選ぶか、絞り込みを解除するとすべての読みものが表示されます。",
-    "emptyFilteredAction": "絞り込みを解除する"
+    "emptyFilteredAction": "絞り込みを解除する",
+    "bookmarkSaved": "保存済み",
+    "bookmarkSaving": "保存中…",
+    "bookmarkLoginToSave": "ログインして保存"
   },
   "teaMenu": {
     "title": "お茶メニュー",

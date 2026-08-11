@@ -96,12 +96,26 @@ export function CatalogToolbar({
       >
         {chips.map((chip) => {
           const selected = chip.value === current;
+          // 状態は Figma `Chip / Category (Module)` 8171:269 の 6 バリアント
+          // (default / hover / focus / selected / selected-hover / disabled) に
+          // 揃える。Figma に無い状態は足さない (unselected の active は Chip に
+          // 定義が無いので作らない)。
+          //
+          // 意図的な Figma 差分: 角丸。Chip Module は radius-lg (8px) だが、
+          // このツールバーの正本は R2 確定版の共通リストパターン Toolbar
+          // (8061:1789) で全丸めであり、商品一覧・お茶メニューも同じ部品を
+          // 共有している。Figma 側に 2 つの正本が併存している状態なので、
+          // ここでは形は既存 (全丸め) のまま「状態だけ」を Chip Module へ寄せる。
+          // 形の統一は Chip Module の注記どおり Figma 側の次回改訂で決める。
           const chipClass = cn(
             bodySmClass,
             "flex h-11 shrink-0 items-center rounded-full px-3 py-3 whitespace-nowrap lg:px-4 lg:py-2",
+            "transition-colors duration-200",
+            "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none",
             selected
-              ? "bg-primary text-primary-foreground"
-              : "border border-border text-foreground hover:bg-muted"
+              ? "bg-primary text-primary-foreground hover:bg-brand-charcoal"
+              : "border border-border text-foreground hover:bg-secondary",
+            "aria-disabled:pointer-events-none aria-disabled:text-muted-foreground aria-disabled:opacity-50"
           );
 
           if (chip.href) {
@@ -145,7 +159,10 @@ export function CatalogToolbar({
             aria-label={sortLabel}
             value={activeSort ?? sortOptions[0]?.value}
             onChange={(event) => router.push(hrefWith("sort", event.target.value))}
-            className="h-11 w-45 rounded-full"
+            // Select は Figma に状態バリアントが無い。Chip と同じ列に並ぶ操作系
+            // なので、Chip の hover (mode/secondary) と揃えて「触れる要素」だと
+            // 分かるようにする。focus は NativeSelect 本体が既に持つ。
+            className="h-11 w-45 rounded-full transition-colors duration-200 hover:bg-secondary"
           >
             {sortOptions.map((option) => (
               <NativeSelectOption key={option.value} value={option.value}>

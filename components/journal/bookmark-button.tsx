@@ -50,8 +50,10 @@ type BookmarkButtonProps = {
   articleImageUrl: string | null;
   /** Label text for screen readers */
   addLabel: string;
-  /** Label text when already bookmarked */
+  /** Label text when already bookmarked (押すと外す、という動作の説明。title に出す) */
   removeLabel: string;
+  /** 保存済みのときに画面に出す状態ラベル (Figma 8171:299 active = 「保存済み」) */
+  savedLabel: string;
   /** Label while the current bookmark state is being fetched */
   loadingLabel: string;
   /** Label shown to signed-out visitors */
@@ -86,6 +88,7 @@ export function BookmarkButton({
   articleImageUrl,
   addLabel,
   removeLabel,
+  savedLabel,
   loadingLabel,
   loginRequiredLabel,
   statusUnknownLabel,
@@ -220,54 +223,79 @@ export function BookmarkButton({
   const isResolving = authState === "unknown" || checkState === "checking";
   const isUnknown = checkState === "error";
 
-  const label = isResolving
-    ? loadingLabel
+  /**
+   * Figma `BookmarkButton (Module)` 8171:299 の 4 状態へ写す。
+   *
+   * Figma は default / active / loading / logged-out の 4 つ。Wave 2 で足した
+   * `unknown` (登録状態の取得に失敗) は Figma に無いが、これを消すと
+   * 「取得できていないのに未登録の顔をする」= A5 で直した不具合に戻るため残す。
+   * 見た目は destructive の罫線で 4 状態のどれとも取り違えないようにする
+   * (DS 側は次回改訂で 5 つ目の状態として取り込むこと)。
+   *
+   * ラベルは Figma の文言をそのまま出す。Figma の注記どおり「アイコンは
+   * aria-hidden、状態はラベル文字列で読み上げる」ので、見えている文字列が
+   * そのままアクセシブル名になる (aria-label で別の文字列を被せない)。
+   */
+  const visual = isResolving
+    ? "loading"
     : isUnknown
-      ? statusUnknownLabel
+      ? "unknown"
       : authState === "anonymous"
-        ? loginRequiredLabel
+        ? "logged-out"
         : isBookmarked
-          ? removeLabel
-          : addLabel;
+          ? "active"
+          : "default";
+
+  const label =
+    visual === "loading"
+      ? loadingLabel
+      : visual === "unknown"
+        ? statusUnknownLabel
+        : visual === "logged-out"
+          ? loginRequiredLabel
+          : visual === "active"
+            ? savedLabel
+            : addLabel;
 
   return (
     <Button
       variant="ghost"
-      size="icon"
       onClick={toggleBookmark}
       // 解決中だけ無効化する。未ログインは「押すと理由が出る」ほうが伝わるので
       // 無効化しない (無効なボタンは理由を伝えられない)。
       disabled={isResolving}
       aria-busy={isResolving || isPending}
-      aria-label={label}
-      title={label}
       // 状態不明のときは pressed を騙らない (未登録と断定できないため)。
       aria-pressed={isUnknown ? undefined : isBookmarked}
-      data-state={isResolving ? "loading" : isUnknown ? "unknown" : authState}
-      className={cn("transition-colors duration-200", className)}
-    >
-      {isResolving ? (
-        // 読み込み中はスケルトン (skeleton プリミティブと同じ見え方)。
-        <span
-          data-slot="bookmark-skeleton"
-          aria-hidden="true"
-          className="size-5 animate-pulse rounded-md bg-accent"
-        />
-      ) : (
-        <Bookmark
-          aria-hidden="true"
-          className={cn(
-            "size-5 transition-colors duration-200",
-            isUnknown
-              ? "fill-none text-destructive"
-              : authState === "anonymous"
-                ? "fill-none text-muted-foreground/60"
-                : isBookmarked
-                  ? "fill-foreground text-foreground"
-                  : "fill-none text-muted-foreground"
-          )}
-        />
+      title={visual === "active" ? removeLabel : label}
+      data-state={visual}
+      className={cn(
+        // Figma 実測: 高さ 44 (タップ最小域) / padding 16x12 / gap 8 /
+        // 角丸 radius-md / 1px 罫線 / 文字 body-sm。
+        "h-11 gap-2 rounded-md border px-4 py-3 text-sm font-normal",
+        "transition-colors duration-200",
+        // 4 状態 (+ unknown) の面と罫線。
+        visual === "active"
+          ? "border-foreground bg-secondary text-foreground hover:bg-secondary"
+          : visual === "loading"
+            ? "border-border bg-card text-muted-foreground opacity-70"
+            : visual === "logged-out"
+              ? "border-input bg-card text-muted-foreground hover:bg-muted"
+              : visual === "unknown"
+                ? "border-destructive bg-card text-destructive hover:bg-muted"
+                : "border-border bg-card text-foreground hover:bg-muted",
+        className
       )}
+    >
+      <Bookmark
+        aria-hidden="true"
+        className={cn(
+          "size-4 shrink-0 transition-colors duration-200",
+          visual === "active" ? "fill-current" : "fill-none",
+          visual === "loading" && "animate-pulse"
+        )}
+      />
+      {label}
     </Button>
   );
 }

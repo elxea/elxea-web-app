@@ -178,7 +178,10 @@
     "emptyFilteredCount": "0 results",
     "emptyFilteredTitle": "No readings match this filter yet",
     "emptyFilteredBody": "Choose another category, or clear the filter to see every reading.",
-    "emptyFilteredAction": "Clear the filter"
+    "emptyFilteredAction": "Clear the filter",
+    "bookmarkSaved": "Saved",
+    "bookmarkSaving": "Saving…",
+    "bookmarkLoginToSave": "Log in to save"
   },
   "teaMenu": {
     "title": "Tea Menu",

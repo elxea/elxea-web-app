@@ -15,6 +15,7 @@ import { Breadcrumb } from "@/components/seo/breadcrumb";
 import { PortableText } from "@/components/sanity/portable-text";
 import { ImageCard } from "@/components/ui/image-card";
 import { MemberGate } from "@/components/ui/member-gate";
+import { pillClass } from "@/components/ui/pill-button";
 import {
   bodySmClass,
   captionClass,
@@ -210,8 +211,9 @@ export default async function ArticlePage({
                 }
                 addLabel={t("addToBookmarks")}
                 removeLabel={t("removeFromBookmarks")}
-                loadingLabel={t("bookmarkLoading")}
-                loginRequiredLabel={t("bookmarkLoginRequired")}
+                savedLabel={t("bookmarkSaved")}
+                loadingLabel={t("bookmarkSaving")}
+                loginRequiredLabel={t("bookmarkLoginToSave")}
                 statusUnknownLabel={t("bookmarkStatusUnknown")}
                 addedMessage={t("addedToBookmarks")}
                 removedMessage={t("removedFromBookmarks")}
@@ -393,12 +395,10 @@ export default async function ArticlePage({
               {/* NextRead — 行き止まりを作らない (カテゴリ回遊) */}
               {article.category?.slug?.current && (
                 <div className="mt-6 flex justify-center">
+                  {/* 手組みの pill を DS 部品 (Figma 8171:286) へ寄せる。 */}
                   <Link
                     href={`/journal?category=${article.category.slug.current}`}
-                    className={cn(
-                      bodySmClass,
-                      "flex h-12 items-center rounded-full border border-border px-4 text-foreground transition-colors hover:bg-muted"
-                    )}
+                    className={pillClass("outline")}
                   >
                     {t("moreInCategory", { name: article.category.title })}
                   </Link>
