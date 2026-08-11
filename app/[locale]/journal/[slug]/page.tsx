@@ -22,6 +22,10 @@ import {
 } from "@/components/editorial/rule-list";
 import { AuthorByline } from "@/components/journal/author-byline";
 import { AuthorProfile } from "@/components/journal/author-profile";
+import {
+  RelatedReadingsSection,
+  TeaDetailSection,
+} from "@/components/journal/article-modal-sections";
 import { BookmarkButton } from "@/components/journal/bookmark-button";
 import { ArticleReadTracker } from "@/components/journal/article-read-tracker";
 import { ReadingProgress } from "@/components/journal/reading-progress";
@@ -307,83 +311,84 @@ export default async function ArticlePage({
                 </div>
               )}
 
-              {/* この記事に出てきた茶葉 (商品連動のある記事のみ) */}
-              {relatedProducts.length > 0 && (
-                <section className="mt-6">
-                  <p className={cn(captionClass, "text-muted-foreground")}>{t("teaInArticle")}</p>
-                  <ul className="mt-4 space-y-4">
-                    {relatedProducts.map((product) => (
-                      <li key={product.id} className="flex gap-4 lg:gap-6">
-                        <div className="w-24 shrink-0 lg:w-40">
-                          <ImageCard
-                            image={product.featuredImage?.url}
-                            alt={product.featuredImage?.altText ?? product.title}
-                            style={{ aspectRatio: "1/1" }}
-                          />
-                        </div>
-                        <div className="flex flex-col justify-center gap-2">
-                          <p className="text-foreground">{product.title}</p>
-                          {product.productType ? (
-                            <p className={cn(captionClass, "hidden text-muted-foreground lg:block")}>
-                              {product.productType}
-                            </p>
-                          ) : null}
-                          <Link
-                            href={`/products/${product.handle}`}
-                            className={cn(
-                              bodySmClass,
-                              "flex h-12 items-center text-foreground underline-offset-4 hover:underline"
-                            )}
-                          >
-                            {t("toProduct")}
-                          </Link>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                </section>
-              )}
+              {/* この記事に出てきた茶葉 (商品連動のある記事のみ)。
+                  行を押すとページを離れずに茶葉詳細モーダルが開く
+                  (Figma Modal 8172:280 + 中身スロット 8184:365)。
+                  スペックと「さらに潜る」本文は Shopify のメタフィールドに
+                  実在する項目だけを渡す — 無い項目は行ごと出さない。 */}
+              <TeaDetailSection
+                heading={t("teaInArticle")}
+                labels={{
+                  kicker: t("teaInArticle"),
+                  close: t("close"),
+                  toProduct: t("toProduct"),
+                }}
+                teas={relatedProducts.map((product) => ({
+                  id: product.id,
+                  title: product.title,
+                  href: `/products/${product.handle}`,
+                  imageUrl: product.featuredImage?.url,
+                  meta: product.productType || undefined,
+                  description: product.description || undefined,
+                  spec: [
+                    { label: t("teaSpecNo"), value: product.metafields?.menuNumber },
+                    {
+                      label: t("teaSpecCategory"),
+                      value: product.metafields?.teaCategory || product.productType,
+                    },
+                    { label: t("teaSpecName"), value: product.title },
+                    { label: t("teaSpecVariety"), value: product.metafields?.variety },
+                    { label: t("teaSpecSeason"), value: product.metafields?.season },
+                  ].filter((row): row is { label: string; value: string } =>
+                    Boolean(row.value)
+                  ),
+                  details: [
+                    {
+                      id: "how-to-enjoy",
+                      label: t("teaDetailHowToEnjoy"),
+                      body: product.metafields?.howToEnjoy,
+                    },
+                    {
+                      id: "taste",
+                      label: t("teaDetailTaste"),
+                      body: [product.metafields?.taste, product.metafields?.aroma]
+                        .filter(Boolean)
+                        .join(" / "),
+                    },
+                  ].filter(
+                    (row): row is { id: string; label: string; body: string } =>
+                      Boolean(row.body)
+                  ),
+                }))}
+              />
 
               {/* 著者プロフィール */}
               {author && <AuthorProfile author={author} writtenByLabel={t("writtenBy")} />}
 
-              {/* 関連記事 — 記事末尾カード型 (行 72 / サムネ 56) */}
-              {relatedArticles.length > 0 && (
-                <section className="mt-6">
-                  <p className={cn(captionClass, "text-muted-foreground")}>
-                    {t("relatedArticles")}
-                  </p>
-                  <ul className="mt-2">
-                    {relatedArticles.slice(0, 3).map((related) => {
-                      const image = related.thumbnail ?? related.mainImage;
-                      return (
-                        <li key={related._id}>
-                          <Link
-                            href={`/journal/${related.slug.current}`}
-                            className="flex h-18 items-center gap-4"
-                          >
-                            <div className="size-14 shrink-0">
-                              <ImageCard
-                                image={image?.asset ? urlFor(image).width(112).height(112).url() : undefined}
-                                alt={related.title}
-                                style={{ aspectRatio: "1/1" }}
-                              />
-                            </div>
-                            <span
-                              className={cn(
-                                bodySmClass,
-                                "text-foreground underline-offset-4 hover:underline"
-                              )}
-                            >
-                              {related.title}
-                            </span>
-                          </Link>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </section>
-              )}
+              {/* この号のほかの読みもの — 行 72 / サムネ 56 (Figma 8175:364)。
+                  行を押すと即遷移せずモーダルが開き、フッターの主導線で初めて
+                  記事へ移動する。モーダルの中では対象を乗り換えられるので、
+                  「関連記事を開く → 戻る → 読了位置を失う」が起きない。 */}
+              <RelatedReadingsSection
+                heading={t("otherReadings")}
+                labels={{
+                  kicker: t("otherReadings"),
+                  close: t("close"),
+                  open: t("openThisReading"),
+                  onlyOne: t("onlyOneReading"),
+                }}
+                readings={relatedArticles.slice(0, 3).map((related) => {
+                  const image = related.thumbnail ?? related.mainImage;
+                  return {
+                    id: related._id,
+                    title: related.title,
+                    href: `/journal/${related.slug.current}`,
+                    imageUrl: image?.asset
+                      ? urlFor(image).width(112).height(112).url()
+                      : undefined,
+                  };
+                })}
+              />
 
               {/* NextRead — 行き止まりを作らない (カテゴリ回遊) */}
               {article.category?.slug?.current && (
