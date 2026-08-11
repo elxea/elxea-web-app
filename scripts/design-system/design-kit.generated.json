@@ -133,7 +133,7 @@
           "hex_note": "#5d5e61 charcoal / gray-100"
         },
         "card": {
-          "value": "oklch(0.863 0.026 102.0)",
+          "value": "oklch(0.963 0.008 98.9)",
           "css_var": "--color-card",
           "hex_note": "#d5d3c0 sand / gray-40"
         },
@@ -160,7 +160,7 @@
           "hex_note": "#ffffff"
         },
         "secondary": {
-          "value": "oklch(0.846 0.173 85.6)",
+          "value": "oklch(0.863 0.026 102.0)",
           "css_var": "--color-secondary",
           "hex_note": "#ffc200 gold",
           "warning": "コードでは secondary = gold。elxea-custom.json では secondary = sand。意味が反転している。conflicts[c-02] 参照。"
@@ -170,7 +170,7 @@
           "css_var": "--color-secondary-foreground"
         },
         "muted": {
-          "value": "oklch(0.933 0.012 96.4)",
+          "value": "oklch(0.893 0.018 99.0)",
           "css_var": "--color-muted"
         },
         "muted-foreground": {
@@ -1272,6 +1272,12 @@
         "--overlay-foreground": "oklch(0.98 0.01 60)",
         "--overlay-foreground-muted": "oklch(0.75 0.01 60)",
         "--overlay-border": "oklch(1 0.02 60 / 0.4)",
+        "--overlay-scrim": "color-mix(in oklab, var(--color-brand-graphite) 62%, transparent)",
+        "--graphite-pressed": "oklch(0.333 0.007 274.8)",
+        "--z-sticky": "1020",
+        "--z-overlay": "1040",
+        "--z-modal": "1050",
+        "--elevation-shadow-modal": "0 12px 40px 0 color-mix(in oklab, var(--color-brand-graphite) 18%, transparent)",
         "--sidebar": "hsl(0 0% 98%)",
         "--sidebar-foreground": "hsl(240 5.3% 26.1%)",
         "--sidebar-primary": "hsl(240 5.9% 10%)",
@@ -1295,6 +1301,8 @@
       "theme_inline": {
         "--color-brand-line": "var(--brand-line)",
         "--color-overlay": "var(--overlay)",
+        "--color-overlay-scrim": "var(--overlay-scrim)",
+        "--color-graphite-pressed": "var(--graphite-pressed)",
         "--color-overlay-foreground": "var(--overlay-foreground)",
         "--color-overlay-foreground-muted": "var(--overlay-foreground-muted)",
         "--color-overlay-border": "var(--overlay-border)",
@@ -1388,7 +1396,7 @@
   "components": {
     "code_sot": {
       "path": "components/ui",
-      "count_tsx": 61,
+      "count_tsx": 64,
       "list": [
         "accordion",
         "alert",
@@ -1414,6 +1422,7 @@
         "drawer",
         "dropdown-menu",
         "empty",
+        "empty-state",
         "field",
         "form",
         "hover-card",
@@ -1431,6 +1440,7 @@
         "native-select",
         "navigation-menu",
         "pagination",
+        "pill-button",
         "popover",
         "progress",
         "radio-group",
@@ -1441,6 +1451,7 @@
         "sheet",
         "sidebar",
         "skeleton",
+        "skeleton-bar",
         "slider",
         "sonner",
         "spinner",
@@ -2409,6 +2420,6 @@
     "_figma_node_count_method": "components.figma_mirror 配下に現れる distinct な Figma node ID (\\d+:\\d+) を、直近の verified_at の有無で分類した実カウント。",
     "figma_nodes_verified": 48,
     "figma_nodes_unverified": 0,
-    "code_ui_components": 61
+    "code_ui_components": 64
   }
 }
