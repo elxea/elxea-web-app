@@ -48,20 +48,27 @@ import {
  * 起草の 【要値確定】 のうち、Setaka が 2026-08-11 に確定した 4 点は埋めた
  * (定期便の送料無料 / 初回1,880円・継続2,280円 / 初回はご注文から5営業日以内に発送 /
  * 解約はマイページを主としLINE・メールを補助)。残る 5 点は Shopify の設定・実測に
- * 依存するため `lib/placeholders.ts` の仮値ガードに載せてある。
+ * 依存するため `lib/placeholders.ts` の仮値ガードに載せた。
  *
- * その 5 点のうち 3 点 (初回 / 2回目以降の課金タイミング・解約の受付期限・マイページで
- * 変更できる項目) は、本番 Shopify とマイページ実装を読めば決まる事実だったため、事実確認
- * 調査 (https://app.notion.com/p/3b870c9d064c8132b9daf9088fc5df7b) の実測値で確定させた
- * (2026-08-11)。このとき IV-6 と IV-9 の地の文も実装事実に合わせて直している。IV-6 は
- * 受付期限の基準が発送予定日ではなく請求日なので「次回発送予定日の〜」を外し、IV-9 は
- * マイページに存在しない項目 (お届け先・お支払い方法) を「変更できる」と読める文だった
- * ため、できる 5 種を列挙してそれ以外を窓口に寄せる形にした (不実表示の回避)。
- * 起草側の文面もこの 2 項目は同じ趣旨に直す必要がある。
+ * その 5 点は 2026-08-11 に全件を実測で確定させた。3 点 (初回 / 2回目以降の課金タイミング・
+ * 解約の受付期限・マイページで変更できる項目) は事実確認調査
+ * (https://app.notion.com/p/3b870c9d064c8132b9daf9088fc5df7b) の実測値による。このとき
+ * IV-6 と IV-9 の地の文も実装事実に合わせて直している。IV-6 は受付期限の基準が発送予定日
+ * ではなく請求日なので「次回発送予定日の〜」を外し、IV-9 はマイページに存在しない項目
+ * (お届け先・お支払い方法) を「変更できる」と読める文だったため、できる 5 種を列挙して
+ * それ以外を窓口に寄せる形にした (不実表示の回避)。起草側の文面もこの 2 項目は同じ趣旨に
+ * 直す必要がある。
+ *
+ * 残る 1 点 (定期便の決済手段) も同日、Shopify 管理画面 + Storefront / Admin API の実測で
+ * **クレジットカード 4 ブランドのみ**に確定した。単発販売 (群 I) で使えるコンビニ決済・
+ * 銀行振込・代金引換や、KOMOJU 経由の楽天ペイ・スマホ決済は、Shopify の定期便が請求先と
+ * して保管できる決済手段ではないため定期便では使えない。IV-4 に除外を明記しているのは、
+ * 群 I の一覧を読んだ人が「定期便でも同じ手段が使える」と誤読するのを防ぐため
+ * (根拠と実測の内訳は `lib/placeholders.ts` の当該 basis)。
  *
  * `PLACEHOLDER_MARKER` が 1 件でも残る間は production 相当のビルド / テストが機械的に
- * 落ちる設計なので、本ページは現状のままでは公開できない (それが正しい状態)。
- * 内訳は lib/placeholders.ts / 台帳 `docs/placeholders.md` を見ること。
+ * 落ちる設計。本ページ由来の仮値は全て解消済みで、リポジトリ全体で残るのは定期便LPの
+ * 初回お届け日 1 件のみ。内訳は lib/placeholders.ts / 台帳 `docs/placeholders.md` を見ること。
  */
 
 const OPERATIONS_MANAGER = placeholderValue("tokushoho.operationsManager");
@@ -69,7 +76,7 @@ const ADDRESS = placeholderValue("tokushoho.address");
 const PHONE = placeholderValue("tokushoho.phone");
 const EMAIL = placeholderValue("tokushoho.email");
 
-/* 群 IV の未確定値 (Shopify の設定・実測待ち)。差し替えは lib/placeholders.ts で行う。 */
+/* 群 IV の値 (Shopify の設定・実装の実測で確定済み)。変更は lib/placeholders.ts で行う。 */
 const SUB_PAYMENT_METHODS = placeholderValue("tokushoho.subscriptionPaymentMethods");
 const SUB_FIRST_CHARGE = placeholderValue("tokushoho.subscriptionFirstChargeTiming");
 const SUB_RECURRING_CHARGE = placeholderValue("tokushoho.subscriptionRecurringChargeTiming");
@@ -162,7 +169,7 @@ const GROUPS: { id: string; heading: string; items: { label: string; value: stri
       },
       {
         label: "お支払い方法と時期",
-        value: `定期便のお支払い方法は${SUB_PAYMENT_METHODS}です。初回の代金は${SUB_FIRST_CHARGE}に、2回目以降の代金は${SUB_RECURRING_CHARGE}に、ご登録の決済手段へ自動で請求します。`,
+        value: `定期便のお支払い方法は${SUB_PAYMENT_METHODS}です。初回の代金は${SUB_FIRST_CHARGE}に、2回目以降の代金は${SUB_RECURRING_CHARGE}に、ご登録のクレジットカードへ自動で請求します。コンビニ決済、銀行振込、代金引換、スマホ決済（楽天ペイなど）は、継続してご請求する仕組みに対応していないため、定期便ではご利用いただけません。`,
       },
       {
         label: "各回のお届け時期",

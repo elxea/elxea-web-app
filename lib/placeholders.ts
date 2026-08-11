@@ -139,20 +139,20 @@ export const PLACEHOLDERS = {
    * 確定した 4 項目 (送料無料 / 初回1,880円・継続2,280円 / 初回発送は5営業日以内 /
    * 解約はマイページ主) はページ側に直接書いている (Setaka 確定 2026-08-11)。
    *
-   * 当初 5 件を登録したが、うち 3 件 (初回 / 2回目以降の課金タイミング・解約の受付期限・
-   * マイページで変更できる項目) は本番 Shopify とマイページ実装を読めば決まる「事実」で、
-   * 事実確認調査 (https://app.notion.com/p/3b870c9d064c8132b9daf9088fc5df7b) の実測値で
-   * confirmed 化した (2026-08-11)。ここに仮値として残るのは、決済ゲートウェイの構成が
-   * 未完了で値そのものが存在しない決済手段の 1 件だけ。
+   * 当初 5 件を登録したが、全件を本番 Shopify とマイページ実装の実測で confirmed 化した
+   * (3 件は 2026-08-11 の事実確認調査 https://app.notion.com/p/3b870c9d064c8132b9daf9088fc5df7b、
+   * 決済手段は同日の管理画面実測 + Storefront / Admin API 実測)。この群に残る仮値は無い。
    */
   "tokushoho.subscriptionPaymentMethods": {
     surface: "特商法ページ S2 記載事項 IV-4 お支払い方法と時期",
     label: "定期便で利用できる決済手段",
-    value: "（公開前に差し替え）ご利用いただける決済手段",
-    status: PLACEHOLDER_MARKER,
-    owner: "Setaka (事業判断) / Shopify 設定",
+    // 「のみ」を落とさないこと。群 I (単発販売) にはコンビニ決済・銀行振込・代金引換が
+    // 並んでおり、限定を外すと定期便でもそれらが使えると読める (不実表示)。
+    value: "クレジットカード（Visa、Mastercard、American Express、JCB）のみ",
+    status: "confirmed",
+    owner: "Setaka (法定表記)",
     basis:
-      "特定商取引法 第11条2号。単発販売の「クレジットカード、コンビニ決済、銀行振込、代金引換」を流用してはいけない (継続課金で使える手段は Shopify の subscription 対応決済に依存する)。Shopify の対応決済を実測して差し替える。起草 IV-4 / 未確定 U-2 — https://app.notion.com/p/3b870c9d064c8173b866f824f95f36fa",
+      "特定商取引法 第11条2号。単発販売の「クレジットカード、コンビニ決済、銀行振込、代金引換」を流用してはいけない (継続課金で使える手段は Shopify の subscription 対応決済に依存する)。実測で確定 (2026-08-11 JST): (a) Shopify 管理画面のペイメント設定 = Visa / Mastercard / American Express / JCB 有効・PayPal 未有効・テストモード オフ (elxea-admin)、(b) Storefront API `shop.paymentSettings.acceptedCardBrands` = VISA / MASTERCARD / AMERICAN_EXPRESS / JCB (管理画面の「+2」は `supportedDigitalWallets` の APPLE_PAY / GOOGLE_PAY で、カードブランドではない)、(c) 実注文の `paymentGatewayNames` は本番が `shopify_payments` (Shopify Payments が稼働中 = 定期便のカード保管に対応)、(d) 定期便の請求は Shopify の subscriptionBillingAttempt で `customerPaymentMethod` に保管済みの手段へ行う仕組みで、実在契約の instrument は `CustomerCreditCard`。KOMOJU 経由の楽天ペイ / スマホ決済 (コンビニ等)・代金引換 (`Cash on Delivery (COD)`)・銀行振込 (`manual`) は保管して自動請求できないため定期便では使えない。Apple Pay / Google Pay は単発チェックアウトのウォレットとしては有効だが定期便で使える確証が無いため記載しない (不明分を足さない)。起草 IV-4 / 未確定 U-2 — https://app.notion.com/p/3b870c9d064c8173b866f824f95f36fa",
   },
   "tokushoho.subscriptionFirstChargeTiming": {
     surface: "特商法ページ S2 記載事項 IV-4 お支払い方法と時期",

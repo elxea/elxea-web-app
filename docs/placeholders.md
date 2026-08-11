@@ -3,7 +3,7 @@
 - 対象プロダクト: roji (elxea)
 - 仮値のSoT: `lib/placeholders.ts` (このファイルは読み手向けの台帳。値の正本はコード側)
 - 作成: 2026-08-09 JST / elxea-developer
-- 最終更新: 2026-08-11 JST / elxea-developer (定期便5件のうち3件を事実確認調査の実測値で `confirmed` 化。残り2件)
+- 最終更新: 2026-08-11 JST / elxea-developer (定期便5件を全件 `confirmed` 化。残り1件)
 
 ## 一言で
 
@@ -12,8 +12,7 @@
 
 ## 結論・状態
 
-**13件のうち10件が解決済み。未確定は2件** — `subscription.firstDeliveryDate` (初回お届け日) と
-`tokushoho.subscriptionPaymentMethods` (定期便で使える決済手段)。
+**13件のうち12件が解決済み。未確定は1件** — `subscription.firstDeliveryDate` (初回お届け日) だけ。
 
 - **法人情報6件** = NotionのCorporate Info DBの登録値で実値化し `confirmed` にした
   (2026-08-10)。所在地が3通りあった不一致も、Corporate Info DBを唯一のSoTとして
@@ -34,12 +33,14 @@
   受付期限だけは、技術的な限界値 (次回課金日の当日09:00 JSTのcron実行まで) をそのまま
   案内せず、調査の推奨どおり余裕を持たせて「次回のご請求日の前日まで」を顧客向けの期限と
   している
-- **残る2件の性格** = 初回お届け日はShopify側の締日・起算日が未設定で導出できない。
-  決済手段は決済ゲートウェイの構成が未完了で値そのものが存在しない (現に定期課金が
-  ゲートウェイ設定エラーで失敗している)。どちらも「文面を決める」問題ではなく
-  **Shopify側の作業待ち**
+- **残る1件 (決済手段) も同日 `confirmed` 化** (2026-08-11) = **クレジットカード
+  （Visa、Mastercard、American Express、JCB）のみ**で確定した。「決済ゲートウェイの構成が
+  未完了で値そのものが存在しない」という前回の見立ては**誤りだった** (下記
+  「定期便の決済手段をどう確定したか」)
+- **残る1件の性格** = 初回お届け日はShopify側の締日・起算日が未設定で導出できない。
+  「文面を決める」問題ではなく **Shopify側の作業待ち**
 
-未解決2件が残っている間、`VERCEL_ENV=production` のビルドは設計どおり失敗する
+未解決1件が残っている間、`VERCEL_ENV=production` のビルドは設計どおり失敗する
 (dev / Previewは失敗しない)。
 
 ## Ask
@@ -47,10 +48,9 @@
 **判断 (Tier 2 / Setaka)** — 次の2点。
 
 1. **Shopifyに定期便の締日と発送スケジュールを設定するか** (初回お届け日の公開ブロッカー。
-   設定されれば計算式で自動表示になり、この仮値は恒久的に消える)。あわせて **定期便で
-   使える決済手段** はShopify側の決済ゲートウェイ構成の完了待ち (特商法ページの公開
-   ブロッカー)。課金タイミング・解約の受付期限・マイページで変更できる項目の3点は
-   2026-08-11に実測で確定したので判断は不要になった
+   設定されれば計算式で自動表示になり、この仮値は恒久的に消える)。**これが唯一残った
+   公開ブロッカー**で、定期便の契約条件5件 (決済手段 / 課金タイミング / 解約の受付期限 /
+   マイページで変更できる項目) は2026-08-11に全件実測で確定したので判断は不要になった
 2. **月額の表示が `1,800円` → `2,280円` に変わる**点の確認。Shopifyの実データが
    継続2,280円 / 初回1,880円 で、仮値の1,800円 はどちらでもなかった (下記
    「月額はShopifyのどの値か」)
@@ -85,7 +85,7 @@ flowchart LR
 | 6 | `tokushoho.email` | 特商法ページS1販売者 + S4窓口 / お問い合わせS1メタ / About / 利用規約S4 (8109:46669) | 法人代表メールアドレス | Setaka (法定表記) | Corporate Info DB「代表メールアドレス（一般問い合わせ用）」(Contact / 最終確認日あり) | 差し替え済 (2026-08-10) |
 | 7 | `about.headOffice` | AboutページS6会社情報「本社」(8121:1312 / SP 8121:1386) | #4と同一値 | Setaka (会社情報) | Corporate Info DB「本社住所」。#4と同時に差し替えた | 差し替え済 (2026-08-10) |
 | 8 | `about.branchOffice` | AboutページS6会社情報「京都事務所」(8121:1312 / SP 8121:1386) | 京都倉庫兼事務所の所在地 | Setaka (会社情報) | Corporate Info DB「京都倉庫住所」(Address)。**記載する**判断 (2026-08-10) | 差し替え済 (2026-08-10) |
-| 9 | `tokushoho.subscriptionPaymentMethods` | 特商法ページ IV-4 お支払い方法と時期 | 定期便で使える決済手段 | Setaka / Shopify設定 | Shopifyのsubscription対応決済の実測。特定商取引法 第11条2号 | 未確定 (公開ブロッカー) |
+| 9 | `tokushoho.subscriptionPaymentMethods` | 特商法ページIV-4お支払い方法と時期 | 定期便で使える決済手段 (クレジットカード4ブランドのみ) | Setaka (法定表記) | Shopify管理画面のペイメント設定 + Storefront API `acceptedCardBrands` + 実注文の `paymentGatewayNames` + 定期便契約の `customerPaymentMethod` の実測。特定商取引法 第11条2号 | 差し替え済 (2026-08-11 / 実測確定) |
 | 10 | `tokushoho.subscriptionFirstChargeTiming` | 特商法ページIV-4 | 初回課金のタイミング (ご注文の確定時) | Setaka (法定表記) | 本番Shopifyのselling plan billing policyの実測。特定商取引法 第11条2号。事実確認調査 [3b870c9d…5df7b](https://app.notion.com/p/3b870c9d064c8132b9daf9088fc5df7b) | 差し替え済 (2026-08-11 / 実測確定) |
 | 11 | `tokushoho.subscriptionRecurringChargeTiming` | 特商法ページIV-4 | 2回目以降の課金のタイミング (お申し込み日を起点とした応当日・当日午前中) | Setaka (法定表記) | 同上 + 課金cron (`app/api/cron/billing/route.ts` / `vercel.json` 毎日09:00 JST)。基準日 (anchors) 未設定のため加入日基準で回る | 差し替え済 (2026-08-11 / 実測確定) |
 | 12 | `tokushoho.subscriptionCancelCutoff` | 特商法ページIV-6停止・解約の方法 | 解約・変更の受付期限 (次回のご請求日の前日) | Setaka (法定表記) | 消費者庁ガイドライン別添9 2(2)⑥。技術的限界は次回課金日の当日09:00 JST (cron実行) だが、調査の推奨どおり余裕を持たせた期限を案内する。定期便LPのFAQとリマインドメールも同一基準に統一済み (2026-08-11) | 差し替え済 (2026-08-11 / 実測確定) |
@@ -100,7 +100,7 @@ flowchart LR
 `app/[locale]/about/page.tsx` の会社情報の行を落とす (画面ラベルは倉庫兼事務所のため
 「京都事務所」のまま)。
 
-仮値がまだ残っているエントリ (#1 / #9) は、実在の住所・電話番号・個人名に見えない文字列に
+仮値がまだ残っているエントリ (#1) は、実在の住所・電話番号・個人名に見えない文字列に
 してある。万一ガードをすり抜けても読み手が一目で仮値と分かる状態を保つため、
 単体テストが `tokushoho.*` / `about.*` の**未確定エントリだけ**に次を強制している
 (実値に差し替えた `confirmed` エントリは本物の住所・電話番号になるので対象外)。
@@ -151,6 +151,43 @@ LP本文は初回特別価格に触れていないので、初回1,880円を打�
 
 商品タグの照合は**大小文字を区別しない**。店舗の実タグは `Subscription` で、
 完全一致だと定期便商品が1件も引けず月額が出なかった (2026-08-10に修正)。
+
+## 定期便の決済手段をどう確定したか (#9)
+
+確定値は **クレジットカード（Visa、Mastercard、American Express、JCB）のみ** (2026-08-11)。
+
+前回この項目を仮値にしたときの見立て —「決済ゲートウェイの構成が未完了で、値そのものが
+存在しない」— は**誤りだった**。誤診の元は、定期便の課金試行に残っていた失敗
+(`PAYMENT_METHOD_INCOMPATIBLE_WITH_GATEWAY_CONFIG` /
+`Payment method cannot be used with the current payment gateway test mode configuration`)
+を「ゲートウェイ未構成」と読んだこと。実際は**テストカードで作った契約を本番モードの
+ゲートウェイに投げた**ことによるテスト/本番の食い違いで、ゲートウェイ自体は稼働している。
+
+実測 (2026-08-11 JST) の内訳:
+
+| 観測 | 手段 | 結果 |
+|---|---|---|
+| 有効なカードブランド | Shopify管理画面 (elxea-admin) / Storefront API `shop.paymentSettings.acceptedCardBrands` | Visa / Mastercard / American Express / JCB |
+| 管理画面の「+2」の正体 | Storefront API `supportedDigitalWallets` | `APPLE_PAY` / `GOOGLE_PAY` (カードブランドではなくウォレット) |
+| カードの処理系 | 本番注文の `paymentGatewayNames` | `shopify_payments` (Shopify Paymentsが稼働 = 定期便のカード保管に対応) |
+| 定期便の請求先 | 実在契約の `customerPaymentMethod.instrument` | `CustomerCreditCard` |
+| その他の有効な手段 | 管理画面 (KOMOJU) / 実注文の `paymentGatewayNames` | 楽天ペイ・スマホ決済 (コンビニ等) / `Cash on Delivery (COD)` / `manual` |
+| PayPal | 管理画面 | 未有効 |
+
+判断は2つ。
+
+1. **カード以外は書かない** — 定期便の請求はShopifyの `subscriptionBillingAttempt` が
+   保管済みの `customerPaymentMethod` に対して行う。楽天ペイ・スマホ決済 (コンビニ等)・
+   代金引換・銀行振込は保管して自動請求できないため、定期便では使えない。単発販売の
+   一覧 (群I) をそのまま流用すると不実表示になる
+2. **Apple Pay / Google Payも書かない** — 単発チェックアウトのウォレットとしては有効だが、
+   定期便で使える確証が無い。**確証の無い手段を足さない**方針で除外した。少なく書くこと
+   自体は不実表示にならない (逆は違反になる)
+
+「のみ」を落とさないこと。群Iにコンビニ決済・銀行振込・代金引換が並んでいるため、限定を
+外すと定期便でも同じ手段が使えると読める。特商法ページIV-4には除外の一文も置いた。
+回帰は `__tests__/subscription-payment-methods.test.ts` で機械固定している
+(4ブランドの過不足・「のみ」の有無・使えない手段の混入・値の直書き)。
 
 ## 差し替え手順 (実値が決まったとき)
 
@@ -284,7 +321,15 @@ PC 1440x900・SP 375x812 / 2026-08-09 JST。`getBoundingClientRect` の実測値
    特商法ページと同一基準に統一した。メールは値を直書きせず `lib/placeholders.ts` の
    `tokushoho.subscriptionCancelCutoff` から読む。回帰は
    `__tests__/dispatch-lead-time.test.ts` の「解約・変更の受付期限の統一」で機械固定。
-11. **お届け間隔の選択肢がLPと実プランで食い違う (未解決)** — 実在のselling planは
+11. **定期便の決済手段のLPと特商法の不一致 (解消済2026-08-11)** — 定期便LPのFAQ
+   (`subscriptionR2.faqA2` ja/en) は「クレジットカード決済です。毎回のお届け日に合わせて
+   引き落とします」、旧カタログ (`subscriptionLp.faqA6` ja/en) は「Apple Pay、Google Payに
+   対応しています」で、特商法ページに書く内容と食い違っていた。両方を確定値
+   (カード4ブランドのみ) に統一し、あわせてLPの引き落としタイミングも #11の確定値
+   (お申し込み日を起点とした応当日) に直した。「お届け日に合わせて引き落とす」は実装事実
+   ではない (課金cronは請求日基準で回り、発送日とは連動しない)。回帰は
+   `__tests__/subscription-payment-methods.test.ts`。
+12. **お届け間隔の選択肢がLPと実プランで食い違う (未解決)** — 実在のselling planは
    毎月 / 2ヶ月ごと / 3ヶ月ごとの3件 (2026-08-11時点) だが、定期便LP (`subscriptionR2`) は
    「毎月 / 隔月」の2択として書いている。特商法ページ IV-2 は実プランどおり3つで記載した。
    LP側の表記を実プランに合わせるかはコピーの判断。
@@ -301,3 +346,6 @@ PC 1440x900・SP 375x812 / 2026-08-09 JST。`getBoundingClientRect` の実測値
 - 特定商取引法 第11条 (通信販売の広告表示義務)
 - 定期便の契約条件の起草 (文面の正本 / 法令チェックリスト14件) — https://app.notion.com/p/3b870c9d064c8173b866f824f95f36fa
 - `__tests__/dispatch-lead-time.test.ts` (発送リードタイムと定期便条件の回帰テスト)
+- `__tests__/subscription-payment-methods.test.ts` (定期便の決済手段の回帰テスト)
+- Shopify Storefront API `shop.paymentSettings` / Admin API `orders.paymentGatewayNames` ・ `subscriptionContracts.customerPaymentMethod` (決済手段の実測 / 2026-08-11 JST)
+- Shopify管理画面のペイメント設定 (elxea-admin実測 / 2026-08-11 JST)
