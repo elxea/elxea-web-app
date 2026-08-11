@@ -200,10 +200,14 @@ export default async function ArticlePage({
                 }
                 addLabel={t("addToBookmarks")}
                 removeLabel={t("removeFromBookmarks")}
+                loadingLabel={t("bookmarkLoading")}
+                loginRequiredLabel={t("bookmarkLoginRequired")}
+                statusUnknownLabel={t("bookmarkStatusUnknown")}
                 addedMessage={t("addedToBookmarks")}
                 removedMessage={t("removedFromBookmarks")}
                 errorMessage={t("bookmarkError")}
                 loginRequiredMessage={t("loginRequiredForBookmark")}
+                statusRetryMessage={t("bookmarkStatusRetry")}
                 className="mt-1 shrink-0"
               />
             </div>
