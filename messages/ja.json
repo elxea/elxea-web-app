@@ -176,7 +176,8 @@
     "audioTrackList": "収録曲",
     "audioExternalNote": "曲単位のフル尺・ダウンロードは SoundCloud で",
     "audioInterviewNote": "このページで再生します。外部の配信サービスには公開していません。",
-    "audioInterviewLabel": "インタビュー音声"
+    "audioInterviewLabel": "インタビュー音声",
+    "readTime": "{minutes} 分で読める"
   },
   "teaMenu": {
     "title": "お茶メニュー",

@@ -176,7 +176,8 @@
     "audioTrackList": "Tracks",
     "audioExternalNote": "Full-length tracks and downloads are on SoundCloud",
     "audioInterviewNote": "Plays on this page. Not published to external streaming services.",
-    "audioInterviewLabel": "Interview audio"
+    "audioInterviewLabel": "Interview audio",
+    "readTime": "{minutes} min read"
   },
   "teaMenu": {
     "title": "Tea Menu",

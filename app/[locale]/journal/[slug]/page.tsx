@@ -31,6 +31,7 @@ import { BookmarkButton } from "@/components/journal/bookmark-button";
 import { ArticleReadTracker } from "@/components/journal/article-read-tracker";
 import { ReadingProgress } from "@/components/journal/reading-progress";
 import { formatArticleDate } from "@/lib/format-date";
+import { readingMinutes } from "@/lib/journal/read-time";
 import { cn } from "@/lib/utils";
 
 /**
@@ -183,6 +184,10 @@ export default async function ArticlePage({
     ? urlFor(author.image).width(64).height(64).url()
     : undefined;
 
+  // 読了目安。本文が無い記事 (準備中・会員限定で本文を返していない等) では
+  // null が返るので、その場合は表示ごと出さない。
+  const readMinutes = readingMinutes(article.body);
+
   return (
     <>
       <ReadingProgress />
@@ -229,19 +234,25 @@ export default async function ArticlePage({
                 className="mt-1 shrink-0"
               />
             </div>
-            {author ? (
+            {author || readMinutes ? (
               <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
-                {author.slug?.current ? (
-                  /* C17-1: 著者ページは People 詳細へ統合 (Figma 7805:1952
-                     「【廃止: People 詳細へ統合】 ジャーナル:著者」)。旧 URL は
-                     next.config.ts の 308 で寄せてあるが、内部リンクは 1 ホップ
-                     無駄に踏ませないよう直接 /people/[slug] を指す。 */
-                  <Link href={`/people/${author.slug.current}`}>
+                {/* 著者が未設定でも日付・読了目安は出す (メタ行ごと消さない)。 */}
+                {author &&
+                  (author.slug?.current ? (
+                    /* C17-1: 著者ページは People 詳細へ統合 (Figma 7805:1952
+                       「【廃止: People 詳細へ統合】 ジャーナル:著者」)。旧 URL は
+                       next.config.ts の 308 で寄せてあるが、内部リンクは 1 ホップ
+                       無駄に踏ませないよう直接 /people/[slug] を指す。 */
+                    <Link href={`/people/${author.slug.current}`}>
+                      <AuthorByline
+                        name={author.name}
+                        role={author.role}
+                        avatarUrl={authorAvatar}
+                      />
+                    </Link>
+                  ) : (
                     <AuthorByline name={author.name} role={author.role} avatarUrl={authorAvatar} />
-                  </Link>
-                ) : (
-                  <AuthorByline name={author.name} role={author.role} avatarUrl={authorAvatar} />
-                )}
+                  ))}
                 {article.publishedAt && (
                   <time
                     dateTime={article.publishedAt}
@@ -249,6 +260,13 @@ export default async function ArticlePage({
                   >
                     {formatArticleDate(article.publishedAt)}
                   </time>
+                )}
+                {/* 読了目安。日付と同じ控えめなメタ表示に留める (本文へ入る前の
+                    判断材料であって、見出しの一部ではないため)。 */}
+                {readMinutes && (
+                  <span className={cn(captionClass, "text-muted-foreground")}>
+                    {t("readTime", { minutes: readMinutes })}
+                  </span>
                 )}
                 {isGated && (
                   <span className={cn(captionClass, "text-muted-foreground")}>
