@@ -26,7 +26,6 @@ import { AuthorProfile } from "@/components/journal/author-profile";
 import { BookmarkButton } from "@/components/journal/bookmark-button";
 import { ArticleReadTracker } from "@/components/journal/article-read-tracker";
 import { ReadingProgress } from "@/components/journal/reading-progress";
-import { CommentSection } from "@/components/community/comment-section";
 import { formatArticleDate } from "@/lib/format-date";
 import { cn } from "@/lib/utils";
 
@@ -99,7 +98,6 @@ export default async function ArticlePage({
   const locale = await getLocale();
   const t = await getTranslations("journal");
   const tCommon = await getTranslations("common");
-  const tComment = await getTranslations("comment");
   const bt = await getTranslations("breadcrumb");
 
   let article;
@@ -435,27 +433,12 @@ export default async function ArticlePage({
                 </div>
               )}
 
-              {/* コメント */}
-              <CommentSection
-                targetType="article"
-                targetId={slug}
-                locale={locale}
-                i18n={{
-                  title: tComment("title"),
-                  placeholder: tComment("placeholder"),
-                  submit: tComment("submit"),
-                  submitting: tComment("submitting"),
-                  loginRequired: tComment("loginRequired"),
-                  postedMessage: tComment("postedMessage"),
-                  deletedMessage: tComment("deletedMessage"),
-                  errorPosting: tComment("errorPosting"),
-                  errorDeleting: tComment("errorDeleting"),
-                  noComments: tComment("noComments"),
-                  delete: tComment("delete"),
-                  characterCount: tComment("characterCount"),
-                  moderation: tComment("moderation"),
-                }}
-              />
+              {/* コメントは一旦撤去 (Setaka 判断 2026-08-11 / D1)。Figma 記事詳細
+                  R2 にコメント UI が無く、実装だけが先行していたため表示を外す。
+                  復活手順: `CommentSection` (components/community/comment-section)
+                  を import し、farmers/[slug]/page.tsx と同じ i18n prop
+                  (`getTranslations("comment")`) を渡してここに置き直す。
+                  コンポーネント本体・API・翻訳キーはすべて残してある。 */}
             </>
           ) : (
             <MemberGate requiredTier={requiredTier} />
