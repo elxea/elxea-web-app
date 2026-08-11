@@ -195,7 +195,7 @@
   },
   "elxeaJournal": {
     "title": "elxea Journal",
-    "description": "A newsletter about seasonal tea and everyday life",
+    "description": "The Set Edition — seasonal tea and the places it comes from, sent with your assortment.",
     "empty": "No journals yet.",
     "loadError": "Could not load journals.",
     "teaSection": "About the Tea in This Issue",

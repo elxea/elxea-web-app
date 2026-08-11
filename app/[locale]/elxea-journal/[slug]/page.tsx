@@ -2,25 +2,49 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 import { getLocale, getTranslations } from "next-intl/server";
+
 import { getClient } from "@/sanity/lib/client";
 import { JOURNAL_BY_SLUG_QUERY } from "@/sanity/lib/queries";
 import { urlFor } from "@/sanity/lib/image";
-import { PortableText } from "@/components/sanity/portable-text";
-import { ImageWithFallback } from "@/components/ui/image-with-fallback";
-import { TeaSpecCard } from "@/components/journal/tea-spec-card";
 import { Link } from "@/i18n/navigation";
+import { Section } from "@/components/layout/container";
+import { Breadcrumb } from "@/components/seo/breadcrumb";
+import { PortableText } from "@/components/sanity/portable-text";
+import { ImageCard } from "@/components/ui/image-card";
+import { ImageWithFallback } from "@/components/ui/image-with-fallback";
+import { TeaSpecCard } from "@/components/set-edition/tea-spec-card";
+import { ThemeBadge } from "@/components/set-edition/theme";
+import { CatalogGrid } from "@/components/catalog/catalog-list";
+import { bodySmClass, captionClass, overlineClass } from "@/components/editorial/rule-list";
+import { cn } from "@/lib/utils";
 
-// 短縮ラベル (Figma Journal Theme Badge 6934:143 が正)
-const themeLabels: Record<string, string> = {
-  akane: "茜",
-  sui: "翠",
-  sohi: "そひ",
-};
+/**
+ * Set Edition 詳細 (`/elxea-journal/[slug]`) — C3 の DS 移行。
+ *
+ * 呼称は「Set Edition」(旧「ニュースレター」は廃語 / Setaka 2026-08-11 確定)。
+ * URL は互換のため据え置き。
+ *
+ * DS 移行の中身 (新規部品は作らない):
+ * - 外枠           `section-narrow` / `section-wide` の直書き → `Section`
+ * - パンくず       無し → `Breadcrumb`
+ * - テーマバッジ   ページ内の重複定数 → `components/set-edition/theme`
+ * - ヒーロー写真   生の `aspect-[2/1]` + `bg-muted` → `ImageCard`
+ * - お茶グリッド   手組み 3 列 → `CatalogGrid`
+ * - 文字組み       生 px (`text-[11px]` / `tracking-[0.25em]`) →
+ *                  `overlineClass` / `captionClass` / `bodySmClass`
+ */
 
-const themeColors: Record<string, string> = {
-  akane: "var(--color-brand-tea-red)",
-  sui: "var(--color-brand-tea-green)",
-  sohi: "var(--color-brand-tea-warm)",
+type TeaMenuItem = {
+  _id: string;
+  slug: { current: string };
+  displayName: string;
+  productNumber: string;
+  category: string;
+  variety: string;
+  season: string;
+  origin: string;
+  netWeight: number;
+  photo?: { asset: object; alt?: string };
 };
 
 export async function generateMetadata({
@@ -37,7 +61,9 @@ export async function generateMetadata({
     const seo = journal.seo;
     const title = seo?.title || journal.title;
     const description = seo?.description || journal.summary?.slice(0, 160);
-    const image = journal.mainImage?.asset ? urlFor(journal.mainImage).width(1200).url() : undefined;
+    const image = journal.mainImage?.asset
+      ? urlFor(journal.mainImage).width(1200).url()
+      : undefined;
     return {
       title,
       description,
@@ -48,7 +74,7 @@ export async function generateMetadata({
   }
 }
 
-export default async function ElxeaJournalDetailPage({
+export default async function SetEditionDetailPage({
   params,
 }: {
   params: Promise<{ slug: string }>;
@@ -56,6 +82,7 @@ export default async function ElxeaJournalDetailPage({
   const { slug } = await params;
   const locale = await getLocale();
   const t = await getTranslations("elxeaJournal");
+  const bt = await getTranslations("breadcrumb");
 
   let journal;
   try {
@@ -63,141 +90,136 @@ export default async function ElxeaJournalDetailPage({
     journal = await client.fetch(JOURNAL_BY_SLUG_QUERY, { slug, language: locale });
   } catch {
     return (
-      <div className="section-narrow">
-        <p className="text-muted-foreground">{t("loadError")}</p>
-      </div>
+      <Section spacing="none" className="pt-6 pb-16 lg:pb-28">
+        <div className="mx-auto w-full max-w-160">
+          <p className="text-sm text-muted-foreground">{t("loadError")}</p>
+        </div>
+      </Section>
     );
   }
 
   if (!journal) notFound();
 
-  const themeLabel = themeLabels[journal.theme] || journal.theme;
-  const themeColor = themeColors[journal.theme] || "var(--color-brand-ash)";
-
   return (
-    <article className="py-20">
-      {/* ① 変A: Theme badge + Title + Summary をヒーロー画像の上に (Figma 6760:120) */}
-      <header className="section-narrow mb-10">
-        <span
-          className="inline-block text-sm font-normal leading-normal text-foreground px-2 py-1 rounded-full tracking-wider mb-4"
-          style={{ backgroundColor: themeColor }}
-        >
-          {themeLabel}
-        </span>
-        <h1 className="mb-6">{journal.title}</h1>
-        {journal.summary && (
-          <p className="text-muted-foreground text-sm leading-relaxed max-w-2xl">
-            {journal.summary}
-          </p>
-        )}
-      </header>
+    <Section spacing="none" className="pt-6 pb-16 lg:pb-28">
+      <div className="mx-auto w-full max-w-160">
+        <Breadcrumb
+          items={[
+            { label: bt("home"), href: "/" },
+            { label: t("title"), href: "/elxea-journal" },
+            { label: journal.title },
+          ]}
+        />
 
-      {/* ② 変A: Hero image — タイトル下・本文幅に内包 */}
-      {journal.mainImage?.asset && (
-        <div className="section-narrow mb-16">
-          <div className="w-full aspect-[2/1] sm:aspect-[16/9] bg-muted overflow-hidden">
-            <ImageWithFallback
-              src={urlFor(journal.mainImage).width(1600).height(900).url()}
-              fallbackSrc="/placeholder-hero-day.jpg"
-              alt={journal.mainImage.alt || journal.title}
-              fill
-              sizes="(max-width: 768px) 100vw, 768px"
-              className="w-full h-full object-cover"
-              priority
-            />
+        {/* Head — テーマバッジ + タイトル + サマリ (Figma 6760:120) */}
+        <header className="mt-6">
+          <ThemeBadge theme={journal.theme} />
+          <h1 className="page-title mt-4 text-foreground">{journal.title}</h1>
+          {journal.summary ? (
+            <p className={cn(captionClass, "mt-4 text-muted-foreground")}>{journal.summary}</p>
+          ) : null}
+        </header>
+
+        {/* ヒーロー写真 — 本文カラムから両側 40px はみ出す (SP は全幅) */}
+        {journal.mainImage?.asset && (
+          <div className="mt-6 -mx-4 lg:-mx-10">
+            <ImageCard
+              className="[--bleed-ar:3/2] lg:[--bleed-ar:16/9] rounded-none lg:rounded-md"
+              style={{ aspectRatio: "var(--bleed-ar)" }}
+            >
+              <ImageWithFallback
+                src={urlFor(journal.mainImage).width(1600).height(900).url()}
+                fallbackSrc="/placeholder-hero-day.jpg"
+                alt={journal.mainImage.alt || journal.title}
+                fill
+                sizes="(max-width: 1024px) 100vw, 720px"
+                className="h-full w-full object-cover"
+                priority
+              />
+            </ImageCard>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* ③ Body (Portable Text) */}
-      {journal.body && (
-        <div className="section-narrow mb-20">
-          <div className="prose-custom">
+        {/* 本文 */}
+        {journal.body && (
+          <div className="prose-custom mt-6">
             <PortableText value={journal.body} />
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
-      {/* ④ お届けのお茶について */}
+      {/* お届けのお茶について — グリッドは本文カラムより広く取る */}
       {journal.teaMenus && journal.teaMenus.length > 0 && (
-        <section className="section-wide py-16 border-t border-border">
-          <div className="mb-12">
-            <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-4">
-              Tea Selection
-            </p>
-            <h2 className="text-2xl font-normal">{t("teaSection")}</h2>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-14">
-            {journal.teaMenus.map(
-              (tea: {
-                _id: string;
-                slug: { current: string };
-                displayName: string;
-                productNumber: string;
-                category: string;
-                variety: string;
-                season: string;
-                origin: string;
-                netWeight: number;
-                photo?: { asset: object; alt?: string };
-              }) => (
-                <TeaSpecCard key={tea._id} tea={tea} />
-              )
-            )}
-          </div>
+        <section className="mt-16 border-t border-border pt-16">
+          <p className={cn(overlineClass, "text-muted-foreground")}>Tea Selection</p>
+          <h2 className="mt-4 text-foreground">{t("teaSection")}</h2>
+          <CatalogGrid className="mt-8 lg:mt-12">
+            {journal.teaMenus.map((tea: TeaMenuItem) => (
+              <TeaSpecCard key={tea._id} tea={tea} />
+            ))}
+          </CatalogGrid>
         </section>
       )}
 
-      {/* ⑤ Playlist */}
+      {/* プレイリスト */}
       {journal.playlist && (
-        <section className="section-narrow py-16 border-t border-border">
-          <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-4">
-            Soundtrack
-          </p>
-          <h3 className="text-base font-medium mb-8">{t("relatedPlaylist")}</h3>
-          <Link
-            href={`/playlists/${journal.playlist.slug.current}`}
-            className="flex items-center gap-5 group"
-          >
-            {journal.playlist.albumImage?.asset && (
-              <Image
-                src={urlFor(journal.playlist.albumImage).width(120).height(120).url()}
-                alt={journal.playlist.title}
-                width={120}
-                height={120}
-                className="size-20 object-cover flex-shrink-0"
-              />
-            )}
-            <div>
-              <p className="text-sm font-medium group-hover:underline underline-offset-4">
-                {journal.playlist.title}
-              </p>
-              {journal.playlist.spotifyUrl && (
-                <p className="text-xs text-muted-foreground mt-2">Spotify</p>
+        <section className="mt-16 border-t border-border pt-16">
+          <div className="mx-auto w-full max-w-160">
+            <p className={cn(overlineClass, "text-muted-foreground")}>Soundtrack</p>
+            <h2 className="mt-4 text-foreground">{t("relatedPlaylist")}</h2>
+            <Link
+              href={`/playlists/${journal.playlist.slug.current}`}
+              className="group mt-8 flex items-center gap-5"
+            >
+              {journal.playlist.albumImage?.asset && (
+                <div className="size-20 shrink-0">
+                  <ImageCard style={{ aspectRatio: "1/1" }}>
+                    <Image
+                      src={urlFor(journal.playlist.albumImage).width(160).height(160).url()}
+                      alt={journal.playlist.title}
+                      width={160}
+                      height={160}
+                      className="h-full w-full object-cover"
+                    />
+                  </ImageCard>
+                </div>
               )}
-            </div>
-          </Link>
+              <div>
+                <p
+                  className={cn(
+                    bodySmClass,
+                    "text-foreground underline-offset-4 group-hover:underline"
+                  )}
+                >
+                  {journal.playlist.title}
+                </p>
+                {journal.playlist.spotifyUrl && (
+                  <p className={cn(captionClass, "mt-2 text-muted-foreground")}>Spotify</p>
+                )}
+              </div>
+            </Link>
+          </div>
         </section>
       )}
 
-      {/* ⑥ Related article (コラム) */}
+      {/* 関連するコラム (Personal Edition 側の公開記事) */}
       {journal.relatedPost && (
-        <section className="section-narrow py-16 border-t border-border">
-          <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-4">
-            Related Article
-          </p>
-          <h3 className="text-base font-medium mb-4">{t("relatedPost")}</h3>
-          <Link
-            href={`/journal/${journal.relatedPost.slug.current}`}
-            className="text-sm underline underline-offset-4 hover:text-muted-foreground transition-colors"
-          >
-            {journal.relatedPost.title}
-          </Link>
+        <section className="mt-16 border-t border-border pt-16">
+          <div className="mx-auto w-full max-w-160">
+            <p className={cn(overlineClass, "text-muted-foreground")}>Related Article</p>
+            <h2 className="mt-4 text-foreground">{t("relatedPost")}</h2>
+            <Link
+              href={`/journal/${journal.relatedPost.slug.current}`}
+              className={cn(
+                bodySmClass,
+                "mt-8 inline-flex h-12 items-center text-foreground underline underline-offset-4 hover:text-muted-foreground"
+              )}
+            >
+              {journal.relatedPost.title}
+            </Link>
+          </div>
         </section>
       )}
-
-      {/* Bottom spacing */}
-      <div className="pb-16" />
-    </article>
+    </Section>
   );
 }
