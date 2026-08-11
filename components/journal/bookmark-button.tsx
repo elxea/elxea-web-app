@@ -251,7 +251,7 @@ export function BookmarkButton({
         <span
           data-slot="bookmark-skeleton"
           aria-hidden="true"
-          className="size-5 animate-pulse rounded-md bg-accent"
+          className="size-5 animate-pulse rounded-md bg-muted"
         />
       ) : (
         <Bookmark
