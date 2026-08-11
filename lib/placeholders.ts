@@ -21,21 +21,18 @@
  *
  * ## 本番ビルドで機械的に止まる仕組み
  *
- * `status: PLACEHOLDER_MARKER` が 1 件でも残っていると本番公開できない。止める層は 2 つ:
+ * `status: PLACEHOLDER_MARKER` が 1 件でも残っていると公開できない。止める層は 2 つ:
  *
- * - **ビルド (本番の実ブロック)**: `pnpm build` が `next build` の前に
- *   `validate:placeholders` (`scripts/check-placeholders.ts`) を走らせ、
- *   production 判定時に exit 1 する。dotenv を読まない素の node プロセスなので、
- *   Vercel が注入する `VERCEL_ENV=production` にだけ反応する
- * - **テスト (公開前チェック)**: `__tests__/placeholders.test.ts` は
- *   `ROJI_PLACEHOLDER_GUARD=error` を明示したときだけ未解決 0 件を要求する。
- *   vitest は `.env.local` を process.env に読み込むため `VERCEL_ENV` で発火させると
- *   手元の env ファイル次第で通常の `pnpm test` が落ちてしまう (実際にこのリポジトリの
- *   手元環境の `.env.local` が `VERCEL_ENV="production"` を持っていた)
+ * - **ビルド (実ブロック)**: `pnpm build` が `next build` の前に
+ *   `validate:placeholders` (`scripts/check-placeholders.ts`) を走らせ、未解決が
+ *   あれば exit 1 する
+ * - **テスト (公開前チェック)**: `__tests__/placeholders.test.ts` が未解決 0 件を要求する
  *
- * production 判定は Vercel が自動注入する `VERCEL_ENV=production` のみ
- * (dev / Preview は落とさない = 作業を止めない)。CI や手元での動作確認用に
- * `ROJI_PLACEHOLDER_GUARD=error` で強制、`=off` で無効化できる。
+ * **判定は全環境で同じ** (2026-08-12 Setaka 決定)。production / Preview / dev / test を
+ * 区別せず、常に落とす。環境で挙動を変えていた旧仕様では Preview が通って本番だけが
+ * 落ち、そのたびにガードを無効化する運用になっていた。逃げ道は
+ * `ROJI_PLACEHOLDER_GUARD=off` の明示指定 1 つだけ。判定の詳細は
+ * {@link placeholderGuardMode}。
  *
  * @see docs/placeholders.md 差し替え台帳 (対象 / 現在の仮値 / 担当 / 根拠)
  */
@@ -83,11 +80,12 @@ export const PLACEHOLDERS = {
     label: "初回お届け日",
     // 文字列長を C3-2R 忠実度計測時と同一に保つ (DateRibbon の SP 2 行折返しが
     // 計測前提。長さを変えると帯の高さ実測値が無効になる)。
+    // 2026-09-10 は実際に木曜 (曜日表記と日付が食い違わないことを確認済み)。
     value: "9月10日（木）",
-    status: PLACEHOLDER_MARKER,
+    status: "confirmed",
     owner: "Setaka (事業判断)",
     basis:
-      "Shopify の定期便 selling plan の締日 (cutoff) と起算日 (anchors) から「今申し込むと初回は N 月 N 日」を導出する設計だが、2026-08-10 時点の本番ストアは selling plan group「elxea 定期便プラン」の全 3 プランが anchors=[] / cutoff=null / preAnchorBehavior=ASAP で、締日・発送曜日が未設定のため導出できない。Shopify 側にこれらを設定する (= 事業判断) まで仮値のまま。設定後は定数を消し計算式にする",
+      "**暫定確定値 (後で変更予定)**。Setaka 決定 2026-08-12: 「初回お届け日は適当な日付で仮確定してよい (後で変更する)」。本来の SoT は Shopify の定期便 selling plan の締日 (cutoff) と起算日 (anchors) から「今申し込むと初回は N 月 N 日」を導出する設計だが、2026-08-10 時点の本番ストアは selling plan group「elxea 定期便プラン」の全 3 プランが anchors=[] / cutoff=null / preAnchorBehavior=ASAP で締日・発送曜日が未設定のため導出できない。Shopify 側に設定が入ったら、この定数を消して計算式に置き換える (差し替え待ち: All Tasks ID-7657 の親スレッド / 台帳 docs/placeholders.md)",
   },
 
   /* ---- 特定商取引法ページ (/ja/legal/tokushoho) ------------------------ */
@@ -237,20 +235,33 @@ export type PlaceholderGuardMode = "error" | "off";
 /**
  * 仮値ガードを「落とすモード」で動かすかどうかを決める純関数。
  *
- * - `ROJI_PLACEHOLDER_GUARD` の明示指定が最優先 (`error` / `off`)
- * - 次に `VERCEL_ENV === "production"` なら `error`
- * - それ以外 (dev / Preview / test) は `off` = 作業を止めない
+ * **全環境で `error` が既定** (2026-08-12 Setaka 決定)。環境で挙動を変えない:
  *
- * `NODE_ENV` は見ない。`next build` はローカルでも `NODE_ENV=production` になるため、
- * これで判定すると Preview 用ビルドまで落ちてしまう。
+ * - `ROJI_PLACEHOLDER_GUARD=off` を明示したときだけ `off` (唯一の逃げ道)
+ * - それ以外はすべて `error` — production / Preview / dev / test を区別しない
+ *
+ * ## なぜ環境で分けるのをやめたか
+ *
+ * 旧仕様は `VERCEL_ENV=production` だけを `error` にしていた。結果、Preview では
+ * 未解決の仮値が通ってしまい「Preview で確認 OK → 本番デプロイで初めて落ちる」
+ * が毎回起きた。落ちるたびに `ROJI_PLACEHOLDER_GUARD=off` を付けて回避する運用に
+ * なり、ガードが本番公開を止める意味を失っていた。環境差をなくせば Preview の
+ * 時点で必ず気づけるので、`off` を使う場面そのものが無くなる。
+ *
+ * ## 代償 (承知の上)
+ *
+ * 新しい仮値を追加した瞬間から、手元の `pnpm build` / `pnpm test` も落ちる。
+ * 「仮値を入れて先に進む」ためにその場をしのぐなら `ROJI_PLACEHOLDER_GUARD=off`
+ * を明示的に付ける。既定を緩める (env で自動的に off になる) 形には戻さない。
+ *
+ * `NODE_ENV` / `VERCEL_ENV` はどちらも見ない (見る必要がなくなった)。
  */
 export function placeholderGuardMode(
   env: Record<string, string | undefined>
 ): PlaceholderGuardMode {
   const override = env.ROJI_PLACEHOLDER_GUARD;
-  if (override === "error") return "error";
   if (override === "off") return "off";
-  return env.VERCEL_ENV === "production" ? "error" : "off";
+  return "error";
 }
 
 /**

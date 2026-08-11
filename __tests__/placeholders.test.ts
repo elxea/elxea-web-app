@@ -2,12 +2,13 @@
  * 仮当て値ガード (lib/placeholders.ts) の単体テスト。
  *
  * 守りたい性質は 3 つ:
- *   1. production 相当の env では、仮値が残っている限り必ず落ちる
- *   2. dev / Preview / test では落ちない (作業を止めない)
+ *   1. **全環境で** 仮値が残っている限り必ず落ちる (2026-08-12 Setaka 決定)
+ *   2. 抜け道は `ROJI_PLACEHOLDER_GUARD=off` の明示指定だけ
  *   3. 法定表記の仮値が「実在の住所・電話番号・個人名に見える」形で書かれていない
  *
- * さらに、このテスト自体が本番相当環境で走ったときは未解決 0 件を要求する
- * (`VERCEL_ENV=production pnpm test` でも止まるようにする二重化)。
+ * 旧仕様 (`VERCEL_ENV=production` のときだけ落とす) は Preview を通してしまい、
+ * 本番デプロイで初めて落ちるためガード無効化が常用されていた。環境差を無くしたので
+ * このテストも env による分岐を持たない。
  */
 
 import { describe, expect, it } from "vitest";
@@ -42,62 +43,65 @@ const RESOLVED_FIXTURE: Record<string, PlaceholderEntry> = {
 };
 
 describe("placeholderGuardMode", () => {
-  it("VERCEL_ENV=production を error 判定にする", () => {
+  it("env 無指定でも error 判定にする (既定で落とす)", () => {
+    expect(placeholderGuardMode({})).toBe("error");
+  });
+
+  it("production / Preview / dev を区別しない (全環境で error)", () => {
     expect(placeholderGuardMode({ VERCEL_ENV: "production" })).toBe("error");
+    expect(placeholderGuardMode({ VERCEL_ENV: "preview" })).toBe("error");
+    expect(placeholderGuardMode({ VERCEL_ENV: "development" })).toBe("error");
+    expect(placeholderGuardMode({ NODE_ENV: "production" })).toBe("error");
+    expect(placeholderGuardMode({ NODE_ENV: "test" })).toBe("error");
   });
 
-  it("dev / Preview / env 無指定では落とさない", () => {
-    expect(placeholderGuardMode({})).toBe("off");
-    expect(placeholderGuardMode({ VERCEL_ENV: "preview" })).toBe("off");
-    expect(placeholderGuardMode({ VERCEL_ENV: "development" })).toBe("off");
-  });
-
-  it("NODE_ENV=production では落とさない (next build はローカルでもこの値になる)", () => {
-    expect(placeholderGuardMode({ NODE_ENV: "production" })).toBe("off");
-  });
-
-  it("ROJI_PLACEHOLDER_GUARD の明示指定が VERCEL_ENV より優先される", () => {
-    expect(placeholderGuardMode({ ROJI_PLACEHOLDER_GUARD: "error" })).toBe("error");
+  it("ROJI_PLACEHOLDER_GUARD=off だけが唯一の逃げ道", () => {
+    expect(placeholderGuardMode({ ROJI_PLACEHOLDER_GUARD: "off" })).toBe("off");
     expect(
       placeholderGuardMode({ VERCEL_ENV: "production", ROJI_PLACEHOLDER_GUARD: "off" })
     ).toBe("off");
   });
+
+  it("ROJI_PLACEHOLDER_GUARD=error は既定と同じ (後方互換)", () => {
+    expect(placeholderGuardMode({ ROJI_PLACEHOLDER_GUARD: "error" })).toBe("error");
+  });
+
+  it("未知の値は既定 (error) にフォールバックする — 誤記でガードが外れない", () => {
+    expect(placeholderGuardMode({ ROJI_PLACEHOLDER_GUARD: "OFF" })).toBe("error");
+    expect(placeholderGuardMode({ ROJI_PLACEHOLDER_GUARD: "false" })).toBe("error");
+  });
 });
 
 describe("assertPlaceholdersResolved", () => {
-  it("本番相当 env + 仮値ありなら throw する", () => {
-    expect(() =>
-      assertPlaceholdersResolved({ VERCEL_ENV: "production" }, UNRESOLVED_FIXTURE)
-    ).toThrow(PLACEHOLDER_MARKER);
+  it("仮値ありなら throw する (env 指定なしでも)", () => {
+    expect(() => assertPlaceholdersResolved({}, UNRESOLVED_FIXTURE)).toThrow(
+      PLACEHOLDER_MARKER
+    );
   });
 
   it("throw するときは対象 id と担当を含める (誰が何を直すか分かる)", () => {
-    expect(() =>
-      assertPlaceholdersResolved({ VERCEL_ENV: "production" }, UNRESOLVED_FIXTURE)
-    ).toThrow(/fixture\.pending/);
+    expect(() => assertPlaceholdersResolved({}, UNRESOLVED_FIXTURE)).toThrow(
+      /fixture\.pending/
+    );
   });
 
-  it("本番相当 env でも全件 confirmed なら通る", () => {
+  it("Preview でも仮値ありなら throw する (旧仕様との差はここ)", () => {
+    expect(() =>
+      assertPlaceholdersResolved({ VERCEL_ENV: "preview" }, UNRESOLVED_FIXTURE)
+    ).toThrow(PLACEHOLDER_MARKER);
+  });
+
+  it("全件 confirmed なら通る", () => {
+    expect(() => assertPlaceholdersResolved({}, RESOLVED_FIXTURE)).not.toThrow();
     expect(() =>
       assertPlaceholdersResolved({ VERCEL_ENV: "production" }, RESOLVED_FIXTURE)
     ).not.toThrow();
   });
 
-  it("dev / Preview では仮値が残っていても通る", () => {
-    expect(() => assertPlaceholdersResolved({}, UNRESOLVED_FIXTURE)).not.toThrow();
+  it("guard=off を明示したときだけ仮値が残っていても通る", () => {
     expect(() =>
-      assertPlaceholdersResolved({ VERCEL_ENV: "preview" }, UNRESOLVED_FIXTURE)
+      assertPlaceholdersResolved({ ROJI_PLACEHOLDER_GUARD: "off" }, UNRESOLVED_FIXTURE)
     ).not.toThrow();
-  });
-
-  it("実レジストリも本番相当 env では同じ判定になる (仮値が残る間は throw)", () => {
-    const unresolved = unresolvedPlaceholderIds();
-    const run = () => assertPlaceholdersResolved({ VERCEL_ENV: "production" });
-    if (unresolved.length > 0) {
-      expect(run).toThrow(PLACEHOLDER_MARKER);
-    } else {
-      expect(run).not.toThrow();
-    }
   });
 });
 
@@ -130,7 +134,13 @@ describe("PLACEHOLDERS レジストリ", () => {
     // 検査対象は「まだ仮値のもの」だけ。実値に差し替えた (`confirmed`) エントリは
     // 本物の住所・電話番号になるため、ここで数字列を禁じてはいけない。
     // 「1 件以上あること」も要求しない (全件 confirmed = 正常な最終状態)。
-    const legalPlaceholders = Object.entries(PLACEHOLDERS).filter(
+    //
+    // `PlaceholderEntry` に widen して読む理由: 現在は全件 `confirmed` なので
+    // `PLACEHOLDERS` の `status` はリテラル型 `"confirmed"` に推論され、
+    // `=== PLACEHOLDER_MARKER` が「型が重ならない比較」(TS2367) になる。仮値が
+    // 1 件でも復活すれば必要になる検査なので、比較を消さずに型だけ広げる。
+    const entries: Record<string, PlaceholderEntry> = PLACEHOLDERS;
+    const legalPlaceholders = Object.entries(entries).filter(
       ([id, entry]) =>
         (id.startsWith("tokushoho.") || id.startsWith("about.")) &&
         entry.status === PLACEHOLDER_MARKER
@@ -152,26 +162,20 @@ describe("PLACEHOLDERS レジストリ", () => {
 
 describe("公開ゲート", () => {
   /**
-   * 実レジストリに対する公開可否チェック。`ROJI_PLACEHOLDER_GUARD=error` を
-   * 明示したときだけ発火させる (`ROJI_PLACEHOLDER_GUARD=error pnpm test`)。
+   * 実レジストリに対する公開可否チェック。全環境でガードが有効になったので、
+   * env による分岐 (旧: `ROJI_PLACEHOLDER_GUARD=error` を明示したときだけ発火) は
+   * 廃止し、常に未解決 0 件を要求する。
    *
-   * なぜ `VERCEL_ENV` で発火させないか: vitest は `.env.local` を process.env に
-   * 読み込むため、手元の `.env.local` が `VERCEL_ENV="production"` を持っていると
-   * 通常の `pnpm test` が落ちてしまう (実際にこのリポジトリの手元環境がそうだった)。
-   * 「dev / Preview では作業を止めない」を守るため、テスト側の発火は明示指定に限る。
-   *
-   * 本番公開の実ブロックはビルド側 (`scripts/check-placeholders.ts`) が担う。
-   * こちらは dotenv を読まない素の node プロセスなので、Vercel が注入する
-   * `VERCEL_ENV=production` だけに反応する。
+   * これが落ちたら「新しい仮値が入ったまま」= そのブランチは公開できない状態。
+   * 意図して仮値を入れて作業を進めるなら `ROJI_PLACEHOLDER_GUARD=off pnpm test`。
    */
-  const releaseCheck = process.env.ROJI_PLACEHOLDER_GUARD === "error";
-
-  it.runIf(releaseCheck)("未解決の仮値が 0 件であること (公開前チェック)", () => {
+  it("未解決の仮値が 0 件であること (公開前チェック)", () => {
     expect(unresolvedPlaceholderIds()).toEqual([]);
   });
 
-  it("明示指定がないときは公開ゲートを発火させない (作業を止めない)", () => {
-    expect(placeholderGuardMode({ VERCEL_ENV: "preview" })).toBe("off");
-    expect(placeholderGuardMode({})).toBe("off");
+  it("ビルドゲートと同じ判定関数を使っている (二重管理しない)", () => {
+    expect(placeholderGuardMode(process.env)).toBe(
+      process.env.ROJI_PLACEHOLDER_GUARD === "off" ? "off" : "error"
+    );
   });
 });

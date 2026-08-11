@@ -1,22 +1,22 @@
 /**
  * check-placeholders.ts
  *
- * 仮当て値 (lib/placeholders.ts の `status: ROJI_PLACEHOLDER`) が本番に出ることを
+ * 仮当て値 (lib/placeholders.ts の `status: ROJI_PLACEHOLDER`) が公開物に出ることを
  * 機械的に止めるビルドゲート。
  *
  * 判定ポリシー (詳細は lib/placeholders.ts の `placeholderGuardMode`):
- *   - `VERCEL_ENV=production`            → 未解決 1 件でも exit 1 (本番ビルドを落とす)
- *   - `ROJI_PLACEHOLDER_GUARD=error`     → 同上 (CI / 手元の動作確認用の強制スイッチ)
- *   - `ROJI_PLACEHOLDER_GUARD=off`       → 常に exit 0
- *   - それ以外 (dev / Preview / test)     → 一覧を出すだけで exit 0 (作業を止めない)
+ *   - 既定 (production / Preview / dev / test すべて) → 未解決 1 件でも exit 1
+ *   - `ROJI_PLACEHOLDER_GUARD=off`                    → 常に exit 0 (唯一の逃げ道)
  *
- * `NODE_ENV` では判定しない。`next build` はローカルでも `NODE_ENV=production` に
- * なるため、それを条件にすると Preview 用ビルドまで落ちてしまう。
+ * 環境で挙動を変えない (2026-08-12 Setaka 決定)。旧仕様は `VERCEL_ENV=production`
+ * だけを落としていたため、Preview では通って本番デプロイで初めて落ち、毎回
+ * `ROJI_PLACEHOLDER_GUARD=off` で回避する運用になっていた。全環境同一にすれば
+ * Preview の時点で気づけるので `off` を使う場面が無くなる。
  *
  * package.json の `build` が `next build` の前に本スクリプトを走らせる。
  * 単体でも `pnpm validate:placeholders` で実行できる。
  *
- * Exit codes: 0 = 公開可 or 非 production / 1 = production で仮値が残っている
+ * Exit codes: 0 = 公開可 (or guard=off) / 1 = 仮値が残っている
  */
 
 import {
@@ -61,9 +61,10 @@ function main(): void {
   if (unresolved.length === 0) {
     console.log(`OK: ${PLACEHOLDER_MARKER} は残っていません (${total} entries checked)`);
   } else {
+    // ここに来るのは ROJI_PLACEHOLDER_GUARD=off を明示したときだけ。
     console.log(
-      `OK (non-production): ${unresolved.length}/${total} placeholder(s) unresolved — ` +
-        "dev / Preview では落としません。公開前に docs/placeholders.md を消化してください"
+      `OK (guard=off): ${unresolved.length}/${total} placeholder(s) unresolved — ` +
+        "明示的にガードを無効化しています。公開前に docs/placeholders.md を消化してください"
     );
   }
 

@@ -3,7 +3,7 @@
 - 対象プロダクト: roji (elxea)
 - 仮値のSoT: `lib/placeholders.ts` (このファイルは読み手向けの台帳。値の正本はコード側)
 - 作成: 2026-08-09 JST / elxea-developer
-- 最終更新: 2026-08-11 JST / elxea-developer (定期便5件を全件 `confirmed` 化。残り1件)
+- 最終更新: 2026-08-12 JST / elxea-developer (初回お届け日を暫定確定し**未解決0件**に。ガードを全環境統一)
 
 ## 一言で
 
@@ -12,15 +12,19 @@
 
 ## 結論・状態
 
-**13件のうち12件が解決済み。未確定は1件** — `subscription.firstDeliveryDate` (初回お届け日) だけ。
+**13件すべて解決済み。未解決0件 = 公開ブロッカーなし** (2026-08-12)。ただし
+`subscription.firstDeliveryDate` (初回お届け日) は**暫定確定**であり、後で変更する前提。
 
 - **法人情報6件** = NotionのCorporate Info DBの登録値で実値化し `confirmed` にした
   (2026-08-10)。所在地が3通りあった不一致も、Corporate Info DBを唯一のSoTとして
   利用規約ページを含む4か所すべて同じ値を参照する形に寄せて解消した
 - **月額** = 仮値の定数を**廃止**し、Shopifyのselling planから毎リクエスト導出する
   配線に置き換えた (`lib/subscription-pricing.ts`)。レジストリからエントリを削除済み
-- **初回お届け日** = 導出不能で未解決。Shopify側に締日 (cutoff) と起算日 (anchors) が
-  設定されていないため計算できない (下記「初回お届け日が出せない理由」)
+- **初回お届け日** = **暫定確定 (2026-08-12)**。Shopify側に締日 (cutoff) と起算日
+  (anchors) が無く自動導出できない状態は変わっていない (下記「初回お届け日が出せない
+  理由」)。Setaka決定「適当な日付で仮確定してよい (後で変更する)」により、公開を
+  止めないため `9月10日（木）` のまま `confirmed` にした。Shopify側の設定が入ったら
+  定数を消して計算式に置き換える
 - **定期便の契約条件5件** = 2026-08-11に新規登録。特商法ページに定期便 (継続課金) の
   契約条件を追加したさい、法11条の表示事項のうち **決済手段 / 初回と2回目以降の課金
   タイミング / 解約の受付期限 / マイページで変更できる項目** がShopifyの設定・実測に
@@ -37,20 +41,23 @@
   （Visa、Mastercard、American Express、JCB）のみ**で確定した。「決済ゲートウェイの構成が
   未完了で値そのものが存在しない」という前回の見立ては**誤りだった** (下記
   「定期便の決済手段をどう確定したか」)
-- **残る1件の性格** = 初回お届け日はShopify側の締日・起算日が未設定で導出できない。
-  「文面を決める」問題ではなく **Shopify側の作業待ち**
+- **初回お届け日の残課題** = Shopify側の締日・起算日が未設定なので、画面に出ている
+  日付は**実際の初回お届け日を保証しない**。「文面を決める」問題ではなく
+  **Shopify側の作業待ち**であることは変わらない
 
-未解決1件が残っている間、`VERCEL_ENV=production` のビルドは設計どおり失敗する
-(dev / Previewは失敗しない)。
+未解決0件なので、ビルドゲートはどの環境でも通る (2026-08-12にガードを全環境統一。
+下記「仮値が公開物に出ない仕組み」)。
 
 ## Ask
 
 **判断 (Tier 2 / Setaka)** — 次の2点。
 
-1. **Shopifyに定期便の締日と発送スケジュールを設定するか** (初回お届け日の公開ブロッカー。
-   設定されれば計算式で自動表示になり、この仮値は恒久的に消える)。**これが唯一残った
-   公開ブロッカー**で、定期便の契約条件5件 (決済手段 / 課金タイミング / 解約の受付期限 /
-   マイページで変更できる項目) は2026-08-11に全件実測で確定したので判断は不要になった
+1. **Shopifyに定期便の締日と発送スケジュールを設定するか**。設定されれば計算式で
+   自動表示になり、この暫定値は恒久的に消える。**公開ブロッカーではなくなった**が
+   (2026-08-12に暫定確定して公開を通した)、**現在サイトに出ている `9月10日（木）` は
+   実際の初回お届け日を保証しない**状態が続いている。定期便の契約条件5件 (決済手段 /
+   課金タイミング / 解約の受付期限 / マイページで変更できる項目) は2026-08-11に全件
+   実測で確定したので判断は不要
 2. **月額の表示が `1,800円` → `2,280円` に変わる**点の確認。Shopifyの実データが
    継続2,280円 / 初回1,880円 で、仮値の1,800円 はどちらでもなかった (下記
    「月額はShopifyのどの値か」)
@@ -77,7 +84,7 @@ flowchart LR
 
 | # | 対象 (id) | 出る場所 | 値 | 差し替え担当 | 値の根拠 (SoT) | 状態 |
 |---|---|---|---|---|---|---|
-| 1 | `subscription.firstDeliveryDate` | 定期便LP S2 DateRibbon (Figma 8071:126) | `9月10日（木）` (仮) | Setaka (事業判断) | Shopify定期便selling planの締日 (cutoff)・起算日 (anchors)。**2026-08-10時点で未設定のため導出不能** | 未確定 (公開ブロッカー) |
+| 1 | `subscription.firstDeliveryDate` | 定期便LP S2 DateRibbon (Figma 8071:126) | `9月10日（木）` (**暫定確定・後で変更予定**) | Setaka (事業判断) | 本来のSoTはShopify定期便selling planの締日 (cutoff)・起算日 (anchors) だが**2026-08-10時点で未設定のため導出不能**。Setaka決定2026-08-12「適当な日付で仮確定してよい (後で変更する)」により、計測前提の文字列長を保ったまま `confirmed` 化 (2026-09-10は実際に木曜) | 暫定確定 (2026-08-12 / **後で変更予定**) |
 | 2 | ~~`subscription.monthlyPrice`~~ (レジストリから削除) | 定期便LP料金SpecBand (8071:462) / 申し込みブロック (8071:514) | Shopifyから導出 (実測: 継続 `2,280円`) | — (自動) | Shopify定期便商品 (tag: `Subscription`) の毎月お届けプランの継続価格。`lib/subscription-pricing.ts` が導出 | 差し替え済 (2026-08-10 / 定数廃止・実データ配線) |
 | 3 | `tokushoho.operationsManager` | 特商法ページS1販売者 (7856:932) | 代表者氏名 | Setaka (法定表記) | Corporate Info DB「代表者氏名」(Basic)。特定商取引法 第11条 | 差し替え済 (2026-08-10) |
 | 4 | `tokushoho.address` | 特商法ページS1販売者 (7856:932) / プライバシーポリシーS4 / 利用規約S4事業者情報 | 本社所在地 (郵便番号つき) | Setaka (法定表記) | Corporate Info DB「本社住所」(Address)。特定商取引法 第11条 | 差し替え済 (2026-08-10) |
@@ -100,8 +107,8 @@ flowchart LR
 `app/[locale]/about/page.tsx` の会社情報の行を落とす (画面ラベルは倉庫兼事務所のため
 「京都事務所」のまま)。
 
-仮値がまだ残っているエントリ (#1) は、実在の住所・電話番号・個人名に見えない文字列に
-してある。万一ガードをすり抜けても読み手が一目で仮値と分かる状態を保つため、
+仮値がまだ残っているエントリ (2026-08-12時点で0件) は、実在の住所・電話番号・個人名に
+見えない文字列にする。万一ガードをすり抜けても読み手が一目で仮値と分かる状態を保つため、
 単体テストが `tokushoho.*` / `about.*` の**未確定エントリだけ**に次を強制している
 (実値に差し替えた `confirmed` エントリは本物の住所・電話番号になるので対象外)。
 
@@ -204,38 +211,50 @@ LP本文は初回特別価格に触れていないので、初回1,880円を打�
 1. `lib/placeholders.ts` の該当エントリの `value` を実値にする
 2. 同エントリの `status` を `"confirmed"` にし、`basis` にSoT (どのDBのどの項目か + 取得日) を書く
 3. 本ファイルの該当行の「状態」を `差し替え済 (YYYY-MM-DD)` にする
-4. `VERCEL_ENV=production pnpm validate:placeholders` と `ROJI_PLACEHOLDER_GUARD=error pnpm test` を通す
+4. `pnpm validate:placeholders` と `pnpm test` を通す (ガードは全環境で有効なのでenv指定は不要)
 5. 外部システムに値のSoTがあるもの (価格・在庫・配送日) は定数にせず配線に置き換える (#2が実例)
 
 法人情報を差し替えるときは **NotionのCorporate Info DBを唯一のSoTとする**。
 Figmaの凍結版や他ページの記載から値を拾って「確定」扱いにしないこと
 (2026-08-10まで所在地の表記が3通りに分かれていた原因がこれ)。
 
-## 仮値が本番に出ない仕組み
+## 仮値が公開物に出ない仕組み (2026-08-12全環境統一)
 
 | 層 | 実体 | 発火条件 | 落ち方 |
 |---|---|---|---|
-| ビルドゲート (本番の実ブロック) | `scripts/check-placeholders.ts` (`pnpm validate:placeholders`、`pnpm build` の `next build` 前段) | `VERCEL_ENV=production` または `ROJI_PLACEHOLDER_GUARD=error` | 検出したid・ラベル・仮値・担当を列挙してexit 1 |
-| テスト (公開前チェック) | `__tests__/placeholders.test.ts` | `ROJI_PLACEHOLDER_GUARD=error` の明示指定のみ | 未解決id一覧との差分を出してfail |
+| ビルドゲート (実ブロック) | `scripts/check-placeholders.ts` (`pnpm validate:placeholders`、`pnpm build` の `next build` 前段) | **常に** (production / Preview / dev / testの区別なし) | 検出したid・ラベル・仮値・担当を列挙してexit 1 |
+| テスト (公開前チェック) | `__tests__/placeholders.test.ts` | **常に** | 未解決id一覧との差分を出してfail |
 
-いずれもdev / Previewでは発火しない (ビルドは一覧をWARN表示して通過、テストはskip)。
+**唯一の逃げ道は `ROJI_PLACEHOLDER_GUARD=off` の明示指定**。`VERCEL_ENV` も `NODE_ENV` も
+見ない。
 
-判定はVercelが自動注入する `VERCEL_ENV=production` を見る。`NODE_ENV` は見ない
-(`next build` はローカルでも `NODE_ENV=production` になり、それで判定するとPreview用
-ビルドまで落ちてしまうため)。
+### なぜ環境で分けるのをやめたか (Setaka決定2026-08-12)
 
-テスト側だけ `VERCEL_ENV` で発火させていない理由: vitestは `.env.local` をprocess.envに
-読み込むため、手元の `.env.local` が `VERCEL_ENV="production"` を持っていると通常の
-`pnpm test` が落ちてしまう (このリポジトリの手元環境が実際にそうだった)。ビルドゲート側は
-dotenvを読まない素のnodeプロセスなので、この影響を受けない。
+旧仕様は `VERCEL_ENV=production` のときだけ落としていた。狙いは「dev / Previewでは
+作業を止めない」だったが、実際に起きたのはこうだった。
+
+1. Previewでは仮値が通るので、Previewの確認では気づけない
+2. 本番デプロイのビルドで初めて落ちる
+3. 出したいので `ROJI_PLACEHOLDER_GUARD=off` を付けてデプロイする
+4. ガードが本番公開を止める意味を失う
+
+全環境同一にすれば (1) の時点で必ず気づくので、(3) の運用が要らなくなる。
+
+**代償**: 新しい仮値を追加した瞬間から手元の `pnpm build` / `pnpm test` も落ちる。
+意図して仮値を置いたまま作業を進めるときは `ROJI_PLACEHOLDER_GUARD=off` を明示する。
+既定を環境で緩める形には戻さない。
 
 ```bash
-# 未解決1件 (初回お届け日) が残っている現状 — 設計どおり落ちる
-VERCEL_ENV=production pnpm validate:placeholders   # exit 1 / 残り 1 件を列挙
-ROJI_PLACEHOLDER_GUARD=error pnpm test             # 「公開ゲート」1 件だけ fail
-
-# 通常のテストは全件 pass (作業を止めない)
+# 全件confirmedの現状 — どの環境でも通る
+pnpm validate:placeholders                         # exit 0
 pnpm test                                          # pass
+
+# 新しい仮値を入れた直後は、環境を問わず落ちる (これが狙い)
+pnpm validate:placeholders                         # exit 1 / 未解決を列挙
+VERCEL_ENV=preview pnpm validate:placeholders      # exit 1 (旧仕様では通っていた)
+
+# 意図して仮値のまま進めるとき (明示が必要)
+ROJI_PLACEHOLDER_GUARD=off pnpm validate:placeholders  # exit 0
 ```
 
 ## 仮値投入でレイアウトが崩れていないか (実測)
@@ -282,8 +301,10 @@ PC 1440x900・SP 375x812 / 2026-08-09 JST。`getBoundingClientRect` の実測値
 (DateRibbon PC 49.19 / SP 74.38、特商法MetaRow PC 53.19 / SP 53.19-78.38、横スクロールなし)。
 `/ja/subscription` と `/ja/legal/tokushoho` はいずれもHTTP 200。
 
-このPreviewビルドが通ったこと自体が「Previewでは仮値ガードが発火しない」実機確認になる
-(VercelはPreviewに `VERCEL_ENV=preview` を注入するため)。
+このPreviewビルドが通ったこと自体が、当時の「Previewでは仮値ガードが発火しない」挙動の
+実機確認だった (VercelはPreviewに `VERCEL_ENV=preview` を注入する)。
+**この挙動は2026-08-12に廃止した** — ガードは全環境で発火する (上記「仮値が公開物に
+出ない仕組み」)。以後、未解決の仮値があるPreviewビルドは通らない。
 
 ## Open items (仮値ではなく、要判断の不一致)
 
