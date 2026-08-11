@@ -136,13 +136,46 @@ describe("notifyBillingCronFatal", () => {
 
 describe("notifySubscriptionPaused", () => {
   it("契約 ID と失敗回数を載せ、level は error", async () => {
-    await notifySubscriptionPaused({ contractId: contractGid(7001), failureCount: 3 });
+    await notifySubscriptionPaused({
+      contractId: contractGid(7001),
+      failureCount: 3,
+      customerNotified: true,
+    });
 
     const payload = sent();
     expect(payload.level).toBe("error");
     expect(payload.subject).toContain("停止");
     expect(payload.body).toContain("契約: 7001");
     expect(payload.body).toContain("3 回");
+  });
+
+  /**
+   * 以前ここは固定文で「顧客への最終案内は送信済み」と書いていた。督促メールが
+   * 送れていなくても運営には送信済みと見え、顧客だけが何も知らないまま契約が
+   * 止まる (2026-08-11 の失敗系監査 High-2)。実結果をそのまま出す。
+   */
+  it("最終督促メールを送れていれば「送信済み」と書く", async () => {
+    await notifySubscriptionPaused({
+      contractId: contractGid(7001),
+      failureCount: 3,
+      customerNotified: true,
+    });
+
+    expect(sent().body).toContain("顧客への最終案内は送信済み");
+    expect(sent().body).not.toContain("手動連絡");
+  });
+
+  it("送れていなければ「送信できていません (手動連絡が必要)」と書く", async () => {
+    await notifySubscriptionPaused({
+      contractId: contractGid(7001),
+      failureCount: 3,
+      customerNotified: false,
+    });
+
+    const body = sent().body;
+    expect(body).toContain("顧客への最終案内は送信できていません");
+    expect(body).toContain("手動連絡が必要");
+    expect(body).not.toContain("送信済み");
   });
 });
 
@@ -176,7 +209,11 @@ describe("送信が失敗しても本処理を壊さない", () => {
     sendLineNotifyMock.mockRejectedValue(new Error("push exploded"));
 
     await expect(
-      notifySubscriptionPaused({ contractId: contractGid(7001), failureCount: 3 }),
+      notifySubscriptionPaused({
+        contractId: contractGid(7001),
+        failureCount: 3,
+        customerNotified: true,
+      }),
     ).resolves.toBeUndefined();
 
     expect(console.error).toHaveBeenCalled();

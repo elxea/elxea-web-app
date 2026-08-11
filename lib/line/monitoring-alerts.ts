@@ -126,21 +126,31 @@ export async function notifyBillingCronFatal({
 
 /**
  * 督促の上限に達して契約を停止した (PAUSE 遷移)。
- * 顧客への最終案内は課金 cron 側で送っているので、運営側は「止まった事実」を受ける。
+ * 運営側は「止まった事実」と「顧客が知らされたかどうか」を受ける。
+ *
+ * `customerNotified` を必ず呼び出し側から受け取るのは、以前ここが固定文で
+ * 「顧客への最終案内は送信済み」と書いていたため。督促メールが送れていなくても
+ * 運営には送信済みと見え、顧客だけが何も知らないまま止まる状態を作っていた
+ * (2026-08-11 の失敗系監査 High-2)。
  */
 export async function notifySubscriptionPaused({
   contractId,
   failureCount,
+  customerNotified,
 }: {
   contractId: string;
   failureCount: number;
+  /** 顧客への最終督促メールを送れたか。false なら手動連絡が要る。 */
+  customerNotified: boolean;
 }): Promise<void> {
   await push({
     level: "error",
     subject: "定期便契約を停止しました (課金リトライ上限)",
     body: [
       `契約: ${shortId(contractId)}`,
-      `課金失敗 ${failureCount} 回で自動停止。顧客への最終案内は送信済み。`,
+      customerNotified
+        ? `課金失敗 ${failureCount} 回で自動停止。顧客への最終案内は送信済み。`
+        : `課金失敗 ${failureCount} 回で自動停止。顧客への最終案内は送信できていません (手動連絡が必要)。`,
       "確認: Shopify Admin > 定期購入",
     ].join("\n"),
   });

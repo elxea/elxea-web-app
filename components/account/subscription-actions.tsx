@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import {
   frequencyOptionKey,
   isSameFrequency,
+  STALE_BILLING_CYCLE_VIEW,
   type FrequencyOption,
 } from "@/lib/subscription-view";
 import {
@@ -54,6 +55,8 @@ export type SubscriptionActionLabels = {
   selectFrequency: string;
   cancel: string;
   actionError: string;
+  /** 見ていた画面が古くてスキップを中止したときの案内。 */
+  staleViewError: string;
   frequencyChanged: string;
   frequencyChangeError: string;
   previewNotice: string;
@@ -65,6 +68,7 @@ type PanelKind = "frequency" | "cancel" | null;
 export function SubscriptionActions({
   contractId,
   kind,
+  nextBillingDate,
   currentInterval,
   currentIntervalCount,
   frequencyOptions,
@@ -74,6 +78,13 @@ export function SubscriptionActions({
   contractId: string;
   /** 表示モデルの状態 (active / paused)。cancelled では描画しない。 */
   kind: "active" | "paused";
+  /**
+   * この画面が表示しているお届け予定日。スキップ操作でサーバへ渡し、
+   * 「顧客が狙った周期」と「サーバが解決した次の周期」が一致するかの照合に使う。
+   * 別タブ・リロード後の再実行で 2 周期目まで飛ぶのを防ぐためのもので、
+   * 周期を指定する手段ではない (サーバは常に自分で解決する)。
+   */
+  nextBillingDate: string | null;
   currentInterval?: string;
   currentIntervalCount?: number;
   /**
@@ -136,12 +147,21 @@ export function SubscriptionActions({
           result = await cancelSubscriptionAction(contractId);
           break;
         case "skip":
-          result = await skipNextDeliveryAction(contractId);
+          // 画面が見せているお届け予定日を一緒に渡す。サーバはこれと自分で解決した
+          // 周期が食い違ったら何もしない (別タブ・リロード後の再実行で 2 周期目まで
+          // 飛ぶのを防ぐ)。
+          result = await skipNextDeliveryAction(contractId, nextBillingDate);
           break;
       }
 
       if (result && !result.success) {
-        setError(result.error ?? labels.actionError);
+        // 「見ていた画面が古い」は機械可読コードで返る。顧客には何をすれば
+        // よいか (再読み込み) が分かる案内に差し替える。
+        setError(
+          result.error === STALE_BILLING_CYCLE_VIEW
+            ? labels.staleViewError
+            : (result.error ?? labels.actionError)
+        );
         return;
       }
       setOpenPanel(null);

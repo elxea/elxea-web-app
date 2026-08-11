@@ -315,6 +315,7 @@
     "cancelConfirmBody": "本当に解約しますか？この操作は取り消せません。",
     "confirmCancel": "本当に解約する",
     "actionError": "操作に失敗しました。もう一度お試しください。",
+    "staleViewError": "表示中のお届け予定が最新ではないため、スキップは行いませんでした。ページを再読み込みしてから、もう一度お試しください。",
     "changeFrequency": "お届け頻度を変更",
     "frequencyEveryMonth": "毎月",
     "frequencyEvery2Months": "隔月（2ヶ月ごと）",

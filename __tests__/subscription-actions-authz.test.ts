@@ -65,6 +65,7 @@ import {
   changeSubscriptionProductAction,
   skipNextDeliveryAction,
 } from "@/lib/shopify/subscription-actions";
+import { STALE_BILLING_CYCLE_VIEW } from "@/lib/subscription-view";
 
 const OWN_CONTRACT = "gid://shopify/SubscriptionContract/1111";
 const OTHER_CONTRACT = "gid://shopify/SubscriptionContract/2222";
@@ -268,22 +269,55 @@ describe("changeSubscriptionProductAction — 所有者照合", () => {
 });
 
 describe("skipNextDeliveryAction", () => {
-  it("does not let the caller choose the billing cycle index", async () => {
-    // The action takes exactly one parameter; the cycle is resolved server-side.
-    expect(skipNextDeliveryAction.length).toBe(1);
+  const SEEN_DATE = "2026-09-01";
 
-    await skipNextDeliveryAction(OWN_CONTRACT);
+  it("does not let the caller choose the billing cycle index", async () => {
+    // 受け取る 2 つ目の引数は「顧客が画面で見ていたお届け予定日」であって
+    // 周期指定ではない。billingCycleIndex は undefined のまま渡し、index の解決は
+    // サーバ (customer.ts) に閉じたままであることを固定する。
+    expect(skipNextDeliveryAction.length).toBe(2);
+
+    await skipNextDeliveryAction(OWN_CONTRACT, SEEN_DATE);
 
     expect(skipNextBillingCycleMock).toHaveBeenCalledWith(
       "shcat_test_access_token",
-      OWN_CONTRACT
+      OWN_CONTRACT,
+      undefined,
+      SEEN_DATE
     );
   });
 
   it("rejects an unauthenticated caller", async () => {
     getSessionMock.mockResolvedValue(null);
 
-    await expect(skipNextDeliveryAction(OWN_CONTRACT)).rejects.toThrow(/not authenticated/i);
+    await expect(skipNextDeliveryAction(OWN_CONTRACT, SEEN_DATE)).rejects.toThrow(
+      /not authenticated/i
+    );
+    expect(skipNextBillingCycleMock).not.toHaveBeenCalled();
+  });
+
+  /**
+   * 二重実行ガードの入口側 (2026-08-11 の失敗系監査 Medium-4)。
+   * 見ていた日付が無いまま呼ばれたら、周期を解決せずに拒否する — Server Action は
+   * 公開 HTTP エンドポイントなので、ガードを外して呼べる抜け道を残さない。
+   */
+  it("拒否する: 見ていたお届け予定日が無いとき (Shopify へ到達しない)", async () => {
+    const result = await skipNextDeliveryAction(OWN_CONTRACT, null);
+
+    expect(result).toEqual({
+      success: false,
+      error: STALE_BILLING_CYCLE_VIEW,
+    });
+    expect(skipNextBillingCycleMock).not.toHaveBeenCalled();
+  });
+
+  it("形式不正の契約 ID は日付の有無より先に弾く (エラー文言の対称性を保つ)", async () => {
+    const result = await skipNextDeliveryAction("1111", null);
+
+    expect(result).toEqual({
+      success: false,
+      error: "Invalid subscription contract ID",
+    });
     expect(skipNextBillingCycleMock).not.toHaveBeenCalled();
   });
 });

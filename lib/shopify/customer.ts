@@ -1,5 +1,10 @@
 import { createHash, randomBytes, createCipheriv, createDecipheriv } from "crypto";
 
+import {
+  matchesExpectedBillingDate,
+  STALE_BILLING_CYCLE_VIEW,
+} from "@/lib/subscription-view";
+
 import { SHOPIFY_API_VERSION } from "./api-version";
 
 const CLIENT_ID = process.env.SHOPIFY_CUSTOMER_ACCOUNT_CLIENT_ID || "";
@@ -461,6 +466,24 @@ export async function resolveNextBillingCycleIndex(
   subscriptionContractId: string,
   lookahead: number = 10
 ): Promise<number | null> {
+  const cycle = await resolveNextBillingCycle(
+    accessToken,
+    subscriptionContractId,
+    lookahead
+  );
+  return cycle ? cycle.cycleIndex : null;
+}
+
+/**
+ * `resolveNextBillingCycleIndex` と同じ解決を行い、**周期そのもの** (index と
+ * 予定日) を返す。予定日は「顧客が画面で見たお届け予定」と突き合わせるために要る
+ * (`skipNextBillingCycle` の二重実行ガード)。
+ */
+export async function resolveNextBillingCycle(
+  accessToken: string,
+  subscriptionContractId: string,
+  lookahead: number = 10
+): Promise<UpcomingBillingCycle | null> {
   if (!accessToken) return null;
   if (!isSubscriptionContractGid(subscriptionContractId)) return null;
 
@@ -523,7 +546,11 @@ export async function resolveNextBillingCycleIndex(
   if (!next || typeof next.cycleIndex !== "number" || next.cycleIndex < 1) {
     return null;
   }
-  return next.cycleIndex;
+  return {
+    cycleIndex: next.cycleIndex,
+    skipped: next.skipped,
+    billingAttemptExpectedDate: next.billingAttemptExpectedDate ?? null,
+  };
 }
 
 export async function getSubscriptionContracts(
@@ -765,7 +792,8 @@ export async function cancelSubscription(
 export async function skipNextBillingCycle(
   accessToken: string,
   subscriptionContractId: string,
-  billingCycleIndex?: number
+  billingCycleIndex?: number,
+  expectedBillingDate?: string | null
 ): Promise<SubscriptionMutationResult> {
   if (!isSubscriptionContractGid(subscriptionContractId)) {
     return INVALID_CONTRACT_ID;
@@ -774,7 +802,7 @@ export async function skipNextBillingCycle(
   let cycleIndex = billingCycleIndex;
 
   if (cycleIndex === undefined) {
-    const resolved = await resolveNextBillingCycleIndex(
+    const resolved = await resolveNextBillingCycle(
       accessToken,
       subscriptionContractId
     );
@@ -784,7 +812,29 @@ export async function skipNextBillingCycle(
         error: "Could not determine the next billing cycle to skip",
       };
     }
-    cycleIndex = resolved;
+
+    // 二重実行ガード (2026-08-11 の失敗系監査 Medium-4)。
+    //
+    // サーバは常に「次の未スキップ周期」を自分で解決する。そのため、別タブや
+    // リロード後にもう一度スキップが飛ぶと、顧客が意図した周期ではなく**その次の
+    // 周期**が黙って飛ぶ (連続 2 周期スキップ = 顧客の意図と違う売上減)。
+    //
+    // そこで「顧客が画面で見ていたお届け予定日」を突き合わせ、一致しないときは
+    // 何もせず拒否する。index はクライアントから受け取らない (詐称できない) まま、
+    // 期待とのズレだけを検出する形。日付が読めない場合も**倒す側は拒否**にする —
+    // 検証できないまま周期を飛ばす方が実害が大きい。
+    if (expectedBillingDate !== undefined) {
+      if (
+        !matchesExpectedBillingDate(
+          resolved.billingAttemptExpectedDate,
+          expectedBillingDate
+        )
+      ) {
+        return { success: false, error: STALE_BILLING_CYCLE_VIEW };
+      }
+    }
+
+    cycleIndex = resolved.cycleIndex;
   }
 
   // Cycle indexes are 1-based; reject 0 / negatives / non-integers outright

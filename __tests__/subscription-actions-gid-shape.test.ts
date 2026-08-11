@@ -37,11 +37,21 @@ const VALID_CONTRACT = "gid://shopify/SubscriptionContract/1111";
 /** The single failure shape every contract-scoped action must return. */
 const INVALID_ID = { success: false, error: "Invalid subscription contract ID" };
 
+/**
+ * skip だけは「顧客が画面で見ていたお届け予定日」を第 2 引数に取る (二重実行ガード)。
+ * ここでの関心は **contractId の形式検証**なので、日付は常に妥当な値を与えて
+ * 4 操作を同じ形 `(contractId) => Promise<ActionResult>` に揃える。
+ */
+const SEEN_DATE = "2026-09-01";
+
 const ACTIONS = [
   ["pauseSubscriptionAction", pauseSubscriptionAction],
   ["activateSubscriptionAction", activateSubscriptionAction],
   ["cancelSubscriptionAction", cancelSubscriptionAction],
-  ["skipNextDeliveryAction", skipNextDeliveryAction],
+  [
+    "skipNextDeliveryAction",
+    (contractId: string) => skipNextDeliveryAction(contractId, SEEN_DATE),
+  ],
 ] as const;
 
 /**

@@ -205,6 +205,44 @@ export function canManageSubscription(kind: SubscriptionStatusKind): boolean {
   return kind === "active" || kind === "paused";
 }
 
+/**
+ * スキップ操作の「見ていた画面が古い」エラーコード。
+ *
+ * 文字列そのものを画面に出さず、UI 側でローカライズした案内に差し替えるための
+ * 機械可読コード。サーバ (`lib/shopify/customer.ts`) とクライアント
+ * (`components/account/subscription-actions.tsx`) の両方から参照するので、
+ * サーバ専用モジュールではなくこの純粋モジュールに置く。
+ */
+export const STALE_BILLING_CYCLE_VIEW = "STALE_BILLING_CYCLE_VIEW";
+
+/**
+ * 顧客が画面で見ていたお届け予定日と、サーバが解決した次の周期の予定日が
+ * 同じ日を指すか。
+ *
+ * 日付だけで比べる (UTC の暦日)。定期便の周期は最短でも週単位なので、隣り合う
+ * 周期が同じ暦日になることはなく、時刻成分の差 (Shopify が返す形式のゆれ) で
+ * 正当なスキップを弾かないようにするため。
+ *
+ * どちらかが読めなければ `false` = 拒否側に倒す。検証できないまま周期を飛ばす
+ * 方が、顧客の意図と違う結果 (連続 2 周期スキップ) を生む。
+ */
+export function matchesExpectedBillingDate(
+  resolvedDate: string | null | undefined,
+  expectedDate: string | null | undefined
+): boolean {
+  const resolved = toUtcDateKey(resolvedDate);
+  const expected = toUtcDateKey(expectedDate);
+  if (resolved === null || expected === null) return false;
+  return resolved === expected;
+}
+
+function toUtcDateKey(value: string | null | undefined): string | null {
+  if (typeof value !== "string" || value.trim() === "") return null;
+  const ms = new Date(value).getTime();
+  if (!Number.isFinite(ms)) return null;
+  return new Date(ms).toISOString().slice(0, 10);
+}
+
 /** 1 行分の商品表示 (Figma 6718:14894 / 6723:14801)。 */
 export type SubscriptionLineView = {
   id: string;

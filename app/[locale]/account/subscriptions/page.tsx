@@ -122,6 +122,7 @@ export default async function SubscriptionsPage() {
     selectFrequency: t("selectFrequency"),
     cancel: t("cancel"),
     actionError: t("actionError"),
+    staleViewError: t("staleViewError"),
     frequencyChanged: t("frequencyChanged"),
     frequencyChangeError: t("frequencyChangeError"),
     previewNotice: t("previewNotice"),
@@ -252,6 +253,7 @@ function SubscriptionContractCard({
         <SubscriptionActions
           contractId={card.id}
           kind={card.kind === "active" ? "active" : "paused"}
+          nextBillingDate={card.nextBillingDate}
           currentInterval={card.interval}
           currentIntervalCount={card.intervalCount}
           frequencyOptions={frequencyOptions}

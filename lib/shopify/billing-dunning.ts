@@ -27,6 +27,25 @@
  * 下限 (grace) は残す。これは前の周期の失敗を今の周期に持ち込まないための境界で、
  * タイムゾーン差やcronの実行遅れで請求日直前に落ちた試行を拾うための猶予でもある。
  *
+ * ## 再開 (ACTIVE 復帰) で下限を進める理由 (2026-08-11 の失敗系監査 High-1)
+ *
+ * 上記の窓は「請求日起点・上限なし」なので、**上限到達で停止した契約を顧客が再開しても
+ * 失敗履歴がそのまま残り続ける**。失敗中は `nextBillingDate` が前進しないため、翌日の
+ * cron は新しい課金を 1 度も試さずに再び上限到達と判定し、PAUSED + 最終督促メールを
+ * 送り直す (無限再停止)。督促メールの「支払い方法を更新後、マイページから再開して
+ * いただけます」が機能しない誤案内になる。
+ *
+ * そこで `cycleResetAt` (顧客が再開した時刻。`lib/shopify/billing-cycle-reset.ts` が
+ * 保持する) を渡せるようにし、**窓の下限をそこまで進める**。再開後は失敗件数が 0 に
+ * 戻るので、cron は更新後の支払い方法で 1 回課金を試す。誤課金にならない根拠:
+ *
+ *   - 数え落とすのは「既に失敗した試行」だけで、成功 (`completedAt`) は
+ *     リセット後も別途拾われる (Case 1 の二重課金防止は効いたまま)
+ *   - 再課金の鍵にリセット時刻を混ぜる (route 側) ので、同日二重発火は
+ *     同じ鍵になり Shopify 側で重複が拒否される
+ *   - リセットは**周期の内側にあるときだけ**効かせる (下記 `analyzeBillingCycle`)
+ *
+
  * ## 安全側の倒し方
  *
  * 実顧客の誤課金・誤停止を避けるため、判断がつかない場合は**課金しない**側に倒す。
@@ -73,6 +92,20 @@ export type BillingCycleState = {
   completedAt: Date | null;
   /** この周期で結果待ちの試行の時刻 (`errorCode` なし & `ready` でない)。 */
   inFlightAt: Date | null;
+  /**
+   * 実際に適用された周期リセットの時刻 (再開により窓の下限を進めた場合)。
+   * 適用しなかった場合は null。route はこれを idempotencyKey に混ぜて、
+   * 再開後の課金が「前の周期の同じ鍵」で拒否されないようにする。
+   */
+  cycleResetAt: Date | null;
+};
+
+export type AnalyzeBillingCycleOptions = {
+  /**
+   * 顧客が契約を再開した時刻。渡すと、この時刻より前の試行は閉じた周期のものとして
+   * 数えない。**周期の内側 (請求日 - grace より後) にあるときだけ**適用する。
+   */
+  cycleResetAt?: Date | null;
 };
 
 const HOUR_MS = 60 * 60 * 1000;
@@ -88,10 +121,15 @@ function parseMs(value: string): number | null {
  * 窓は `[請求日 - CYCLE_GRACE_HOURS, ∞)`。**上限は設けない** —
  * 上限を設けると失敗中に前進しない `nextBillingDate` のせいで古い契約の失敗が
  * 数え落とされ、上限到達も停止も起きなくなる (このファイル冒頭の障害)。
+ *
+ * `options.cycleResetAt` を渡すと下限をそこまで進める (顧客の再開で周期を閉じる)。
+ * ただし**周期の内側にあるときだけ**適用する: 前の周期に置かれた古いマーカーで
+ * 下限を戻して失敗を数え直すことがないようにする。
  */
 export function analyzeBillingCycle(
   attempts: DunningAttempt[],
-  billingDate: string
+  billingDate: string,
+  options?: AnalyzeBillingCycleOptions
 ): BillingCycleState {
   const billingDateMs = parseMs(billingDate);
 
@@ -102,10 +140,17 @@ export function analyzeBillingCycle(
       lastFailureAt: null,
       completedAt: null,
       inFlightAt: null,
+      cycleResetAt: null,
     };
   }
 
-  const cycleStartMs = billingDateMs - CYCLE_GRACE_HOURS * HOUR_MS;
+  const graceStartMs = billingDateMs - CYCLE_GRACE_HOURS * HOUR_MS;
+
+  // リセットは「周期の内側にある」ときだけ効かせる (grace の下限より後)。
+  const resetMs = toMs(options?.cycleResetAt);
+  const appliedResetMs =
+    resetMs !== null && resetMs > graceStartMs ? resetMs : null;
+  const cycleStartMs = appliedResetMs ?? graceStartMs;
 
   let failureCount = 0;
   let lastFailureMs: number | null = null;
@@ -145,7 +190,14 @@ export function analyzeBillingCycle(
     lastFailureAt: lastFailureMs === null ? null : new Date(lastFailureMs),
     completedAt: completedMs === null ? null : new Date(completedMs),
     inFlightAt: inFlightMs === null ? null : new Date(inFlightMs),
+    cycleResetAt: appliedResetMs === null ? null : new Date(appliedResetMs),
   };
+}
+
+function toMs(value: Date | null | undefined): number | null {
+  if (!value) return null;
+  const ms = value.getTime();
+  return Number.isFinite(ms) ? ms : null;
 }
 
 /**

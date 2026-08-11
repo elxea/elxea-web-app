@@ -315,6 +315,7 @@
     "cancelConfirmBody": "Cancel this subscription? This cannot be undone.",
     "confirmCancel": "Yes, cancel it",
     "actionError": "Action failed. Please try again.",
+    "staleViewError": "The delivery date shown was out of date, so nothing was skipped. Please reload the page and try again.",
     "changeFrequency": "Change delivery frequency",
     "frequencyEveryMonth": "Monthly",
     "frequencyEvery2Months": "Every 2 months",

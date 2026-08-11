@@ -267,9 +267,11 @@ describe("PAUSE 遷移", () => {
     await GET(request());
 
     expect(notifySubscriptionPausedMock).toHaveBeenCalledTimes(1);
+    // customerNotified は最終督促メールの実結果。ここでは送信成功のケース。
     expect(notifySubscriptionPausedMock).toHaveBeenCalledWith({
       contractId: CONTRACT_A,
       failureCount: 3,
+      customerNotified: true,
     });
   });
 

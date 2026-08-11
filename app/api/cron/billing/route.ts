@@ -20,6 +20,7 @@ import {
   isStaleInFlight,
   MAX_RETRY_ATTEMPTS,
 } from "@/lib/shopify/billing-dunning";
+import { getBillingCycleResetAt } from "@/lib/shopify/billing-cycle-reset";
 
 /**
  * Cron-triggered billing processor with dunning (retry) logic.
@@ -38,6 +39,18 @@ import {
  * `analyzeBillingCycle` が持つ。失敗の集計窓に上限を置くと、失敗中に前進しない
  * `nextBillingDate` のせいで古い契約の失敗が数え落とされ、上限到達も一時停止も
  * 起きず毎日再課金と督促メールが続く (2026-08-11 の障害)。窓の根拠は同ファイル参照。
+ *
+ * 逆向きの欠陥 (再開しても即再停止する無限ループ) は、顧客の再開時に書かれる
+ * 周期リセットのマーカー (`lib/shopify/billing-cycle-reset.ts`) を窓の下限として
+ * 使うことで閉じている。再開後は失敗件数が 0 に戻り、この cron が更新後の支払い
+ * 方法で 1 回課金を試す。リセットが効いている周期の idempotencyKey には
+ * リセット時刻を混ぜる (前の周期と同じ鍵になって Shopify に弾かれないため)。
+ *
+ * 督促メールの送信可否は**申告に必ず反映する**。`sendDunningEmail` は失敗を
+ * 例外ではなく `{ success: false }` で返すので、戻り値を見ずに「送信済み」と
+ * ログするとメール不着が完全に沈黙する (2026-08-11 の失敗系監査 High-2)。
+ * 失敗は Sentry に上げ、summary の `dunning_email_failed` に計上し、運営宛の
+ * 停止通知にも「顧客へ届いていない」ことをそのまま載せる。
  *
  * Expected to be called by Vercel Cron (vercel.json) daily.
  * Protected by CRON_SECRET header check.
@@ -83,7 +96,16 @@ type BillingResult = {
   action: BillingAction;
   attemptNumber?: number;
   detail?: string;
+  /**
+   * 顧客への督促メールを送れなかった (Resend がエラー応答 / 例外 / 宛先不明)。
+   * `action` とは独立した軸なので別フィールドにする — 課金の申告を歪めずに、
+   * 「顧客が知らされていない」を summary と監視に必ず出すため。
+   */
+  dunningEmailFailed?: boolean;
 };
+
+/** 督促メール 1 通ぶんの結末。送れなかったことを呼び出し側に必ず返す。 */
+type DunningNotifyOutcome = { notified: boolean; reason?: string };
 
 /**
  * Timing-safe comparison of the incoming Authorization header against the
@@ -168,6 +190,9 @@ export async function GET(request: NextRequest) {
       waiting: count("waiting"),
       skipped: count("skipped"),
       errors: count("error"),
+      // 「顧客に届かなかった督促メール」の件数。action とは独立に数える
+      // (課金は正しく失敗と申告されているのに、顧客だけが知らない状態を隠さない)。
+      dunning_email_failed: results.filter((r) => r.dunningEmailFailed).length,
     };
 
     console.log(`[Billing Cron] Summary:`, JSON.stringify(summary));
@@ -230,8 +255,17 @@ async function processContract(
 
   // この周期の試行履歴から現在地を出す。判定は lib/shopify/billing-dunning に閉じている
   // (窓の設計と、そこを間違えたときに何が起きたかは同ファイルの冒頭を参照)。
-  const attempts = await getBillingAttempts(contract.id);
-  const cycle = analyzeBillingCycle(attempts, contract.nextBillingDate);
+  //
+  // 顧客が再開していれば、その時刻より前の失敗は閉じた周期のものとして数えない。
+  // 読めなければ null = 従来判定 (課金を足さない側) なので、Firestore 障害が
+  // 誤課金に化けることはない。
+  const [attempts, cycleResetAt] = await Promise.all([
+    getBillingAttempts(contract.id),
+    getBillingCycleResetAt(contract.id),
+  ]);
+  const cycle = analyzeBillingCycle(attempts, contract.nextBillingDate, {
+    cycleResetAt,
+  });
 
   // Case 0: 請求日が日時として読めない。判定の基準が無いので課金しない。
   if (!cycle.billingDateValid) {
@@ -280,6 +314,8 @@ async function processContract(
 
   // Case 3: リトライ上限に到達 -- 契約を一時停止する。
   // 窓に上限が無いので、請求日から何日経っていても失敗は数え落とされずここに入る。
+  // ただし顧客が再開していれば、リセット後に積み直した失敗だけがここに数えられる
+  // (再開直後は 0 件なので、必ず新しい課金試行が 1 回走ってから停止に入る)。
   if (cycle.failureCount >= MAX_RETRY_ATTEMPTS) {
     return handleMaxRetriesExceeded(contract);
   }
@@ -304,19 +340,45 @@ async function processContract(
         detail: `Waiting for retry interval (${cycle.failureCount} failures, last at ${cycle.lastFailureAt.toISOString()})`,
       };
     }
-    return performBillingAttempt(contract, cycle.failureCount + 1);
+    return performBillingAttempt(
+      contract,
+      cycle.failureCount + 1,
+      cycle.cycleResetAt
+    );
   }
 
   // Case 6: この周期の初回試行
-  return performBillingAttempt(contract, 1);
+  return performBillingAttempt(contract, 1, cycle.cycleResetAt);
+}
+
+/**
+ * Shopify に渡す idempotency key。
+ *
+ * 通常は `contractId + 請求日 + 試行番号`。周期リセット (顧客の再開) が効いている
+ * 間は**リセット時刻も混ぜる** — 混ぜないと再開後の 1 回目が停止前の 1 回目と同じ鍵に
+ * なり、Shopify 側の重複判定で新しい課金が作られないため。同じ日に cron が二重発火
+ * したときは鍵が一致する (= 重複が拒否される) 性質はそのまま維持される。
+ */
+function buildIdempotencyKey(
+  contract: { id: string; nextBillingDate: string | null },
+  attemptNumber: number,
+  cycleResetAt: Date | null
+): string {
+  const base = `${contract.id}-${contract.nextBillingDate}`;
+  const reset = cycleResetAt ? `-reset${cycleResetAt.getTime()}` : "";
+  return `${base}${reset}-attempt${attemptNumber}`;
 }
 
 async function performBillingAttempt(
   contract: { id: string; nextBillingDate: string | null },
-  attemptNumber: number
+  attemptNumber: number,
+  cycleResetAt: Date | null
 ): Promise<BillingResult> {
-  // Idempotency key: contractId + billing date + attempt number
-  const idempotencyKey = `${contract.id}-${contract.nextBillingDate}-attempt${attemptNumber}`;
+  const idempotencyKey = buildIdempotencyKey(
+    contract,
+    attemptNumber,
+    cycleResetAt
+  );
 
   const isRetry = attemptNumber > 1;
   const attempt = await createBillingAttempt(contract.id, idempotencyKey);
@@ -327,13 +389,20 @@ async function performBillingAttempt(
       `[Billing Cron] Attempt ${attemptNumber} failed for ${contract.id}: ${attempt.errorMessage}`
     );
 
-    await sendDunningNotification(contract.id, attemptNumber, false);
+    const notify = await sendDunningNotification(
+      contract.id,
+      attemptNumber,
+      false
+    );
 
     return {
       contractId: contract.id,
       action: isRetry ? "retry_failed" : "failed",
       attemptNumber,
-      detail: `Failed: ${attempt.errorMessage ?? attempt.errorCode}`,
+      detail: `Failed: ${attempt.errorMessage ?? attempt.errorCode}${
+        notify.notified ? "" : ` (dunning email not sent: ${notify.reason})`
+      }`,
+      ...(notify.notified ? {} : { dunningEmailFailed: true }),
     };
   }
 
@@ -370,16 +439,25 @@ async function handleMaxRetriesExceeded(
     await updateSubscriptionContract(contract.id, { status: "PAUSED" });
 
     // Send final dunning email
-    await sendDunningNotification(contract.id, MAX_RETRY_ATTEMPTS, true);
+    const notify = await sendDunningNotification(
+      contract.id,
+      MAX_RETRY_ATTEMPTS,
+      true
+    );
 
     // 契約が止まったことは運営が個別に把握すべき状態変化なので、run 集約とは別に送る
     // (顧客への最終案内より後に置く。運営通知が顧客対応を遅らせない順序)。
     // `.catch` は保険。ここは try の内側なので、通知が漏れると停止に成功した契約が
     // action=error として申告されてしまう (実態と申告のずれ = この route が 2026-08 に
     // 直したのと同じ種類の欠陥)。
+    //
+    // `customerNotified` は最終督促メールの実結果をそのまま渡す。ここを固定文で
+    // 「送信済み」と書くと、メールが届いていない契約まで運営が「案内済み」と誤認する
+    // (2026-08-11 の失敗系監査 High-2 の後半)。
     await notifySubscriptionPaused({
       contractId: contract.id,
       failureCount: MAX_RETRY_ATTEMPTS,
+      customerNotified: notify.notified,
     }).catch((notifyError) =>
       console.error("[Billing Cron] 契約停止通知の送出に失敗しました:", notifyError)
     );
@@ -388,7 +466,10 @@ async function handleMaxRetriesExceeded(
       contractId: contract.id,
       action: "paused",
       attemptNumber: MAX_RETRY_ATTEMPTS,
-      detail: "Contract paused after max retries",
+      detail: notify.notified
+        ? "Contract paused after max retries"
+        : `Contract paused after max retries (final dunning email not sent: ${notify.reason})`,
+      ...(notify.notified ? {} : { dunningEmailFailed: true }),
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
@@ -405,11 +486,23 @@ async function handleMaxRetriesExceeded(
   }
 }
 
+/**
+ * 顧客へ督促メールを送り、**送れたかどうかを必ず返す**。
+ *
+ * `sendDunningEmail` は Resend のエラー応答を例外にせず `{ success: false }` で返す。
+ * 以前はこの戻り値を見ずに「Dunning email sent」とログしていたため、メール不着が
+ * どこにも現れず (Sentry にも LINE にも乗らず)、運営は送信済みと誤認していた
+ * (2026-08-11 の失敗系監査 High-2)。
+ *
+ * 送れなかった 3 経路 — 宛先が無い / Resend がエラー応答 / 例外 — をすべて
+ * `notified: false` に畳み、Sentry に上げる。課金処理そのものは止めない
+ * (メールが送れないことは課金の失敗ではない)。
+ */
 async function sendDunningNotification(
   contractId: string,
   attemptNumber: number,
   isFinalAttempt: boolean
-): Promise<void> {
+): Promise<DunningNotifyOutcome> {
   try {
     // Fetch full contract details for email data
     const fullContract = await getSubscriptionContract(contractId);
@@ -418,7 +511,17 @@ async function sendDunningNotification(
       console.warn(
         `[Billing Cron] No customer email for contract ${contractId}, skipping dunning email`
       );
-      return;
+      Sentry.captureMessage("[Billing Cron] Dunning email not sent", {
+        level: "warning",
+        tags: { cron: "billing", phase: "dunning-email" },
+        extra: {
+          contractId,
+          attemptNumber,
+          isFinalAttempt,
+          reason: "no customer email",
+        },
+      });
+      return { notified: false, reason: "no customer email" };
     }
 
     const items = fullContract.lines.map((line) => ({
@@ -428,7 +531,7 @@ async function sendDunningNotification(
       currencyCode: line.currentPrice.currencyCode,
     }));
 
-    await sendDunningEmail({
+    const sendResult = await sendDunningEmail({
       customerEmail: fullContract.customer.email,
       customerName: fullContract.customer.displayName,
       attemptNumber,
@@ -436,11 +539,28 @@ async function sendDunningNotification(
       items,
     });
 
+    // 戻り値を必ず見る。`success: false` を握り潰すと顧客も運営も気づけない。
+    if (sendResult && sendResult.success === false) {
+      const reason = sendResult.error ?? "unknown send error";
+      console.error(
+        `[Billing Cron] Dunning email NOT sent for ${contractId} (attempt ${attemptNumber}): ${reason}`
+      );
+      Sentry.captureMessage("[Billing Cron] Dunning email not sent", {
+        level: "error",
+        tags: { cron: "billing", phase: "dunning-email" },
+        extra: { contractId, attemptNumber, isFinalAttempt, reason },
+      });
+      return { notified: false, reason };
+    }
+
     console.log(
       `[Billing Cron] Dunning email sent for ${contractId} (attempt ${attemptNumber}, final: ${isFinalAttempt})`
     );
+    return { notified: true };
   } catch (error) {
-    // Non-critical: log but don't fail the billing process
+    // Non-critical for billing itself: 課金処理は止めないが、顧客に届いていない
+    // ことは申告に必ず残す (呼び出し側が summary と停止通知に反映する)。
+    const reason = error instanceof Error ? error.message : "Unknown error";
     console.error(
       `[Billing Cron] Failed to send dunning email for ${contractId}:`,
       error
@@ -449,5 +569,6 @@ async function sendDunningNotification(
       tags: { cron: "billing", phase: "dunning-email" },
       extra: { contractId, attemptNumber },
     });
+    return { notified: false, reason };
   }
 }
