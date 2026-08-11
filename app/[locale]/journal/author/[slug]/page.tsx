@@ -10,6 +10,28 @@ import {
 import { urlFor } from "@/sanity/lib/image";
 import { ArticleCard } from "@/components/journal/article-card";
 
+type AuthorDoc = {
+  name: string;
+  role?: string;
+  bio?: string;
+  website?: string;
+  image?: { asset: object };
+};
+
+type AuthorArticle = {
+  _id: string;
+  slug: { current: string };
+  title: string;
+  excerpt?: string;
+  thumbnail?: { asset: object; alt?: string };
+  mainImage?: { asset: object; alt?: string };
+  publishedAt?: string;
+  memberOnly?: boolean;
+  category?: { title: string; slug: { current: string } };
+  tags?: { _id: string; title: string; slug: { current: string } }[];
+  author?: { name: string; image?: { asset: object } };
+};
+
 export async function generateMetadata({
   params,
 }: {
@@ -41,16 +63,30 @@ export default async function AuthorPage({
 
   const client = getClient();
 
-  const [author, articles] = await Promise.all([
-    client.fetch(AUTHOR_BY_SLUG_QUERY, { slug }),
-    client.fetch(ARTICLES_BY_AUTHOR_QUERY, {
-      language: locale,
-      authorSlug: slug,
-      start: 0,
-      end: 30,
-    }),
-  ]);
+  // A7: 以前はここが素の await で、Sanity 側の障害がそのまま 500 になっていた
+  // (著者ページだけ他のジャーナル系ページと扱いが違った)。障害は 404 にも
+  // 500 にもせず、他ページと同じ loadError 表示に倒す。
+  let author: AuthorDoc | null;
+  let articles: AuthorArticle[];
+  try {
+    [author, articles] = await Promise.all([
+      client.fetch(AUTHOR_BY_SLUG_QUERY, { slug }),
+      client.fetch(ARTICLES_BY_AUTHOR_QUERY, {
+        language: locale,
+        authorSlug: slug,
+        start: 0,
+        end: 30,
+      }),
+    ]);
+  } catch {
+    return (
+      <div className="section-wide">
+        <p className="text-sm text-muted-foreground">{t("loadError")}</p>
+      </div>
+    );
+  }
 
+  // 取得は成功したが著者が居ない = 本物の 404。
   if (!author) notFound();
 
   return (
@@ -95,28 +131,14 @@ export default async function AuthorPage({
         <p className="text-muted-foreground text-sm">{t("empty")}</p>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-14">
-          {articles.map(
-            (article: {
-              _id: string;
-              slug: { current: string };
-              title: string;
-              excerpt?: string;
-              thumbnail?: { asset: object; alt?: string };
-              mainImage?: { asset: object; alt?: string };
-              publishedAt?: string;
-              memberOnly?: boolean;
-              category?: { title: string; slug: { current: string } };
-              tags?: { _id: string; title: string; slug: { current: string } }[];
-              author?: { name: string; image?: { asset: object } };
-            }) => (
-              <ArticleCard
-                key={article._id}
-                article={article}
-                locale={locale}
-                memberOnlyLabel={tCommon("memberOnly")}
-              />
-            )
-          )}
+          {articles.map((article) => (
+            <ArticleCard
+              key={article._id}
+              article={article}
+              locale={locale}
+              memberOnlyLabel={tCommon("memberOnly")}
+            />
+          ))}
         </div>
       )}
     </div>
