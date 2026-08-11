@@ -153,7 +153,18 @@
     "categoryStackMeta": "{count} categories · {total} articles",
     "lastUpdated": "Updated {date}",
     "articleCount": "{count}",
-    "shelfMore": "More in {name} →"
+    "shelfMore": "More in {name} →",
+    "audioPlay": "Play",
+    "audioPause": "Pause",
+    "audioLoading": "Loading",
+    "audioError": "Could not play this audio. Please try again later.",
+    "audioNowPlaying": "Now playing",
+    "audioClose": "Close player",
+    "audioSeek": "Seek",
+    "audioTrackList": "Tracks",
+    "audioExternalNote": "Full-length tracks and downloads are on SoundCloud",
+    "audioInterviewNote": "Plays on this page. Not published to external streaming services.",
+    "audioInterviewLabel": "Interview audio"
   },
   "teaMenu": {
     "title": "Tea Menu",

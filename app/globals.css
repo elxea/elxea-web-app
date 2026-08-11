@@ -362,6 +362,66 @@ h1.auth-card-title[data-emphasis="strong"] {
   letter-spacing: var(--typography-style-h5-tracking);
 }
 
+/* 記事内プレイヤーのシーク帯 (Figma AudioPlayer 7047:6363)。
+ * 高さ 6 / 全丸め / 溝 mode/muted / 進捗 mode/foreground。
+ * ネイティブの range を土台にするのは、キーボードと支援技術から操作できる
+ * 状態を保つため (見た目だけ寄せて操作できない部品は作らない)。
+ * 進捗の塗りは背景のグラデーションで作る — つまみ前後を別々に塗る CSS は
+ * ブラウザごとに当たる疑似要素が違い、片方だけ塗れない事故が起きる。 */
+.audio-seek {
+  appearance: none;
+  -webkit-appearance: none;
+  height: 0.375rem;
+  border-radius: var(--shape-radius-full);
+  background:
+    linear-gradient(
+      to right,
+      var(--color-foreground) 0,
+      var(--color-foreground) var(--audio-progress, 0%),
+      var(--color-muted) var(--audio-progress, 0%),
+      var(--color-muted) 100%
+    );
+  cursor: pointer;
+}
+.audio-seek:disabled {
+  cursor: default;
+}
+/* つまみ。Figma は静止画なので描かれていないが、掴む対象が見えないと
+ * ドラッグでシークできないので置く。 */
+.audio-seek::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 0.875rem;
+  height: 0.875rem;
+  border-radius: var(--shape-radius-full);
+  background: var(--color-foreground);
+}
+.audio-seek::-moz-range-thumb {
+  width: 0.875rem;
+  height: 0.875rem;
+  border: 0;
+  border-radius: var(--shape-radius-full);
+  background: var(--color-foreground);
+}
+.audio-seek:disabled::-webkit-slider-thumb {
+  background: var(--color-muted-foreground);
+}
+.audio-seek:disabled::-moz-range-thumb {
+  background: var(--color-muted-foreground);
+}
+.audio-seek:focus-visible {
+  outline: 2px solid var(--color-ring);
+  outline-offset: 2px;
+}
+
+/* 空状態の見出し (Figma EmptyState 8173:298) は h4 プリセット (16px / 500)。
+ * 文書構造としては見出しではなく本文なので要素は p のままにし、体裁だけ揃える。 */
+:lang(ja) p[data-slot="empty-state-title"],
+:lang(en) p[data-slot="empty-state-title"] {
+  font: var(--typography-style-h4);
+  letter-spacing: var(--typography-style-h4-tracking);
+}
+
 /* マイページ【R2: 確定版】の挨拶 (Figma PC 8095:741 / SP 8095:800) は
  * `elxea/typography/editorial/jp/h1` = 32px / Light / lh 1.2 / tracking .02em。
  * 見出しではなく本文 (挨拶) なので要素は p のままにして体裁だけ h1 に揃える。

@@ -27,6 +27,7 @@ const BehaviorActionSchema = z.enum([
   "purchase",
   "line_message",
   "search",
+  "audio_play",
 ]);
 
 // Explicit whitelist. Do NOT use .catchall() — behavior payloads come from

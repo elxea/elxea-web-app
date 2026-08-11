@@ -153,7 +153,18 @@
     "categoryStackMeta": "{count} カテゴリ ・ 全 {total} 本",
     "lastUpdated": "最終更新 {date}",
     "articleCount": "{count}本",
-    "shelfMore": "{name}を、もっと見る →"
+    "shelfMore": "{name}を、もっと見る →",
+    "audioPlay": "再生",
+    "audioPause": "一時停止",
+    "audioLoading": "読み込んでいます",
+    "audioError": "音声を再生できませんでした。時間をおいて、もう一度お試しください。",
+    "audioNowPlaying": "再生中",
+    "audioClose": "プレイヤーを閉じる",
+    "audioSeek": "再生位置",
+    "audioTrackList": "収録曲",
+    "audioExternalNote": "曲単位のフル尺・ダウンロードは SoundCloud で",
+    "audioInterviewNote": "このページで再生します。外部の配信サービスには公開していません。",
+    "audioInterviewLabel": "インタビュー音声"
   },
   "teaMenu": {
     "title": "お茶メニュー",

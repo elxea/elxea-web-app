@@ -162,6 +162,10 @@ export type BehaviorAction =
   | "purchase"
   | "line_message"
   | "search"
+  // 記事内の音声 (楽曲プレイリスト / インタビュー) の再生開始。BGM は
+  // ページに常駐する環境音なので対象外 — 「その記事の音を聴いた」という
+  // 意思のある行動だけを残す。
+  | "audio_play"
   | "tea_mention"
   | "flavor_preference"
   | "topic_interest";

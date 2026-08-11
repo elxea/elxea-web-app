@@ -9,6 +9,8 @@ import {
   useState,
 } from "react";
 
+import { announceAudioPlay, subscribeAudioPlay } from "@/lib/audio/audio-bus";
+
 /**
  * `status` は「今この瞬間ユーザーに何を見せるべきか」の唯一の根拠。
  *
@@ -138,6 +140,23 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  // 記事内の音声 (楽曲・インタビュー) が鳴り始めたら BGM は黙る。
+  // Figma AudioBlock/Track 8181:5288 の「BGM とは排他」を両方向で成立させる
+  // ための片側。もう片側は article-audio-provider にある。
+  useEffect(
+    () =>
+      subscribeAudioPlay((owner) => {
+        if (owner === "bgm") return;
+        const audio = audioRef.current;
+        if (audio && !audio.paused) {
+          audio.pause();
+          setIsPlaying(false);
+          setIsLoading(false);
+        }
+      }),
+    []
+  );
+
   const toggle = useCallback(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -147,6 +166,8 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
       // 数秒間まったく反応が無いように見えるため。
       setIsLoading(true);
       setError(null);
+      // 先に記事音声を止める。順番が逆だと一瞬とはいえ二重に鳴る。
+      announceAudioPlay("bgm");
       audio
         .play()
         .then(() => {
