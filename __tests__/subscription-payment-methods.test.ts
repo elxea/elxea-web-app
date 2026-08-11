@@ -17,10 +17,18 @@
  * 確定値 (2026-08-11 実測): **クレジットカード（Visa、Mastercard、American Express、JCB）のみ**。
  * 実測の内訳は `lib/placeholders.ts` の `tokushoho.subscriptionPaymentMethods` の `basis`。
  *
- * Apple Pay / Google Pay は単発チェックアウトのウォレットとしては有効
- * (Storefront API `supportedDigitalWallets`) だが、定期便で使える確証が無いため
- * 書かない。**確証の無い手段を足さない**のがこのテストの守る性質で、
- * 少なく書くこと自体は不実表示にならない。
+ * Apple Pay / Google Pay を書かないのは「使えないから」ではない。Shopify 公式
+ * ドキュメント (https://help.shopify.com/en/manual/products/purchase-options/subscriptions/considerations
+ * 2026-08-11 取得) は Shopify Payments 利用時について "Customers can use accelerated
+ * checkouts, such as Shop Pay, Apple Pay, Google Pay, or PayPal, to purchase
+ * subscriptions" と明記しており、当店は shopify_payments 稼働なので使える見込みが高い。
+ *
+ * それでも表記に出さないのは、ウォレットで契約しても保管される instrument は
+ * クレジットカードだから (実在契約の `CustomerCreditCard` と整合)。カードブランドに
+ * 統一した方が実体に忠実で、ウォレット名を並べると "Apple Pay support for subscriptions
+ * is limited to Visa and Mastercard" (同 doc) の但し書きが要り、かえって読み手を誤らせる。
+ * このテストが守るのは「使える手段を漏れなく列挙すること」ではなく
+ * **表記をカードブランドの 1 通りに保つこと**。
  */
 
 import { readFileSync } from "node:fs";
@@ -44,12 +52,19 @@ const BRANDS = ["Visa", "Mastercard", "American Express", "JCB"] as const;
 const SUBSCRIPTION_PAYMENT_SURFACES = ["messages/ja.json", "messages/en.json"] as const;
 
 /**
- * 定期便では使えない手段。定期便の FAQ 回答に混ざったら落とす。
+ * 定期便の決済手段の回答に出してはいけない語。理由は 2 系統ある。
  *
- * 単発販売の記載 (特商法ページ 群 I) には出てよいので、検査対象は
+ * (a) **この店舗の定期便では実際に使えない手段** — コンビニ決済・銀行振込・代金引換・
+ *     楽天ペイは Shopify の `customerPaymentMethod` として保管できず
+ *     `subscriptionBillingAttempt` の請求先にならない。PayPal は PayPal Express
+ *     ゲートウェイが未有効 (2026-08-11 実測)。書けば不実表示になる。
+ * (b) **使えるが表記に出さない手段** — Apple Pay / Google Pay。理由は冒頭の注記のとおりで、
+ *     使えないからではなく、表記をカードブランドに統一するため。
+ *
+ * 単発販売の記載 (特商法ページ 群 I) には (a) が出てよいので、検査対象は
  * 「定期便の決済手段を答えている FAQ の値」だけに絞る。
  */
-const NOT_AVAILABLE_FOR_SUBSCRIPTION = [
+const MUST_NOT_APPEAR_IN_SUBSCRIPTION_COPY = [
   "Apple Pay",
   "Google Pay",
   "コンビニ",
@@ -105,15 +120,15 @@ describe("定期便の決済手段の統一", () => {
   );
 
   it.each(SUBSCRIPTION_PAYMENT_SURFACES)(
-    "%s の定期便 FAQ が使えない手段を挙げていない",
+    "%s の定期便 FAQ にカードブランド以外の手段名が出ていない",
     (relative) => {
       const catalog = JSON.parse(read(relative));
       const answers = [catalog.subscriptionR2.faqA2, catalog.subscriptionLp.faqA6];
       for (const answer of answers) {
-        const found = NOT_AVAILABLE_FOR_SUBSCRIPTION.filter((method) =>
+        const found = MUST_NOT_APPEAR_IN_SUBSCRIPTION_COPY.filter((method) =>
           answer.includes(method)
         );
-        expect(found, `${relative}: 定期便で使えない手段が載っている`).toEqual([]);
+        expect(found, `${relative}: 表記がカードブランドに統一されていない`).toEqual([]);
       }
     }
   );

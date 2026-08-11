@@ -180,14 +180,24 @@ LP本文は初回特別価格に触れていないので、初回1,880円を打�
    保管済みの `customerPaymentMethod` に対して行う。楽天ペイ・スマホ決済 (コンビニ等)・
    代金引換・銀行振込は保管して自動請求できないため、定期便では使えない。単発販売の
    一覧 (群I) をそのまま流用すると不実表示になる
-2. **Apple Pay / Google Payも書かない** — 単発チェックアウトのウォレットとしては有効だが、
-   定期便で使える確証が無い。**確証の無い手段を足さない**方針で除外した。少なく書くこと
-   自体は不実表示にならない (逆は違反になる)
+2. **Apple Pay / Google Payは「使えないから」ではなく「表記をカードに統一するため」書かない**
+   — Shopify公式ドキュメント ([considerations](https://help.shopify.com/en/manual/products/purchase-options/subscriptions/considerations)
+   2026-08-11取得) はShopify Payments利用時について "Customers can use accelerated
+   checkouts, such as Shop Pay, Apple Pay, Google Pay, or PayPal, to purchase
+   subscriptions" と明記しており、当店はshopify_payments稼働のため**使える見込みが高い**。
+   それでも表記に出さないのは、ウォレットで契約しても保管されるinstrumentはクレジット
+   カード (実在契約の `CustomerCreditCard` と整合) だから。ウォレット名を並べると
+   "Apple Pay support for subscriptions is limited to Visa and Mastercard" (同doc) の
+   但し書きが要り、かえって読み手を誤らせる
+
+なお同docは "Customers can use only Shop Pay on some stores" とも述べており、**実チェック
+アウトで定期便カートにウォレットボタンが出るかは未実測**。将来ウォレットを表記する判断を
+するなら、この実測が前提になる。
 
 「のみ」を落とさないこと。群Iにコンビニ決済・銀行振込・代金引換が並んでいるため、限定を
 外すと定期便でも同じ手段が使えると読める。特商法ページIV-4には除外の一文も置いた。
 回帰は `__tests__/subscription-payment-methods.test.ts` で機械固定している
-(4ブランドの過不足・「のみ」の有無・使えない手段の混入・値の直書き)。
+(4ブランドの過不足・「のみ」の有無・カードブランド以外の手段名の混入・値の直書き)。
 
 ## 差し替え手順 (実値が決まったとき)
 
@@ -349,3 +359,4 @@ PC 1440x900・SP 375x812 / 2026-08-09 JST。`getBoundingClientRect` の実測値
 - `__tests__/subscription-payment-methods.test.ts` (定期便の決済手段の回帰テスト)
 - Shopify Storefront API `shop.paymentSettings` / Admin API `orders.paymentGatewayNames` ・ `subscriptionContracts.customerPaymentMethod` (決済手段の実測 / 2026-08-11 JST)
 - Shopify管理画面のペイメント設定 (elxea-admin実測 / 2026-08-11 JST)
+- Shopify公式「Considerations and payment gateways for subscription products」 — https://help.shopify.com/en/manual/products/purchase-options/subscriptions/considerations (定期便で使える決済手段・ウォレットの制約 / 2026-08-11 JST取得)
