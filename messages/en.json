@@ -109,7 +109,12 @@
     "placeholder": "Search tea or keywords",
     "noResults": "No tea matched \"{q}\". Try another keyword.",
     "results": "{count} results",
-    "loadError": "Search failed."
+    "loadError": "Search failed.",
+    "productsHeading": "Tea",
+    "articlesHeading": "Stories",
+    "articleResults": "{count} stories found",
+    "browseJournal": "Browse the Journal",
+    "partialLoadError": "Part of the results could not be loaded. Please try again shortly."
   },
   "journal": {
     "title": "Journal",

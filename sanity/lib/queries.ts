@@ -63,6 +63,30 @@ export const ARTICLES_BY_CATEGORY_COUNT_QUERY = groq`
   count(*[_type == "article" && language == $language && category->slug.current == $categorySlug])
 `;
 
+/**
+ * 記事検索 (D2)。/search が商品しか引かず、記事が増えるほど回遊の穴になっていた。
+ *
+ * `$term` には呼び出し側で後方ワイルドカード (`お茶*`) を付けて渡す。
+ * 見出し・抜粋に加えて本文 (Portable Text) も `pt::text()` で平文化して当てる。
+ */
+export const ARTICLES_SEARCH_QUERY = groq`
+  *[_type == "article" && language == $language && (
+    title match $term ||
+    excerpt match $term ||
+    pt::text(body) match $term
+  )] | order(publishedAt desc) [$start...$end] {
+    ${ARTICLE_LIST_FIELDS}
+  }
+`;
+
+export const ARTICLES_SEARCH_COUNT_QUERY = groq`
+  count(*[_type == "article" && language == $language && (
+    title match $term ||
+    excerpt match $term ||
+    pt::text(body) match $term
+  )])
+`;
+
 export const FEATURED_ARTICLES_QUERY = groq`
   *[_type == "article" && language == $language && featured == true] | order(publishedAt desc) [0...4] {
     _id,
