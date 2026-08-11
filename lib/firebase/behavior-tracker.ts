@@ -50,9 +50,19 @@ async function sendEvent(
   metadata: Record<string, string | number | undefined>,
 ): Promise<void> {
   try {
-    // Only track for logged-in users (check for session cookie)
+    // Only track for logged-in users (check for session cookie).
+    // A5: LINE ログイン (`line_auth=1`) も対象に含める。以前は Shopify
+    // (`shop_auth=1`) だけを見ていたため、LINE で入った会員の閲覧・読了が
+    // 行動ログに 1 件も残らず、パーソナライズの入力から丸ごと欠けていた。
+    // サーバ側 (`/api/user/behavior`) も `resolveIdentity()` で LINE を
+    // 受けるようにしてあるので、ここを開けると実際に書き込まれる。
     if (typeof document === "undefined") return;
-    if (!document.cookie.includes("shop_auth=1")) return;
+    if (
+      !document.cookie.includes("shop_auth=1") &&
+      !document.cookie.includes("line_auth=1")
+    ) {
+      return;
+    }
 
     await fetch("/api/user/behavior", {
       method: "POST",
