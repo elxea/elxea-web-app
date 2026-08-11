@@ -20,6 +20,16 @@ import { cn } from "@/lib/utils";
  * - 選択中は塗り (primary / primary-foreground)、未選択は 1px 罫線 (border)
  * - SP は横スクロール (Figma "Chips (横スクロール)")、PC は Select 180x44 が右端
  *
+ * S2: SP で「まだ右に続いている」が伝わらない問題への対処
+ * (Figma【Sprint1 追補 B案】8205:5548 / CategoryScroller 8206:15)。
+ * チップ列が画面幅を超えるときだけ、右端に幅 64 のフェードと、列の下に高さ 2 の
+ * スクロールインジケータを出す。Figma 実測 (px) → 実装:
+ * - フェード      64 幅 (`w-16`) / チップ列と同じ高さ 44 / 透明 → background
+ * - インジケータ  チップ列の 8 下 (`mt-2`) / 高さ 2 (`h-0.5`) / 全丸め
+ *                 溝 = border 色 / つまみ = muted-foreground 色
+ *                 つまみ幅 = 可視範囲の割合、位置 = スクロール量の割合
+ * どちらも SP 限定 (`lg:hidden`)。PC はチップ列が全部見えていて隠れ幅が無いため。
+ *
  * 絞り込み・並び替えの状態は URL クエリに載せる (`?category=` / `?sort=`)。
  * 戻る・共有・SSR いずれでも同じ結果になるようにするため、クライアント state に
  * 閉じ込めない。
@@ -77,6 +87,42 @@ export function CatalogToolbar({
    */
   const chipless = chips.length === 0;
 
+  /**
+   * チップ列の「隠れている幅」を測る。可視幅 / 全幅 と スクロール量 / 全幅 の 2 つが
+   * あればフェードとインジケータは描ける。
+   *
+   * 初期値は「隠れ幅なし」(ratio = 1) にしてある。サーバ側では要素を測れないので、
+   * 初回描画をクライアントと揃えて hydration のズレを起こさないため。実際の値は
+   * マウント後の計測で入り、そこで初めてフェードとインジケータが出る。
+   */
+  const scrollerRef = React.useRef<HTMLDivElement | null>(null);
+  const [visible, setVisible] = React.useState({ ratio: 1, offset: 0 });
+
+  const measure = React.useCallback(() => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const { scrollWidth, clientWidth, scrollLeft } = el;
+    if (scrollWidth <= clientWidth) {
+      setVisible({ ratio: 1, offset: 0 });
+      return;
+    }
+    setVisible({ ratio: clientWidth / scrollWidth, offset: scrollLeft / scrollWidth });
+  }, []);
+
+  React.useEffect(() => {
+    measure();
+    const el = scrollerRef.current;
+    if (!el) return;
+    // 画面回転・フォント読み込み・チップ列の差し替えで幅が変わる。
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [measure, chips]);
+
+  const scrollable = visible.ratio < 1;
+  // 右端まで来たらフェードは消す。もう先が無いのに最後のチップを霞ませない。
+  const hasMoreRight = scrollable && visible.offset + visible.ratio < 0.999;
+
   const hrefWith = React.useCallback(
     (key: string, value: string | undefined) => {
       const params = new URLSearchParams(searchParams.toString());
@@ -104,7 +150,10 @@ export function CatalogToolbar({
       )}
     >
       {chipless ? null : (
+      <div data-slot="catalog-chip-scroller" className="relative min-w-0 flex-1 lg:flex-none">
       <div
+        ref={scrollerRef}
+        onScroll={measure}
         data-slot="catalog-chips"
         role="group"
         className="-mx-4 flex gap-2 overflow-x-auto px-4 lg:mx-0 lg:overflow-visible lg:px-0"
@@ -150,6 +199,36 @@ export function CatalogToolbar({
             </button>
           );
         })}
+      </div>
+
+      {/* 右端フェード。チップ列は `-mx-4` で画面端まで抜けているので、
+          フェードもその端 (`-right-4`) に合わせる。装飾なので触れない。 */}
+      {hasMoreRight ? (
+        <div
+          data-slot="catalog-chips-fade"
+          aria-hidden="true"
+          className="pointer-events-none absolute top-0 -right-4 h-11 w-16 bg-linear-to-r from-transparent to-background lg:hidden"
+        />
+      ) : null}
+
+      {/* スクロールインジケータ。つまみの幅が可視範囲の割合、位置がスクロール量。
+          読み上げ対象ではない (同じ情報はチップ列そのものが持っている)。 */}
+      {scrollable ? (
+        <div
+          data-slot="catalog-chips-scrollbar"
+          aria-hidden="true"
+          className="mt-2 h-0.5 w-full overflow-hidden rounded-full bg-border lg:hidden"
+        >
+          <div
+            data-slot="catalog-chips-scrollbar-thumb"
+            className="h-full rounded-full bg-muted-foreground"
+            style={{
+              width: `${visible.ratio * 100}%`,
+              marginInlineStart: `${visible.offset * 100}%`,
+            }}
+          />
+        </div>
+      ) : null}
       </div>
       )}
 

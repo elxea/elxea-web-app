@@ -159,8 +159,21 @@ export type ArticleRailProps = {
 
 /**
  * サイドバー。商品導線は置かない (Figma の注記「Journal 内回遊のみ — 商品導線
- * なし」)。SP は Figma に合わせて人気の記事 3 件まで、カテゴリ節は出さない
- * (SP はツールバーのチップが同じ役割を担うため)。
+ * なし」)。SP は人気の記事 3 件まで (PC は全件)。
+ *
+ * S2: SP でもカテゴリ節を出す (Figma【Sprint1 追補 B案】8205:5548 /
+ * ArticleRail + CategoryFinder 8205:5580)。従来は `hidden lg:block` で SP から
+ * 落としていた — ツールバーのチップが同じ役割を担う前提だったが、SP のチップは
+ * 横スクロールで端が切れるうえ、記事を読み終えた位置からは画面上端まで戻らないと
+ * 触れない。読み終わりの場所に一覧を置く。
+ *
+ * Figma 実測 (px) → 実装 (SP):
+ * - 面            card / 前ブロック (MoreRow) との間隔 0 — 面の変化が区切りになる
+ * - 内側 padding  上下 24 (`py-6`) / 左右 16 (`px-4`)
+ * - 節見出し      12 / 見出しと行の間 0 (行側の 44 が余白を持つ)
+ * - 節と節の間    24 (`mt-6`)
+ * - 行            44 (タップ域。`RailRowLink` が既に `h-11`)
+ * PC は従来どおり面を敷かない (サイドバーとして本文の横に立つため)。
  */
 export function ArticleRail({
   popularTitle,
@@ -175,7 +188,10 @@ export function ArticleRail({
     <aside
       data-slot="article-rail"
       className={cn(
-        "order-3 mt-8 px-4 lg:col-start-2 lg:row-start-1 lg:mt-0 lg:w-86",
+        // SP は画面幅いっぱいの面にする (Figma の card は x0 w375)。`sp-full-bleed`
+        // が lg で margin を戻すので、PC は従来どおり 344 幅のサイドバー。
+        "order-3 sp-full-bleed bg-card px-4 py-6",
+        "lg:col-start-2 lg:row-start-1 lg:w-86 lg:bg-transparent lg:py-0",
         className
       )}
     >
@@ -196,7 +212,7 @@ export function ArticleRail({
       ) : null}
 
       {categories.length > 0 ? (
-        <div className="mt-6 hidden lg:block">
+        <div className={cn(popular.length > 0 && "mt-6")}>
           <p className={cn(captionClass, "text-muted-foreground")}>{categoryTitle}</p>
           <ul className="mt-2">
             {categories.map((item) => (
