@@ -9,6 +9,7 @@ import {
 } from "@/sanity/lib/queries";
 import { urlFor } from "@/sanity/lib/image";
 import { Breadcrumb } from "@/components/seo/breadcrumb";
+import { AudioBlock } from "@/components/journal/audio-block";
 import { AuthorByline } from "@/components/journal/author-byline";
 import { SpecBand } from "@/components/editorial/section-blocks";
 import { PortableText } from "@/components/sanity/portable-text";
@@ -50,10 +51,20 @@ import type { PortableTextBlock } from "@portabletext/types";
  * 上の 7 ブロック以外の節は置かない。C4-3 まで残っていた旧実装の
  * 「LISTEN / 配信で聴く」節 (Spotify・SoundCloud・YouTube リンク + 録音日) は
  * 確定版の構成に無いため C4-2R で削除した (C4-3 QA F1)。`spotifyUrl` /
- * `soundcloudUrl` / `youtubeUrl` / `dateRecorded` は Sanity schema と
- * `PLAYLIST_BY_SLUG_QUERY` には残してある (入力済みデータを消さないため) が、
- * このページでは描画しない。配信リンクの枠が必要になったら Figma 側に足して
- * 凍結してから実装する — コード側で先に生やさない。
+ * `youtubeUrl` / `dateRecorded` は Sanity schema と `PLAYLIST_BY_SLUG_QUERY`
+ * には残してある (入力済みデータを消さないため) が、このページでは描画しない。
+ * 配信リンクの枠が必要になったら Figma 側に足して凍結してから実装する —
+ * コード側で先に生やさない。
+ *
+ * S2: TRACKS 節に音を通した。曲に `audioUrl` が 1 つでも入っていれば、
+ * 凍結済みのプレイヤー `AudioBlock / Track` (Figma 8181:5288) を TRACKS 節の
+ * 先頭に置く。TrackList (Figma 8089:4563) は曲番号とメモを持つこのページ固有の
+ * 凍結レイアウトなので置き換えず、そのまま下に残す — プレイヤーは「聴く手段」を
+ * 足すだけで、読みものとしての曲目一覧は従来どおり。
+ * `soundcloudUrl` はこのプレイヤーの送客ボタン (AudioBlock 内・SoundCloud 1 本に
+ * 限定という Figma 注記どおり) としてだけ描画する。
+ * `audioUrl` が無い曲はプレイヤーに並べない = 鳴らせない再生ボタンを出さない。
+ * 全曲が未入力 (= 現行データ) のときはプレイヤーごと出ないので、表示は従来と同じ。
  */
 
 type AuthorRef = {
@@ -65,7 +76,7 @@ type AuthorRef = {
   bio?: string;
 };
 
-type Track = { title: string; note?: string; minutes?: number };
+type Track = { title: string; note?: string; minutes?: number; audioUrl?: string };
 
 type Playlist = {
   _id: string;
@@ -166,6 +177,37 @@ export default async function PlaylistDetailPage({
     tracks.length > 0 ? { value: tracks.length, label: t("tracks") } : null,
     totalMinutes > 0 ? { value: totalMinutes, label: t("minutes") } : null,
   ].filter(Boolean) as { value: number; label: string }[];
+
+  /* --- 4'. 音源のあるトラック (プレイヤーに並べる分) ----------------------- */
+
+  // 鳴らせる曲だけをプレイヤーに渡す。`audioUrl` 未入力の曲を混ぜると、押しても
+  // 何も起きない再生ボタンが出てしまうため。曲目一覧そのものは下の TrackList が
+  // 全曲を出すので、ここで絞っても情報は落ちない。
+  const playableTracks = tracks
+    .map((track, i) => ({ track, i }))
+    .filter(({ track }) => Boolean(track.audioUrl));
+
+  const playableMinutes = playableTracks.reduce(
+    (sum, { track }) => sum + (track.minutes ?? 0),
+    0
+  );
+
+  // AudioBlock / AudioPlayer / TrackRow / MiniPlayer が使う文言。client 側では
+  // `getTranslations` を呼べないのでここで解決して渡す。音まわりの語彙は記事側と
+  // 同じものを使う (同じ部品なので、同じ言葉で出す)。
+  const tj = await getTranslations("journal");
+  const audioLabels = {
+    play: tj("audioPlay"),
+    pause: tj("audioPause"),
+    loading: tj("audioLoading"),
+    seek: tj("audioSeek"),
+    error: tj("audioError"),
+    close: tj("audioClose"),
+    nowPlaying: tj("audioNowPlaying"),
+    trackListLabel: tj("audioTrackList"),
+    externalNote: tj("audioExternalNote"),
+    interviewNote: tj("audioInterviewNote"),
+  };
 
   /* --- 6. 合わせるお茶 (Shopify) ------------------------------------------ */
 
@@ -286,6 +328,34 @@ export default async function PlaylistDetailPage({
         <PlaylistSection>
           <PlaylistSectionHead overline="TRACKS" title={t("tracksHead")} />
           <PlaylistSectionBody>
+            {playableTracks.length > 0 ? (
+              <AudioBlock
+                variant="track"
+                contentId={pl.slug.current}
+                kicker={t("listenKicker")}
+                title={pl.title}
+                meta={[
+                  `${playableTracks.length} ${t("tracksShort")}`,
+                  playableMinutes > 0
+                    ? `${playableMinutes} ${t("minutesShort")}`
+                    : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+                coverUrl={heroImage}
+                tracks={playableTracks.map(({ track, i }) => ({
+                  id: `track-${i}`,
+                  title: track.title,
+                  src: track.audioUrl!,
+                  // Sanity の「長さ (分)」は分単位。音源のメタデータが読めるまでの
+                  // 初期表示に使うので秒へ直す。
+                  durationSeconds: track.minutes ? track.minutes * 60 : null,
+                }))}
+                soundcloudUrl={pl.soundcloudUrl}
+                labels={audioLabels}
+                className="mt-0 mb-12"
+              />
+            ) : null}
             <TrackList
               items={tracks.map((track, i) => ({
                 no: `TRACK ${String(i + 1).padStart(2, "0")}`,

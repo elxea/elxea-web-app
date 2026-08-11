@@ -93,6 +93,13 @@ export const playlist = defineType({
             }),
             defineField({ name: "note", title: "メモ", type: "text" }),
             defineField({ name: "minutes", title: "長さ (分)", type: "number" }),
+            defineField({
+              name: "audioUrl",
+              title: "音源 URL (この曲をサイト内で鳴らす)",
+              type: "url",
+              description:
+                "入力した曲だけが詳細ページのプレイヤーに並ぶ。未入力の曲には再生ボタンを出さない (鳴らせない再生ボタンを見せないため)。",
+            }),
           ],
           preview: { select: { title: "title", subtitle: "note" } },
         },

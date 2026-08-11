@@ -338,7 +338,7 @@ export const PLAYLIST_BY_SLUG_QUERY = groq`
     curatorQuote,
     curatorQuoteBy,
     artists[]->{_id, name, slug, image, role, bio},
-    tracks[]{title, note, minutes},
+    tracks[]{title, note, minutes, audioUrl},
     dataBand[]{label, value},
     pairedTeas,
     spotifyUrl,

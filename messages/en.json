@@ -204,6 +204,7 @@
     "featured": "Featured",
     "heading": "Playlists",
     "lead": "Music for tea time — while you brew, while you wait, while you drink.",
+    "listenKicker": "Listen to this playlist",
     "loadError": "Could not load playlists.",
     "minutes": "MIN",
     "minutesShort": "min",
@@ -214,7 +215,8 @@
     "teasNote": "A suggestion, not a rule — choose what you like.",
     "title": "Sound from Nature",
     "tracks": "TRACKS",
-    "tracksHead": "Track by track"
+    "tracksHead": "Track by track",
+    "tracksShort": "tracks"
   },
   "elxeaJournal": {
     "title": "elxea Journal",
