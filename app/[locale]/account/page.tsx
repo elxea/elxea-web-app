@@ -3,7 +3,7 @@ import { getTranslations, getLocale } from "next-intl/server";
 import { getCustomerFromSession, getSubscriptionsFromSession } from "@/lib/shopify/auth";
 import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
-import { ImagePlaceholder } from "@/components/ui/image-placeholder";
+import { ImagePlaceholder } from "@/components/media/image-placeholder";
 import { Separator } from "@/components/ui/separator";
 import type { MembershipTier } from "@/lib/shopify/customer";
 import { DashboardSummary } from "@/components/account/dashboard-summary";

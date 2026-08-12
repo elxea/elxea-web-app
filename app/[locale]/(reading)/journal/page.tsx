@@ -10,7 +10,7 @@ import {
 } from "@/sanity/lib/queries";
 import { ArticleCard } from "@/components/journal/article-card";
 import { CategoryFilter } from "@/components/journal/category-filter";
-import { ImageCard } from "@/components/ui/image-card";
+import { ImageCard } from "@/components/media/image-card";
 import { requireAuth } from "@/lib/firebase/auth-guard";
 import { getRecommendedArticles } from "@/lib/recommendations/content-engine";
 

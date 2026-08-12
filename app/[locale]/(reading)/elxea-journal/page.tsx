@@ -4,7 +4,7 @@ import { Link } from "@/i18n/navigation";
 import { getClient } from "@/sanity/lib/client";
 import { JOURNALS_QUERY } from "@/sanity/lib/queries";
 import { urlFor } from "@/sanity/lib/image";
-import { ImageCard } from "@/components/ui/image-card";
+import { ImageCard } from "@/components/media/image-card";
 import { previewSeedEnabled, previewImageForKey, withSeedJournals } from "@/lib/preview-seed";
 
 // 短縮ラベル (Figma Journal Theme Badge 6934:143 が正)

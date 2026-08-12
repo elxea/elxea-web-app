@@ -33,7 +33,7 @@ const SeasonalWash = dynamic(
  * `useState` + `useEffect` で立てるのと結果は同じだが、あちらは
  * **1 回目を描いてから 2 回目を描く** ので面のマウントが 1 フレーム遅れる。
  * `useSyncExternalStore` はハイドレーション時に確定するので、面は最初の
- * クライアント描画から出る。`components/ui/cookie-consent.tsx` と同じ形。
+ * クライアント描画から出る。`components/layout/cookie-consent.tsx` と同じ形。
  */
 const subscribeNever = () => () => {};
 const onClient = () => true;

@@ -1,5 +1,5 @@
 import { type ImageProps } from 'next/image';
-import { ImageWithFallback } from '@/components/ui/image-with-fallback';
+import { ImageWithFallback } from '@/components/media/image-with-fallback';
 import { getSiteAsset } from '@/lib/site-assets';
 
 /**

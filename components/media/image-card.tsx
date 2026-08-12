@@ -1,5 +1,5 @@
 import Image, { type StaticImageData } from "next/image";
-import { ImagePlaceholder } from "@/components/ui/image-placeholder";
+import { ImagePlaceholder } from "@/components/media/image-placeholder";
 import { cn } from "@/lib/utils";
 import { sanitizeImageUrl } from "@/lib/image-utils";
 

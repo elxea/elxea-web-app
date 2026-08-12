@@ -6,7 +6,7 @@ import { getClient } from "@/sanity/lib/client";
 import { JOURNAL_BY_SLUG_QUERY } from "@/sanity/lib/queries";
 import { urlFor } from "@/sanity/lib/image";
 import { PortableText } from "@/components/sanity/portable-text";
-import { ImageWithFallback } from "@/components/ui/image-with-fallback";
+import { ImageWithFallback } from "@/components/media/image-with-fallback";
 import { TeaSpecCard } from "@/components/journal/tea-spec-card";
 import { JournalWashTheme } from "@/components/viz/wash/journal-wash-theme";
 import { Link } from "@/i18n/navigation";

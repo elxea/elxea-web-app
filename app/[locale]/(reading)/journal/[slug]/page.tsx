@@ -8,7 +8,7 @@ import { urlFor } from "@/sanity/lib/image";
 import { PortableText } from "@/components/sanity/portable-text";
 import { getMembershipTier } from "@/lib/shopify/auth";
 import type { MembershipTier } from "@/lib/shopify/customer";
-import { MemberGate } from "@/components/ui/member-gate";
+import { MemberGate } from "@/components/account/member-gate";
 import { AuthorProfile } from "@/components/journal/author-profile";
 import { BookmarkButton } from "@/components/journal/bookmark-button";
 import { RelatedArticles } from "@/components/journal/related-articles";

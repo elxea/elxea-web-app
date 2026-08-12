@@ -5,7 +5,7 @@ import { getClient } from "@/sanity/lib/client";
 import { FARMER_BY_SLUG_QUERY } from "@/sanity/lib/queries";
 import { urlFor } from "@/sanity/lib/image";
 import { PortableText } from "@/components/sanity/portable-text";
-import { ImageCard } from "@/components/ui/image-card";
+import { ImageCard } from "@/components/media/image-card";
 import { FollowButton } from "@/components/farmers/follow-button";
 import { CommentSection } from "@/components/community/comment-section";
 import { isFictionalFarmerSlug } from "@/lib/fictional-farmers";

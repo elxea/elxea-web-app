@@ -5,7 +5,7 @@ import { getClient } from "@/sanity/lib/client";
 import { PLAYLIST_BY_SLUG_QUERY } from "@/sanity/lib/queries";
 import { urlFor } from "@/sanity/lib/image";
 import { PortableText } from "@/components/sanity/portable-text";
-import { ImageCard } from "@/components/ui/image-card";
+import { ImageCard } from "@/components/media/image-card";
 import type { PortableTextBlock } from "@portabletext/types";
 
 // Helper: extract plain text from PortableText blocks or return string as-is

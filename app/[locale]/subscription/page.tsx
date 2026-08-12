@@ -9,7 +9,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Breadcrumb } from "@/components/seo/breadcrumb";
-import { ImageCard } from "@/components/ui/image-card";
+import { ImageCard } from "@/components/media/image-card";
 import { SiteImage } from "@/components/site-image";
 
 export async function generateMetadata(): Promise<Metadata> {

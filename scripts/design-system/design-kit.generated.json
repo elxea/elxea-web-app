@@ -1345,7 +1345,7 @@
   "components": {
     "code_sot": {
       "path": "components/ui",
-      "count_tsx": 61,
+      "count_tsx": 56,
       "list": [
         "accordion",
         "alert",
@@ -1365,7 +1365,6 @@
         "combobox",
         "command",
         "context-menu",
-        "cookie-consent",
         "dialog",
         "direction",
         "drawer",
@@ -1374,16 +1373,12 @@
         "field",
         "form",
         "hover-card",
-        "image-card",
-        "image-placeholder",
-        "image-with-fallback",
         "input",
         "input-group",
         "input-otp",
         "item",
         "kbd",
         "label",
-        "member-gate",
         "menubar",
         "native-select",
         "navigation-menu",
@@ -1457,16 +1452,10 @@
         "shape": "rounded-full / px-2 py-0.5 / text-xs / font-medium / border border-transparent",
         "data_attrs": "data-slot=\"badge\" / data-variant"
       },
-      "_rule": "部品の正本はコード `components/ui/*` (shadcn new-york)。Figma の部品は鏡。",
-      "note": "各 .tsx に対応する .stories.tsx がほぼ全件そろっている (Storybook 運用あり)。image-card / image-placeholder / image-with-fallback は stories 無し。",
-      "elxea_specific": [
-        "cookie-consent",
-        "member-gate",
-        "image-card",
-        "image-placeholder",
-        "image-with-fallback",
-        "direction"
-      ]
+      "_rule": "部品の正本はコード `components/ui/*` (shadcn new-york)。Figma の部品は鏡。`components/ui/` は shadcn registry から入れたものだけ。自前で書いたものは絶対に置かない (置き場は機能名のディレクトリ `components/<機能>/`)。",
+      "note": "各 .tsx に対応する .stories.tsx が全件そろっている (Storybook 運用あり)。",
+      "elxea_specific": [],
+      "_elxea_specific_note": "空である状態が正しい。`components/ui/` は shadcn registry 由来のみを置くため。2026-08-12 に自前実装 5 件を移動した (cookie-consent → components/layout/, member-gate → components/account/, image-card / image-placeholder / image-with-fallback → components/media/)。direction は radix-ui の DirectionProvider ラッパーで shadcn registry 品のため elxea_specific ではない (旧記載は誤り)。"
     },
     "figma_mirror": {
       "_rule": "以下は Figma 側の実在 node。2026-07-31 に get_metadata で実在確認済 (verified=true のもの)。値の正本ではない。",
@@ -2356,6 +2345,6 @@
     "_figma_node_count_method": "components.figma_mirror 配下に現れる distinct な Figma node ID (\\d+:\\d+) を、直近の verified_at の有無で分類した実カウント。",
     "figma_nodes_verified": 48,
     "figma_nodes_unverified": 0,
-    "code_ui_components": 61
+    "code_ui_components": 56
   }
 }

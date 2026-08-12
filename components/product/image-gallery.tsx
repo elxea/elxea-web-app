@@ -11,7 +11,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { ImageCard } from "@/components/ui/image-card";
+import { ImageCard } from "@/components/media/image-card";
 import type { Image as ImageType } from "@/lib/shopify/types";
 
 export function ImageGallery({ images }: { images: ImageType[] }) {
