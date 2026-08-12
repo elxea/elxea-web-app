@@ -7,10 +7,12 @@ import {
 } from "@/lib/roji/prefectures";
 import {
   TEA_MENU_NUMBERS,
+  originPrecisionBreakdown,
   prefecturesFromMenuNumbers,
   resolveTeaOrigin,
   resolveTeaSupplier,
   teaCountByPrefecture,
+  teaOriginPoints,
 } from "@/lib/roji/tea-origins";
 
 describe("prefectures", () => {
@@ -120,6 +122,10 @@ describe("tea-origins", () => {
       prefecture: "奈良県",
       area: "山添村",
       raw: "奈良県 山添村",
+      lat: 34.680874,
+      lng: 136.043472,
+      precision: "area",
+      geoTitle: "奈良県山辺郡山添村",
       needsReview: false,
     });
     // 51001 = 春摘みべにふうきの和紅茶 / つしま大石農園 (長崎県 対馬市 上県町)
@@ -127,6 +133,10 @@ describe("tea-origins", () => {
       prefecture: "長崎県",
       area: "対馬市上県町",
       raw: "長崎県 対馬市 上県町",
+      lat: 34.566456,
+      lng: 129.333176,
+      precision: "area",
+      geoTitle: "長崎県対馬市上県町伊奈",
       needsReview: false,
     });
     expect(resolveTeaSupplier("10701")).toBe("中窪製茶園");
@@ -138,9 +148,125 @@ describe("tea-origins", () => {
         prefecture: null,
         area: null,
         raw: null,
+        lat: null,
+        lng: null,
+        precision: "none",
+        geoTitle: null,
         needsReview: true,
       });
       expect(resolveTeaSupplier(bogus)).toBeNull();
+    }
+  });
+});
+
+describe("座標 (Mapbox 用)", () => {
+  it("lat は日本の緯度範囲 (24〜46) 内 or null", () => {
+    for (const n of TEA_MENU_NUMBERS) {
+      const { lat } = resolveTeaOrigin(n);
+      if (lat === null) continue;
+      expect(lat).toBeGreaterThanOrEqual(24);
+      expect(lat).toBeLessThanOrEqual(46);
+    }
+  });
+
+  it("lng は日本の経度範囲 (122〜154) 内 or null", () => {
+    for (const n of TEA_MENU_NUMBERS) {
+      const { lng } = resolveTeaOrigin(n);
+      if (lng === null) continue;
+      expect(lng).toBeGreaterThanOrEqual(122);
+      expect(lng).toBeLessThanOrEqual(154);
+    }
+  });
+
+  it("lat と lng は必ず揃って存在するか、揃って null", () => {
+    for (const n of TEA_MENU_NUMBERS) {
+      const { lat, lng } = resolveTeaOrigin(n);
+      expect(lat === null).toBe(lng === null);
+    }
+  });
+
+  it("precision と座標の有無が矛盾しない", () => {
+    for (const n of TEA_MENU_NUMBERS) {
+      const { lat, precision, geoTitle } = resolveTeaOrigin(n);
+      if (lat === null) {
+        expect(precision).toBe("none");
+        expect(geoTitle).toBeNull();
+      } else {
+        expect(precision === "area" || precision === "prefecture").toBe(true);
+        expect(geoTitle).toBeTruthy();
+      }
+    }
+  });
+
+  it("座標があれば needsReview は立たない (逆も然り)", () => {
+    for (const n of TEA_MENU_NUMBERS) {
+      const { lat, prefecture, needsReview } = resolveTeaOrigin(n);
+      expect(needsReview).toBe(lat === null || prefecture === null);
+    }
+  });
+
+  it("緯度と経度の取り違えが無い (日本では常に lng > lat)", () => {
+    for (const n of TEA_MENU_NUMBERS) {
+      const { lat, lng } = resolveTeaOrigin(n);
+      if (lat === null || lng === null) continue;
+      expect(lng).toBeGreaterThan(lat);
+    }
+  });
+
+  it("area 粒度のエントリは area 名を持つ", () => {
+    for (const n of TEA_MENU_NUMBERS) {
+      const { precision, area } = resolveTeaOrigin(n);
+      if (precision !== "area") continue;
+      expect(area).toBeTruthy();
+    }
+  });
+
+  it("棚卸し時点では全 43 件が area 粒度 (prefecture 代用・欠損なし)", () => {
+    expect(originPrecisionBreakdown()).toEqual({
+      area: 43,
+      prefecture: 0,
+      none: 0,
+    });
+  });
+});
+
+describe("teaOriginPoints", () => {
+  it("同じ座標の銘柄を 1 点に畳む", () => {
+    // 10101 と 10102 はどちらも しばきり園 (静岡市) で同一座標
+    const points = teaOriginPoints(["10101", "10102"]);
+    expect(points).toHaveLength(1);
+    expect(points[0]).toEqual({
+      menuNumber: "10101",
+      prefecture: "静岡県",
+      area: "静岡市",
+      lat: 34.975185,
+      lng: 138.383286,
+      precision: "area",
+    });
+  });
+
+  it("別産地は別の点になる", () => {
+    expect(teaOriginPoints(["10101", "11301"])).toHaveLength(2);
+  });
+
+  it("座標の無い銘柄は捨てる", () => {
+    expect(teaOriginPoints(["99999", "11301"])).toHaveLength(1);
+    expect(teaOriginPoints([])).toEqual([]);
+  });
+
+  it("全銘柄を渡すと 11 点 (仕入先 12 件のうち五ヶ瀬町の 2 件が同一座標で畳まれる)", () => {
+    const points = teaOriginPoints(TEA_MENU_NUMBERS);
+    expect(points).toHaveLength(11);
+    // 畳んだあとも 9 県すべてが残る
+    expect(new Set(points.map((p) => p.prefecture)).size).toBe(9);
+  });
+
+  it("返る点は全て日本国内の座標", () => {
+    for (const p of teaOriginPoints(TEA_MENU_NUMBERS)) {
+      expect(p.lat).toBeGreaterThanOrEqual(24);
+      expect(p.lat).toBeLessThanOrEqual(46);
+      expect(p.lng).toBeGreaterThanOrEqual(122);
+      expect(p.lng).toBeLessThanOrEqual(154);
     }
   });
 });

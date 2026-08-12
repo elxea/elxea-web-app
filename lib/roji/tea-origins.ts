@@ -2,8 +2,9 @@
  * 銘柄番号 (5 桁) → 産地 (都道府県 / 市町村) の対応表。
  *
  * roji「お茶の旅の地図」(飲んだ産地が日本地図上に灯る可視化) の前提データ。
- * 地図は都道府県ポリゴンを塗るので、**銘柄から一意に都道府県が引ける** ことが
+ * 地図は Mapbox で点を打つので、**銘柄から一意に緯度経度が引ける** ことが
  * 実装の必要条件になる。その結合キーを与えるのがこのファイル。
+ * 都道府県名はポリゴン塗り・集計・凡例の側で使う。
  *
  * ## データの出どころ (2026-08-12 棚卸し)
  *
@@ -29,6 +30,18 @@
  * 中長期的には Sanity `teaMenu` に構造化産地フィールドを足し、Notion からの
  * 同期に乗せるのが単一正本として筋が良い (下の「将来の移行」を参照)。
  *
+ * ## 緯度経度の出どころ
+ *
+ * Notion 側に座標は無い (Place 型の `Place` プロパティは全件空)。よって座標は
+ * **国土地理院 (GSI) の住所検索 API** から取得した公開データを使う。
+ *   https://msearch.gsi.go.jp/address-search/AddressSearch?q=<地名>
+ * 問い合わせたのは `raw` から組み立てた **地名だけ** (仕入先名・番地は送っていない)。
+ * 各エントリの `geoTitle` は GSI が返した正式名称で、どの地点に解決されたかを
+ * 後から検証できるように原文のまま残している。
+ *
+ * 座標は **推測で作らない**。GSI が解決できない地名は `lat`/`lng` を `null` にし
+ * `needsReview: true` を立てる (地図に打たず、確認対象として数える)。
+ *
  * ## 将来の移行
  *
  * このファイルは **暫定の写し** であって正本ではない。Notion 側で仕入先の
@@ -44,6 +57,17 @@
  */
 
 import { isPrefecture, type Prefecture } from "./prefectures";
+
+/**
+ * 座標がどの粒度で取れているか。Mapbox の見せ方を分ける材料になる。
+ *
+ * - `area`       市町村・地域まで特定できた。その地域の代表座標。
+ * - `prefecture` 都道府県までしか分からず、県庁所在地 / 県の重心で代用した。
+ *                実際の茶園はここから数十 km ずれうるので、ピンを小さくする・
+ *                ぼかす等の扱いを地図側で選べるようにこの値を残す。
+ * - `none`       座標が無い (`lat`/`lng` が `null`)。地図に打たない。
+ */
+export type OriginPrecision = "area" | "prefecture" | "none";
 
 /**
  * 産地の一件。地図が必要とする最小限だけを持つ。
@@ -65,7 +89,21 @@ export interface TeaOrigin {
   area: string | null;
   /** Notion Supplier List の Regions の原文。判定の根拠を追えるように残す。 */
   raw: string | null;
-  /** `prefecture` が自動判定できず人の確認が要る場合に true。 */
+  /**
+   * 緯度 (WGS84・度)。日本国内なので 24〜46 の範囲に収まる。
+   * `null` は座標を確定できていない状態で、推測値は入れない。
+   */
+  lat: number | null;
+  /** 経度 (WGS84・度)。日本国内なので 122〜154 の範囲に収まる。 */
+  lng: number | null;
+  /** 座標の粒度。`lat`/`lng` が `null` のときは必ず `none`。 */
+  precision: OriginPrecision;
+  /**
+   * 国土地理院の住所検索が返した正式名称。どの地点に解決されたかの根拠。
+   * 座標が無いときは `null`。
+   */
+  geoTitle: string | null;
+  /** `prefecture` か座標が自動判定できず人の確認が要る場合に true。 */
   needsReview: boolean;
 }
 
@@ -81,11 +119,19 @@ interface OriginSource {
   area: string | null;
   /** Supplier List の Regions 原文。全角・半角スペースもそのまま。 */
   raw: string | null;
+  lat: number | null;
+  lng: number | null;
+  precision: OriginPrecision;
+  /** 国土地理院に投げた地名 (再取得・検証用)。 */
+  geoQuery: string | null;
+  /** 国土地理院が返した正式名称。 */
+  geoTitle: string | null;
 }
 
 /**
- * 産地の実体 (Notion Supplier List のスナップショット)。
+ * 産地の実体 (Notion Supplier List のスナップショット + GSI の座標)。
  * `area` は `raw` の先頭から都道府県名を落として区切りスペースを詰めたもの。
+ * `lat`/`lng` は 2026-08-12 に GSI 住所検索から取得した値をそのまま使う (丸めない)。
  */
 const ORIGIN_SOURCES = {
   shibakiri: {
@@ -93,72 +139,138 @@ const ORIGIN_SOURCES = {
     prefecture: "静岡県",
     area: "静岡市",
     raw: "静岡県 静岡市",
+    // 静岡市は政令市で市域が広く、この座標は市全体の代表点。
+    lat: 34.975185,
+    lng: 138.383286,
+    precision: "area",
+    geoQuery: "静岡県静岡市",
+    geoTitle: "静岡県静岡市",
   },
   "ryokuheki-gokase": {
     supplier: "緑碧茶園 五ヶ瀬茶園",
     prefecture: "宮崎県",
     area: "西臼杵郡五ヶ瀬町",
     raw: "宮崎県 西臼杵郡五ヶ瀬町",
+    lat: 32.68338,
+    lng: 131.196915,
+    precision: "area",
+    geoQuery: "宮崎県西臼杵郡五ヶ瀬町",
+    geoTitle: "宮崎県西臼杵郡五ヶ瀬町",
   },
   nakakubo: {
     supplier: "中窪製茶園",
     prefecture: "京都府",
     area: "相楽郡南山城村",
     raw: "京都府 相楽郡 南山城村",
+    lat: 34.772709,
+    lng: 135.993774,
+    precision: "area",
+    geoQuery: "京都府相楽郡南山城村",
+    geoTitle: "京都府相楽郡南山城村",
   },
   masui: {
     supplier: "ますいさんちの茶　益井園",
     prefecture: "静岡県",
     area: "榛原郡川根本町",
     raw: "静岡県 榛原郡 川根本町",
+    lat: 35.046944,
+    lng: 138.081665,
+    precision: "area",
+    geoQuery: "静岡県榛原郡川根本町",
+    geoTitle: "静岡県榛原郡川根本町",
   },
   mitocha: {
     supplier: "みとちゃ農園",
     prefecture: "奈良県",
     area: "山添村",
     raw: "奈良県 山添村",
+    // Regions は「山添村」だが正式には山辺郡山添村。GSI には郡名込みで問い合わせた。
+    lat: 34.680874,
+    lng: 136.043472,
+    precision: "area",
+    geoQuery: "奈良県山辺郡山添村",
+    geoTitle: "奈良県山辺郡山添村",
   },
   chiyonoen: {
     supplier: "お茶の千代乃園",
     prefecture: "福岡県",
     area: "八女市",
     raw: "福岡県 八女市",
+    lat: 33.211426,
+    lng: 130.558151,
+    precision: "area",
+    geoQuery: "福岡県八女市",
+    geoTitle: "福岡県八女市",
   },
   kajihara: {
     supplier: "お茶のカジハラ",
     prefecture: "熊本県",
     area: "葦北郡芦北町",
     raw: "熊本県 葦北郡芦北町",
+    lat: 32.299034,
+    lng: 130.493118,
+    precision: "area",
+    geoQuery: "熊本県葦北郡芦北町",
+    geoTitle: "熊本県葦北郡芦北町",
   },
   "miyazaki-sabo": {
     supplier: "宮崎茶房",
     prefecture: "宮崎県",
     area: "西臼杵郡五ヶ瀬町",
     raw: "宮崎県 西臼杵郡五ヶ瀬町",
+    // 緑碧茶園 五ヶ瀬茶園 と同一町。別の仕入先だが座標は同じ地域代表点になる。
+    lat: 32.68338,
+    lng: 131.196915,
+    precision: "area",
+    geoQuery: "宮崎県西臼杵郡五ヶ瀬町",
+    geoTitle: "宮崎県西臼杵郡五ヶ瀬町",
   },
   sakaguchi: {
     supplier: "お茶の坂口園",
     prefecture: "熊本県",
     area: "水俣市",
     raw: "熊本県 水俣市",
+    lat: 32.211784,
+    lng: 130.4086,
+    precision: "area",
+    geoQuery: "熊本県水俣市",
+    geoTitle: "熊本県水俣市",
   },
   "tsushima-oishi": {
     supplier: "つしま大石農園",
     prefecture: "長崎県",
     area: "対馬市上県町",
     raw: "長崎県 対馬市 上県町",
+    // 上県町は対馬市の旧町で GSI に単独の重心が無く、大字単位で複数返る。
+    // 先頭の「伊奈」を旧町域の代表点として採用した (対馬市の重心だと
+    // 島が南北に長いぶん実際の産地から離れるため)。
+    lat: 34.566456,
+    lng: 129.333176,
+    precision: "area",
+    geoQuery: "長崎県対馬市上県町",
+    geoTitle: "長崎県対馬市上県町伊奈",
   },
   hasama: {
     supplier: "ハサマ共同製茶組合",
     prefecture: "三重県",
     area: "四日市市川島町",
     raw: "三重県 四日市市 川島町",
+    lat: 34.968712,
+    lng: 136.549942,
+    precision: "area",
+    geoQuery: "三重県四日市市川島町",
+    geoTitle: "三重県四日市市川島町",
   },
   yoshida: {
     supplier: "吉田茶園",
     prefecture: "茨城県",
     area: "古河市",
     raw: "茨城県 古河市",
+    lat: 36.178242,
+    lng: 139.75502,
+    precision: "area",
+    geoQuery: "茨城県古河市",
+    geoTitle: "茨城県古河市",
   },
 } as const satisfies Record<string, OriginSource>;
 
@@ -228,19 +340,37 @@ export type TeaMenuNumber = keyof typeof TEA_ORIGIN_BY_NUMBER;
 /** 対応表に載っている銘柄番号の一覧 (昇順)。 */
 export const TEA_MENU_NUMBERS = Object.keys(TEA_ORIGIN_BY_NUMBER).sort() as TeaMenuNumber[];
 
-/** 産地が判定できなかったときの値。地図には灯らず、確認対象として数える。 */
+/** 産地が判定できなかったときの値。地図には打たず、確認対象として数える。 */
 const UNKNOWN_ORIGIN: TeaOrigin = {
   prefecture: null,
   area: null,
   raw: null,
+  lat: null,
+  lng: null,
+  precision: "none",
+  geoTitle: null,
   needsReview: true,
 };
+
+/** 日本国内の緯度経度の範囲 (南鳥島・与那国島・沖ノ鳥島を含む外接矩形)。 */
+const JAPAN_LAT_RANGE = [24, 46] as const;
+const JAPAN_LNG_RANGE = [122, 154] as const;
+
+/** 日本国内の座標として妥当かを判定する。範囲外は取り違えとみなし採用しない。 */
+function isInJapan(lat: number, lng: number): boolean {
+  return (
+    lat >= JAPAN_LAT_RANGE[0] &&
+    lat <= JAPAN_LAT_RANGE[1] &&
+    lng >= JAPAN_LNG_RANGE[0] &&
+    lng <= JAPAN_LNG_RANGE[1]
+  );
+}
 
 /**
  * 銘柄番号から産地を引く。
  *
  * 未知の番号 (対応表に無い / 5 桁でない) は推測せず `needsReview: true` を返す。
- * 地図側は `prefecture === null` の銘柄を「灯さない」で扱えばよく、
+ * 地図側は `lat === null` の銘柄を「打たない」で扱えばよく、
  * 例外を投げないのは 1 件の欠損で地図全体が落ちるのを避けるため。
  */
 export function resolveTeaOrigin(menuNumber: string): TeaOrigin {
@@ -252,11 +382,20 @@ export function resolveTeaOrigin(menuNumber: string): TeaOrigin {
   // ここを素通しにすると地図の結合キーに未知の文字列が混じる。
   const prefecture = isPrefecture(source.prefecture) ? source.prefecture : null;
 
+  // 座標も同様に範囲検証する。桁の打ち間違い (緯度と経度の取り違え等) を
+  // 地図に届く前に落とすため、疑わしい値は採用せず null 扱いにする。
+  const hasCoords =
+    source.lat !== null && source.lng !== null && isInJapan(source.lat, source.lng);
+
   return {
     prefecture,
     area: source.area,
     raw: source.raw,
-    needsReview: prefecture === null,
+    lat: hasCoords ? source.lat : null,
+    lng: hasCoords ? source.lng : null,
+    precision: hasCoords ? source.precision : "none",
+    geoTitle: hasCoords ? source.geoTitle : null,
+    needsReview: prefecture === null || !hasCoords,
   };
 }
 
@@ -277,6 +416,55 @@ export function prefecturesFromMenuNumbers(menuNumbers: readonly string[]): Set<
     if (prefecture) lit.add(prefecture);
   }
   return lit;
+}
+
+/** 地図に打つ 1 点。Mapbox のマーカー / GeoJSON feature の元になる。 */
+export interface TeaOriginPoint {
+  menuNumber: string;
+  prefecture: Prefecture;
+  area: string | null;
+  lat: number;
+  lng: number;
+  precision: OriginPrecision;
+}
+
+/**
+ * 飲んだ銘柄の一覧から、地図に打つ点を作る。
+ *
+ * 同じ産地の銘柄が複数あっても **1 点に畳む** (同じ座標にピンが重なるのを避ける)。
+ * 座標の無い銘柄は黙って捨てる — 1 件の欠損で地図が壊れないようにするため。
+ * `menuNumber` は畳んだうちの最初の 1 件で、点の代表として持たせている。
+ */
+export function teaOriginPoints(menuNumbers: readonly string[]): TeaOriginPoint[] {
+  const byCoord = new Map<string, TeaOriginPoint>();
+  for (const menuNumber of menuNumbers) {
+    const o = resolveTeaOrigin(menuNumber);
+    if (o.lat === null || o.lng === null || o.prefecture === null) continue;
+    const coordKey = `${o.lat},${o.lng}`;
+    if (byCoord.has(coordKey)) continue;
+    byCoord.set(coordKey, {
+      menuNumber,
+      prefecture: o.prefecture,
+      area: o.area,
+      lat: o.lat,
+      lng: o.lng,
+      precision: o.precision,
+    });
+  }
+  return [...byCoord.values()];
+}
+
+/** 座標の粒度ごとの銘柄数。棚卸し・データ品質の確認用。 */
+export function originPrecisionBreakdown(): Record<OriginPrecision, number> {
+  const breakdown: Record<OriginPrecision, number> = {
+    area: 0,
+    prefecture: 0,
+    none: 0,
+  };
+  for (const n of TEA_MENU_NUMBERS) {
+    breakdown[resolveTeaOrigin(n).precision] += 1;
+  }
+  return breakdown;
 }
 
 /** 都道府県ごとの銘柄数。棚卸し・デバッグ用。 */
