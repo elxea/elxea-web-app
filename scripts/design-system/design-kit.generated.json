@@ -1273,6 +1273,12 @@
         "--overlay-foreground": "oklch(0.98 0.01 60)",
         "--overlay-foreground-muted": "oklch(0.75 0.01 60)",
         "--overlay-border": "oklch(1 0.02 60 / 0.4)",
+        "--overlay-scrim": "color-mix(in oklab, var(--color-brand-graphite) 62%, transparent)",
+        "--graphite-pressed": "oklch(0.333 0.007 274.8)",
+        "--z-sticky": "1020",
+        "--z-overlay": "1040",
+        "--z-modal": "1050",
+        "--elevation-shadow-modal": "0 12px 40px 0 color-mix(in oklab, var(--color-brand-graphite) 18%, transparent)",
         "--sidebar": "hsl(0 0% 98%)",
         "--sidebar-foreground": "hsl(240 5.3% 26.1%)",
         "--sidebar-primary": "hsl(240 5.9% 10%)",
@@ -1296,6 +1302,8 @@
       "theme_inline": {
         "--color-brand-line": "var(--brand-line)",
         "--color-overlay": "var(--overlay)",
+        "--color-overlay-scrim": "var(--overlay-scrim)",
+        "--color-graphite-pressed": "var(--graphite-pressed)",
         "--color-overlay-foreground": "var(--overlay-foreground)",
         "--color-overlay-foreground-muted": "var(--overlay-foreground-muted)",
         "--color-overlay-border": "var(--overlay-border)",
@@ -1389,7 +1397,7 @@
   "components": {
     "code_sot": {
       "path": "components/ui",
-      "count_tsx": 62,
+      "count_tsx": 63,
       "list": [
         "accordion",
         "alert",
@@ -1432,6 +1440,7 @@
         "native-select",
         "navigation-menu",
         "pagination",
+        "pill-button",
         "popover",
         "progress",
         "quantity-stepper",
@@ -2412,6 +2421,6 @@
     "_figma_node_count_method": "components.figma_mirror 配下に現れる distinct な Figma node ID (\\d+:\\d+) を、直近の verified_at の有無で分類した実カウント。",
     "figma_nodes_verified": 48,
     "figma_nodes_unverified": 0,
-    "code_ui_components": 62
+    "code_ui_components": 63
   }
 }

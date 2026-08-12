@@ -31,7 +31,19 @@ on:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  # Cancel superseded runs everywhere EXCEPT the auto-deploy branch.
+  #
+  # Since 2026-08-12 the production deploy is a job in THIS workflow (see
+  # `deploy-production` at the bottom), so a workflow-level cancel would abort a
+  # `vercel deploy` mid-flight — exactly what the old deploy.yml avoided with its
+  # own `cancel-in-progress: false`. A job-level `concurrency:` cannot save it:
+  # workflow-level cancellation kills the whole run regardless. So the guard has
+  # to live here.
+  #
+  # Effect: on the deploy branch runs QUEUE instead of cancelling (FIFO, so the
+  # newest commit still ends up as the final production deploy). Every other
+  # branch keeps the old cheap cancel-the-stale-run behaviour.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/feat/c1-ds-foundation' }}
 
 env:
   NODE_VERSION: "22"
@@ -434,3 +446,164 @@ jobs:
         env:
           BASE_URL: ${{ secrets.STAGING_URL }}
           CI: true
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Production deploy (moved here from .github/workflows/deploy.yml, 2026-08-12)
+  # ─────────────────────────────────────────────────────────────────────────
+  #
+  # deploy.yml had three independent defects; living in this workflow fixes all
+  # three at once:
+  #
+  #  1. It shipped WITHOUT looking at a single test result — `on: push:
+  #     branches: [main]`, no `needs:`, no gate, no `environment:`. The `needs:`
+  #     below makes a green suite a hard precondition: if anything it depends on
+  #     fails, this job never starts.
+  #  2. It targeted `main`, which is ~205 commits BEHIND the branch that actually
+  #     ships. A push to main therefore rolled production BACKWARDS — this really
+  #     happened on 2026-08-12 and had to be manually recovered. See DEPLOY_BRANCH.
+  #  3. It used `vercel build` + `vercel deploy --prebuilt`, broken since
+  #     2026-07-31 (3 consecutive failures). Root cause in the deploy step below.
+  #
+  # Why `needs:` and not `workflow_run:`
+  #   `workflow_run` "will only trigger a workflow run if the workflow file
+  #   exists on the default branch", and the triggered run then executes in
+  #   DEFAULT BRANCH context (GITHUB_SHA = last commit on the default branch).
+  #   Both properties are fatal here: the gate would never fire for a `feat/**`
+  #   push, and if it ever did it would deploy main's tip — re-creating defect 2.
+  #   https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows
+  #   `needs:` has neither problem: same workflow, same run, same commit, and
+  #   ordering guaranteed by the dependency graph. (`workflow_dispatch` is out for
+  #   the same default-branch reason, so there is no manual Actions deploy from a
+  #   feature branch — manual deploys stay a local `vercel --prod`.)
+  #
+  # `visual-regression` is deliberately absent from `needs:` — it is PR-only, and
+  # depending on a skipped job would skip this one too.
+  deploy-production:
+    name: deploy-production
+    # ── DEPLOY_BRANCH ──────────────────────────────────────────────────────
+    # The single line that decides which branch reaches production.
+    #
+    # !! WHEN THE main/feat CONSOLIDATION LANDS, CHANGE THIS LINE. !!
+    # If it is left pinned to a branch that no longer receives pushes, auto-deploy
+    # dies SILENTLY: the ref stops matching, this job is skipped on every run, and
+    # nothing anywhere reports an error. A skipped job looks identical to a
+    # healthy one in the Actions list.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/feat/c1-ds-foundation'
+    needs: [static-checks, unit-tests, coverage, build, storybook-tests, e2e-tests]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Second layer of serialisation, for the cross-workflow case: the workflow
+    # concurrency group is per-ref, this one is global to the deploy.
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    env:
+      # NOT secrets — the team and project identifiers from .vercel/project.json,
+      # which is git-ignored, hence pinned here. The Vercel CLI reads both from
+      # the environment, so no interactive `vercel link` is needed.
+      VERCEL_ORG_ID: team_6ut7roUVtRU2EGbPVR9DNTy6
+      VERCEL_PROJECT_ID: prj_sVwjaJwPAKxRcKu3wVejiqGPt5o6
+      # Supplied ONCE, as an env var. The CLI picks VERCEL_TOKEN up automatically,
+      # so no step passes it as a `--token=` flag: the value never lands on a
+      # command line (which can surface in process listings and step logs).
+      # GitHub masks it either way — keeping it off argv is defence in depth.
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+    steps:
+      - name: Preflight — require VERCEL_TOKEN secret
+        # Fail loudly rather than deep inside the CLI with an opaque auth error.
+        run: |
+          if [ -z "${VERCEL_TOKEN}" ]; then
+            echo "::error title=VERCEL_TOKEN not set::The 'VERCEL_TOKEN' repository secret is missing, so this deploy cannot authenticate to Vercel."
+            echo "To enable deploys:"
+            echo "  1. Create a PROJECT-SCOPED token at https://vercel.com/account/tokens (scope it to the elxea-web-app project only)"
+            echo "  2. Run: gh secret set VERCEL_TOKEN --repo <owner>/elxea-web-app"
+            exit 1
+          fi
+          echo "VERCEL_TOKEN is present."
+
+      - name: Arming switch — is auto-deploy enabled?
+        # ── KILL SWITCH ────────────────────────────────────────────────────
+        # Production only changes when the repository variable DEPLOY_ENABLED is
+        # the exact string "true":
+        #     gh variable set DEPLOY_ENABLED --body true   --repo <owner>/elxea-web-app
+        #     gh variable set DEPLOY_ENABLED --body false  --repo <owner>/elxea-web-app
+        #
+        # The switch is deliberately phrased as ENABLED (opt in) and not DISABLED
+        # (opt out), because only opt-in fails safe. With a DISABLED flag, an
+        # unset, misspelled, or accidentally deleted variable silently means
+        # "deploy to production"; with ENABLED, every one of those cases means
+        # "do nothing". The variable is currently UNSET, so this wiring lands
+        # inert and the first real deploy is a deliberate act.
+        #
+        # This is a STEP-level gate, not a job-level `if:`, on purpose: the job
+        # still runs, so every run shows on the record that the chain reached the
+        # deploy and that the gate is what stopped it. A skipped job would be
+        # indistinguishable from a broken `needs:` graph.
+        id: arm
+        run: |
+          if [ "${{ vars.DEPLOY_ENABLED }}" = "true" ]; then
+            echo "armed=true" >> "$GITHUB_OUTPUT"
+            echo "DEPLOY_ENABLED=true — proceeding to deploy ${GITHUB_SHA}."
+          else
+            echo "armed=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Auto-deploy is disabled::DEPLOY_ENABLED is not 'true', so no deployment was created. All gates passed; this commit is deployable. Enable with: gh variable set DEPLOY_ENABLED --body true"
+          fi
+
+      - name: Checkout
+        if: steps.arm.outputs.armed == 'true'
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        # Only needed to run the Vercel CLI itself. Note there is no pnpm setup
+        # and no `pnpm install` in this job any more: the build happens on
+        # Vercel's infrastructure now (see the deploy step), so the runner never
+        # needs the dependency tree.
+        if: steps.arm.outputs.armed == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install Vercel CLI
+        if: steps.arm.outputs.armed == 'true'
+        run: npm install --global vercel@latest
+
+      - name: Verify Vercel credentials
+        # Cheap auth probe that creates nothing. Deliberately `vercel whoami`
+        # rather than the `vercel pull` the old workflow used: `pull` downloads
+        # the production environment (including secret values) onto the runner's
+        # disk, and now that Vercel does the building we have no use for it. Same
+        # early-failure benefit, no secret materialised.
+        if: steps.arm.outputs.armed == 'true'
+        run: vercel whoami
+
+      - name: Deploy to production
+        # Deploys FROM SOURCE. No `vercel build`, no `--prebuilt`.
+        #
+        # Why --prebuilt was removed (this is what broke on 2026-07-31/08-01/08-12):
+        #   `vercel deploy --prebuilt` uploaded fine (1.7MB) and then failed on
+        #   VERCEL's build machine while rehydrating the deployment:
+        #     Downloading 391 deployment files...
+        #     Error: ENOENT ... lstat '/vercel/path0/node_modules/.pnpm/@opentelemetry+api@1.9.1/.../context.js'
+        #   391 files is far too few for a Next.js prebuilt output. Cause: the
+        #   bare `node_modules` line in .vercelignore matches at ANY depth, so it
+        #   also stripped `.vercel/output/functions/*.func/node_modules/**` — the
+        #   dependencies Next.js had just traced into the functions. The upload
+        #   shipped dangling references and Vercel failed resolving them.
+        #   Note this means adding node_modules to .vercelignore is not the fix;
+        #   it is already there and it IS the fault.
+        #
+        # Deploying from source sidesteps that interaction entirely: Vercel
+        # installs and builds, and node_modules is correctly excluded from the
+        # upload. Vercel also documents --prebuilt as the wrong choice when build
+        # time needs System Environment Variables ("If you need System
+        # Environment Variables at build time, do not use the --prebuilt flag"):
+        #   https://vercel.com/docs/cli/deploy#when-not-to-use---prebuilt
+        # Nothing is lost by not building here — the `build` job above already
+        # fails this workflow before the deploy on any build break.
+        if: steps.arm.outputs.armed == 'true'
+        # TEMPORARY (wiring verification run only) — the real command is
+        # `vercel deploy --prod` and is restored in the very next commit. Held as
+        # an echo so that the first end-to-end run of this new gate cannot create
+        # a deployment even if the arming switch above misbehaves.
+        run: |
+          echo "[DRY RUN] would have run 'vercel deploy --prod' for sha=${GITHUB_SHA}"
