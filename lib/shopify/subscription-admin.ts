@@ -5,6 +5,7 @@ import {
   SELLING_PLAN_GROUP_ADD_PRODUCTS_MUTATION,
   SELLING_PLAN_GROUP_DELETE_MUTATION,
   SUBSCRIPTION_BILLING_ATTEMPT_CREATE_MUTATION,
+  SUBSCRIPTION_CONTRACT_SET_NEXT_BILLING_DATE_MUTATION,
   SUBSCRIPTION_CONTRACT_UPDATE_MUTATION,
   SUBSCRIPTION_DRAFT_COMMIT_MUTATION,
   SUBSCRIPTION_DRAFT_UPDATE_MUTATION,
@@ -17,7 +18,9 @@ import {
   SELLING_PLAN_GROUPS_QUERY,
   SUBSCRIPTION_CONTRACTS_QUERY,
   SUBSCRIPTION_CONTRACT_QUERY,
+  SUBSCRIPTION_CONTRACT_NEXT_BILLING_DATE_QUERY,
   SUBSCRIPTION_BILLING_ATTEMPTS_QUERY,
+  SUBSCRIPTION_BILLING_CYCLES_QUERY,
 } from "./admin-queries";
 import type {
   AdminSellingPlanGroup,
@@ -26,6 +29,8 @@ import type {
   SubscriptionContract,
   SubscriptionContractLine,
   SubscriptionContractStatus,
+  SubscriptionBillingCycle,
+  SubscriptionBillingCyclesIndexRange,
   BillingAttempt,
   SubscriptionDraftInput,
   SubscriptionLineInput,
@@ -410,6 +415,156 @@ export async function getBillingAttempts(
     selectConnection: (data) => data.subscriptionContract?.billingAttempts,
     ...options,
   });
+}
+
+/**
+ * Read only `nextBillingDate` (plus id/status) for one contract.
+ *
+ * Deliberately not `getSubscriptionContract`: that query pulls lines, payment
+ * method and shipping address, and `advanceNextBillingDate` reads this value
+ * twice per contract (once to decide, once immediately before writing). Using
+ * the heavy query there multiplies the cron's requested query cost for two
+ * fields.
+ */
+export async function getContractNextBillingDate(
+  contractId: string
+): Promise<string | null> {
+  const data = await adminFetch<{
+    subscriptionContract: {
+      id: string;
+      status: SubscriptionContractStatus;
+      nextBillingDate: string | null;
+    } | null;
+  }>({
+    query: SUBSCRIPTION_CONTRACT_NEXT_BILLING_DATE_QUERY,
+    variables: { id: contractId },
+  });
+
+  if (!data.subscriptionContract) {
+    throw new Error(
+      `subscriptionContract(${contractId}) returned null — the contract does not ` +
+        `exist or the Admin token cannot read it`
+    );
+  }
+
+  return data.subscriptionContract.nextBillingDate;
+}
+
+// ─── Billing cycle operations ────────────────────────────────────────
+
+/**
+ * Index-range width used when walking a contract's billing cycles.
+ *
+ * Measured against the live store on 2026-08-12 (API 2026-07): a range of
+ * `1..50` succeeds, `1..250` fails with `Upcoming billing cycle selected past
+ * limit.` Shopify does not document the exact ceiling, so this stays well
+ * inside the range that was actually observed to work, and matches
+ * `ADMIN_CONNECTION_PAGE_SIZE` so one window is one page.
+ */
+export const BILLING_CYCLE_INDEX_WINDOW = 25;
+
+/**
+ * Hard ceiling on a single window's width. Anything wider is rejected locally
+ * rather than sent, because Shopify's error for an over-wide range
+ * (`Upcoming billing cycle selected past limit.`) reads like a data problem and
+ * would send a debugger looking at the contract instead of at the caller.
+ */
+export const BILLING_CYCLE_INDEX_MAX_SPAN = 50;
+
+/**
+ * Fetch a contract's billing cycles for an explicit `cycleIndex` range,
+ * ordered by `cycleIndex`.
+ *
+ * The range selector is **required by Shopify** — omitting it returns
+ * `subscriptionBillingCycles requires exactly one of
+ * billing_cycles_date_range_selector, billing_cycles_index_range_selector`
+ * (verified against the live schema, not inferred: introspection reports both
+ * selectors as optional). `SUBSCRIPTION_BILLING_CYCLES_QUERY` therefore declares
+ * the index selector non-null so a missing selector fails at the call site.
+ *
+ * Index ranges are used rather than date ranges on purpose: see the query's
+ * docblock — a date window anchored on "now" silently skips UNBILLED cycles that
+ * sit in the past, which would advance a contract past a charge it never took.
+ */
+export async function getBillingCycles(
+  contractId: string,
+  range: SubscriptionBillingCyclesIndexRange,
+  options: PaginationOptions = {}
+): Promise<SubscriptionBillingCycle[]> {
+  const { startIndex, endIndex } = range;
+
+  if (!Number.isInteger(startIndex) || startIndex < 1) {
+    throw new Error(
+      `getBillingCycles: startIndex must be an integer >= 1 (got ${startIndex}) — ` +
+        `Shopify rejects index 0 with "Billing cycle index out of range."`
+    );
+  }
+  if (!Number.isInteger(endIndex) || endIndex < startIndex) {
+    throw new Error(
+      `getBillingCycles: endIndex must be an integer >= startIndex ` +
+        `(got ${startIndex}..${endIndex})`
+    );
+  }
+  const span = endIndex - startIndex + 1;
+  if (span > BILLING_CYCLE_INDEX_MAX_SPAN) {
+    throw new Error(
+      `getBillingCycles: index range ${startIndex}..${endIndex} spans ${span} ` +
+        `cycles, over the ${BILLING_CYCLE_INDEX_MAX_SPAN} that Shopify was ` +
+        `measured to accept — walk narrower windows instead`
+    );
+  }
+
+  return fetchAllPages<
+    {
+      subscriptionBillingCycles: GraphQLConnection<SubscriptionBillingCycle> | null;
+    },
+    SubscriptionBillingCycle
+  >({
+    query: SUBSCRIPTION_BILLING_CYCLES_QUERY,
+    variables: {
+      contractId,
+      billingCyclesIndexRangeSelector: { startIndex, endIndex },
+    },
+    label: `subscriptionBillingCycles (${contractId} #${startIndex}-${endIndex})`,
+    selectConnection: (data) => data.subscriptionBillingCycles,
+    ...options,
+  });
+}
+
+/**
+ * Set a contract's `nextBillingDate`.
+ *
+ * This is the only write that moves a contract's billing date forward:
+ * `nextBillingDate` is app-managed and `subscriptionBillingAttemptCreate` does
+ * not touch it. The derivation of *which* date to write lives in
+ * `lib/shopify/next-billing-date.ts` — this function only transports it.
+ *
+ * @param date - RFC3339 / ISO-8601 date-time string (GraphQL `DateTime!`).
+ */
+export async function setNextBillingDate(
+  contractId: string,
+  date: string
+): Promise<{ id: string; nextBillingDate: string | null }> {
+  const data = await adminFetch<{
+    subscriptionContractSetNextBillingDate: {
+      contract: { id: string; nextBillingDate: string | null } | null;
+      userErrors: { field: string[] | null; message: string }[];
+    };
+  }>({
+    query: SUBSCRIPTION_CONTRACT_SET_NEXT_BILLING_DATE_MUTATION,
+    variables: { contractId, date },
+  });
+
+  throwOnUserErrors(data, "subscriptionContractSetNextBillingDate");
+
+  const contract = data.subscriptionContractSetNextBillingDate.contract;
+  if (!contract) {
+    throw new Error(
+      `subscriptionContractSetNextBillingDate(${contractId}) reported no ` +
+        `userErrors but returned no contract — treating as a failed write`
+    );
+  }
+  return contract;
 }
 
 // ─── Billing operations ─────────────────────────────────────────────
