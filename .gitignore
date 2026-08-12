@@ -61,6 +61,9 @@ next-env.d.ts
 # reach production. Anything under public/audio/ is a local working copy only.
 public/audio/
 
+# maplibre worker (node_modules から dev / build の先頭で複製する生成物)
+public/maplibre/
+
 # dev notes
 gtm-tag-name.md
 shopify-app-settings.md

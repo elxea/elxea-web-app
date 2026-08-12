@@ -10,6 +10,8 @@ import { Link } from "@/i18n/navigation";
 import { PortableText } from "@/components/sanity/portable-text";
 import { ImageCard } from "@/components/media/image-card";
 import { Breadcrumb } from "@/components/seo/breadcrumb";
+import { TeaOriginBlock } from "@/components/viz/map/tea-origin-block";
+import { resolveTeaOriginPlace } from "@/lib/roji/tea-origins";
 import { Button } from "@/components/ui/button";
 import {
   bodySmClass,
@@ -174,6 +176,21 @@ export default async function TeaMenuDetailPage({
     { term: t("time"), value: tea.brewingGuide?.time },
   ]);
 
+  /**
+   * 産地の地図の代替テキスト。地図の中に文字を置かない設計なので、
+   * 地図が何を指しているかはここでしか伝わらない。
+   *
+   * 産地が引けない銘柄では `TeaOriginBlock` がブロックごと描かないため、
+   * この文字列は使われずに捨てられる (先に組み立てても害はない)。
+   */
+  const originPlace =
+    tea.productNumber === null || tea.productNumber === undefined
+      ? null
+      : resolveTeaOriginPlace(String(tea.productNumber));
+  const originMapLabel = originPlace
+    ? t("originMapAlt", { place: originPlace })
+    : t("originMapAltUnknown");
+
   return (
     <>
       <div className="page-container pt-6">
@@ -241,6 +258,18 @@ export default async function TeaMenuDetailPage({
           </SectionBody>
         </PageSection>
       ) : null}
+
+      {/* R1-A: 産地の地図。銘柄番号から座標が引けないときは自分で null を返す
+          (ブロックごと描かない)。詳細表の「産地」(Sanity の自由記述) の直後に
+          置き、同じ話題を文字 → 図の順で読ませる。
+          節の余白・見出しは `PageSection` / `SectionHead` の確定版リズムに
+          合わせるのではなく、`TeaOriginBlock` が自前の枠を持つ (main 由来の
+          実装をそのまま使い、確定版の節骨格には手を入れない)。 */}
+      <TeaOriginBlock
+        menuNumber={tea.productNumber}
+        heading={t("origin")}
+        mapLabel={originMapLabel}
+      />
 
       {/* 淹れ方ガイド — 変A 6654:13257 / 6656:7967 */}
       {brewItems.length > 0 ? (

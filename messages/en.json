@@ -187,6 +187,8 @@
     "details": "Details",
     "variety": "Variety",
     "origin": "Origin",
+    "originMapAlt": "Map showing the location of {place}",
+    "originMapAltUnknown": "Map showing the tea's origin",
     "season": "Season",
     "netWeight": "Net weight",
     "brewingGuide": "Brewing Guide",
