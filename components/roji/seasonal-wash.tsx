@@ -21,6 +21,12 @@ import {
   prefersReducedMotion,
   resolveMotion,
 } from "@/lib/roji/seasonal-wash-motion";
+import {
+  paletteMeanLightness,
+  washEmphasisFor,
+  MID_RIM_SPREAD_LIMIT,
+  type WashEmphasis,
+} from "@/lib/roji/wash-emphasis";
 
 /**
  * SeasonalWash — 季節のにじみ (roji 情動レイヤー v1)
@@ -160,8 +166,14 @@ const NOMINAL_ASPECT = 1.6;
 const GRAIN_TILE = 220;
 const GRAIN_INTENSITY = 30;
 
-/** 「明るい配色」と見なす平均明度の境目。 */
-const LIGHT_PALETTE_PIVOT = 0.7;
+/**
+ * どちらの明度側を地に取るかの境目。
+ *
+ * `lib/roji/wash-emphasis.ts` の `DARK_PALETTE_PIVOT` / `LIGHT_PALETTE_PIVOT` とは
+ * 別物なので混ぜない。あちらは「色をどれだけ点らせるか」を連続的に決める補間の
+ * 両端で、こちらは「4 色のうちどれを地にするか」という二択の境目。役割が違う。
+ */
+const GROUND_PIVOT = 0.7;
 
 const TAU = Math.PI * 2;
 
@@ -198,7 +210,7 @@ function readRoles(colors: string[]): ColorRole[] {
   });
 
   const mean = measured.reduce((sum, m) => sum + m.l, 0) / measured.length;
-  const wantLightestGround = mean >= LIGHT_PALETTE_PIVOT;
+  const wantLightestGround = mean >= GROUND_PIVOT;
 
   let groundIndex = 0;
   for (let i = 1; i < measured.length; i += 1) {
@@ -227,6 +239,13 @@ function readRoles(colors: string[]): ColorRole[] {
 /**
  * 役割ごとの筆の性格。
  *
+ * ## v2-fix — 主役の値はここに無い (配色から決まる)
+ * 下の `accent` は **明るい配色のときの値** ではなく、`ROLE_STYLE` に居残った
+ * 形骸ではない。主役の置き方は配色の平均明度から `washEmphasisFor` が返すので、
+ * ここには置かない。理由は `lib/roji/wash-emphasis.ts` の冒頭に書いた:
+ * 同じ濃度でも、明るい地では「染み」、暗い地では「光」として読まれ、
+ * 弱め方を一律にすると必ずどちらかが壊れる (v2 は夜を壊した)。
+ *
  * ## v1-fix で分かったこと — 比率ではなく「置き方」が違っていた
  * 同じ 1 枚の中で、地と中間色 (淡い桃色・青灰) は **広い面** としてゆるく
  * 重なり、境界が場所によって濃かったり消えたりしていた = にじみ。ところが
@@ -248,7 +267,24 @@ function readRoles(colors: string[]): ColorRole[] {
  * 濃さの総量 (濃度 x 面積 x 本数) はおおよそ保たれるので、色そのものは消えない。
  * 芯の濃度だけが半分以下になる。
  */
-const ROLE_STYLE = {
+interface RoleStyle {
+  weight: number;
+  width: number;
+  alpha: number;
+  elongation: number;
+  mottleDepth: number;
+  spread: number;
+  rim: boolean;
+}
+
+/**
+ * 地と中間色の置き方。配色によらず一定でよい部分。
+ *
+ * 主役だけが配色依存なのは、地と中間は「面としてゆるく重なる」置き方が
+ * 明暗どちらでも成立しているため (v1 / v2 の実物で確認済み)。中間色は暗い配色で
+ * 濃さだけを押し上げる (`WashEmphasis.midAlpha`)。形は変えない。
+ */
+const BASE_ROLE_STYLE = {
   ground: {
     weight: 1,
     width: 1.3,
@@ -257,15 +293,6 @@ const ROLE_STYLE = {
     mottleDepth: 0.26,
     spread: 0,
     rim: true,
-  },
-  accent: {
-    weight: 2,
-    width: 1.7,
-    alpha: 1.05,
-    elongation: 0.72,
-    mottleDepth: 0.95,
-    spread: 1.4,
-    rim: false,
   },
   mid: {
     weight: 1.35,
@@ -277,6 +304,41 @@ const ROLE_STYLE = {
     rim: true,
   },
 } as const;
+
+/**
+ * 配色の明るさを織り込んだ、役割ごとの筆の性格。
+ *
+ * 主役は `washEmphasisFor` の返り値そのもの、中間は濃さだけを配色で調整、
+ * 地は不変。縁 (`rim`) は主役では常に切る — 全長にわたる均質な輪郭は
+ * 明暗どちらでも図形化の主因だった。
+ */
+function roleStylesFor(emphasis: WashEmphasis): Record<
+  ColorRole["role"],
+  RoleStyle
+> {
+  return {
+    ground: BASE_ROLE_STYLE.ground,
+    mid: {
+      ...BASE_ROLE_STYLE.mid,
+      alpha: BASE_ROLE_STYLE.mid.alpha * emphasis.midAlpha,
+      spread: emphasis.midSpread,
+      mottleDepth: emphasis.midMottleDepth,
+      // 散らした層に均質な縁を重ねると打ち消し合う (`MID_RIM_SPREAD_LIMIT`)。
+      rim:
+        BASE_ROLE_STYLE.mid.rim &&
+        emphasis.midSpread <= MID_RIM_SPREAD_LIMIT,
+    },
+    accent: {
+      weight: emphasis.weight,
+      width: emphasis.width,
+      alpha: emphasis.alpha,
+      elongation: emphasis.elongation,
+      mottleDepth: emphasis.mottleDepth,
+      spread: emphasis.spread,
+      rim: false,
+    },
+  };
+}
 
 /**
  * 役割の性格を焼き込んだストローク。
@@ -447,6 +509,12 @@ export function SeasonalWash({
     const roles = readRoles(colors);
     const ground = roles.find((r) => r.role === "ground")?.hex ?? colors[0];
 
+    // 「色をどれだけ点らせるか」は配色の明るさで決まる。暗い夜の配色なら
+    // 主役は濃く狭くまとまった光になり、明るい昼の配色なら広く薄い染みになる。
+    const roleStyle = roleStylesFor(
+      washEmphasisFor(paletteMeanLightness(colors)),
+    );
+
     const dabs = roles.map((r) => makeDabSprite(r.hex));
     const rims = roles.map((r) => makeRimSprite(rimColor(r.hex)));
 
@@ -458,7 +526,7 @@ export function SeasonalWash({
 
     // 役割の重みで本数を配り、そのあと役割ごとの性格 (太さ・濃さ) を掛ける。
     const rawSeeds = buildStrokeSeeds({
-      weights: roles.map((r) => ROLE_STYLE[r.role].weight),
+      weights: roles.map((r) => roleStyle[r.role].weight),
       count: STROKE_COUNT,
       seed: seed + 101,
       originShift: {
@@ -472,7 +540,7 @@ export function SeasonalWash({
     });
     const strokes: PaintedStroke[] = rawSeeds
       .map((s) => {
-        const style = ROLE_STYLE[roles[s.colorIndex]?.role ?? "mid"];
+        const style = roleStyle[roles[s.colorIndex]?.role ?? "mid"];
         return {
           ...s,
           width: s.width * style.width,
