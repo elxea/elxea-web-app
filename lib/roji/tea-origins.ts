@@ -456,6 +456,21 @@ export function resolveTeaOrigin(menuNumber: string): TeaOrigin {
   };
 }
 
+/**
+ * 銘柄番号から表示用の産地名を作る (「静岡県 静岡市」)。
+ *
+ * 都道府県しか分からなければ都道府県だけを返し、どちらも無ければ `null`。
+ * 表示側で毎回 `[prefecture, area].filter(Boolean).join(" ")` を書くと
+ * 区切り方が面ごとにずれるので、繋ぎ方はここに 1 つだけ持つ。
+ * この値を i18n しないのは、中身が正本 (Notion) の日本語の固有名詞そのもので、
+ * 訳語を持たないため (英語面でも地名は日本語表記のまま出す)。
+ */
+export function resolveTeaOriginPlace(menuNumber: string): string | null {
+  const { prefecture, area } = resolveTeaOrigin(menuNumber);
+  const place = [prefecture, area].filter(Boolean).join(" ");
+  return place || null;
+}
+
 /** 銘柄番号から仕入先名を引く (物語・農家紹介の導線用)。 */
 export function resolveTeaSupplier(menuNumber: string): string | null {
   const key = TEA_ORIGIN_BY_NUMBER[menuNumber as TeaMenuNumber];
