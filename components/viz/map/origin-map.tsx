@@ -15,12 +15,13 @@ import { useEffect, useRef } from "react";
 // maplibre-gl 6 は default export を持たない (5 までの `import maplibregl from` は
 // TS1192 になる)。`MapLibreMap` は `Map` の別名 export で、グローバルの `Map` を
 // 隠さずに済むのでこちらを使う。
-import { MapLibreMap, Marker } from "maplibre-gl";
+import { MapLibreMap, Marker, setWorkerUrl } from "maplibre-gl";
 
 import "maplibre-gl/dist/maplibre-gl.css";
 
 import {
   ITEM_MAP_ZOOM,
+  MAPLIBRE_WORKER_URL,
   centerForPin,
   originMapStyle,
 } from "@/lib/viz/map-style";
@@ -61,6 +62,14 @@ export function OriginMap({
 
     const reducedMotion = prefersReducedMotion();
     const point = { lng, lat };
+
+    // MapLibre は GeoJSON の解析を Worker で行う。Worker の URL は既定では
+    // `import.meta.url` から組み立てられるが、Turbopack がそれを自前の内部値に
+    // 書き換えるため URL が空文字になり、Worker が起動しない。すると GeoJSON は
+    // 解析されず、**枠と DOM のピンだけが出て陸・海岸線・県境が出ない**。
+    // (Marker は DOM なので Worker と無関係に描かれる = 症状が地図の失敗に見えない)
+    // 置き場と複製の根拠は `MAPLIBRE_WORKER_URL` の宣言に書いてある。
+    setWorkerUrl(MAPLIBRE_WORKER_URL);
 
     /**
      * center は高さに依存する (ピンを上端から 57px に置くため南へずらす)。

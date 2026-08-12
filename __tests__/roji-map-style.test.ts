@@ -7,6 +7,7 @@ import {
   ITEM_MAP_SIZE,
   ITEM_MAP_ZOOM,
   LINE_WIDTH,
+  MAPLIBRE_WORKER_URL,
   MAP_TOKEN_COLORS,
   PIN_TOP_PX,
   PREF_BORDER_OPACITY,
@@ -14,6 +15,10 @@ import {
   mapColor,
   originMapStyle,
 } from "@/lib/viz/map-style";
+import {
+  MAPLIBRE_PUBLIC_DIR,
+  MAPLIBRE_WORKER_FILES,
+} from "@/scripts/copy-maplibre-worker.mjs";
 import { PIN_DOT_SIZE, PIN_RIM_WIDTH } from "@/components/viz/map/origin-pin";
 
 /**
@@ -111,6 +116,25 @@ describe("originMapStyle", () => {
     expect(style.layers.some((l) => l.type === "symbol")).toBe(false);
   });
 
+  /**
+   * MapLibre のスタイル検査はキーの **存在** を見るので、`glyphs: undefined` と
+   * 「glyphs を書かない」は同じではない。前者は
+   * `glyphs: string expected, undefined found` で検査に落ち、スタイルの読み込みが
+   * そこで中止される — ソースが 1 本も取りに行かれず、地図は真っ白のままになる。
+   *
+   * 直前の `expect(style.glyphs).toBeUndefined()` は「キーが無い」と
+   * 「キーはあるが値が undefined」を区別できず、実際にこの不具合を通した。
+   * 省略可能なキーは値ではなく **キーの有無** で固定する。
+   */
+  it("省略可能なキーは undefined を代入せずキーごと省く", () => {
+    for (const key of ["glyphs", "sprite"]) {
+      expect(
+        Object.keys(style),
+        `${key}: undefined を代入すると MapLibre のスタイル検査が落ちる`,
+      ).not.toContain(key);
+    }
+  });
+
   it("県境が海岸線より先に描かれる (重なる場所で強い線が勝つ)", () => {
     const ids = style.layers.map((l) => l.id);
     expect(ids.indexOf("pref-border")).toBeLessThan(ids.indexOf("coastline"));
@@ -181,6 +205,55 @@ describe("centerForPin", () => {
     expect(center.lng).toBe(shizuoka.lng);
     // ピンを上に置く = center は点より南 (緯度が小さい)。
     expect(center.lat).toBeLessThan(shizuoka.lat);
+  });
+});
+
+/**
+ * MapLibre は GeoJSON の解析を Worker で行う。Worker が起動しないと
+ * **枠と DOM のピンだけが出て陸・海岸線・県境が出ない** — Marker は DOM なので
+ * Worker と無関係に描かれ、地図が壊れているように見えない。この見分けの付かなさが
+ * 実際に調査を長引かせたので、配線を機械で固定する。
+ *
+ * 既定の Worker URL は `import.meta.url` から組み立てられるが、Turbopack は
+ * これを自前の内部値に書き換えるため URL が空文字になる。よって
+ * `setWorkerUrl` で `public/` の実体を指すのが唯一効く手段で、その実体は
+ * `dev` / `build` の先頭で node_modules から複製される。
+ * この 3 点 (URL の写し・複製・複製の起動) のどれが欠けても地図は白いままになる。
+ */
+describe("maplibre worker の配線", () => {
+  it("setWorkerUrl に渡す URL が複製先と一致する", () => {
+    expect(MAPLIBRE_WORKER_URL).toBe(
+      `/${MAPLIBRE_PUBLIC_DIR}/${MAPLIBRE_WORKER_FILES[0]}`,
+    );
+  });
+
+  it("worker と相方の shared を同じ場所へ複製する", () => {
+    // worker は `./maplibre-gl-shared.mjs` を相対 import する。片方だけ置くと
+    // worker は最初の import で落ち、症状は「複製し忘れ」と同じ白い地図になる。
+    expect(MAPLIBRE_WORKER_FILES).toEqual([
+      "maplibre-gl-worker.mjs",
+      "maplibre-gl-shared.mjs",
+    ]);
+  });
+
+  it("複製が dev と build の両方で走る", () => {
+    const pkg = JSON.parse(
+      readFileSync(path.join(process.cwd(), "package.json"), "utf8"),
+    ) as { scripts: Record<string, string> };
+    for (const name of ["dev", "build"]) {
+      expect(
+        pkg.scripts[name],
+        `${name}: 複製が走らないと public/maplibre が空になり地図が白いまま出る`,
+      ).toContain("scripts/copy-maplibre-worker.mjs");
+    }
+  });
+
+  it("複製物は git に入れない (node_modules と二重管理にしない)", () => {
+    const gitignore = readFileSync(
+      path.join(process.cwd(), ".gitignore"),
+      "utf8",
+    );
+    expect(gitignore).toContain("public/maplibre/");
   });
 });
 

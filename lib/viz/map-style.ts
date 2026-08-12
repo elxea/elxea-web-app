@@ -55,6 +55,20 @@ export function mapColor(name: MapTokenName): string {
   return oklchToHex(MAP_TOKEN_COLORS[name]);
 }
 
+/**
+ * maplibre-gl の Worker スクリプトの置き場。
+ *
+ * MapLibre は GeoJSON の解析を Worker で行うが、Worker の URL を
+ * `import.meta.url` から組み立てる。Turbopack はこれを自前の内部値に書き換えるので
+ * `^https?:` の判定に落ち、**Worker URL が空文字になって GeoJSON が 1 バイトも
+ * 解析されない** (枠と DOM のピンだけが出て陸が出ない)。よって MapLibre 公式の
+ * Turbopack 手順どおり `public/` から配って `setWorkerUrl` で明示する。
+ *
+ * 実体は `scripts/copy-maplibre-worker.mjs` が node_modules から複製する。
+ * この写しがずれたら `__tests__/roji-map-style.test.ts` が落ちる。
+ */
+export const MAPLIBRE_WORKER_URL = "/maplibre/maplibre-gl-worker.mjs";
+
 /** 地形データの置き場。ビルド済みの静的ファイルで、タイルサーバーは介在しない。 */
 export const GEO_DATA = {
   land: "/geo/jp-land.geojson",
@@ -153,8 +167,13 @@ export function centerForPin(
 export function originMapStyle({ reducedMotion = false } = {}): StyleSpecification {
   return {
     version: 8,
-    // 地名ラベルを 1 つも描かないのでフォントの取得先は要らない。
-    glyphs: undefined,
+    // 地名ラベルを 1 つも描かないのでフォントの取得先 (glyphs) は要らない。
+    //
+    // ここで `glyphs: undefined` と **書いてはいけない**。MapLibre のスタイル検査は
+    // 値ではなくキーの存在を見るので、キーが生えているだけで
+    // `glyphs: string expected, undefined found` に落ち、スタイルの読み込みが
+    // そこで中止される。ソースは 1 本も取りに行かれず、地図は真っ白のままになる。
+    // 要らないキーは値を undefined にするのではなく、書かない。
     sources: {
       "jp-land": { type: "geojson", data: GEO_DATA.land },
       "jp-pref": { type: "geojson", data: GEO_DATA.prefBorders },
