@@ -8,6 +8,7 @@ import { urlFor } from "@/sanity/lib/image";
 import { PortableText } from "@/components/sanity/portable-text";
 import { ImageWithFallback } from "@/components/ui/image-with-fallback";
 import { TeaSpecCard } from "@/components/journal/tea-spec-card";
+import { JournalWashTheme } from "@/components/roji/journal-wash-theme";
 import { Link } from "@/i18n/navigation";
 
 // 短縮ラベル (Figma Journal Theme Badge 6934:143 が正)
@@ -76,6 +77,10 @@ export default async function ElxeaJournalDetailPage({
 
   return (
     <article className="py-20">
+      {/* 号のテーマ色を背景のにじみへ渡す (描画は持たない)。バッジの色と
+          面の色が同じ号の色から来ることで、テーマがラベルではなく空気になる。 */}
+      <JournalWashTheme theme={journal.theme} />
+
       {/* ① 変A: Theme badge + Title + Summary をヒーロー画像の上に (Figma 6760:120) */}
       <header className="section-narrow mb-10">
         <span

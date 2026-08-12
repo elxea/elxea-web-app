@@ -42,7 +42,15 @@ export const TIMES_OF_DAY: readonly TimeOfDay[] = [
 /** 4 色ちょうど。にじみの塊はこの色を巡回して使う。 */
 export type SeasonalPalette = [string, string, string, string];
 
-type OklchQuad = [Oklch, Oklch, Oklch, Oklch];
+/**
+ * 面のもとになる 4 色 (時間帯の効果を掛ける **前** の値)。
+ *
+ * 月の色 (`MONTHLY_BASE`) だけでなく、elxea journal の号のテーマ色から作った
+ * 4 色もここへ入る (`lib/roji/theme-palette.ts`)。時間帯の効かせ方
+ * (`TIME_SHAPE`) と彩度・明度の帯はどちらも同じものを通す必要があるので、
+ * 型と整形 (`shapePalette`) を公開して経路を 1 本に保つ。
+ */
+export type OklchQuad = [Oklch, Oklch, Oklch, Oklch];
 
 const o = (l: number, c: number, h: number): Oklch => ({ l, c, h });
 
@@ -387,12 +395,18 @@ export function seasonalRolesFor(
   return assignRoles(MONTHLY_BASE[normalizeMonth(month)], DARK_REGIME[timeOfDay]);
 }
 
-/** 月 + 時間帯 -> 4 色。純関数。 */
-export function seasonalPaletteFor(
-  month: number,
+/**
+ * もとの 4 色 + 時間帯 -> 面の 4 色。純関数。
+ *
+ * 月の色から作る経路 (`seasonalPaletteFor`) と、号のテーマ色から作る経路
+ * (`themePaletteFor`) の **共通の出口**。役割の割り当て・時間帯の効かせ方・
+ * 彩度と明度の帯はすべてここに集約する。テーマ色側で式を書き直すと、
+ * 「同じ夜なのに elxea journal だけ彩度帯が違う」がすぐ起きるため。
+ */
+export function shapePalette(
+  base: OklchQuad,
   timeOfDay: TimeOfDay,
 ): SeasonalPalette {
-  const base = MONTHLY_BASE[normalizeMonth(month)];
   const roles = assignRoles(base, DARK_REGIME[timeOfDay]);
   const shapes = TIME_SHAPE[timeOfDay];
 
@@ -415,6 +429,14 @@ export function seasonalPaletteFor(
     return oklchToHex(applyRoleShape(color, shape, offsetL));
   });
   return [a, b, c, d];
+}
+
+/** 月 + 時間帯 -> 4 色。純関数。 */
+export function seasonalPaletteFor(
+  month: number,
+  timeOfDay: TimeOfDay,
+): SeasonalPalette {
+  return shapePalette(MONTHLY_BASE[normalizeMonth(month)], timeOfDay);
 }
 
 /** その日時の景色の色。端末のローカル時刻をそのまま使う。 */

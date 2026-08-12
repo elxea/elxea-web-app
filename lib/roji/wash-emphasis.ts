@@ -200,6 +200,103 @@ export function washEmphasisFor(meanLightness: number): WashEmphasis {
 }
 
 /** パレットから直接。描画側はこれだけ呼べばよい。 */
-export function washEmphasisForPalette(colors: string[]): WashEmphasis {
-  return washEmphasisFor(paletteMeanLightness(colors));
+export function washEmphasisForPalette(
+  colors: string[],
+  intensity: WashIntensity = "base",
+): WashEmphasis {
+  return scaleWashEmphasis(
+    washEmphasisFor(paletteMeanLightness(colors)),
+    resolveWashIntensity(intensity).deposit,
+  );
+}
+
+/* ------------------------------------------------------------------------- *
+ * 面ごとの強さ (intensity)
+ * ------------------------------------------------------------------------- */
+
+/**
+ * 面ごとの演出の強さ。
+ *
+ * ## なぜ配色の係数とは別の軸が要るか
+ * `washEmphasisFor` は「**この配色を** どう置けば図形に見えないか」を決める。
+ * 配色が同じなら答えは 1 つで、面が違っても変わらない。一方で置き先の面には
+ * それぞれ事情がある — プレビューは面そのものが主役だが、読みもの系の背景は
+ * 本文の後ろに敷くので、同じ配色でも **弱く** 出さなければならない。
+ * 前者は配色の関数、後者は面の要求で、混ぜると「読みもの用に薄くしたら
+ * 夜の配色が灰色に戻った」のような後退が起きる。よって軸を分ける。
+ *
+ * ## 0-1 の 1 本のつまみにした理由
+ * 濃度・不透明度・本数をそれぞれ外から渡せるようにすると、呼び出し側が
+ * 「どう描くか」を知らないと使えなくなる。面が言えるのは
+ * 「**どれだけ出してよいか**」だけなので、入力は 1 スカラーに絞り、
+ * それを何に配るかはこのモジュールが持つ。
+ */
+export type WashIntensityName = "base" | "soft";
+
+/** 名前付きの強さ。数値を直接渡してもよい (0-1 に丸められる)。 */
+export const WASH_INTENSITY_PRESETS: Record<WashIntensityName, number> = {
+  /** 面そのものが主役のとき (プレビュー・ヒーロー)。v3 までの見え方。 */
+  base: 1,
+  /**
+   * 読みもの系の背景。
+   *
+   * 0.55 は「本文の文字が WCAG AA (4.5:1) を割らない」ことから決めた上限側の値。
+   * 検証は `__tests__/roji-reading-palette.test.ts` が 48 通りの配色すべてで行う。
+   */
+  soft: 0.55,
+};
+
+export type WashIntensity = WashIntensityName | number;
+
+export interface ResolvedWashIntensity {
+  /** 丸めたあとの 0-1 のつまみの値。 */
+  scalar: number;
+  /**
+   * 濃度 (`alpha` / `midAlpha`) に掛ける倍率。
+   *
+   * 下限を 0.6 で止めるのは、濃度だけを 0 に近づけると **ストロークが消えて
+   * 地の 1 色だけが残る** ため。それは「弱いにじみ」ではなく「ただの色面」で、
+   * 弱くするほど roji から遠ざかる。面全体を薄くするのは `opacity` の仕事にし、
+   * 濃度は絵が絵として成立する範囲でしか動かさない。
+   */
+  deposit: number;
+  /** 面全体の不透明度。地の明るさを含めて紙へどれだけ届くかを決める。 */
+  opacity: number;
+}
+
+/** 名前 or 数値 -> 実際に効く 3 値。純関数。 */
+export function resolveWashIntensity(
+  intensity: WashIntensity = "base",
+): ResolvedWashIntensity {
+  const raw =
+    typeof intensity === "number"
+      ? intensity
+      : (WASH_INTENSITY_PRESETS[intensity] ?? WASH_INTENSITY_PRESETS.base);
+  const scalar = Math.min(1, Math.max(0, raw));
+  return {
+    scalar,
+    deposit: 0.6 + 0.4 * scalar,
+    opacity: scalar,
+  };
+}
+
+/**
+ * 濃度だけを倍率で動かした係数を返す。純関数。
+ *
+ * 動かすのは `alpha` と `midAlpha` だけ。太さ・引き伸ばし・横ゆれ・切れ目は
+ * 「**図形に見えないための形**」であって強弱の話ではないので触らない。ここを
+ * 一緒に縮めると、弱くするほど筆致が細く均質になって帯が復活する
+ * (v2 -> v3 で潰したのと同じ後退)。配色依存の差 (暗い配色ほど濃い) は倍率が
+ * 一律に掛かるので比のまま保たれる。
+ */
+export function scaleWashEmphasis(
+  emphasis: WashEmphasis,
+  deposit: number,
+): WashEmphasis {
+  const factor = Math.max(0, deposit);
+  return {
+    ...emphasis,
+    alpha: emphasis.alpha * factor,
+    midAlpha: emphasis.midAlpha * factor,
+  };
 }

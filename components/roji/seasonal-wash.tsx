@@ -23,9 +23,12 @@ import {
 } from "@/lib/roji/seasonal-wash-motion";
 import {
   paletteMeanLightness,
+  resolveWashIntensity,
+  scaleWashEmphasis,
   washEmphasisFor,
   MID_RIM_SPREAD_LIMIT,
   type WashEmphasis,
+  type WashIntensity,
 } from "@/lib/roji/wash-emphasis";
 
 /**
@@ -78,6 +81,15 @@ export interface SeasonalWashProps {
   grain?: boolean;
   /** 絵柄の seed。同じ値なら必ず同じ絵になる。既定 1。 */
   seed?: number;
+  /**
+   * この面でどれだけ強く出すか。`"base"` (既定) / `"soft"` または 0-1 の数値。
+   *
+   * 配色ごとの置き方 (`washEmphasisFor`) とは別の軸。あちらは「この配色を
+   * どう置けば図形に見えないか」で、こちらは「この **面** がどれだけ出して
+   * よいか」。読みもの系の背景は本文の後ろに敷くので `"soft"` を渡す。
+   * 詳細と数値の根拠は `lib/roji/wash-emphasis.ts` の `WashIntensity` 参照。
+   */
+  intensity?: WashIntensity;
   className?: string;
 }
 
@@ -487,8 +499,12 @@ export function SeasonalWash({
   tempo = 1,
   grain = true,
   seed = 1,
+  intensity = "base",
   className,
 }: SeasonalWashProps) {
+  // 面の強さは 3 値に開く。濃度は描画へ、不透明度は面全体へ掛ける。
+  const { deposit, opacity } = resolveWashIntensity(intensity);
+
   const hostRef = useRef<HTMLDivElement | null>(null);
   const washRef = useRef<HTMLCanvasElement | null>(null);
   const grainRef = useRef<HTMLCanvasElement | null>(null);
@@ -511,8 +527,10 @@ export function SeasonalWash({
 
     // 「色をどれだけ点らせるか」は配色の明るさで決まる。暗い夜の配色なら
     // 主役は濃く狭くまとまった光になり、明るい昼の配色なら広く薄い染みになる。
+    // 面の強さは濃度にだけ掛ける。形 (太さ・横ゆれ・切れ目) は配色が決めた
+    // ままにする — 弱めるつもりで形まで縮めると帯が戻る (`scaleWashEmphasis`)。
     const roleStyle = roleStylesFor(
-      washEmphasisFor(paletteMeanLightness(colors)),
+      scaleWashEmphasis(washEmphasisFor(paletteMeanLightness(colors)), deposit),
     );
 
     const dabs = roles.map((r) => makeDabSprite(r.hex));
@@ -758,14 +776,21 @@ export function SeasonalWash({
       document.removeEventListener("visibilitychange", onVisibility);
       motionQuery?.removeEventListener?.("change", onMotionChange);
     };
-  }, [paletteKey, tempo, grain, seed]);
+  }, [paletteKey, tempo, grain, seed, deposit]);
 
   return (
     <div
       ref={hostRef}
       aria-hidden="true"
       className={className}
-      style={{ position: "relative", overflow: "hidden", isolation: "isolate" }}
+      style={{
+        position: "relative",
+        overflow: "hidden",
+        isolation: "isolate",
+        // 不透明度は host に置く。canvas 側に置くと紙の粒子 (別 canvas) が
+        // 素の濃さで残り、弱めるほど粒だけが目立つ面になる。
+        opacity,
+      }}
     >
       <canvas
         ref={washRef}
