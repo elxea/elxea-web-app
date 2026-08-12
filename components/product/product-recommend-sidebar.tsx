@@ -12,7 +12,7 @@
 
 import Image from "next/image";
 import { Link } from "@/i18n/navigation";
-import { ImagePlaceholder } from "@/components/ui/image-placeholder";
+import { ImagePlaceholder } from "@/components/media/image-placeholder";
 import { getProducts } from "@/lib/shopify";
 import { formatPrice } from "@/lib/utils";
 import { getRecommendedProducts } from "@/lib/recommendations/product-engine";
