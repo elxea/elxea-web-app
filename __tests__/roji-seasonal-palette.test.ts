@@ -6,6 +6,7 @@ import {
   normalizeMonth,
   seasonalPalette,
   seasonalPaletteFor,
+  seasonalRolesFor,
   seasonalTempo,
   timeOfDayFromHour,
 } from "@/lib/roji/seasonal-palette";
@@ -121,27 +122,28 @@ describe("seasonalPaletteFor", () => {
   });
 
   /**
-   * 既存デザイントークンとの同居条件。`dist/tokens.css` の彩度は
-   * 0.006〜0.061 (brand-gold 0.173 のみ例外) なので、生成色がそれを大きく超えると
-   * 既存 UI と喧嘩する。0.09 は gold を除いた実測上限に余裕を持たせた上限。
+   * 彩度の天井。brand-gold (0.173) を超えなければ既存 UI と喧嘩しない。
+   *
+   * v0 は本文用トークンの帯域 (0.006〜0.061) に収めていたが、それは文字と罫線の
+   * 帯域であって面の帯域ではなかった (実測: 面がオフホワイトと区別できなかった)。
    */
-  it("stays inside the chroma band the design tokens use", () => {
+  it("stays under the brand chroma ceiling", () => {
     for (const month of MONTHS) {
       for (const timeOfDay of TIMES_OF_DAY) {
         for (const hex of seasonalPaletteFor(month, timeOfDay)) {
-          expect(hexToOklch(hex).c).toBeLessThanOrEqual(0.09);
+          expect(hexToOklch(hex).c).toBeLessThanOrEqual(0.13);
         }
       }
     }
   });
 
-  /** 明度の床と天井。夜でも黒く潰さず、昼でも白飛びさせない。 */
-  it("keeps lightness between the quiet floor and the paper ceiling", () => {
+  /** 明度の床と天井。真っ黒に潰さず、昼でも白飛びさせない。 */
+  it("keeps lightness between the ink floor and the paper ceiling", () => {
     for (const month of MONTHS) {
       for (const timeOfDay of TIMES_OF_DAY) {
         for (const hex of seasonalPaletteFor(month, timeOfDay)) {
           const { l } = hexToOklch(hex);
-          expect(l).toBeGreaterThanOrEqual(0.4);
+          expect(l).toBeGreaterThanOrEqual(0.16);
           expect(l).toBeLessThanOrEqual(0.98);
         }
       }
@@ -183,24 +185,157 @@ describe("seasonalPaletteFor", () => {
    * 実値の固定。色を触ったらこのテストが落ちるので、変更が意図的かを必ず問われる。
    * 8月 = 晩夏 (淡い水色 / 薄緑 / 生成り / 白藤)、10月 = 秋 (薄柿 / 金茶 / 生成り / 薄墨)。
    */
+  /**
+   * v1 の中心的な回帰検査。
+   *
+   * v0 の夜は「明度を落として彩度も落とす」だったので、12月夜がほぼ無彩色、
+   * 8月夜が濁った青灰になった。実物を見て初めて分かる壊れ方だったので、
+   * ここで数値として固定しておく。**暗い = 灰色ではない**。
+   */
+  it("never lets a night color fall to near-grey", () => {
+    for (const month of MONTHS) {
+      for (const hex of seasonalPaletteFor(month, "night")) {
+        const { c } = hexToOklch(hex);
+        expect(c).toBeGreaterThanOrEqual(0.04);
+      }
+    }
+  });
+
+  it("makes night more chromatic than day, not less", () => {
+    const meanC = (palette: string[]) =>
+      palette.reduce((sum, hex) => sum + hexToOklch(hex).c, 0) / palette.length;
+
+    for (const month of MONTHS) {
+      expect(meanC(seasonalPaletteFor(month, "night"))).toBeGreaterThan(
+        meanC(seasonalPaletteFor(month, "day")),
+      );
+    }
+  });
+
+  /** 夜の色相が 1 点に潰れると、明度差だけの面 = モノクロになる。 */
+  it("keeps the night hues spread apart", () => {
+    const distance = (a: number, b: number) => {
+      const delta = (((a - b) % 360) + 360) % 360;
+      return delta > 180 ? 360 - delta : delta;
+    };
+
+    for (const month of MONTHS) {
+      const hues = seasonalPaletteFor(month, "night").map(
+        (hex) => hexToOklch(hex).h,
+      );
+      const widest = Math.max(
+        ...hues.flatMap((a) => hues.map((b) => distance(a, b))),
+      );
+      expect(widest).toBeGreaterThanOrEqual(60);
+    }
+  });
+
+  /**
+   * 夜には必ず「灯り」が 1 色ある。暗がりの中で暖色が点って見えることが、
+   * 夜を静けさとして成立させる条件 (沈んだだけの面は静かではなく、ただ暗い)。
+   */
+  it("gives every night a warm lit color that stays bright", () => {
+    const distanceFromAmber = (h: number) => {
+      const delta = (((h - 55) % 360) + 360) % 360;
+      return delta > 180 ? 360 - delta : delta;
+    };
+
+    for (const month of MONTHS) {
+      const colors = seasonalPaletteFor(month, "night").map((hex) =>
+        hexToOklch(hex),
+      );
+      const lamp = colors.find(
+        (color) => distanceFromAmber(color.h) <= 60 && color.l >= 0.55,
+      );
+      expect(lamp, `month ${month} has no lamp`).toBeDefined();
+
+      // 地と灯りのあいだに、はっきりした明度差があること。
+      const darkest = Math.min(...colors.map((color) => color.l));
+      expect(lamp!.l - darkest).toBeGreaterThanOrEqual(0.28);
+    }
+  });
+
+  /**
+   * `components/roji/seasonal-wash.tsx` の `readRoles` は「地を除いていちばん
+   * 彩度の高い色が主役」という前提で役割を逆算する。その前提をここで固定する
+   * (崩れると面の主役と地が入れ替わり、絵が反転する)。
+   */
+  it("always makes the accent the most chromatic color", () => {
+    for (const month of MONTHS) {
+      for (const timeOfDay of TIMES_OF_DAY) {
+        const palette = seasonalPaletteFor(month, timeOfDay);
+        const roles = seasonalRolesFor(month, timeOfDay);
+        const accentIndex = roles.indexOf("accent");
+        const accentC = hexToOklch(palette[accentIndex]).c;
+        palette.forEach((hex, i) => {
+          if (i === accentIndex) return;
+          expect(hexToOklch(hex).c).toBeLessThan(accentC);
+        });
+      }
+    }
+  });
+
+  /** 同じ前提の残り半分: 地は明るい時間帯なら最も明るく、暗い時間帯なら最も暗い。 */
+  it("puts the ground at the majority end of the lightness range", () => {
+    for (const month of MONTHS) {
+      for (const timeOfDay of TIMES_OF_DAY) {
+        const palette = seasonalPaletteFor(month, timeOfDay);
+        const roles = seasonalRolesFor(month, timeOfDay);
+        const ls = palette.map((hex) => hexToOklch(hex).l);
+        const groundL = ls[roles.indexOf("ground")];
+        const dark = timeOfDay === "dusk" || timeOfDay === "night";
+        expect(groundL).toBe(dark ? Math.min(...ls) : Math.max(...ls));
+      }
+    }
+  });
+
+  /**
+   * 明るい配色が無地のオフホワイトと見分けが付かない、という v0 の指摘への回帰検査。
+   * 地と主役の彩度差が開いていれば、面に色がある。
+   */
+  it("keeps light palettes distinguishable from plain off-white", () => {
+    for (const month of MONTHS) {
+      for (const timeOfDay of ["morning", "day"] as const) {
+        const palette = seasonalPaletteFor(month, timeOfDay);
+        const roles = seasonalRolesFor(month, timeOfDay);
+        const groundC = hexToOklch(palette[roles.indexOf("ground")]).c;
+        const accentC = hexToOklch(palette[roles.indexOf("accent")]).c;
+        expect(accentC - groundC).toBeGreaterThanOrEqual(0.04);
+      }
+    }
+  });
+
+  it("gives each palette exactly one ground, one accent and two mids", () => {
+    for (const month of MONTHS) {
+      for (const timeOfDay of TIMES_OF_DAY) {
+        const roles = seasonalRolesFor(month, timeOfDay);
+        expect(roles.filter((r) => r === "ground")).toHaveLength(1);
+        expect(roles.filter((r) => r === "accent")).toHaveLength(1);
+        expect(roles.filter((r) => r === "mid")).toHaveLength(2);
+      }
+    }
+  });
+
   it("pins the reference palettes", () => {
     expect(seasonalPaletteFor(8, "day")).toEqual([
-      "#c6e4f0",
-      "#c4e2d2",
-      "#edebe1",
-      "#ccd3e2",
+      "#b5ebfe",
+      "#93dab6",
+      "#eeece4",
+      "#bbc7e0",
     ]);
+    // 8月夜 = 深い藍の地 (#1a2a46) に生成りが灯り (#ae9052) として点る。
+    // v0 はここが #708591 / #969c96 という無彩色の泥だった。
     expect(seasonalPaletteFor(8, "night")).toEqual([
-      "#708591",
-      "#627e7c",
-      "#969c96",
-      "#666b76",
+      "#316c85",
+      "#035549",
+      "#ae9052",
+      "#1a2a46",
     ]);
     expect(seasonalPaletteFor(10, "day")).toEqual([
-      "#e7b9a8",
-      "#dcbb96",
-      "#e9e6dc",
-      "#abb1b8",
+      "#ffc1a9",
+      "#e7b06e",
+      "#eceae2",
+      "#a4b3c8",
     ]);
   });
 });

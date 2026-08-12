@@ -20,6 +20,7 @@ export interface SeasonalWashPreviewProps {
   timeOfDay: TimeOfDay;
   tempo: number;
   grain: boolean;
+  seed: number;
 }
 
 /**
@@ -34,6 +35,7 @@ export function SeasonalWashPreview({
   timeOfDay,
   tempo,
   grain,
+  seed,
 }: SeasonalWashPreviewProps) {
   return (
     <main className="relative h-dvh w-full">
@@ -41,6 +43,7 @@ export function SeasonalWashPreview({
         palette={palette}
         tempo={tempo}
         grain={grain}
+        seed={seed}
         className="absolute inset-0 h-full w-full"
       />
       {/* 夜の配色では地が暗くなるので、読み出しは背景付きにして常に読めるようにする。 */}
@@ -49,7 +52,7 @@ export function SeasonalWashPreview({
         data-testid="seasonal-wash-params"
       >
         month={month} time={timeOfDay} tempo={tempo.toFixed(2)} grain=
-        {grain ? "on" : "off"}
+        {grain ? "on" : "off"} seed={seed}
       </p>
     </main>
   );

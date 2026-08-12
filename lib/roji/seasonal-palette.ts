@@ -19,8 +19,13 @@
  * 「季節ごとの地の色」が Figma 変数になった時点で、ここは Figma の写しに置き換える。
  * それまでは v0 のプレビュー専用値として扱い、本番の画面からは参照しない。
  *
- * 彩度は既存トークンの帯域 (C = 0.006〜0.061、brand-gold 0.173 のみ例外) に収める。
- * ここを外すと既存 UI と喧嘩する。テストで機械的に検査している。
+ * ## 彩度の帯域 (v1 で引き上げ)
+ * v0 は既存トークンの彩度域 (C = 0.006〜0.061) にそのまま収めていたが、それは
+ * **文字や罫線の色** の帯域であって、面の帯域ではなかった。結果として色が地の
+ * オフホワイトと区別できず、夜は無彩色に潰れた。v1 は上限を 0.13 (brand-gold
+ * 0.173 より下) まで開ける。ただし **全色を一律に上げるのではない**: 地の彩度は
+ * むしろ下げ (紙は紙のまま)、主役だけを上げて **色どうしの差** を作る。
+ * 面の存在感は平均彩度ではなく色間コントラストで出す、というのが v1 の方針。
  */
 
 import { mixHue, oklchToHex, type Oklch } from "./color";
@@ -74,79 +79,279 @@ const MONTHLY_BASE: Record<number, OklchQuad> = {
   12: [o(0.945, 0.008, 92), o(0.832, 0.02, 205), o(0.802, 0.008, 265), o(0.848, 0.028, 50)],
 };
 
-interface TimeShift {
-  /** 明度の移動量。その月の平均明度を基準に上下する。夜がいちばん深い。 */
-  deltaL: number;
-  /**
-   * 明度差の倍率。1 なら月の色の明暗差をそのまま保つ。
-   *
-   * 夜を「全部を同じだけ暗くする」で作ると、4 色が中明度に固まって
-   * **一様な灰色の霞** になる (実測: 8月夜が灰緑一色になった)。暗くするときは
-   * 同時に明暗差を開いて、月明かりの側と沈む側を作る。
-   */
-  contrast: number;
-  /** 彩度の倍率。朝は澄み、夕は濃く、夜は少しだけ褪せる。 */
+/**
+ * 4 色それぞれが面の中で果たす役割。
+ *
+ * v0 は 4 色を **一律に** 変換していた (全部を同じだけ暗くし、全部の彩度に同じ倍率を
+ * 掛ける)。その結果いちばん壊れたのが夜で、明度が中央に寄り彩度が一様に下がるので
+ * 面全体が無彩色に潰れた (実測: 12月夜がほぼグレー、8月夜が濁った青灰)。
+ *
+ * v1 は「暗い = 灰色」を切り離す。色を役割に分けて **別々の式** を当てる:
+ * - `ground` — 地。夜は深い藍・墨、朝昼は生成りの紙。面積がいちばん広い
+ * - `accent` — 主役。夜は行灯の **灯り** (暖色・明度を落とさず彩度を上げる)、
+ *   朝昼はいちばん色のある一色
+ * - `mid` — 残り。地と主役をつなぐ中間層
+ *
+ * 夜に彩度を **上げる** のがこの設計の要。OKLCH の C は明度と独立なので、L を
+ * 0.25 まで落としても C を 0.05〜0.09 に保てば「深い藍」であって「暗いグレー」には
+ * ならない。逆に C を 0.03 のまま L だけ落とすと必ずグレーになる (v0 の失敗)。
+ */
+export type WashRole = "ground" | "accent" | "mid";
+
+/** 役割の並び。`seasonalRolesFor` の返り値と `SeasonalPalette` は同じ添字。 */
+export type SeasonalRoles = [WashRole, WashRole, WashRole, WashRole];
+
+interface RoleShape {
+  /** 目標明度。base の明度と `lBlend` で混ぜる。 */
+  targetL: number;
+  /** 目標明度への寄せ量 (0 = 月の色のまま、1 = 目標そのもの)。 */
+  lBlend: number;
+  /** 同じ役割が複数あるとき (mid) に明度を散らす幅。0 だと mid が団子になる。 */
+  lSpread: number;
+  /** 彩度の倍率。夜は 1 を大きく超える (下のコメント参照)。 */
   chromaScale: number;
-  /** 寄せ先の色相。`towardAmount` = 0 のときは使わない。 */
-  towardHue: number;
+  /** 彩度の下限。淡い月 (1月・12月) でも色が消えないための床。 */
+  chromaFloor: number;
+  /** 彩度の上限。既存 UI と喧嘩しないための天井。 */
+  chromaCap: number;
+  /**
+   * 寄せ先の色相の候補。**元の色相にいちばん近いものが選ばれる**。
+   *
+   * 候補を複数持つのは、単一のアンカーへ全色を寄せると色相環の反対側にある色が
+   * 「短い方の弧」を通って想定外の色になるため (実測: 9月夜の地が薄柿 48 度から
+   * 藍 262 度へ寄って、途中のマゼンタ 335 度で止まり紫の地になった)。夜の地は
+   * 藍か墨 (焦茶) のどちらかへ沈むのが正しく、暖色の月は焦茶側へ沈めばよい。
+   */
+  anchors: number[];
   /** 寄せる量 (0-1)。 */
   towardAmount: number;
 }
 
 /**
- * 時間帯の効き方。
+ * 時間帯 x 役割の効き方。
  *
  * 色相は「固定量だけ回す」のではなく **アンカー色相へ寄せる**。固定回転だと
  * 暖色と寒色で意味が逆になり、季節ごとに破綻するため (`mixHue` のコメント参照)。
+ *
+ * 夜の `towardAmount` を v0 の 0.28 から役割ごとに割り振り直してある。全色を同じ
+ * 色相へ強く寄せると 4 色の色相差が消え、明度差だけの面 = モノクロになる。
+ * 地と中間だけを藍へ寄せ、灯りは元の暖色を残す。
  */
-const TIME_SHIFT: Record<TimeOfDay, TimeShift> = {
-  // 朝 — わずかに明るく、明暗差は締めて、澄む。
+const TIME_SHAPE: Record<TimeOfDay, Record<WashRole, RoleShape>> = {
+  // 朝 — 紙は白く、色は締まって澄む。明暗差は小さいまま、色相差で見せる。
   morning: {
-    deltaL: 0.018,
-    contrast: 0.95,
-    chromaScale: 0.92,
-    towardHue: 100,
-    towardAmount: 0.1,
+    ground: {
+      targetL: 0.955,
+      lBlend: 0.7,
+      lSpread: 0,
+      chromaScale: 0.7,
+      chromaFloor: 0,
+      chromaCap: 0.02,
+      anchors: [96],
+      towardAmount: 0.14,
+    },
+    accent: {
+      targetL: 0.79,
+      lBlend: 0.55,
+      lSpread: 0,
+      chromaScale: 2.1,
+      chromaFloor: 0.058,
+      chromaCap: 0.1,
+      anchors: [104],
+      towardAmount: 0.06,
+    },
+    mid: {
+      targetL: 0.855,
+      lBlend: 0.5,
+      lSpread: 0.055,
+      chromaScale: 1.6,
+      chromaFloor: 0.032,
+      chromaCap: 0.078,
+      anchors: [104],
+      towardAmount: 0.08,
+    },
   },
-  // 昼 — 基準。月の色そのまま。
-  day: { deltaL: 0, contrast: 1, chromaScale: 1, towardHue: 0, towardAmount: 0 },
-  // 夕 — 沈みながら温度が上がり、影が出る。
+  // 昼 — 基準。月の色をいちばん素直に出す時間帯だが、地と主役の差は開く。
+  day: {
+    ground: {
+      targetL: 0.945,
+      lBlend: 0.55,
+      lSpread: 0,
+      chromaScale: 0.78,
+      chromaFloor: 0,
+      chromaCap: 0.022,
+      anchors: [],
+      towardAmount: 0,
+    },
+    accent: {
+      targetL: 0.775,
+      lBlend: 0.5,
+      lSpread: 0,
+      chromaScale: 2.3,
+      chromaFloor: 0.062,
+      chromaCap: 0.105,
+      anchors: [],
+      towardAmount: 0,
+    },
+    mid: {
+      targetL: 0.845,
+      lBlend: 0.4,
+      lSpread: 0.06,
+      chromaScale: 1.7,
+      chromaFloor: 0.034,
+      chromaCap: 0.082,
+      anchors: [],
+      towardAmount: 0,
+    },
+  },
+  // 夕 — 温度が上がり、影が出る。ここから地が暗い側に移る。
   dusk: {
-    deltaL: -0.05,
-    contrast: 1.35,
-    chromaScale: 1.25,
-    towardHue: 40,
-    towardAmount: 0.22,
+    ground: {
+      targetL: 0.5,
+      lBlend: 0.72,
+      lSpread: 0,
+      chromaScale: 1.7,
+      chromaFloor: 0.048,
+      chromaCap: 0.075,
+      anchors: [30, 285],
+      towardAmount: 0.26,
+    },
+    accent: {
+      targetL: 0.755,
+      lBlend: 0.62,
+      lSpread: 0,
+      chromaScale: 2.9,
+      chromaFloor: 0.088,
+      chromaCap: 0.125,
+      anchors: [48],
+      towardAmount: 0.36,
+    },
+    mid: {
+      targetL: 0.6,
+      lBlend: 0.5,
+      lSpread: 0.09,
+      chromaScale: 2.0,
+      chromaFloor: 0.048,
+      chromaCap: 0.078,
+      anchors: [40, 265],
+      towardAmount: 0.18,
+    },
   },
-  // 夜 — 深く沈み、藍へ寄る。彩度は落としすぎない (落とすと「静けさ」ではなく
-  // 「くすみ」になる)。明暗差を大きく開くのがこの時間帯の要。
+  // 夜 — 深く沈むが、色は点る。
+  //
+  // chromaScale が 1 を大きく超えるのは意図的。月の地の色は C = 0.006〜0.062 と
+  // 極端に淡く、そのまま L だけ落とすと必ずグレーになる。L を落とす分だけ C を
+  // 押し上げて初めて「深い藍」「濃紺」「墨」として読める。
   night: {
-    deltaL: -0.3,
-    contrast: 2.2,
-    chromaScale: 0.85,
-    towardHue: 265,
-    towardAmount: 0.28,
+    ground: {
+      targetL: 0.235,
+      lBlend: 0.92,
+      lSpread: 0,
+      chromaScale: 2.6,
+      chromaFloor: 0.045,
+      chromaCap: 0.085,
+      anchors: [258, 30],
+      towardAmount: 0.5,
+    },
+    // 灯り。明度を落とさず (0.63)、彩度を最も高く取る一色。暗がりの中で
+    // ここだけが点って見えることが「夜 = 灰色」からの脱出条件。
+    accent: {
+      targetL: 0.63,
+      lBlend: 0.88,
+      lSpread: 0,
+      chromaScale: 3.4,
+      chromaFloor: 0.088,
+      chromaCap: 0.125,
+      anchors: [62],
+      towardAmount: 0.32,
+    },
+    mid: {
+      targetL: 0.375,
+      lBlend: 0.85,
+      lSpread: 0.1,
+      chromaScale: 2.0,
+      chromaFloor: 0.048,
+      chromaCap: 0.072,
+      anchors: [250, 40],
+      towardAmount: 0.2,
+    },
   },
 };
 
-/** 生成色の明度域。下限は「暗い」ではなく「静か」に留めるための床。 */
-const MIN_LIGHTNESS = 0.42;
+/**
+ * 生成色の明度域。
+ *
+ * 床を v0 の 0.42 から 0.16 へ下げた。0.42 は「暗くしすぎない」ための床のつもり
+ * だったが、実際には夜の地をそこで頭打ちにして 4 色を中明度に集める装置になって
+ * いた (= 灰色化の直接原因)。深さは床ではなく役割ごとの目標明度で決める。
+ */
+const MIN_LIGHTNESS = 0.16;
 const MAX_LIGHTNESS = 0.97;
 
-/** 明暗差を開閉する基準点 = その月の 4 色の平均明度。 */
-function meanLightness(quad: OklchQuad): number {
-  return quad.reduce((sum, color) => sum + color.l, 0) / quad.length;
+/** 地を暗い側に置く時間帯か。夕から地が沈む。 */
+const DARK_REGIME: Record<TimeOfDay, boolean> = {
+  morning: false,
+  day: false,
+  dusk: true,
+  night: true,
+};
+
+/** 2 つの色相の角距離 (0-180)。 */
+function hueDistance(a: number, b: number): number {
+  const delta = (((a - b) % 360) + 360) % 360;
+  return delta > 180 ? 360 - delta : delta;
 }
 
-function applyTimeShift(base: Oklch, shift: TimeShift, pivot: number): Oklch {
-  const l = pivot + shift.deltaL + (base.l - pivot) * shift.contrast;
+/** 琥珀 (55 度) からの色相角距離。小さいほど暖かい。 */
+function hueDistanceFromAmber(hue: number): number {
+  return hueDistance(hue, 55);
+}
+
+/**
+ * 4 色に役割を割り当てる。
+ *
+ * 地は regime で決まる (暗い時間帯は最も暗い色、明るい時間帯は最も明るい色)。
+ * 主役は暗い時間帯なら **最も暖かい色** = 灯りになる色、明るい時間帯なら
+ * **最も彩度の高い色**。地と主役が同じ色にならないよう、地を先に確定してから
+ * 残りから主役を選ぶ。
+ */
+function assignRoles(quad: OklchQuad, dark: boolean): SeasonalRoles {
+  const indices = [0, 1, 2, 3];
+  const groundIndex = indices.reduce((best, i) =>
+    (dark ? quad[i].l < quad[best].l : quad[i].l > quad[best].l) ? i : best,
+  );
+  const rest = indices.filter((i) => i !== groundIndex);
+  const isBetterAccent = (i: number, best: number) =>
+    dark
+      ? hueDistanceFromAmber(quad[i].h) < hueDistanceFromAmber(quad[best].h)
+      : quad[i].c > quad[best].c;
+  const accentIndex = rest.reduce((best, i) =>
+    isBetterAccent(i, best) ? i : best,
+  );
+  return indices.map((i) =>
+    i === groundIndex ? "ground" : i === accentIndex ? "accent" : "mid",
+  ) as SeasonalRoles;
+}
+
+/** 候補のうち、元の色相にいちばん近いものを返す。 */
+function nearestAnchor(hue: number, anchors: number[]): number {
+  return anchors.reduce((best, anchor) =>
+    hueDistance(hue, anchor) < hueDistance(hue, best) ? anchor : best,
+  );
+}
+
+function applyRoleShape(base: Oklch, shape: RoleShape, offsetL: number): Oklch {
+  const l = base.l * (1 - shape.lBlend) + shape.targetL * shape.lBlend + offsetL;
   return {
     l: Math.min(MAX_LIGHTNESS, Math.max(MIN_LIGHTNESS, l)),
-    c: base.c * shift.chromaScale,
+    c: Math.min(
+      shape.chromaCap,
+      Math.max(shape.chromaFloor, base.c * shape.chromaScale),
+    ),
     h:
-      shift.towardAmount === 0
+      shape.towardAmount === 0 || shape.anchors.length === 0
         ? base.h
-        : mixHue(base.h, shift.towardHue, shift.towardAmount),
+        : mixHue(base.h, nearestAnchor(base.h, shape.anchors), shape.towardAmount),
   };
 }
 
@@ -170,17 +375,45 @@ export function timeOfDayFromHour(hour: number): TimeOfDay {
   return "night";
 }
 
+/**
+ * 月 + 時間帯 -> 4 色の役割。純関数。
+ *
+ * 面積配分に使う。`seasonalPaletteFor` と同じ添字で対応する。
+ */
+export function seasonalRolesFor(
+  month: number,
+  timeOfDay: TimeOfDay,
+): SeasonalRoles {
+  return assignRoles(MONTHLY_BASE[normalizeMonth(month)], DARK_REGIME[timeOfDay]);
+}
+
 /** 月 + 時間帯 -> 4 色。純関数。 */
 export function seasonalPaletteFor(
   month: number,
   timeOfDay: TimeOfDay,
 ): SeasonalPalette {
   const base = MONTHLY_BASE[normalizeMonth(month)];
-  const shift = TIME_SHIFT[timeOfDay];
-  const pivot = meanLightness(base);
-  const [a, b, c, d] = base.map((color) =>
-    oklchToHex(applyTimeShift(color, shift, pivot)),
-  );
+  const roles = assignRoles(base, DARK_REGIME[timeOfDay]);
+  const shapes = TIME_SHAPE[timeOfDay];
+
+  // mid だけは複数あるので、元の明度の順位で上下に散らす。散らさないと
+  // 中間層が 1 色に潰れて、面の階調が地と主役の 2 段しか無くなる。
+  const midOrder = base
+    .map((color, index) => ({ index, l: color.l }))
+    .filter((entry) => roles[entry.index] === "mid")
+    .sort((a, b) => a.l - b.l)
+    .map((entry) => entry.index);
+
+  const [a, b, c, d] = base.map((color, index) => {
+    const role = roles[index];
+    const shape = shapes[role];
+    const rank = midOrder.indexOf(index);
+    const offsetL =
+      role === "mid" && midOrder.length > 1
+        ? shape.lSpread * (rank - (midOrder.length - 1) / 2)
+        : 0;
+    return oklchToHex(applyRoleShape(color, shape, offsetL));
+  });
   return [a, b, c, d];
 }
 

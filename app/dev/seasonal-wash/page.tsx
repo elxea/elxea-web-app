@@ -18,7 +18,7 @@ import { SeasonalWashPreview } from "./preview";
  * 目的は 48 通り (12ヶ月 x 4時間帯) を実機で確認できるようにすること。
  * 本番のナビゲーションからはリンクしない。`app/dev/layout.tsx` で noindex。
  *
- * 例: /dev/seasonal-wash?month=10&timeOfDay=dusk&tempo=1.6&grain=1
+ * 例: /dev/seasonal-wash?month=10&timeOfDay=dusk&tempo=1.6&grain=0&seed=3
  */
 
 export const metadata: Metadata = {
@@ -66,8 +66,12 @@ export default async function SeasonalWashPreviewPage({
     Number.isFinite(tempoParam) ? tempoParam : seasonalTempo(now),
   );
 
+  // 粒子は既定 on (v1)。切って比べたいときだけ ?grain=0 で落とす。
   const grainParam = first(params.grain);
-  const grain = grainParam === "1" || grainParam === "true";
+  const grain = !(grainParam === "0" || grainParam === "false");
+
+  const seedParam = Number(first(params.seed));
+  const seed = Number.isFinite(seedParam) && seedParam !== 0 ? seedParam : 1;
 
   return (
     <SeasonalWashPreview
@@ -76,6 +80,7 @@ export default async function SeasonalWashPreviewPage({
       timeOfDay={timeOfDay}
       tempo={tempo}
       grain={grain}
+      seed={seed}
     />
   );
 }
