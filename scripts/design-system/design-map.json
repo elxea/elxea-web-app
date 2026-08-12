@@ -160,7 +160,7 @@
     {
       "figma_node_id": "6956:18179",
       "figma_name": "Tag",
-      "code_path": "app/[locale]/journal/[slug]/page.tsx",
+      "code_path": "app/[locale]/(reading)/journal/[slug]/page.tsx",
       "kind": "ds-component",
       "notes": "inline chip (border+rounded のタグリンク)。専用 Tag component 無し。"
     },
@@ -181,14 +181,14 @@
     {
       "figma_node_id": "6904:17378",
       "figma_name": "PlaylistCard",
-      "code_path": "app/[locale]/playlists/page.tsx",
+      "code_path": "app/[locale]/(reading)/playlists/page.tsx",
       "kind": "ds-component",
       "notes": "inline (PlaylistGrid, ImageCard を利用)。"
     },
     {
       "figma_node_id": "6904:17385",
       "figma_name": "TeaMenuCard",
-      "code_path": "app/[locale]/tea-menu/page.tsx",
+      "code_path": "app/[locale]/(reading)/tea-menu/page.tsx",
       "kind": "ds-component",
       "notes": "inline (TeaMenuList, ImageCard を利用)。"
     },
@@ -202,7 +202,7 @@
     {
       "figma_node_id": "6934:143",
       "figma_name": "Journal Theme Badge",
-      "code_path": "app/[locale]/elxea-journal/page.tsx",
+      "code_path": "app/[locale]/(reading)/elxea-journal/page.tsx",
       "kind": "ds-component",
       "notes": "inline theme badge (themeColors で着色)。一覧のみ。詳細ページは【R2: 確定版】(8110:46893) で英字キッカー (ELXEA JOURNAL) に置き換わったためバッジを持たない。"
     },
@@ -748,14 +748,14 @@
     {
       "figma_node_id": "8079:3748",
       "figma_name": "農家詳細 / 【R2: 確定版】People 詳細テンプレ統合 (茶園セクション拡張) — PC 1440",
-      "code_path": "app/[locale]/farmers/[slug]/page.tsx",
+      "code_path": "app/[locale]/(reading)/farmers/[slug]/page.tsx",
       "kind": "module",
       "notes": "9 ブロック構成 (PersonHead / Quote / THE WORK / INTERVIEW / PROFILE / THE FIELD 帯 / THE FIELD 一年 / TEAS / OTHER PEOPLE)。データが無い節は枠ごと出さない。SP は 8079:3966。bio / FollowButton / CommentSection は Figma 非掲載だが既存機能なので残す (意図的差分)。"
     },
     {
       "figma_node_id": "8079:3966",
       "figma_name": "農家詳細 / 【R2: 確定版】People 詳細テンプレ統合 (茶園セクション拡張) — SP 375",
-      "code_path": "app/[locale]/farmers/[slug]/page.tsx",
+      "code_path": "app/[locale]/(reading)/farmers/[slug]/page.tsx",
       "kind": "module",
       "notes": "同ページの SP。写真は Figma では全幅 375 だが実装はページカラム幅 343 に収める (C4-3 と同じ判断)。"
     },
@@ -790,14 +790,14 @@
     {
       "figma_node_id": "8079:3806",
       "figma_name": "PROFILE (データ帯)",
-      "code_path": "app/[locale]/farmers/[slug]/page.tsx",
+      "code_path": "app/[locale]/(reading)/farmers/[slug]/page.tsx",
       "kind": "module",
       "notes": "FarmerDataBand (muted 面) + 共有部品 SpecBand を罫線なしで使う (farmerBandClass)。SP は 8079:4024。"
     },
     {
       "figma_node_id": "8079:3937",
       "figma_name": "FIELD DATA (茶園データ帯: 産地 / 標高 / 品種 / 栽培)",
-      "code_path": "app/[locale]/farmers/[slug]/page.tsx",
+      "code_path": "app/[locale]/(reading)/farmers/[slug]/page.tsx",
       "kind": "module",
       "notes": "PROFILE 帯と同型。茶園を持たない人は fieldBand 未入力で帯ごと出ない。SP は 8079:4071。"
     },
@@ -825,14 +825,14 @@
     {
       "figma_node_id": "8110:46893",
       "figma_name": "elxea Journal 詳細 / 【R2: 確定版】本文完結 + 末尾のみ回遊 (同梱セット文脈・執筆者クレジット) — PC 1440",
-      "code_path": "app/[locale]/elxea-journal/[slug]/page.tsx",
+      "code_path": "app/[locale]/(reading)/elxea-journal/[slug]/page.tsx",
       "kind": "module",
       "notes": "9 ブロック構成 (ReadingProgress / Breadcrumb / Head / lead / 冒頭写真 / 本文 / この号に入っているお茶 / この号のほかの読みもの / NextRead)。データが無い節は枠ごと出さない。SP は 8110:47043。Playlist は Figma 非掲載だが既存データを残す意図的差分。"
     },
     {
       "figma_node_id": "8110:47043",
       "figma_name": "elxea Journal 詳細 / 【R2: 確定版】本文完結 + 末尾のみ回遊 (同梱セット文脈・執筆者クレジット) — SP 375",
-      "code_path": "app/[locale]/elxea-journal/[slug]/page.tsx",
+      "code_path": "app/[locale]/(reading)/elxea-journal/[slug]/page.tsx",
       "kind": "module",
       "notes": "同ページの SP。写真は全幅 375 (`.sp-full-bleed`)・本文は余白内 343 (Setaka 裁定 2026-08-08)。"
     },
@@ -1105,14 +1105,14 @@
     {
       "figma_node_id": "6639:7029",
       "figma_name": "農家一覧 変A（部品ベース）— PC/SP @/ja/farmers",
-      "code_path": "app/[locale]/farmers/page.tsx",
+      "code_path": "app/[locale]/(reading)/farmers/page.tsx",
       "kind": "module",
       "notes": "農家一覧。この画面は R2 確定版フレームが存在しない (Structure List 行 33270c9d064c81e089dff5ab464cce55 の ステータス：Design=Not started。R2 セクションを 7567:2 / 7567:4 / 7567:6 全数走査して不在を確認)。よって構造の正本は共通リストパターン【R2: 確定版】お茶メニュー一覧 PC 8063:2144 / SP 8063:2372 (= 商品一覧 8061:1781 / 8062:2008) とし、部品は components/catalog/catalog-list.tsx をそのまま共有する。本ノードは内容モデル (FarmerCard = 写真 + 氏名 + 産地) とラベルの由来として登録。差分は英字キッカー FARMERS / 絞り込み軸が産地 (region) / meta 行なしの 3 点。C9-1 新規。"
     },
     {
       "figma_node_id": "6654:13189",
       "figma_name": "お茶メニュー詳細 変A（部品ベース）— PC/SP @/ja/tea-menu/[slug]",
-      "code_path": "app/[locale]/tea-menu/[slug]/page.tsx",
+      "code_path": "app/[locale]/(reading)/tea-menu/[slug]/page.tsx",
       "kind": "module",
       "notes": "お茶メニュー詳細。この画面も R2 確定版フレームが存在しない (Structure List 行 36b70c9d064c8159915bca38ddc7965d の ステータス：Design=Not started)。構造の正本は商品詳細【R2: 確定版】PC 8056:1517 / SP 8057:1700 の節骨格 (components/editorial/section-blocks.tsx = PageSection / SectionHead / SectionBody / SpecBand)。本ノードは内容モデル (お茶の詳細 4 項目 6654:13244 / 淹れ方ガイド 3 項目 6654:13259 / 購入 / 関連記事 6654:13272) と見本文言の由来として登録。主見出しは 44px display の全体裁定。データが無い節・行は出さない (変A はスペック 4 行を常時表示していたが是正)。C9-1 新規。"
     },
@@ -1245,7 +1245,7 @@
     {
       "figma_node_id": "8121:1264",
       "figma_name": "About /【R2: 確定版】目次付き読み物型 (C案採用) — PC 1440",
-      "code_path": "app/[locale]/about/page.tsx",
+      "code_path": "app/[locale]/(reading)/about/page.tsx",
       "kind": "module",
       "notes": "About ページ確定版。section 8121:1263 / SP は 8121:1333。11 ブロック (パンくず / Statement / 目次6章 / 01 わたしたちのこと / 産地タイル / 02 選ぶ基準 / 章切り / 03 つくり方 / 04 つくり手 / 05 お茶との向き合い方 / 06 会社情報 / 静かなリンク)。旧 R1 世代 (写真ヒーロー + max-w-3xl 読み枠) を全面置換。"
     },
@@ -1287,7 +1287,7 @@
     {
       "figma_node_id": "8121:1409",
       "figma_name": "About 産地 (写真タイル・プレースホルダ / 撮影後差替)",
-      "code_path": "app/[locale]/about/page.tsx",
+      "code_path": "app/[locale]/(reading)/about/page.tsx",
       "kind": "ds-component",
       "notes": "ImageCard (19:14) + caption のタイル。PC 4 列 304 gap32 / SP 2 列 163.5 gap16 (8121:1419)。写真は未撮影なので ImagePlaceholder が出る。ページ内 inline 描画 (再利用が無いため専用部品にしていない)。"
     },
@@ -1301,7 +1301,7 @@
     {
       "figma_node_id": "8121:1330",
       "figma_name": "About 静かなリンク (購入導線・最下部)",
-      "code_path": "app/[locale]/about/page.tsx",
+      "code_path": "app/[locale]/(reading)/about/page.tsx",
       "kind": "ds-component",
       "notes": "body-sm のリンク 2 本。PC は 12 列グリッドの col1-4 / col5-8 (x64 / x512 = 実測どおり)、SP は縦積みピッチ 40 (8121:1404)。"
     },
@@ -1322,14 +1322,14 @@
     {
       "figma_node_id": "8105:1120",
       "figma_name": "お茶カルテ PageTitle (キッカー + 主見出し + リード)",
-      "code_path": "app/[locale]/tasting-note/page.tsx",
+      "code_path": "app/[locale]/(reading)/tasting-note/page.tsx",
       "kind": "ds-component",
       "notes": "共有 ListPageHead に載せた。主見出しは全体裁定どおり PC 44 (display) / SP 32 で、Figma ノードの PC 32 とは意図的に違う (マイページ R2 の AccountTitleBlock と同じ扱い)。キッカー・リードは DS の overline 12 / caption 12 で Figma の 14 とは差がある (共有部品なので本レーンでは変えない)。SP は 8105:1251。"
     },
     {
       "figma_node_id": "8105:1200",
       "figma_name": "お茶カルテ 茶葉導線 (次の一杯を探しに → 茶葉の棚へ)",
-      "code_path": "app/[locale]/tasting-note/page.tsx",
+      "code_path": "app/[locale]/(reading)/tasting-note/page.tsx",
       "kind": "ds-component",
       "notes": "中央寄せの静かな 1 本 (body 16 / lh 28)。SP 8105:1330 は link 枠が h48 なのでタップ域 48 を min-h-12 で確保する。"
     },
