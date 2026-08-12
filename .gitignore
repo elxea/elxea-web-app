@@ -56,7 +56,9 @@ next-env.d.ts
 !public/**/*.jpg
 .mcp.json
 
-# audio assets (large files, deployed via Vercel but excluded from git)
+# audio assets (35MB+): NOT part of the deploy. The site loads BGM from Vercel
+# Blob by absolute URL (see lib/audio/bgm-source.ts), so nothing here needs to
+# reach production. Anything under public/audio/ is a local working copy only.
 public/audio/
 
 # dev notes

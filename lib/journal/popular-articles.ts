@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/nextjs";
 import { unstable_cache } from "next/cache";
 
 import { getAdminFirestore } from "@/lib/firebase/admin";
@@ -19,10 +20,21 @@ import { COLLECTIONS } from "@/lib/firebase/collections";
  *   走らせない (全ユーザー共通の集計なので個別化する必要がない)。
  * - 失敗・データ不足は例外にせず空配列を返す。呼び出し側は現行の
  *   「特集が先・残りは新しい順」フォールバックをそのまま使う。
+ *   ただし **黙って空にはしない**: 失敗は必ず Sentry とサーバーログに残す
+ *   (下記「なぜ通知するのか」)。
  *
  * 必要な Firestore インデックス (firestore.indexes.json に追加済み):
  *   collectionGroup=behaviorLog / queryScope=COLLECTION_GROUP /
  *   action ASC + createdAt DESC
+ *
+ * ## なぜ失敗を通知するのか
+ *
+ * `firestore.indexes.json` はアプリのデプロイでは反映されない (Firestore 側へ
+ * `firebase deploy --only firestore:indexes` 相当の操作が別途必要)。索引が
+ * 未反映のあいだ Firestore は FAILED_PRECONDITION を返すが、ここで捕まえて
+ * 空配列にしていたため **エラーも出ず「人気の記事」が空のまま表示される**
+ * = 検知手段のない失敗になっていた。フォールバックは維持したまま、原因が
+ * 必ずどこかに残るようにする。
  */
 
 /** 集計対象の期間 (日)。長すぎると「今の人気」でなくなる。 */
@@ -78,18 +90,117 @@ const cachedPopularArticles = unstable_cache(
 );
 
 /**
+ * 集計が失敗した理由の分類。ログと Sentry のタグに使う。
+ *
+ * - `missing-index`  複合インデックスが未反映 (Firestore が FAILED_PRECONDITION)
+ * - `not-configured` Firebase 資格情報が無い (ローカル / プレビュー環境)
+ * - `permission`     資格情報はあるが Firestore への権限が足りない
+ * - `unknown`        上記以外 (ネットワーク断・想定外の例外)
+ */
+export type PopularArticlesFailure =
+  | "missing-index"
+  | "not-configured"
+  | "permission"
+  | "unknown";
+
+/** 各分類に対する「次にやること」。ログを見た人がそのまま動けるようにする。 */
+const FAILURE_ACTIONS: Record<PopularArticlesFailure, string> = {
+  "missing-index":
+    "Firestore の複合インデックス (behaviorLog: action ASC + createdAt DESC / COLLECTION_GROUP) が未反映。firestore.indexes.json を Firestore へ反映してください (pnpm deploy:indexes)。",
+  "not-configured":
+    "Firebase Admin の環境変数 (FIREBASE_PROJECT_ID / FIREBASE_CLIENT_EMAIL / FIREBASE_PRIVATE_KEY) が未設定。ローカル・プレビューでは想定内。",
+  permission:
+    "Firebase 資格情報では behaviorLog を読めません。サービスアカウントの権限を確認してください。",
+  unknown: "想定外の失敗。Sentry のスタックトレースを確認してください。",
+};
+
+/**
+ * 例外を上記の分類に落とす。
+ *
+ * Firestore の「インデックスが無い」は gRPC code 9 (FAILED_PRECONDITION) で
+ * 返り、メッセージに索引作成 URL が含まれる。code だけだと他の
+ * FAILED_PRECONDITION と混ざるので、code とメッセージの両方を見る。
+ */
+export function classifyPopularArticlesFailure(
+  error: unknown
+): PopularArticlesFailure {
+  const code = (error as { code?: unknown } | null)?.code;
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  const lower = message.toLowerCase();
+
+  if (code === 9 || code === "failed-precondition") {
+    return lower.includes("index") ? "missing-index" : "unknown";
+  }
+  if (lower.includes("requires an index") || lower.includes("create_composite")) {
+    return "missing-index";
+  }
+  // lib/firebase/admin.ts が env 不足で投げる文言 ("Firebase Admin SDK:
+  // missing required env vars. projectId=false, ...") を含む。
+  if (
+    lower.includes("missing required env vars") ||
+    lower.includes("firebase_project_id") ||
+    lower.includes("firebase_client_email") ||
+    lower.includes("firebase_private_key") ||
+    lower.includes("could not load the default credentials")
+  ) {
+    return "not-configured";
+  }
+  if (
+    code === 7 ||
+    code === "permission-denied" ||
+    lower.includes("permission_denied") ||
+    lower.includes("permission denied")
+  ) {
+    return "permission";
+  }
+  return "unknown";
+}
+
+/**
+ * 失敗を「気づける形」で外に出す。空配列を返す判断そのものは呼び出し側に残す。
+ *
+ * - Sentry: 原因分類をタグに付けて送る (集計・アラートの対象にできる)
+ * - サーバーログ: 何が起きて画面がどう見えるか・次に何をするかを 1 行で残す
+ *
+ * `not-configured` (ローカル / プレビューで資格情報が無い) は運用上の異常では
+ * ないので Sentry には送らず、ログだけに残す。ここを送ってしまうと本当の
+ * 異常がノイズに埋もれる。
+ */
+export function reportPopularArticlesFailure(error: unknown): void {
+  const reason = classifyPopularArticlesFailure(error);
+
+  console.warn(
+    `[popular-articles] 集計に失敗したため「人気の記事」は空で表示されます (フォールバック: 特集優先・新しい順)。原因: ${reason}。${FAILURE_ACTIONS[reason]}`,
+    error
+  );
+
+  if (reason === "not-configured") return;
+
+  Sentry.captureException(error, {
+    tags: { feature: "journal-popular-articles", reason },
+    extra: {
+      impact: "sidebar popular articles render empty (silent fallback)",
+      nextAction: FAILURE_ACTIONS[reason],
+    },
+  });
+}
+
+/**
  * 直近の閲覧数が多い記事スラッグを多い順に返す。
  *
  * 実データが無い / Firestore に届かない場合は空配列。呼び出し側は必ず
- * フォールバックを用意すること (この関数は投げない)。
+ * フォールバックを用意すること (この関数は投げない)。失敗した場合は
+ * `reportPopularArticlesFailure` で必ず記録されるので、無言では消えない。
  */
 export async function getPopularArticles(limit = 5): Promise<PopularArticle[]> {
   if (limit <= 0) return [];
   try {
     return await cachedPopularArticles(limit);
-  } catch {
+  } catch (error) {
     // 環境変数未設定 (プレビュー / ローカル)・インデックス未作成・権限不足は
-    // すべてここに落ちる。人気順は「あれば嬉しい」情報なので落として続行する。
+    // すべてここに落ちる。人気順は「あれば嬉しい」情報なので画面は落とさない
+    // が、失敗そのものは必ず記録してから空を返す。
+    reportPopularArticlesFailure(error);
     return [];
   }
 }

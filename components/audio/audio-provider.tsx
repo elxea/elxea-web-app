@@ -10,6 +10,7 @@ import {
 } from "react";
 
 import { announceAudioPlay, subscribeAudioPlay } from "@/lib/audio/audio-bus";
+import { BGM_URL } from "@/lib/audio/bgm-source";
 
 /**
  * `status` は「今この瞬間ユーザーに何を見せるべきか」の唯一の根拠。
@@ -59,7 +60,9 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<AudioError | null>(null);
 
   useEffect(() => {
-    const audio = new Audio("/audio/bgm.mp3");
+    // 音源はリポジトリ外 (Vercel Blob) にある。理由と差し替え手順は
+    // `lib/audio/bgm-source.ts` のコメント参照。
+    const audio = new Audio(BGM_URL);
     audio.loop = true;
     audio.volume = 0.3;
     audio.preload = "none";

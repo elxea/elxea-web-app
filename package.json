@@ -20,6 +20,8 @@
     "validate:placeholders": "npx tsx scripts/check-placeholders.ts",
     "generate:design-kit": "npx tsx scripts/design-system/generate-design-kit.ts",
     "validate:design-kit": "npx tsx scripts/design-system/validate-design-kit.ts",
+    "deploy:indexes": "tsx scripts/deploy-firestore-indexes.ts",
+    "deploy:indexes:dry": "tsx scripts/deploy-firestore-indexes.ts --dry-run",
     "sync:notion": "tsx scripts/sync-notion-to-sanity.ts",
     "sync:notion:dry": "tsx scripts/sync-notion-to-sanity.ts --dry-run",
     "design-catalog": "storybook dev -p 6006",

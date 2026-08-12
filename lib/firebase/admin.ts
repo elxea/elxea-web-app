@@ -21,7 +21,7 @@ import { getFirestore, type Firestore } from "firebase-admin/firestore";
  * 2. Escaped newlines (\\n → \n)
  * 3. Raw PEM with literal newlines (used as-is)
  */
-function decodePrivateKey(raw: string | undefined): string | undefined {
+export function decodePrivateKey(raw: string | undefined): string | undefined {
   if (!raw) return undefined;
 
   // Base64-encoded: starts with base64 chars, not "-----"
