@@ -338,6 +338,114 @@ export async function getSubscriptionContracts(
   return edges.map((e: { node: SubscriptionContract }) => e.node);
 }
 
+// --- Subscription contract ownership verification ---
+
+/**
+ * Query used to prove that a subscription contract belongs to the customer who
+ * owns `accessToken`.
+ *
+ * `customer` is implicitly scoped to the bearer of the token, so
+ * `customer.subscriptionContract(id:)` returns null for any contract the caller
+ * does not own. That makes it a positive ownership proof rather than a guess
+ * derived from client-supplied data.
+ *
+ * Ref: https://shopify.dev/docs/api/customer/latest/queries/customer
+ */
+const SUBSCRIPTION_CONTRACT_OWNERSHIP_QUERY = /* GraphQL */ `
+  query SubscriptionContractOwnership($id: ID!) {
+    customer {
+      subscriptionContract(id: $id) {
+        id
+      }
+    }
+  }
+`;
+
+/**
+ * Shape of a Shopify SubscriptionContract GID.
+ * Anything else is rejected before it reaches an API call, so a caller cannot
+ * smuggle a different resource type (or a raw numeric id) into a mutation.
+ */
+const SUBSCRIPTION_CONTRACT_GID_PATTERN =
+  /^gid:\/\/shopify\/SubscriptionContract\/\d+$/;
+
+export function isSubscriptionContractGid(value: unknown): value is string {
+  return typeof value === "string" && SUBSCRIPTION_CONTRACT_GID_PATTERN.test(value);
+}
+
+function gidNumericSuffix(gid: string): string | null {
+  const match = gid.match(/(\d+)$/);
+  return match ? match[1] : null;
+}
+
+/**
+ * Verify that `subscriptionContractId` belongs to the customer authenticated by
+ * `accessToken`.
+ *
+ * Fail-closed by construction: every path that is not an explicit, matching
+ * contract id returns `false` — transport failure, GraphQL error, null contract,
+ * malformed GID, or an id that does not match what we asked for. A caller that
+ * cannot prove ownership must be treated exactly like a caller that does not own
+ * the contract.
+ */
+export async function verifySubscriptionContractOwnership(
+  accessToken: string,
+  subscriptionContractId: string
+): Promise<boolean> {
+  if (!accessToken) return false;
+  if (!isSubscriptionContractGid(subscriptionContractId)) return false;
+
+  let json: {
+    data?: { customer?: { subscriptionContract?: { id?: string } | null } | null };
+    errors?: unknown[];
+  };
+
+  try {
+    const res = await fetch(CUSTOMER_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: accessToken,
+      },
+      body: JSON.stringify({
+        query: SUBSCRIPTION_CONTRACT_OWNERSHIP_QUERY,
+        variables: { id: subscriptionContractId },
+      }),
+      cache: "no-store",
+    });
+
+    if (!res.ok) {
+      console.error(
+        "[verifySubscriptionContractOwnership] Customer API error:",
+        res.status
+      );
+      return false;
+    }
+
+    json = await res.json();
+  } catch (e) {
+    console.error("[verifySubscriptionContractOwnership] request failed:", e);
+    return false;
+  }
+
+  if (json.errors && json.errors.length > 0) {
+    console.error(
+      "[verifySubscriptionContractOwnership] GraphQL errors:",
+      JSON.stringify(json.errors)
+    );
+    return false;
+  }
+
+  const returnedId = json.data?.customer?.subscriptionContract?.id;
+  if (!returnedId) return false;
+
+  // Compare on the numeric suffix so an equivalent-but-differently-formatted
+  // GID from Shopify still matches, while a different contract never does.
+  const requested = gidNumericSuffix(subscriptionContractId);
+  const returned = gidNumericSuffix(returnedId);
+  return requested !== null && requested === returned;
+}
+
 // --- Subscription management mutations ---
 
 const SUBSCRIPTION_PAUSE_MUTATION = /* GraphQL */ `
