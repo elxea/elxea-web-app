@@ -175,7 +175,13 @@ jobs:
 
   visual-regression:
     name: visual-regression
-    if: github.event_name == 'pull_request'
+    # Runs on PRs AND on main pushes. The `if: github.event_name ==
+    # 'pull_request'` guard that used to live here made `autoAcceptChanges: main`
+    # below unreachable: the job never ran on main, so no main push ever produced
+    # a new baseline. Chromatic kept comparing every PR against the last manually
+    # accepted build (#43, 2026-07-13) and reported the same frozen 69 changes on
+    # five unrelated PRs (#44/#45/#46/#47/#49) — a permanently red gate that can
+    # no longer tell a real regression from the backlog. See issue #50.
     needs: static-checks
     runs-on: ubuntu-latest
     timeout-minutes: 10
