@@ -1,6 +1,6 @@
 import { Link } from "@/i18n/navigation";
 import { urlFor } from "@/sanity/lib/image";
-import { ImageCard } from "@/components/ui/image-card";
+import { ImageCard } from "@/components/media/image-card";
 import { bodySmClass, captionClass } from "@/components/editorial/rule-list";
 import { formatArticleDate } from "@/lib/format-date";
 import { previewSeedEnabled, previewImageForKey } from "@/lib/preview-seed";

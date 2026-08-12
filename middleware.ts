@@ -85,6 +85,16 @@ export default async function middleware(request: NextRequest) {
   const passwordResponse = await checkSitePassword(request);
   if (passwordResponse) return passwordResponse;
 
+  // 実装確認用のプレビュー面 (`/dev/*`) は i18n の外に置く。
+  // next-intl のミドルウェアを通すと `/dev/...` が `/ja/dev/...` へ飛ばされるが、
+  // ルートは `app/dev/` (= `[locale]` の外) にあるので 404 になる。ここで手前に
+  // 抜けることでロケール接頭辞なしのまま到達できる。
+  // サイトパスワードの検査より **後** に置いてあるのは意図的で、staging では
+  // このプレビューにもパスワードが掛かる (公開面を増やさない)。
+  if (pathname === "/dev" || pathname.startsWith("/dev/")) {
+    return NextResponse.next();
+  }
+
   // Redirect /en/* to /ja/* (English content not ready yet)
   if (pathname.startsWith("/en")) {
     const jaPath = pathname.replace(/^\/en/, "/ja") || "/ja";

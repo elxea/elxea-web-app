@@ -7,7 +7,7 @@ import {
   overlineClass,
 } from "@/components/editorial/rule-list";
 import { Badge } from "@/components/ui/badge";
-import { ImagePlaceholder } from "@/components/ui/image-placeholder";
+import { ImagePlaceholder } from "@/components/media/image-placeholder";
 import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
 import type { SubscriptionStatusKind } from "@/lib/subscription-view";

@@ -28,7 +28,7 @@ import {
   StepCards,
   TripleColumn,
 } from "@/components/editorial/section-blocks";
-import { ImageCard } from "@/components/ui/image-card";
+import { ImageCard } from "@/components/media/image-card";
 import { cn } from "@/lib/utils";
 
 /**

@@ -41,7 +41,7 @@
     {
       "figma_node_id": "6821:132",
       "figma_name": "CookieBanner (Module)",
-      "code_path": "components/ui/cookie-consent.tsx",
+      "code_path": "components/layout/cookie-consent.tsx",
       "kind": "module",
       "notes": "グローバル部品 (全ページ下部固定)。"
     },
@@ -55,7 +55,7 @@
     {
       "figma_node_id": "5269:2",
       "figma_name": "ImageCard",
-      "code_path": "components/ui/image-card.tsx",
+      "code_path": "components/media/image-card.tsx",
       "kind": "ds-component",
       "notes": "汎用画像カード。collections/farmers/playlists/tea-menu/events で再利用される基底。"
     },
@@ -293,7 +293,7 @@
     {
       "figma_node_id": "6846:124",
       "figma_name": "MemberGate (Module)",
-      "code_path": "components/ui/member-gate.tsx",
+      "code_path": "components/account/member-gate.tsx",
       "kind": "module",
       "notes": "会員ゲート (Server Component)。"
     },

@@ -311,7 +311,7 @@ IAどおり `/ja/tasting-note` をR2の飲んだ記録に譲り、アンケー�
 
 | 変更 | 影響範囲 | 確認 |
 |---|---|---|
-| `components/ui/member-gate.tsx` のhref `/membership` → `/subscription` | 会員限定ゲートを出す全ページ | 転送を1回省くだけで表示は不変。`viewPlans` ラベルも不変 |
+| `components/account/member-gate.tsx` のhref `/membership` → `/subscription` | 会員限定ゲートを出す全ページ | 転送を1回省くだけで表示は不変。`viewPlans` ラベルも不変 |
 | `next.config.ts` の `redirects()` に2件追加 | 既存13件の末尾に追記のみ | 既存sourceと衝突なし (`/ja/membership` / `/membership` は未使用だった) |
 | `lib/preview-seed.ts` に `seedTastingNotes` 追加 | 既存seed群 | 純粋な追加。フラグ未設定で `null` |
 | `messages/{ja,en}.json` に `tastingNoteR2` 追加 | 既存キー | 追加のみ (既存 `tastingNote` は不変) |

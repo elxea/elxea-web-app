@@ -6,7 +6,7 @@ import {
   captionClass,
   overlineClass,
 } from "@/components/editorial/rule-list";
-import { ImagePlaceholder } from "@/components/ui/image-placeholder";
+import { ImagePlaceholder } from "@/components/media/image-placeholder";
 import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
 

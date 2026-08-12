@@ -8,7 +8,7 @@ import { Breadcrumb } from "@/components/seo/breadcrumb";
 import { Section } from "@/components/layout/container";
 import { CatalogToolbar } from "@/components/catalog/catalog-toolbar";
 import { ListPageHead, MoreRow } from "@/components/catalog/catalog-list";
-import { ImageCard } from "@/components/ui/image-card";
+import { ImageCard } from "@/components/media/image-card";
 import { ArticleCard } from "@/components/journal/article-card";
 import {
   ArticleRail,

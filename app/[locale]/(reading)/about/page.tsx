@@ -19,7 +19,7 @@ import {
 } from "@/components/editorial/section-blocks";
 import { Section } from "@/components/layout/container";
 import { Breadcrumb } from "@/components/seo/breadcrumb";
-import { ImageCard } from "@/components/ui/image-card";
+import { ImageCard } from "@/components/media/image-card";
 import { Link } from "@/i18n/navigation";
 import { filterOutFictionalFarmers } from "@/lib/fictional-farmers";
 import { placeholderValue } from "@/lib/placeholders";

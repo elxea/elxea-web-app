@@ -2,7 +2,7 @@
 
 import * as React from "react";
 
-import { ImageCard } from "@/components/ui/image-card";
+import { ImageCard } from "@/components/media/image-card";
 import { captionClass } from "@/components/editorial/rule-list";
 import { AudioPlayer } from "@/components/audio/audio-player";
 import { MiniPlayer } from "@/components/audio/mini-player";

@@ -19,7 +19,7 @@
  */
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ImageWithFallback } from "@/components/ui/image-with-fallback";
+import { ImageWithFallback } from "@/components/media/image-with-fallback";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { Section } from "@/components/layout/container";

@@ -8,7 +8,7 @@ import { TEA_MENU_BY_SLUG_QUERY } from "@/sanity/lib/queries";
 import { urlFor } from "@/sanity/lib/image";
 import { Link } from "@/i18n/navigation";
 import { PortableText } from "@/components/sanity/portable-text";
-import { ImageCard } from "@/components/ui/image-card";
+import { ImageCard } from "@/components/media/image-card";
 import { Breadcrumb } from "@/components/seo/breadcrumb";
 import { Button } from "@/components/ui/button";
 import {

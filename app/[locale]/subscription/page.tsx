@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { getTranslations } from "next-intl/server";
 import { getProducts } from "@/lib/shopify";
 import { Link } from "@/i18n/navigation";
-import { ImageCard } from "@/components/ui/image-card";
+import { ImageCard } from "@/components/media/image-card";
 import { VariantSelector } from "@/components/product/variant-selector";
 import { ProductPurchaseOptions } from "@/components/product/product-purchase-options";
 import { bodySmClass, captionClass, h4Class, overlineClass } from "@/components/editorial/rule-list";

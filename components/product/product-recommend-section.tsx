@@ -13,7 +13,7 @@
 
 import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
-import { ImageCard } from "@/components/ui/image-card";
+import { ImageCard } from "@/components/media/image-card";
 import { getProducts } from "@/lib/shopify";
 import { formatPrice } from "@/lib/utils";
 import {

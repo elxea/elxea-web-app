@@ -3,7 +3,7 @@
 import * as React from "react";
 
 import { Link } from "@/i18n/navigation";
-import { ImageCard } from "@/components/ui/image-card";
+import { ImageCard } from "@/components/media/image-card";
 import { bodySmClass, captionClass } from "@/components/editorial/rule-list";
 import { pillClass } from "@/components/ui/pill-button";
 import { cn } from "@/lib/utils";

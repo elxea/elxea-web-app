@@ -6,7 +6,7 @@ import { locales } from "@/i18n/config";
 import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
 import { CartProviderWrapper } from "@/components/cart/cart-provider-wrapper";
-import { CookieConsent } from "@/components/ui/cookie-consent";
+import { CookieConsent } from "@/components/layout/cookie-consent";
 import { Toaster } from "@/components/ui/sonner";
 import { LenisProvider } from "@/components/providers/lenis-provider";
 import { ChatProvider } from "@/components/chat/chat-provider";

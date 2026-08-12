@@ -6,7 +6,7 @@ import {
   captionClass,
   overlineClass,
 } from "@/components/editorial/rule-list";
-import { ImageCard } from "@/components/ui/image-card";
+import { ImageCard } from "@/components/media/image-card";
 import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
 

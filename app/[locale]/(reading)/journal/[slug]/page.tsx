@@ -13,8 +13,8 @@ import { Link } from "@/i18n/navigation";
 import { Section } from "@/components/layout/container";
 import { Breadcrumb } from "@/components/seo/breadcrumb";
 import { PortableText } from "@/components/sanity/portable-text";
-import { ImageCard } from "@/components/ui/image-card";
-import { MemberGate } from "@/components/ui/member-gate";
+import { ImageCard } from "@/components/media/image-card";
+import { MemberGate } from "@/components/account/member-gate";
 import {
   bodySmClass,
   captionClass,

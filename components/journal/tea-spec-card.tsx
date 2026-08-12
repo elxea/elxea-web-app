@@ -2,7 +2,7 @@ import Image from "next/image";
 import { useTranslations } from "next-intl";
 import { urlFor } from "@/sanity/lib/image";
 import { Link } from "@/i18n/navigation";
-import { ImagePlaceholder } from "@/components/ui/image-placeholder";
+import { ImagePlaceholder } from "@/components/media/image-placeholder";
 import { formatNetWeight, type NetWeightValue } from "@/lib/format-net-weight";
 
 interface TeaSpecCardProps {

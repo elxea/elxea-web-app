@@ -4,7 +4,7 @@
       "count": 2
     }
   },
-  "app/[locale]/tasting-note/feedback/page.tsx": {
+  "app/[locale]/(reading)/tasting-note/feedback/page.tsx": {
     "elxea-tokens/no-raw-colors": {
       "count": 1
     }

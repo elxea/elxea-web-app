@@ -8,7 +8,7 @@ import {
   h4Class,
   overlineClass,
 } from "@/components/editorial/rule-list";
-import { ImageCard } from "@/components/ui/image-card";
+import { ImageCard } from "@/components/media/image-card";
 import { cn } from "@/lib/utils";
 
 /**

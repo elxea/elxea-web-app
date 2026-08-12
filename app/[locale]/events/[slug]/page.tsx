@@ -7,7 +7,7 @@ import { urlFor } from "@/sanity/lib/image";
 import { PortableText } from "@/components/sanity/portable-text";
 import { getMembershipTier } from "@/lib/shopify/auth";
 import type { MembershipTier } from "@/lib/shopify/customer";
-import { MemberGate } from "@/components/ui/member-gate";
+import { MemberGate } from "@/components/account/member-gate";
 import { Breadcrumb } from "@/components/seo/breadcrumb";
 import {
   EventBody,

@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import { Button } from "./button";
+import { Button } from "@/components/ui/button";
 
 /**
  * MemberGate is an async server component that depends on next-intl server

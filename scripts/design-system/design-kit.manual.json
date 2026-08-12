@@ -50,16 +50,10 @@
   },
   "components": {
     "code_sot": {
-      "_rule": "部品の正本はコード `components/ui/*` (shadcn new-york)。Figma の部品は鏡。",
-      "note": "各 .tsx に対応する .stories.tsx がほぼ全件そろっている (Storybook 運用あり)。image-card / image-placeholder / image-with-fallback は stories 無し。",
-      "elxea_specific": [
-        "cookie-consent",
-        "member-gate",
-        "image-card",
-        "image-placeholder",
-        "image-with-fallback",
-        "direction"
-      ],
+      "_rule": "部品の正本はコード `components/ui/*` (shadcn new-york)。Figma の部品は鏡。`components/ui/` は shadcn registry から入れたものだけ。自前で書いたものは絶対に置かない (置き場は機能名のディレクトリ `components/<機能>/`)。",
+      "note": "各 .tsx に対応する .stories.tsx が全件そろっている (Storybook 運用あり)。",
+      "elxea_specific": [],
+      "_elxea_specific_note": "空である状態が正しい。`components/ui/` は shadcn registry 由来のみを置くため。2026-08-12 に自前実装 5 件を移動した (cookie-consent → components/layout/, member-gate → components/account/, image-card / image-placeholder / image-with-fallback → components/media/)。direction は radix-ui の DirectionProvider ラッパーで shadcn registry 品のため elxea_specific ではない (旧記載は誤り)。",
       "button_variants": {
         "defaults": {
           "variant": "default",

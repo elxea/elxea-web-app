@@ -2,7 +2,7 @@
 
 import * as React from "react";
 
-import { ImageCard } from "@/components/ui/image-card";
+import { ImageCard } from "@/components/media/image-card";
 import { QuantityStepper } from "@/components/ui/quantity-stepper";
 import { bodySmClass, h5Class } from "@/components/editorial/rule-list";
 import { cn } from "@/lib/utils";

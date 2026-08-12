@@ -2,7 +2,7 @@
 
 elxea-web-app の UI コンポーネント管理に使う。
 
-## コンポーネント一覧（59個）
+## コンポーネント一覧（56個）
 
 ### 実際に使用中（10個）
 app/ 配下で import されている:
@@ -20,14 +20,14 @@ app/ 配下で import されている:
 | Skeleton | `@/components/ui/skeleton` | ローディング状態 |
 | Sonner (Toaster) | `@/components/ui/sonner` | layout（通知） |
 
-### 未使用（49個）
-accordion, alert, alert-dialog, aspect-ratio, avatar, breadcrumb, button-group, calendar, carousel, chart, checkbox, collapsible, combobox, command, context-menu, cookie-consent, direction, drawer, dropdown-menu, empty, field, form, hover-card, input-group, input-otp, item, kbd, member-gate, menubar, native-select, navigation-menu, pagination, popover, progress, radio-group, resizable, scroll-area, select, sidebar, slider, spinner, switch, table, tabs, textarea, toggle, toggle-group, tooltip
+### 未使用（46個）
+accordion, alert, alert-dialog, aspect-ratio, avatar, breadcrumb, button-group, calendar, carousel, chart, checkbox, collapsible, combobox, command, context-menu, direction, drawer, dropdown-menu, empty, field, form, hover-card, input-group, input-otp, item, kbd, menubar, native-select, navigation-menu, pagination, popover, progress, radio-group, resizable, scroll-area, select, sidebar, slider, spinner, switch, table, tabs, textarea, toggle, toggle-group, tooltip
 
 ## Storybook 構成
 
 ### Stories ディレクトリ
 ```
-components/ui/*.stories.tsx    ← 各コンポーネントの個別 stories（59個）
+components/ui/*.stories.tsx    ← 各コンポーネントの個別 stories（56個）
 stories/
   ActiveComponents.stories.tsx ← 使用中10個を1ページに集約
   tokens/
