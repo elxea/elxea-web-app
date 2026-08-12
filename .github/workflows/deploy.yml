@@ -14,6 +14,12 @@ name: Deploy Production
 # per Vercel's documented GitHub Actions recipe.
 
 on:
+  # Manual re-run. Deploys are not always reproducible from a code change (a
+  # Vercel-side or CLI-side failure can break a deploy with no repo change at
+  # all — see VERCEL_CLI_VERSION below), so we must be able to retry a deploy
+  # without pushing a dummy commit. workflow_dispatch also ignores the
+  # paths-ignore filter below, which is what we want for a forced redeploy.
+  workflow_dispatch:
   push:
     branches: [main]
     # Skip deploys for docs-only pushes: if EVERY changed file matches these
@@ -43,6 +49,15 @@ env:
   # pull/build/deploy, removing the need for an interactive `vercel link`.
   VERCEL_ORG_ID: team_6ut7roUVtRU2EGbPVR9DNTy6
   VERCEL_PROJECT_ID: prj_sVwjaJwPAKxRcKu3wVejiqGPt5o6
+  # Pinned deliberately. This used to be `vercel@latest`, which meant a
+  # third-party patch release could break production deploys with zero changes
+  # in this repo — and on 2026-07-30 exactly that happened (57.0.0 deployed
+  # fine, 58.4.4 did not; see .vercelignore for the mechanism). Deploys must be
+  # reproducible, so the CLI is a pinned input like any other dependency.
+  # Bump intentionally, and check the run stays green after you do.
+  VERCEL_CLI_VERSION: "58.9.4"
+  # Public production URL, asserted by the smoke check after every deploy.
+  PRODUCTION_URL: "https://elxea.com"
 
 jobs:
   deploy-production:
@@ -87,7 +102,7 @@ jobs:
           cache: pnpm
 
       - name: Install Vercel CLI
-        run: npm install --global vercel@latest
+        run: npm install --global "vercel@${VERCEL_CLI_VERSION}"
 
       - name: Pull Vercel environment (production)
         run: vercel pull --yes --environment=production
@@ -96,4 +111,41 @@ jobs:
         run: vercel build --prod
 
       - name: Deploy prebuilt artifacts to production
-        run: vercel deploy --prebuilt --prod
+        id: deploy
+        # `vercel deploy` writes the deployment URL to stdout and its progress
+        # to stderr, so capturing stdout yields exactly the deployment this run
+        # created. We keep it for the smoke check and the run summary.
+        run: |
+          deployment_url="$(vercel deploy --prebuilt --prod)"
+          echo "deployment_url=${deployment_url}" >> "$GITHUB_OUTPUT"
+          echo "Deployed: ${deployment_url}"
+
+      - name: Smoke check — production must actually serve traffic
+        # A green `vercel deploy` is not proof the site works. The 2026-07-31
+        # outage was the reverse case (deploy failed loudly), but the same
+        # underlying defect — files silently missing from the uploaded
+        # deployment — can also produce a "successful" deploy that serves
+        # errors. So we assert the production domain really returns 200 before
+        # calling this workflow successful.
+        #
+        # This does NOT roll back; it only reports. Rolling back automatically
+        # would be a riskier action to take unattended, and Vercel keeps the
+        # previous deployment available for an instant manual rollback.
+        env:
+          DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment_url }}
+        run: |
+          echo "Deployment: ${DEPLOYMENT_URL}"
+          code=000
+          # Retry: alias propagation is not instant, and a single transient
+          # network blip should not fail an otherwise good deploy.
+          for attempt in 1 2 3 4 5; do
+            code="$(curl -sS -o /dev/null -w '%{http_code}' -L --max-time 20 "${PRODUCTION_URL}" || echo 000)"
+            if [ "${code}" = "200" ]; then
+              echo "${PRODUCTION_URL} returned 200 on attempt ${attempt}."
+              exit 0
+            fi
+            echo "Attempt ${attempt}: ${PRODUCTION_URL} returned HTTP ${code}; retrying in 10s..."
+            sleep 10
+          done
+          echo "::error title=Production smoke check failed::${PRODUCTION_URL} did not return 200 after 5 attempts (last: HTTP ${code}). The deploy may have shipped a broken build — check ${DEPLOYMENT_URL} and consider rolling back in the Vercel dashboard."
+          exit 1
