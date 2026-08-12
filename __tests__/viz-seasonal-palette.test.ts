@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { hexToOklch, mixHue, oklchToHex } from "@/lib/roji/color";
+import { hexToOklch, mixHue, oklchToHex } from "@/lib/viz/color";
 import {
   TIMES_OF_DAY,
   normalizeMonth,
@@ -9,7 +9,7 @@ import {
   seasonalRolesFor,
   seasonalTempo,
   timeOfDayFromHour,
-} from "@/lib/roji/seasonal-palette";
+} from "@/lib/viz/seasonal-palette";
 
 const MONTHS = Array.from({ length: 12 }, (_, i) => i + 1);
 const HEX = /^#[0-9a-f]{6}$/;
@@ -256,7 +256,7 @@ describe("seasonalPaletteFor", () => {
   });
 
   /**
-   * `components/roji/seasonal-wash.tsx` の `readRoles` は「地を除いていちばん
+   * `components/viz/wash/seasonal-wash.tsx` の `readRoles` は「地を除いていちばん
    * 彩度の高い色が主役」という前提で役割を逆算する。その前提をここで固定する
    * (崩れると面の主役と地が入れ替わり、絵が反転する)。
    */

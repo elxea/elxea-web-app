@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { paperGrainTile, periodicValueNoise } from "@/lib/roji/paper-grain";
+import { paperGrainTile, periodicValueNoise } from "@/lib/viz/paper-grain";
 
 const SIZE = 64;
 const INTENSITY = 30;

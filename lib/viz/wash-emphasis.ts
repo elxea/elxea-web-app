@@ -241,7 +241,7 @@ export const WASH_INTENSITY_PRESETS: Record<WashIntensityName, number> = {
    * 読みもの系の背景。
    *
    * 0.55 は「本文の文字が WCAG AA (4.5:1) を割らない」ことから決めた上限側の値。
-   * 検証は `__tests__/roji-reading-palette.test.ts` が 48 通りの配色すべてで行う。
+   * 検証は `__tests__/viz-reading-palette.test.ts` が 48 通りの配色すべてで行う。
    */
   soft: 0.55,
 };

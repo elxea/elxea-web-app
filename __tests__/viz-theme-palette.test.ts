@@ -3,8 +3,8 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { hexToOklch } from "@/lib/roji/color";
-import { seasonalPaletteFor, TIMES_OF_DAY } from "@/lib/roji/seasonal-palette";
+import { hexToOklch } from "@/lib/viz/color";
+import { seasonalPaletteFor, TIMES_OF_DAY } from "@/lib/viz/seasonal-palette";
 import {
   asJournalTheme,
   themePaletteFor,
@@ -12,7 +12,7 @@ import {
   JOURNAL_THEMES,
   JOURNAL_THEME_COLOR,
   type JournalTheme,
-} from "@/lib/roji/theme-palette";
+} from "@/lib/viz/theme-palette";
 
 /**
  * 号のテーマ色から作る面の色。

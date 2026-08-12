@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 
-import type { TimeOfDay } from "@/lib/roji/seasonal-palette";
+import type { TimeOfDay } from "@/lib/viz/seasonal-palette";
 
 /**
  * canvas に触る本体はクライアント専用。`ssr: false` で読み込むのは、SSR で
@@ -10,7 +10,7 @@ import type { TimeOfDay } from "@/lib/roji/seasonal-palette";
  * (コンポーネント自体は useEffect 内でしか canvas に触らないので SSR 安全)。
  */
 const SeasonalWash = dynamic(
-  () => import("@/components/roji/seasonal-wash").then((m) => m.SeasonalWash),
+  () => import("@/components/viz/wash/seasonal-wash").then((m) => m.SeasonalWash),
   { ssr: false },
 );
 

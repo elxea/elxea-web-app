@@ -8,7 +8,7 @@ import {
   clampTempo,
   prefersReducedMotion,
   resolveMotion,
-} from "@/lib/roji/seasonal-wash-motion";
+} from "@/lib/viz/seasonal-wash-motion";
 
 /** `window` の最小の偽物。matchMedia の戻り値と、渡されたクエリを記録する。 */
 function hostWith(matches: boolean) {

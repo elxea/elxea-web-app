@@ -47,7 +47,7 @@ export const JOURNAL_THEMES: readonly JournalTheme[] = [
  *
  * ここに実値を置くのは、面の色を作るのに **CSS 変数を解決できない** ため
  * (純関数はブラウザに依存しない)。トークン側が動いたらここも動かす必要がある。
- * 対応は `__tests__/roji-theme-palette.test.ts` が `dist/tokens.css` を読んで
+ * 対応は `__tests__/viz-theme-palette.test.ts` が `dist/tokens.css` を読んで
  * 照合するので、片方だけ動けばテストが落ちる。
  */
 export const JOURNAL_THEME_COLOR: Record<JournalTheme, Oklch> = {

@@ -7,8 +7,8 @@ import {
   seasonalTempo,
   timeOfDayFromHour,
   type TimeOfDay,
-} from "@/lib/roji/seasonal-palette";
-import { clampTempo } from "@/lib/roji/seasonal-wash-motion";
+} from "@/lib/viz/seasonal-palette";
+import { clampTempo } from "@/lib/viz/seasonal-wash-motion";
 
 import { SeasonalWashPreview } from "./preview";
 

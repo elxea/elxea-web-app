@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { seasonalPaletteFor } from "@/lib/roji/seasonal-palette";
+import { seasonalPaletteFor } from "@/lib/viz/seasonal-palette";
 import {
   resolveWashIntensity,
   scaleWashEmphasis,
@@ -8,7 +8,7 @@ import {
   washEmphasisForPalette,
   WASH_INTENSITY_PRESETS,
   type WashEmphasis,
-} from "@/lib/roji/wash-emphasis";
+} from "@/lib/viz/wash-emphasis";
 
 /**
  * 面ごとの強さ (intensity)。

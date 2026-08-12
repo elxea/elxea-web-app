@@ -3,17 +3,17 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { hexToOklch, oklchToHex } from "@/lib/roji/color";
+import { hexToOklch, oklchToHex } from "@/lib/viz/color";
 import {
   paperAnchoredPalette,
   readingPaletteFor,
   readingThemePaletteFor,
   READING_LIGHTNESS_CEIL,
   READING_LIGHTNESS_FLOOR,
-} from "@/lib/roji/reading-palette";
-import { seasonalPaletteFor, TIMES_OF_DAY } from "@/lib/roji/seasonal-palette";
-import { JOURNAL_THEMES } from "@/lib/roji/theme-palette";
-import { resolveWashIntensity } from "@/lib/roji/wash-emphasis";
+} from "@/lib/viz/reading-palette";
+import { seasonalPaletteFor, TIMES_OF_DAY } from "@/lib/viz/seasonal-palette";
+import { JOURNAL_THEMES } from "@/lib/viz/theme-palette";
+import { resolveWashIntensity } from "@/lib/viz/wash-emphasis";
 
 /**
  * 読みもの系に敷ける色かどうかの検査。

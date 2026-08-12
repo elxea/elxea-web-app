@@ -46,7 +46,7 @@ export type SeasonalPalette = [string, string, string, string];
  * 面のもとになる 4 色 (時間帯の効果を掛ける **前** の値)。
  *
  * 月の色 (`MONTHLY_BASE`) だけでなく、elxea journal の号のテーマ色から作った
- * 4 色もここへ入る (`lib/roji/theme-palette.ts`)。時間帯の効かせ方
+ * 4 色もここへ入る (`lib/viz/theme-palette.ts`)。時間帯の効かせ方
  * (`TIME_SHAPE`) と彩度・明度の帯はどちらも同じものを通す必要があるので、
  * 型と整形 (`shapePalette`) を公開して経路を 1 本に保つ。
  */

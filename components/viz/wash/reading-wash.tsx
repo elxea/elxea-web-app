@@ -6,24 +6,24 @@ import { useMemo, useSyncExternalStore } from "react";
 import {
   readingPaletteFor,
   readingThemePaletteFor,
-} from "@/lib/roji/reading-palette";
+} from "@/lib/viz/reading-palette";
 import {
   seasonalTempo,
   timeOfDayFromHour,
   type SeasonalPalette,
-} from "@/lib/roji/seasonal-palette";
+} from "@/lib/viz/seasonal-palette";
 import {
   getWashTheme,
   getWashThemeServerSnapshot,
   subscribeWashTheme,
-} from "@/lib/roji/wash-theme-store";
+} from "@/lib/viz/wash-theme-store";
 
 /**
  * canvas に触る本体はクライアント専用。`ssr: false` は SSR で描かれない要素を
  * サーバーで組み立てる無駄を省くため。
  */
 const SeasonalWash = dynamic(
-  () => import("@/components/roji/seasonal-wash").then((m) => m.SeasonalWash),
+  () => import("@/components/viz/wash/seasonal-wash").then((m) => m.SeasonalWash),
   { ssr: false },
 );
 

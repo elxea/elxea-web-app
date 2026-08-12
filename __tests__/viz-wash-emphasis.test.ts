@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { seasonalPaletteFor } from "@/lib/roji/seasonal-palette";
+import { seasonalPaletteFor } from "@/lib/viz/seasonal-palette";
 import {
   DARK_PALETTE_PIVOT,
   LIGHT_PALETTE_PIVOT,
@@ -8,7 +8,7 @@ import {
   washEmphasisFor,
   washEmphasisForPalette,
   type WashEmphasis,
-} from "@/lib/roji/wash-emphasis";
+} from "@/lib/viz/wash-emphasis";
 
 /**
  * 配色の明るさ -> にじみの置き方の係数。

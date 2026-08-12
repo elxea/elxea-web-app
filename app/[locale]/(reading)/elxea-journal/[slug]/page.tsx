@@ -8,7 +8,7 @@ import { urlFor } from "@/sanity/lib/image";
 import { PortableText } from "@/components/sanity/portable-text";
 import { ImageWithFallback } from "@/components/ui/image-with-fallback";
 import { TeaSpecCard } from "@/components/journal/tea-spec-card";
-import { JournalWashTheme } from "@/components/roji/journal-wash-theme";
+import { JournalWashTheme } from "@/components/viz/wash/journal-wash-theme";
 import { Link } from "@/i18n/navigation";
 
 // 短縮ラベル (Figma Journal Theme Badge 6934:143 が正)

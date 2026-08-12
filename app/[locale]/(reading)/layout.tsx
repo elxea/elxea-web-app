@@ -1,4 +1,4 @@
-import { ReadingWash } from "@/components/roji/reading-wash";
+import { ReadingWash } from "@/components/viz/wash/reading-wash";
 
 /**
  * 読みもの系ページのレイヤー。
@@ -17,7 +17,7 @@ import { ReadingWash } from "@/components/roji/reading-wash";
  * 「読み違えてはいけないもの」の後ろで動くことになるため。
  *
  * 面の敷き方と、`<body>` の背景を外さずに済んでいる理由は
- * `components/roji/reading-wash.tsx` の説明を参照。
+ * `components/viz/wash/reading-wash.tsx` の説明を参照。
  */
 export default function ReadingLayout({
   children,

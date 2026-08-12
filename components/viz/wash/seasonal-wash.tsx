@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 
-import { hexToOklch, oklchToHex } from "@/lib/roji/color";
+import { hexToOklch, oklchToHex } from "@/lib/viz/color";
 import {
   buildStrokeSeeds,
   dabScatter,
@@ -15,12 +15,12 @@ import {
   traceStroke,
   STROKE_STEPS,
   type StrokeSeed,
-} from "@/lib/roji/flow-field";
-import { paperGrainTile } from "@/lib/roji/paper-grain";
+} from "@/lib/viz/flow-field";
+import { paperGrainTile } from "@/lib/viz/paper-grain";
 import {
   prefersReducedMotion,
   resolveMotion,
-} from "@/lib/roji/seasonal-wash-motion";
+} from "@/lib/viz/seasonal-wash-motion";
 import {
   paletteMeanLightness,
   resolveWashIntensity,
@@ -29,7 +29,7 @@ import {
   MID_RIM_SPREAD_LIMIT,
   type WashEmphasis,
   type WashIntensity,
-} from "@/lib/roji/wash-emphasis";
+} from "@/lib/viz/wash-emphasis";
 
 /**
  * SeasonalWash — 季節のにじみ (roji 情動レイヤー v1)
@@ -48,7 +48,7 @@ import {
  * 2. **境界を全部ぼかさない。** 色が出会うところに薄い濃度差 (にじみの縁) を残す。
  *    水彩が乾くときに縁へ顔料が寄る現象と同じで、これが無いと絵に見えない。
  *    ただし全ストロークには付けない (付けると筆致が数えられて工業的になる)。
- * 3. **夜の配色を彩度で作る。** 色の設計は `lib/roji/seasonal-palette.ts` 側。
+ * 3. **夜の配色を彩度で作る。** 色の設計は `lib/viz/seasonal-palette.ts` 側。
  *
  * ## 実装上の選択と、その理由
  * - **canvas 2D。WebGL でもライブラリでもない。** 流れに沿ったスタンプを重ねる
@@ -62,7 +62,7 @@ import {
  * - **乱数は seed から決定的に作る。** ハイドレーションのズレもスクリーンショットの
  *   揺れも構造的に起きない。
  *
- * 動きの正本はコード、色の正本は季節パレット (`lib/roji/seasonal-palette.ts`)。
+ * 動きの正本はコード、色の正本は季節パレット (`lib/viz/seasonal-palette.ts`)。
  * 参照: https://www.notion.so/3b970c9d064c816da7b3c0bf2c15557f
  */
 
@@ -87,7 +87,7 @@ export interface SeasonalWashProps {
    * 配色ごとの置き方 (`washEmphasisFor`) とは別の軸。あちらは「この配色を
    * どう置けば図形に見えないか」で、こちらは「この **面** がどれだけ出して
    * よいか」。読みもの系の背景は本文の後ろに敷くので `"soft"` を渡す。
-   * 詳細と数値の根拠は `lib/roji/wash-emphasis.ts` の `WashIntensity` 参照。
+   * 詳細と数値の根拠は `lib/viz/wash-emphasis.ts` の `WashIntensity` 参照。
    */
   intensity?: WashIntensity;
   className?: string;
@@ -181,7 +181,7 @@ const GRAIN_INTENSITY = 30;
 /**
  * どちらの明度側を地に取るかの境目。
  *
- * `lib/roji/wash-emphasis.ts` の `DARK_PALETTE_PIVOT` / `LIGHT_PALETTE_PIVOT` とは
+ * `lib/viz/wash-emphasis.ts` の `DARK_PALETTE_PIVOT` / `LIGHT_PALETTE_PIVOT` とは
  * 別物なので混ぜない。あちらは「色をどれだけ点らせるか」を連続的に決める補間の
  * 両端で、こちらは「4 色のうちどれを地にするか」という二択の境目。役割が違う。
  */
@@ -199,7 +199,7 @@ interface ColorRole {
  * 配色から役割を読み取る。
  *
  * パレットは 4 色の hex しか渡ってこない (props 互換のため) ので、色そのものから
- * 逆算する。`lib/roji/seasonal-palette.ts` が付けた役割と一致するように作ってあるが、
+ * 逆算する。`lib/viz/seasonal-palette.ts` が付けた役割と一致するように作ってあるが、
  * 任意のパレットを渡されても破綻しない。
  *
  * - 明るい配色 (朝・昼) → いちばん明るい色が地。生成りの紙の上に色が滲む
@@ -254,7 +254,7 @@ function readRoles(colors: string[]): ColorRole[] {
  * ## v2-fix — 主役の値はここに無い (配色から決まる)
  * 下の `accent` は **明るい配色のときの値** ではなく、`ROLE_STYLE` に居残った
  * 形骸ではない。主役の置き方は配色の平均明度から `washEmphasisFor` が返すので、
- * ここには置かない。理由は `lib/roji/wash-emphasis.ts` の冒頭に書いた:
+ * ここには置かない。理由は `lib/viz/wash-emphasis.ts` の冒頭に書いた:
  * 同じ濃度でも、明るい地では「染み」、暗い地では「光」として読まれ、
  * 弱め方を一律にすると必ずどちらかが壊れる (v2 は夜を壊した)。
  *

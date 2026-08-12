@@ -15,7 +15,7 @@ import {
   STROKE_STEPS,
   type FlowField,
   type StrokeSeed,
-} from "@/lib/roji/flow-field";
+} from "@/lib/viz/flow-field";
 
 const FIELD = { baseAngle: -0.38, turn: 0.85, seed: 1 };
 
