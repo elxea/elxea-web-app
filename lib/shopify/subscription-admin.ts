@@ -9,8 +9,6 @@ import {
   SUBSCRIPTION_CONTRACT_UPDATE_MUTATION,
   SUBSCRIPTION_DRAFT_COMMIT_MUTATION,
   SUBSCRIPTION_DRAFT_UPDATE_MUTATION,
-  SUBSCRIPTION_DRAFT_LINE_ADD_MUTATION,
-  SUBSCRIPTION_DRAFT_LINE_REMOVE_MUTATION,
   CUSTOMER_TAGS_ADD_MUTATION,
   CUSTOMER_TAGS_REMOVE_MUTATION,
 } from "./admin-mutations";
@@ -33,7 +31,6 @@ import type {
   SubscriptionBillingCyclesIndexRange,
   BillingAttempt,
   SubscriptionDraftInput,
-  SubscriptionLineInput,
 } from "./admin-types";
 
 // ─── Helpers to flatten GraphQL edges ────────────────────────────────
@@ -667,7 +664,6 @@ export async function removeMembershipTags(
 
 /**
  * Create a draft from an existing contract and return the draft ID.
- * Shared by updateSubscriptionContract and changeSubscriptionLineItem.
  */
 async function createContractDraft(contractId: string): Promise<string> {
   const draftData = await adminFetch<{
@@ -728,52 +724,6 @@ export async function updateSubscriptionContract(
   });
 
   throwOnUserErrors(updateData, "subscriptionDraftUpdate");
-
-  return commitDraft(draftId);
-}
-
-/**
- * Change a line item in a subscription contract.
- * Uses the draft pattern: create draft → remove old line → add new line → commit.
- *
- * @param contractId - The subscription contract GID
- * @param oldLineId - The GID of the line to remove
- * @param newLine - The new line item to add
- */
-export async function changeSubscriptionLineItem(
-  contractId: string,
-  oldLineId: string,
-  newLine: SubscriptionLineInput
-): Promise<{ id: string; status: string }> {
-  const draftId = await createContractDraft(contractId);
-
-  // Remove old line
-  const removeData = await adminFetch<{
-    subscriptionDraftLineRemove: {
-      lineRemoved: { id: string; title: string } | null;
-      draft: { id: string; status: string };
-      userErrors: { field: string[] | null; message: string }[];
-    };
-  }>({
-    query: SUBSCRIPTION_DRAFT_LINE_REMOVE_MUTATION,
-    variables: { draftId, lineId: oldLineId },
-  });
-
-  throwOnUserErrors(removeData, "subscriptionDraftLineRemove");
-
-  // Add new line
-  const addData = await adminFetch<{
-    subscriptionDraftLineAdd: {
-      lineAdded: { id: string; title: string } | null;
-      draft: { id: string; status: string };
-      userErrors: { field: string[] | null; message: string }[];
-    };
-  }>({
-    query: SUBSCRIPTION_DRAFT_LINE_ADD_MUTATION,
-    variables: { draftId, input: newLine },
-  });
-
-  throwOnUserErrors(addData, "subscriptionDraftLineAdd");
 
   return commitDraft(draftId);
 }

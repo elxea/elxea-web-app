@@ -233,51 +233,6 @@ export const SUBSCRIPTION_DRAFT_COMMIT_MUTATION = /* GraphQL */ `
   }
 `;
 
-export const SUBSCRIPTION_DRAFT_LINE_ADD_MUTATION = /* GraphQL */ `
-  mutation SubscriptionDraftLineAdd($draftId: ID!, $input: SubscriptionLineInput!) {
-    subscriptionDraftLineAdd(draftId: $draftId, input: $input) {
-      lineAdded {
-        id
-        title
-        variantTitle
-        quantity
-        currentPrice { amount currencyCode }
-        productId
-        variantId
-        variantImage { url altText }
-        sku
-      }
-      draft {
-        id
-        status
-      }
-      userErrors {
-        field
-        message
-      }
-    }
-  }
-`;
-
-export const SUBSCRIPTION_DRAFT_LINE_REMOVE_MUTATION = /* GraphQL */ `
-  mutation SubscriptionDraftLineRemove($draftId: ID!, $lineId: ID!) {
-    subscriptionDraftLineRemove(draftId: $draftId, lineId: $lineId) {
-      lineRemoved {
-        id
-        title
-      }
-      draft {
-        id
-        status
-      }
-      userErrors {
-        field
-        message
-      }
-    }
-  }
-`;
-
 export const SUBSCRIPTION_DRAFT_UPDATE_MUTATION = /* GraphQL */ `
   mutation SubscriptionDraftUpdate($draftId: ID!, $input: SubscriptionDraftInput!) {
     subscriptionDraftUpdate(draftId: $draftId, input: $input) {

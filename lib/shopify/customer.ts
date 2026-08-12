@@ -6,6 +6,7 @@ import {
 } from "@/lib/subscription-view";
 
 import { SHOPIFY_API_VERSION } from "./api-version";
+import { reportSubscriptionFailure } from "./subscription-failure";
 
 const CLIENT_ID = process.env.SHOPIFY_CUSTOMER_ACCOUNT_CLIENT_ID || "";
 const SESSION_SECRET = process.env.SESSION_SECRET || "";
@@ -682,13 +683,15 @@ async function executeSubscriptionMutation(
     });
 
     if (!res.ok) {
-      return { success: false, error: `API error: ${res.status}` };
+      // HTTP status も顧客には返さない (外部 API の内部状態を推し量る材料になる)。
+      reportSubscriptionFailure("customerApiMutation", `HTTP ${res.status}`);
+      return { success: false };
     }
 
     json = await res.json();
   } catch (e) {
-    console.error("[executeSubscriptionMutation] request failed:", e);
-    return { success: false, error: "Subscription API request failed" };
+    reportSubscriptionFailure("customerApiMutation:transport", e);
+    return { success: false };
   }
 
   // Check for userErrors in any mutation response
@@ -698,25 +701,26 @@ async function executeSubscriptionMutation(
     if (mutationKey) {
       const userErrors = data[mutationKey]?.userErrors;
       if (userErrors && userErrors.length > 0) {
-        return {
-          success: false,
-          error: userErrors.map((e) => e.message).join(", "),
-        };
+        // Shopify の userErrors はストア側の事情 (在庫・プラン構成・内部 ID) を
+        // 含みうるので転送しない。画面は `actionError` にフォールバックする。
+        reportSubscriptionFailure("customerApiMutation:userErrors", userErrors, {
+          mutationKey,
+        });
+        return { success: false };
       }
     }
   }
 
   if (json.errors && json.errors.length > 0) {
-    return {
-      success: false,
-      error: json.errors.map((e) => e.message).join(", "),
-    };
+    reportSubscriptionFailure("customerApiMutation:graphqlErrors", json.errors);
+    return { success: false };
   }
 
   // No data at all means the request did not produce a mutation result — treat
   // that as failure rather than reporting success on an empty response.
   if (!data) {
-    return { success: false, error: "Subscription API returned no data" };
+    reportSubscriptionFailure("customerApiMutation:emptyResponse", "no data field");
+    return { success: false };
   }
 
   return { success: true };

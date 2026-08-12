@@ -50,19 +50,16 @@ vi.mock("@/lib/shopify/customer", async () => {
 });
 
 const updateSubscriptionContractMock = vi.fn();
-const changeSubscriptionLineItemMock = vi.fn();
 const getSellingPlanGroupsMock = vi.fn();
 vi.mock("@/lib/shopify/subscription-admin", () => ({
   updateSubscriptionContract: (...args: unknown[]) =>
     updateSubscriptionContractMock(...args),
-  changeSubscriptionLineItem: (...args: unknown[]) =>
-    changeSubscriptionLineItemMock(...args),
   getSellingPlanGroups: (...args: unknown[]) => getSellingPlanGroupsMock(...args),
 }));
 
 import {
   changeDeliveryFrequencyAction,
-  changeSubscriptionProductAction,
+  pauseSubscriptionAction,
   skipNextDeliveryAction,
 } from "@/lib/shopify/subscription-actions";
 import { STALE_BILLING_CYCLE_VIEW } from "@/lib/subscription-view";
@@ -75,10 +72,6 @@ const VARIANT_GID = "gid://shopify/ProductVariant/4444";
 /** The generic denial message — identical for every unauthorized outcome. */
 const DENIED = "Subscription not found or not accessible";
 
-function changeProduct(contractId: string) {
-  return changeSubscriptionProductAction(contractId, LINE_GID, VARIANT_GID, "3800");
-}
-
 beforeEach(() => {
   vi.clearAllMocks();
   vi.spyOn(console, "error").mockImplementation(() => {});
@@ -88,8 +81,8 @@ beforeEach(() => {
     expiresAt: Date.now() + 600_000,
   });
   updateSubscriptionContractMock.mockResolvedValue({ id: OWN_CONTRACT, status: "ACTIVE" });
-  changeSubscriptionLineItemMock.mockResolvedValue({ id: OWN_CONTRACT, status: "ACTIVE" });
   skipNextBillingCycleMock.mockResolvedValue({ success: true });
+  pauseSubscriptionMock.mockResolvedValue({ success: true });
   // ストアに実在する selling plan (毎月 / 2ヶ月ごと / 3ヶ月ごと)。
   // 頻度変更はこの実データに含まれる頻度しか受け付けない。
   getSellingPlanGroupsMock.mockResolvedValue([
@@ -199,72 +192,71 @@ describe("changeDeliveryFrequencyAction — 所有者照合", () => {
   });
 });
 
-describe("changeSubscriptionProductAction — 所有者照合", () => {
-  it("rejects a contract owned by another customer without touching the Admin API", async () => {
-    verifyOwnershipMock.mockResolvedValue(false);
+/**
+ * 顧客に返すメッセージに内部情報を混ぜない (2026-08-12 の QA 指摘 3)。
+ *
+ * これらの action の返り値はそのままブラウザに届く。実測された漏洩例は
+ * `{"success":false,"error":"Customer API 429 throttled for customer 8877"}` で、
+ * 顧客 ID と外部 API の内部状態が画面に出ていた。従来のテストは
+ * `success === false` しか見ておらずメッセージを固定していなかったため、
+ * いつでも表に出せる状態だった。ここで**文言そのもの**を固定する。
+ */
+describe("エラーメッセージに内部情報を載せない", () => {
+  /** 内部情報と判定する語 (顧客 ID・外部 API 名・HTTP status・生の例外文)。 */
+  const INTERNAL_MARKERS = [
+    "Customer API",
+    "throttled",
+    "customer 8877",
+    "GraphQL",
+    "429",
+    "500",
+    "Shopify",
+    "transport",
+    "fetch",
+  ];
 
-    const result = await changeProduct(OTHER_CONTRACT);
+  function expectNoInternalDetail(message: string | undefined) {
+    if (message === undefined) return; // 文言を載せない = 画面側の localized 文言に委ねる
+    for (const marker of INTERNAL_MARKERS) {
+      expect(message.toLowerCase()).not.toContain(marker.toLowerCase());
+    }
+  }
 
-    expect(result).toEqual({ success: false, error: DENIED });
-    expect(changeSubscriptionLineItemMock).not.toHaveBeenCalled();
-  });
-
-  it("fails closed when ownership verification itself fails", async () => {
-    verifyOwnershipMock.mockRejectedValue(new Error("verification transport failure"));
-
-    const result = await changeProduct(OWN_CONTRACT);
-
-    expect(result.success).toBe(false);
-    expect(changeSubscriptionLineItemMock).not.toHaveBeenCalled();
-  });
-
-  it("rejects a malformed contract id without even verifying", async () => {
-    verifyOwnershipMock.mockResolvedValue(true);
-
-    const result = await changeProduct("gid://shopify/SubscriptionContract/not-a-number");
-
-    expect(result).toEqual({ success: false, error: DENIED });
-    expect(verifyOwnershipMock).not.toHaveBeenCalled();
-    expect(changeSubscriptionLineItemMock).not.toHaveBeenCalled();
-  });
-
-  it("rejects an unauthenticated caller", async () => {
-    getSessionMock.mockResolvedValue(null);
-    verifyOwnershipMock.mockResolvedValue(true);
-
-    const result = await changeProduct(OWN_CONTRACT);
-
-    expect(result.success).toBe(false);
-    expect(changeSubscriptionLineItemMock).not.toHaveBeenCalled();
-  });
-
-  it("rejects an invalid quantity before authorizing", async () => {
-    verifyOwnershipMock.mockResolvedValue(true);
-
-    const result = await changeSubscriptionProductAction(
-      OWN_CONTRACT,
-      LINE_GID,
-      VARIANT_GID,
-      "3800",
-      0
+  it("照合が内部エラーで落ちても、返るのは一般化した固定文言だけ", async () => {
+    // 実測された漏洩の形をそのまま再現する
+    verifyOwnershipMock.mockRejectedValue(
+      new Error("Customer API 429 throttled for customer 8877")
     );
 
-    expect(result).toEqual({ success: false, error: "Invalid quantity" });
-    expect(changeSubscriptionLineItemMock).not.toHaveBeenCalled();
+    const result = await changeDeliveryFrequencyAction(OWN_CONTRACT, "MONTH", 1);
+
+    expect(result).toEqual({ success: false, error: DENIED });
+    expectNoInternalDetail(result.error);
+    expect(updateSubscriptionContractMock).not.toHaveBeenCalled();
   });
 
-  it("proceeds for the owner", async () => {
+  it("Admin API が生メッセージで落ちても、それを顧客に返さない", async () => {
     verifyOwnershipMock.mockResolvedValue(true);
+    updateSubscriptionContractMock.mockRejectedValue(
+      new Error("Shopify subscriptionDraftCommit failed: internal draft 998877")
+    );
 
-    const result = await changeProduct(OWN_CONTRACT);
+    const result = await changeDeliveryFrequencyAction(OWN_CONTRACT, "MONTH", 2);
 
-    expect(result).toEqual({ success: true });
-    expect(changeSubscriptionLineItemMock).toHaveBeenCalledTimes(1);
-    expect(changeSubscriptionLineItemMock).toHaveBeenCalledWith(OWN_CONTRACT, LINE_GID, {
-      productVariantId: VARIANT_GID,
-      currentPrice: "3800",
-      quantity: 1,
-    });
+    // 文言を載せない → 画面は自分の localized な frequencyChangeError を出す
+    expect(result).toEqual({ success: false });
+    expectNoInternalDetail(result.error);
+  });
+
+  it("Customer API の userErrors を顧客に転送しない", async () => {
+    // pause は Customer Account API 経路。executeSubscriptionMutation の
+    // userErrors がそのまま返っていた箇所を固定する。
+    pauseSubscriptionMock.mockResolvedValue({ success: false });
+
+    const result = await pauseSubscriptionAction(OWN_CONTRACT);
+
+    expect(result).toEqual({ success: false });
+    expectNoInternalDetail(result.error);
   });
 });
 

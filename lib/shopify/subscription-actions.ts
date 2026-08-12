@@ -10,7 +10,8 @@ import {
   isSubscriptionContractGid,
 } from "./customer";
 import { recordBillingCycleReset } from "./billing-cycle-reset";
-import { updateSubscriptionContract, changeSubscriptionLineItem } from "./subscription-admin";
+import { updateSubscriptionContract } from "./subscription-admin";
+import { reportSubscriptionFailure } from "./subscription-failure";
 import { getAvailableFrequencyOptions } from "@/lib/subscription-frequencies.server";
 import { STALE_BILLING_CYCLE_VIEW } from "@/lib/subscription-view";
 
@@ -172,8 +173,13 @@ export async function changeDeliveryFrequencyAction(
   try {
     await authorizeContractAccess(contractId);
   } catch (error) {
-    const message = error instanceof Error ? error.message : NOT_AUTHORIZED;
-    return { success: false, error: message };
+    // 失敗理由は返さない。`verifySubscriptionContractOwnership` が自分で throw した
+    // 場合 (Customer API のスロットル等) のメッセージには顧客 ID や外部 API の内部
+    // 状態が入りうるため、返すのは常に同じ一般化文言にする。
+    reportSubscriptionFailure("changeDeliveryFrequency:authorize", error, {
+      impact: "customer sees the generic not-authorized message",
+    });
+    return { success: false, error: NOT_AUTHORIZED };
   }
 
   try {
@@ -183,49 +189,11 @@ export async function changeDeliveryFrequencyAction(
     });
     return { success: true };
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown error";
-    console.error("[changeDeliveryFrequency] Error:", message);
-    return { success: false, error: message };
-  }
-}
-
-/**
- * Change a product in a subscription contract.
- * Removes the old line item and adds a new one via the Admin API draft pattern.
- */
-export async function changeSubscriptionProductAction(
-  contractId: string,
-  oldLineId: string,
-  newVariantId: string,
-  newPrice: string,
-  quantity: number = 1
-): Promise<ActionResult> {
-  if (!contractId || !oldLineId || !newVariantId || !newPrice) {
-    return { success: false, error: "Missing required parameters" };
-  }
-  if (!Number.isInteger(quantity) || quantity < 1) {
-    return { success: false, error: "Invalid quantity" };
-  }
-
-  // Authenticate the caller and prove they own this contract before touching
-  // the store-wide Admin API.
-  try {
-    await authorizeContractAccess(contractId);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : NOT_AUTHORIZED;
-    return { success: false, error: message };
-  }
-
-  try {
-    await changeSubscriptionLineItem(contractId, oldLineId, {
-      productVariantId: newVariantId,
-      currentPrice: newPrice,
-      quantity,
+    // Shopify の生メッセージは返さない。`error` を載せないことで画面は自分の
+    // ローカライズ済み文言 (`frequencyChangeError`) にフォールバックする。
+    reportSubscriptionFailure("changeDeliveryFrequency", error, {
+      impact: "customer sees the localized frequency-change failure message",
     });
-    return { success: true };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown error";
-    console.error("[changeSubscriptionProduct] Error:", message);
-    return { success: false, error: message };
+    return { success: false };
   }
 }

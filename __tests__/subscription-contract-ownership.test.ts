@@ -348,7 +348,15 @@ describe("skipNextBillingCycle", () => {
     });
   });
 
-  it("surfaces userErrors as a failure", async () => {
+  /**
+   * userErrors は失敗として扱うが、**顧客には転送しない** (2026-08-12 の QA 指摘 3)。
+   *
+   * 以前はここで `result.error === "Cycle already skipped"` を固定しており、
+   * つまり Shopify の生メッセージがブラウザまで届く挙動をテストが保証していた。
+   * userErrors はストア側の事情 (在庫・プラン構成・内部 ID) を含みうるので、
+   * 失敗の事実だけを返し、詳細はサーバーログと Sentry に残す。
+   */
+  it("treats userErrors as a failure without forwarding the message", async () => {
     stubFetch({
       body: {
         data: {
@@ -363,7 +371,7 @@ describe("skipNextBillingCycle", () => {
     const result = await skipNextBillingCycle(TOKEN, CONTRACT_GID, 4);
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe("Cycle already skipped");
+    expect(result.error).toBeUndefined();
   });
 });
 

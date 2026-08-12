@@ -517,7 +517,12 @@ R でも 4 ケースすべて再計測し、error / warning / pageerror は **�
 | 再開 | `activateSubscriptionAction` | `activateSubscription` | **なし** | **あり** |
 | 解約 | `cancelSubscriptionAction` | `cancelSubscription` | **なし** | **あり** |
 | 頻度変更 | `changeDeliveryFrequencyAction` | (Admin API) | あり + 所有者照合 | 同じ |
-| 商品変更 | `changeSubscriptionProductAction` | (Admin API) | あり + 所有者照合 | 同じ |
+
+商品変更 (`changeSubscriptionProductAction`) は2026-08-12に**削除**した。どのUIからも
+呼ばれていない一方で、継続課金額 (`currentPrice`) をクライアント指定のままAdmin APIへ
+渡す公開エンドポイントとして生きていたため (所有者照合は通るので他人の契約は触れないが、
+自分の契約の金額を任意の値に設定できた)。Admin API側の `changeSubscriptionLineItem` と
+`SubscriptionLineInput` も同時に削除し、金額を指定できる経路自体を残していない。
 
 **なぜ必要か (事実)**: `lib/shopify/subscription-actions.ts` の export はすべて
 Server Action = 公開HTTPエンドポイントで、`contractId` はクライアント由来。

@@ -210,19 +210,6 @@ export type SellingPlanInput = {
   }[];
 };
 
-export type SubscriptionLineInput = {
-  /** The price of the product (required). */
-  currentPrice: string;
-  /** The ID of the product variant (required). */
-  productVariantId: string;
-  /** The quantity of the product (required). */
-  quantity: number;
-  /** The selling plan ID (optional). */
-  sellingPlanId?: string;
-  /** The selling plan name (optional). */
-  sellingPlanName?: string;
-};
-
 export type SubscriptionDraftInput = {
   status?: SubscriptionContractStatus;
   nextBillingDate?: string;
