@@ -83,22 +83,40 @@ export type BillingRunFailureAlert = {
   retryFailed: number;
   /** 処理中の例外で結果が取れなかった件数 (action=error) */
   errors: number;
+  /**
+   * 課金は通ったのに `nextBillingDate` を前進させられなかった件数。
+   *
+   * 課金の失敗とは**別の軸**として必ず載せる。前進が止まると次回以降の課金が来なく
+   * なるのに、金は動いているので失敗として現れない — 2026-08 に 1 か月ぶんの売上が
+   * 無音で止まったのはこの形だった。件数を本文に出さないと、運営は「課金は全部成功」
+   * と読んで終わってしまう。
+   */
+  advanceFailed: number;
   /** 上記に該当した契約の GID */
   contractIds: string[];
 };
 
 /**
- * 課金 cron の run 内で失敗が出た (failed / retry_failed / error)。
+ * 課金 cron の run 内で異常が出た (failed / retry_failed / error / 前進失敗)。
  * run 単位で 1 通。契約ごとには送らない。
  */
 export async function notifyBillingRunFailures(
   alert: BillingRunFailureAlert,
 ): Promise<void> {
+  const chargeFailures = alert.failed + alert.retryFailed + alert.errors;
+
   await push({
     level: "warning",
-    subject: "定期便の課金に失敗があります",
+    // 件名は「何が起きたか」で分ける。課金が全部通っていて前進だけ失敗している run を
+    // 「課金に失敗があります」と伝えると、運営が Shopify の課金履歴を見て「問題ない」
+    // と結論づけてしまう (実際に止まっているのは次回以降の課金)。
+    subject:
+      chargeFailures === 0 && alert.advanceFailed > 0
+        ? "定期便の次回請求日を更新できませんでした"
+        : "定期便の課金に失敗があります",
     body: [
       `対象 ${alert.due} 件 / 初回失敗 ${alert.failed} 件 / 再試行失敗 ${alert.retryFailed} 件 / 処理エラー ${alert.errors} 件`,
+      `次回請求日の更新失敗 ${alert.advanceFailed} 件 (放置すると次回以降の課金が行われません)`,
       `契約: ${formatIdList(alert.contractIds)}`,
       "確認: Shopify Admin > 定期購入",
     ].join("\n"),

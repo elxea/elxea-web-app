@@ -50,6 +50,15 @@ vi.mock("@/lib/email/dunning", () => ({
   sendDunningEmail: (...args: unknown[]) => sendDunningEmailMock(...args),
 }));
 
+// nextBillingDate の前進は Shopify Admin を叩くので mock する。ここでは「呼ばれた/
+// 呼ばれない」の配線だけが関心事で、前進そのものの検証は
+// __tests__/next-billing-date.test.ts と __tests__/billing-advance-wiring.test.ts が持つ。
+const advanceNextBillingDateMock = vi.fn();
+vi.mock("@/lib/shopify/next-billing-date", () => ({
+  advanceNextBillingDate: (...args: unknown[]) =>
+    advanceNextBillingDateMock(...args),
+}));
+
 vi.mock("@sentry/nextjs", () => ({
   captureException: vi.fn(),
   captureMessage: vi.fn(),
@@ -109,6 +118,12 @@ async function runCron(): Promise<CronBody> {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  advanceNextBillingDateMock.mockResolvedValue({
+    action: "noop",
+    from: null,
+    to: null,
+    reason: "test default",
+  });
   vi.spyOn(console, "log").mockImplementation(() => {});
   vi.spyOn(console, "warn").mockImplementation(() => {});
   vi.spyOn(console, "error").mockImplementation(() => {});
@@ -193,8 +208,8 @@ describe("課金試行が成功／未確定のときの action", () => {
     expect(body.results[0]).toMatchObject({
       action: "billed",
       attemptNumber: 1,
-      detail: "Success",
     });
+    expect(body.results[0]!.detail).toContain("Success");
     expect(body.billed).toBe(1);
     expect(body.failed).toBe(0);
     expect(body.pending).toBe(0);
@@ -215,8 +230,8 @@ describe("課金試行が成功／未確定のときの action", () => {
     expect(body.results[0]).toMatchObject({
       action: "retried",
       attemptNumber: 2,
-      detail: "Success",
     });
+    expect(body.results[0]!.detail).toContain("Success");
     expect(body.retried).toBe(1);
     expect(body.billed).toBe(0);
   });

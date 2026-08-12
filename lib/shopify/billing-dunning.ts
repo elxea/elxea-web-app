@@ -81,6 +81,26 @@ export const CYCLE_GRACE_HOURS = 24;
  */
 export const STALE_IN_FLIGHT_HOURS = 48;
 
+/**
+ * `nextBillingDate` の前進が詰まっていると見なす基準周期 (時間)。
+ *
+ * 月次定期便の 1 周期を**最長の月 (31 日)** で見る。ここを短く取ると、月末アンカーの
+ * 契約で「まだ正常な待ち時間」を異常として鳴らしてしまう (狼少年になった監視は読まれ
+ * なくなる)。長い月に合わせて false positive を消し、検知が数日遅れる側に倒す。
+ *
+ * この定数は**検知にしか使わない**。実際に書き込む日付は
+ * `lib/shopify/next-billing-date.ts` が Shopify の billing cycle から導出しており、
+ * こちらの周期推定は一切混ざらない (混ぜると「アプリが自前でカレンダー演算する」
+ * という元の欠陥に戻る)。
+ */
+export const ADVANCE_STALL_PERIOD_HOURS = 24 * 31;
+
+/**
+ * 上記の周期に足す猶予 (時間)。cron の実行間隔 (日次) と Shopify 側の
+ * cycle status 反映ラグを吸収する。
+ */
+export const ADVANCE_STALL_GRACE_HOURS = 24;
+
 export type BillingCycleState = {
   /** 請求日が日時として読めたか。false なら他の値は判定不能として扱う。 */
   billingDateValid: boolean;
@@ -216,4 +236,50 @@ export function isReadyForRetry(lastFailureAt: Date, now: Date): boolean {
 export function isStaleInFlight(inFlightAt: Date, now: Date): boolean {
   const hoursSince = (now.getTime() - inFlightAt.getTime()) / HOUR_MS;
   return hoursSince >= STALE_IN_FLIGHT_HOURS;
+}
+
+/**
+ * 無音の売上停止の安全網 — 「課金は通ったのに請求日が前に進んでいない」を検知する。
+ *
+ * ## なぜ前進処理とは別にこれが要るか
+ *
+ * `nextBillingDate` はアプリが管理するフィールドで、前進させるのはアプリの責務
+ * (`lib/shopify/next-billing-date.ts`)。その前進処理が**どこかで詰まったとき**、
+ * 症状は「毎日 cron が Case 1 (この周期は既に課金済み) を返して `skipped` で抜ける」
+ * になる。`skipped` は失敗として数えられないので、実際に起きた 2026-08 の停止では
+ * **1 か月まるごと無音**で売上が止まった。
+ *
+ * 前進処理を入れても、Shopify の応答形が変わる・権限が落ちる・導出元の cycle が
+ * 想定外の状態になる等で再び詰まりうる。そのとき**詰まった事実そのものを鳴らす**のが
+ * この関数の役割。前進処理の正しさに依存しない独立した検知層にしてある。
+ *
+ * ## 判定
+ *
+ * 「この周期の課金が完了した (`completedAt`) のに、それから 1 周期 + 猶予を過ぎても
+ * まだ同じ請求日で cron に引っかかっている」= 前進が詰まっている。
+ *
+ * cron がこの契約を処理しているのは `nextBillingDate <= now` だからで、前進が
+ * 効いていれば次の周期の日付になって対象から外れているはず。つまり「課金完了済み
+ * かつ依然として期限到来」という組み合わせ自体が前進の失敗を意味し、経過時間の
+ * 閾値は「課金直後の正常なラグ」を除くためだけに置く。
+ *
+ * 時計は引数で受ける (`analyzeBillingCycle` と同じ流儀)。純関数なのでテストできる。
+ *
+ * @param completedAt この周期で課金が完了した時刻 (`BillingCycleState.completedAt`)
+ * @param now         現在時刻
+ * @param periodHours 想定する 1 周期 (時間)。既定は月次を最長の月で見た値
+ */
+export function isAdvanceStalled(
+  completedAt: Date,
+  now: Date,
+  periodHours: number = ADVANCE_STALL_PERIOD_HOURS
+): boolean {
+  const completedMs = toMs(completedAt);
+  // 時刻が読めないなら鳴らさない (判断材料が無いのに error を出すと監視が濁る)。
+  if (completedMs === null) return false;
+
+  const hoursSince = (now.getTime() - completedMs) / HOUR_MS;
+  if (!Number.isFinite(hoursSince)) return false;
+
+  return hoursSince > periodHours + ADVANCE_STALL_GRACE_HOURS;
 }

@@ -83,6 +83,7 @@ describe("notifyBillingRunFailures", () => {
       failed: 1,
       retryFailed: 1,
       errors: 0,
+      advanceFailed: 0,
       contractIds: [contractGid(7001), contractGid(7002)],
     });
 
@@ -102,6 +103,7 @@ describe("notifyBillingRunFailures", () => {
       failed: 7,
       retryFailed: 0,
       errors: 0,
+      advanceFailed: 0,
       contractIds: [1, 2, 3, 4, 5, 6, 7].map((n) => contractGid(n)),
     });
 
@@ -116,10 +118,41 @@ describe("notifyBillingRunFailures", () => {
       failed: 0,
       retryFailed: 0,
       errors: 1,
+      advanceFailed: 0,
       contractIds: [],
     });
 
     expect(sent().body).toContain("契約: -");
+  });
+
+  it("次回請求日の更新失敗の件数を必ず本文に出す", async () => {
+    await notifyBillingRunFailures({
+      due: 2,
+      failed: 1,
+      retryFailed: 0,
+      errors: 0,
+      advanceFailed: 1,
+      contractIds: [contractGid(7001)],
+    });
+
+    expect(sent().body).toContain("次回請求日の更新失敗 1 件");
+  });
+
+  it("課金は全部通って前進だけ失敗した run は件名を課金失敗にしない", async () => {
+    // 課金の失敗が 0 件なのに「課金に失敗があります」と伝えると、運営が Shopify の
+    // 課金履歴を見て「問題なし」と結論づけてしまう。止まっているのは次回以降の課金。
+    await notifyBillingRunFailures({
+      due: 1,
+      failed: 0,
+      retryFailed: 0,
+      errors: 0,
+      advanceFailed: 1,
+      contractIds: [contractGid(7001)],
+    });
+
+    const payload = sent();
+    expect(payload.subject).toBe("定期便の次回請求日を更新できませんでした");
+    expect(payload.body).toContain("次回請求日の更新失敗 1 件");
   });
 });
 

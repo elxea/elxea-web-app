@@ -46,6 +46,15 @@ vi.mock("@/lib/email/dunning", () => ({
   sendDunningEmail: (...args: unknown[]) => sendDunningEmailMock(...args),
 }));
 
+// nextBillingDate の前進は Shopify Admin を叩くので mock する。ここでは「呼ばれた/
+// 呼ばれない」の配線だけが関心事で、前進そのものの検証は
+// __tests__/next-billing-date.test.ts と __tests__/billing-advance-wiring.test.ts が持つ。
+const advanceNextBillingDateMock = vi.fn();
+vi.mock("@/lib/shopify/next-billing-date", () => ({
+  advanceNextBillingDate: (...args: unknown[]) =>
+    advanceNextBillingDateMock(...args),
+}));
+
 vi.mock("@sentry/nextjs", () => ({
   captureException: vi.fn(),
   captureMessage: vi.fn(),
@@ -98,6 +107,12 @@ function request(secret: string = CRON_SECRET): NextRequest {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  advanceNextBillingDateMock.mockResolvedValue({
+    action: "noop",
+    from: null,
+    to: null,
+    reason: "test default",
+  });
   vi.spyOn(console, "log").mockImplementation(() => {});
   vi.spyOn(console, "warn").mockImplementation(() => {});
   vi.spyOn(console, "error").mockImplementation(() => {});
@@ -199,6 +214,7 @@ describe("失敗が出た run", () => {
       failed: 1,
       retryFailed: 0,
       errors: 0,
+      advanceFailed: 0,
       contractIds: [CONTRACT_A],
     });
   });

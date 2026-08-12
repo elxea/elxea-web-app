@@ -61,6 +61,15 @@ vi.mock("@/lib/email/dunning", () => ({
 
 const captureExceptionMock = vi.fn();
 const captureMessageMock = vi.fn();
+// nextBillingDate の前進は Shopify Admin を叩くので mock する。ここでは「呼ばれた/
+// 呼ばれない」の配線だけが関心事で、前進そのものの検証は
+// __tests__/next-billing-date.test.ts と __tests__/billing-advance-wiring.test.ts が持つ。
+const advanceNextBillingDateMock = vi.fn();
+vi.mock("@/lib/shopify/next-billing-date", () => ({
+  advanceNextBillingDate: (...args: unknown[]) =>
+    advanceNextBillingDateMock(...args),
+}));
+
 vi.mock("@sentry/nextjs", () => ({
   captureException: (...args: unknown[]) => captureExceptionMock(...args),
   captureMessage: (...args: unknown[]) => captureMessageMock(...args),
@@ -153,6 +162,12 @@ async function runCron(): Promise<CronBody> {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  advanceNextBillingDateMock.mockResolvedValue({
+    action: "noop",
+    from: null,
+    to: null,
+    reason: "test default",
+  });
   vi.useFakeTimers();
   vi.setSystemTime(NOW);
   vi.spyOn(console, "log").mockImplementation(() => {});
