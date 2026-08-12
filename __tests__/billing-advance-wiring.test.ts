@@ -13,10 +13,15 @@
  *      契約が自力で復旧できる唯一の口。ここを塞ぐと既存の停止契約が永久に残る
  *   4. 結果待ち (in-flight) の skipped では前進させない (2 と同じ理由)
  *   5. 前進が失敗しても課金の `action` を `error` に倒さない (金は動いている)
- *   6. ただし **`failed` を捨てない**。`advanceFailed` に計上し、運営宛通知に載せ、
+ *   6. ただし **`failed` を捨てない**。`advance_failed` に計上し、運営宛通知に載せ、
  *      課金の失敗が 0 件の run でも通知を出す (捨てると 2026-08 の無音停止が再発する)
- *   7. 無音停止の安全網: 課金完了から 1 周期 + 猶予を過ぎてまだ同じ請求日なら
- *      Sentry error を出す。過ぎていなければ出さない
+ *   7. **`blocked_backward` / `no_unbilled_cycle` も捨てない** (2026-08-12 / QA 条件 1)。
+ *      独立カウンタ `advance_blocked` / `advance_no_unbilled_cycle` に計上し通知の
+ *      発火条件に含めるが、`advanceFailed` には数えない (別の軸・別の言葉で伝える)
+ *   8. 無音停止の安全網: 課金完了から 1 周期 + 猶予を過ぎてまだ同じ請求日なら
+ *      Sentry error を出す。過ぎていなければ出さない。**1 周期は契約の
+ *      `billingPolicy` から出す** (2026-08-12 / QA 条件 2)
+ *   9. summary の JSON キーは snake_case (`advance_failed` 等)
  *
  * Shopify Admin / 督促メール / LINE 送出 / 前進処理はすべて mock。**実送信・実 mutation
  * は行わない**。
@@ -28,6 +33,8 @@ import * as Sentry from "@sentry/nextjs";
 import {
   ADVANCE_STALL_GRACE_HOURS,
   ADVANCE_STALL_PERIOD_HOURS,
+  INTERVAL_MAX_HOURS,
+  advanceStallPeriodHours,
   isAdvanceStalled,
 } from "@/lib/shopify/billing-dunning";
 
@@ -99,6 +106,11 @@ function request(secret: string = CRON_SECRET): NextRequest {
   });
 }
 
+/**
+ * summary の JSON キーは **snake_case** (既存の慣習: TS プロパティは camelCase、
+ * summary キーは snake_case = `dunningEmailFailed` -> `dunning_email_failed`)。
+ * `advanced` は 1 語なのでそのまま。
+ */
 type CronBody = {
   due: number;
   billed: number;
@@ -108,13 +120,17 @@ type CronBody = {
   skipped: number;
   errors: number;
   advanced: number;
-  advanceFailed: number;
+  advance_failed: number;
+  advance_blocked: number;
+  advance_no_unbilled_cycle: number;
   results: {
     contractId: string;
     action: string;
     detail?: string;
     advanced?: boolean;
     advanceFailed?: boolean;
+    advanceBlocked?: boolean;
+    advanceNoUnbilledCycle?: boolean;
     advanceAction?: string;
   }[];
 };
@@ -226,7 +242,7 @@ describe("確定成功したときだけ前進させる", () => {
     expect(advanceNextBillingDateMock).toHaveBeenCalledTimes(1);
     expect(advanceNextBillingDateMock).toHaveBeenCalledWith(CONTRACT_GID);
     expect(body.advanced).toBe(1);
-    expect(body.advanceFailed).toBe(0);
+    expect(body.advance_failed).toBe(0);
     // 前進の結末は detail からも読める (action だけ見る監視の取りこぼしを防ぐ)
     expect(body.results[0]!.detail).toContain("advanced");
   });
@@ -260,7 +276,7 @@ describe("確定成功したときだけ前進させる", () => {
     expect(body.results[0]).toMatchObject({ action: "pending" });
     expect(advanceNextBillingDateMock).not.toHaveBeenCalled();
     expect(body.advanced).toBe(0);
-    expect(body.advanceFailed).toBe(0);
+    expect(body.advance_failed).toBe(0);
   });
 
   it("課金が失敗したら前進処理を呼ばない", async () => {
@@ -309,7 +325,7 @@ describe("詰まった契約の自力復旧 (skipped 経路)", () => {
     });
     expect(body.results[0]!.advanced).toBeUndefined();
     expect(body.advanced).toBe(0);
-    expect(body.advanceFailed).toBe(0);
+    expect(body.advance_failed).toBe(0);
   });
 
   it("結果待ち (in-flight) の skipped では前進処理を呼ばない", async () => {
@@ -354,7 +370,7 @@ describe("前進の失敗は捨てない (無音にしない)", () => {
     });
     expect(body.billed).toBe(1);
     expect(body.errors).toBe(0);
-    expect(body.advanceFailed).toBe(1);
+    expect(body.advance_failed).toBe(1);
     expect(body.advanced).toBe(0);
     // 理由が detail に残る
     expect(body.results[0]!.detail).toContain("Admin API 503");
@@ -382,6 +398,8 @@ describe("前進の失敗は捨てない (無音にしない)", () => {
       retryFailed: 0,
       errors: 0,
       advanceFailed: 1,
+      advanceBlocked: 0,
+      advanceNoUnbilledCycle: 0,
       contractIds: [CONTRACT_GID],
     });
   });
@@ -399,21 +417,155 @@ describe("前進の失敗は捨てない (無音にしない)", () => {
     expect(notifyBillingRunFailuresMock).not.toHaveBeenCalled();
   });
 
-  it("巻き戻り拒否 (blocked_backward) は失敗に数えないが申告には残す", async () => {
-    // lib 側が Sentry warning を上げており「書かない判断が正しく働いた」状態。
-    // ここを advanceFailed に数えると、正常な保護でも運営通知が鳴る。
-    getBillingAttemptsMock.mockResolvedValue([completedAttempt(hoursAgo(3))]);
-    advanceNextBillingDateMock.mockResolvedValue({
-      action: "blocked_backward",
-      from: "2026-10-12T04:00:00Z",
-      to: "2026-09-12T04:00:00Z",
-      reason: "導出値が現在値より過去",
+  it("summary の前進系キーは snake_case (camelCase を残さない)", async () => {
+    createBillingAttemptMock.mockResolvedValue({
+      id: ATTEMPT_GID,
+      ready: true,
+      errorCode: null,
+      errorMessage: null,
     });
+    advanceNextBillingDateMock.mockResolvedValue(FAILED);
+
+    const raw = (await (await GET(request())).json()) as Record<
+      string,
+      unknown
+    >;
+
+    // 既存の慣習: TS プロパティは camelCase、summary の JSON キーは snake_case
+    // (`dunningEmailFailed` -> `dunning_email_failed`)。
+    expect(Object.keys(raw)).toContain("advance_failed");
+    expect(Object.keys(raw)).toContain("advance_blocked");
+    expect(Object.keys(raw)).toContain("advance_no_unbilled_cycle");
+    expect(Object.keys(raw)).not.toContain("advanceFailed");
+    expect(Object.keys(raw)).not.toContain("advanceBlocked");
+    expect(Object.keys(raw)).not.toContain("advanceNoUnbilledCycle");
+    // 1 語の `advanced` は分解しない
+    expect(Object.keys(raw)).toContain("advanced");
+  });
+});
+
+/**
+ * 2026-08-12 / QA 条件 1: `advanced` と `failed` しか数えていなかったため、
+ * `blocked_backward` と `no_unbilled_cycle` はどのカウンタにも載らず運営通知にも
+ * 出なかった (= 本修正が消そうとした「無音」そのもの)。
+ *
+ * この describe が固定するのは 3 点:
+ *   1. 独立カウンタに載る (`advance_blocked` / `advance_no_unbilled_cycle`)
+ *   2. 課金が全部通った run でも通知が出る
+ *   3. **`advanceFailed` には数えない** (「前進が失敗した」と伝えると運営が課金履歴を
+ *      調べて「問題なし」と誤結論する)
+ *
+ * Sentry を error にする責務は lib 側 (`__tests__/next-billing-date.test.ts` が固定)。
+ */
+describe("失敗ではない無変更も無音にしない (blocked_backward / no_unbilled_cycle)", () => {
+  const BLOCKED = {
+    action: "blocked_backward",
+    from: "2026-10-12T04:00:00Z",
+    to: "2026-09-12T04:00:00Z",
+    reason: "導出値が現在値より過去",
+  };
+
+  const NO_UNBILLED = {
+    action: "no_unbilled_cycle",
+    from: "2026-10-12T04:00:00Z",
+    to: null,
+    reason: "UNBILLED (skipped でない) cycle が無い",
+  };
+
+  /** 課金は確定成功する run (= 前進側だけが異常な形)。 */
+  function billedRun() {
+    createBillingAttemptMock.mockResolvedValue({
+      id: ATTEMPT_GID,
+      ready: true,
+      errorCode: null,
+      errorMessage: null,
+    });
+  }
+
+  it("blocked_backward は advance_blocked に計上し、advanceFailed には数えない", async () => {
+    getBillingAttemptsMock.mockResolvedValue([completedAttempt(hoursAgo(3))]);
+    advanceNextBillingDateMock.mockResolvedValue(BLOCKED);
 
     const body = await runCron();
 
-    expect(body.advanceFailed).toBe(0);
-    expect(body.results[0]!.advanceAction).toBe("blocked_backward");
+    expect(body.results[0]).toMatchObject({
+      advanceBlocked: true,
+      advanceAction: "blocked_backward",
+    });
+    expect(body.advance_blocked).toBe(1);
+    // 失敗の軸には入れない (保護が正しく働いた結末)
+    expect(body.advance_failed).toBe(0);
+    expect(body.results[0]!.advanceFailed).toBeUndefined();
+    expect(body.advanced).toBe(0);
+  });
+
+  it("blocked_backward だけの run でも運営宛通知を出す", async () => {
+    billedRun();
+    advanceNextBillingDateMock.mockResolvedValue(BLOCKED);
+
+    const body = await runCron();
+
+    // 課金は全部通っている = 発火条件に含めなければ通知は 1 通も出ない
+    expect(body.failed).toBe(0);
+    expect(body.errors).toBe(0);
+    expect(body.advance_failed).toBe(0);
+    expect(notifyBillingRunFailuresMock).toHaveBeenCalledTimes(1);
+    expect(notifyBillingRunFailuresMock).toHaveBeenCalledWith({
+      due: 1,
+      failed: 0,
+      retryFailed: 0,
+      errors: 0,
+      advanceFailed: 0,
+      advanceBlocked: 1,
+      advanceNoUnbilledCycle: 0,
+      contractIds: [CONTRACT_GID],
+    });
+  });
+
+  it("no_unbilled_cycle は advance_no_unbilled_cycle に計上し、advanceFailed には数えない", async () => {
+    getBillingAttemptsMock.mockResolvedValue([completedAttempt(hoursAgo(3))]);
+    advanceNextBillingDateMock.mockResolvedValue(NO_UNBILLED);
+
+    const body = await runCron();
+
+    expect(body.results[0]).toMatchObject({
+      advanceNoUnbilledCycle: true,
+      advanceAction: "no_unbilled_cycle",
+    });
+    expect(body.advance_no_unbilled_cycle).toBe(1);
+    expect(body.advance_failed).toBe(0);
+    expect(body.results[0]!.advanceFailed).toBeUndefined();
+  });
+
+  it("no_unbilled_cycle だけの run でも運営宛通知を出す", async () => {
+    billedRun();
+    advanceNextBillingDateMock.mockResolvedValue(NO_UNBILLED);
+
+    const body = await runCron();
+
+    expect(body.failed).toBe(0);
+    expect(body.advance_failed).toBe(0);
+    expect(notifyBillingRunFailuresMock).toHaveBeenCalledTimes(1);
+    expect(notifyBillingRunFailuresMock).toHaveBeenCalledWith({
+      due: 1,
+      failed: 0,
+      retryFailed: 0,
+      errors: 0,
+      advanceFailed: 0,
+      advanceBlocked: 0,
+      advanceNoUnbilledCycle: 1,
+      contractIds: [CONTRACT_GID],
+    });
+  });
+
+  it("noop だけの run は通知を出さない (正常に前進済み)", async () => {
+    billedRun();
+    advanceNextBillingDateMock.mockResolvedValue(NOOP);
+
+    const body = await runCron();
+
+    expect(body.advance_blocked).toBe(0);
+    expect(body.advance_no_unbilled_cycle).toBe(0);
     expect(notifyBillingRunFailuresMock).not.toHaveBeenCalled();
   });
 });
@@ -518,5 +670,241 @@ describe("isAdvanceStalled の境界 (純関数)", () => {
     expect(
       isAdvanceStalled(new Date(base.getTime() + stallMs * 2), base),
     ).toBe(false);
+  });
+});
+
+/**
+ * 2026-08-12 / QA 条件 2: 停止検知の閾値が契約周期を見ていなかった。
+ *
+ * `ADVANCE_STALL_PERIOD_HOURS` (24x31) + 猶予 24 の**固定 768h** で、cron は
+ * `periodHours` を渡していなかった。`subscription-actions.ts` は DAY / WEEK / MONTH /
+ * YEAR を受け付けるので、**週次契約が詰まっても約 8 日で気づくべきところ 32 日**
+ * かかっていた。誤検知は起こり得ない (`nextBillingDate <= now` の due フィルタにより
+ * 健全な契約は Case 1 に到達しない) ので、これは純粋な検知遅れの是正。
+ */
+describe("停止検知の閾値を契約周期から出す (advanceStallPeriodHours)", () => {
+  it("DAY / WEEK / MONTH / YEAR をそれぞれ最長側で算出する", () => {
+    expect(advanceStallPeriodHours({ interval: "DAY", intervalCount: 1 })).toBe(
+      24,
+    );
+    expect(advanceStallPeriodHours({ interval: "WEEK", intervalCount: 1 })).toBe(
+      24 * 7,
+    );
+    // 月は最長の月 (31 日)。28 日で見ると月末アンカーの契約を誤検知する。
+    expect(
+      advanceStallPeriodHours({ interval: "MONTH", intervalCount: 1 }),
+    ).toBe(24 * 31);
+    // 年は閏年 (366 日)。365 日で見ると閏年の契約を誤検知する。
+    expect(advanceStallPeriodHours({ interval: "YEAR", intervalCount: 1 })).toBe(
+      24 * 366,
+    );
+    // 公開定数と一致している (route 側が別の表を持たない)
+    expect(INTERVAL_MAX_HOURS).toEqual({
+      DAY: 24,
+      WEEK: 24 * 7,
+      MONTH: 24 * 31,
+      YEAR: 24 * 366,
+    });
+  });
+
+  it("intervalCount を掛ける (2 週ごと / 3 か月ごとの契約)", () => {
+    expect(advanceStallPeriodHours({ interval: "WEEK", intervalCount: 2 })).toBe(
+      24 * 14,
+    );
+    expect(
+      advanceStallPeriodHours({ interval: "MONTH", intervalCount: 3 }),
+    ).toBe(24 * 93);
+  });
+
+  it("既定 (MONTH x1) は従来の閾値と同じ = 既存契約の挙動を変えない", () => {
+    expect(
+      advanceStallPeriodHours({ interval: "MONTH", intervalCount: 1 }),
+    ).toBe(ADVANCE_STALL_PERIOD_HOURS);
+  });
+
+  it("読めない値は月次既定にフォールバックする (鳴るのが遅れる側に倒す)", () => {
+    expect(advanceStallPeriodHours(undefined)).toBe(ADVANCE_STALL_PERIOD_HOURS);
+    expect(advanceStallPeriodHours(null)).toBe(ADVANCE_STALL_PERIOD_HOURS);
+    expect(advanceStallPeriodHours({})).toBe(ADVANCE_STALL_PERIOD_HOURS);
+    // 未知の interval (Shopify が enum を増やした場合)
+    expect(
+      advanceStallPeriodHours({
+        interval: "FORTNIGHT" as never,
+        intervalCount: 1,
+      }),
+    ).toBe(ADVANCE_STALL_PERIOD_HOURS);
+    // 非数 / 0 以下の intervalCount は 1 として扱う (0 倍で閾値が消えないように)
+    expect(
+      advanceStallPeriodHours({ interval: "WEEK", intervalCount: 0 }),
+    ).toBe(24 * 7);
+    expect(
+      advanceStallPeriodHours({
+        interval: "WEEK",
+        intervalCount: Number.NaN,
+      }),
+    ).toBe(24 * 7);
+  });
+
+  it("各周期の境界: 閾値ちょうどは鳴らず、+1h で鳴り、-1h では鳴らない", () => {
+    const base = new Date("2026-08-12T00:00:00Z");
+    const cases: { interval: "DAY" | "WEEK" | "MONTH" | "YEAR"; hours: number }[] =
+      [
+        { interval: "DAY", hours: 24 },
+        { interval: "WEEK", hours: 24 * 7 },
+        { interval: "MONTH", hours: 24 * 31 },
+        { interval: "YEAR", hours: 24 * 366 },
+      ];
+
+    for (const { interval, hours } of cases) {
+      const periodHours = advanceStallPeriodHours({
+        interval,
+        intervalCount: 1,
+      });
+      expect(periodHours).toBe(hours);
+      const thresholdHours = periodHours + ADVANCE_STALL_GRACE_HOURS;
+      const at = (h: number) => new Date(base.getTime() + h * HOUR_MS);
+
+      expect(isAdvanceStalled(base, at(thresholdHours - 1), periodHours)).toBe(
+        false,
+      );
+      // 厳密 `>` なので閾値ちょうどでは鳴らない
+      expect(isAdvanceStalled(base, at(thresholdHours), periodHours)).toBe(
+        false,
+      );
+      expect(isAdvanceStalled(base, at(thresholdHours + 1), periodHours)).toBe(
+        true,
+      );
+    }
+  });
+
+  it("週次契約は約 8 日で鳴る (月次固定だと 32 日かかっていた)", () => {
+    const base = new Date("2026-08-12T00:00:00Z");
+    const weekly = advanceStallPeriodHours({
+      interval: "WEEK",
+      intervalCount: 1,
+    });
+    // 8 日 + 1h 経過時点
+    const now = new Date(base.getTime() + (24 * 8 + 1) * HOUR_MS);
+
+    expect(isAdvanceStalled(base, now, weekly)).toBe(true);
+    // 同じ時点を月次既定で見ると、まだ鳴らない (= 24 日以上の検知遅れ)
+    expect(isAdvanceStalled(base, now)).toBe(false);
+  });
+});
+
+describe("cron が契約の billingPolicy から閾値を出す (配線)", () => {
+  function advanceStallMessages() {
+    return vi
+      .mocked(Sentry.captureMessage)
+      .mock.calls.filter(
+        ([message]) =>
+          typeof message === "string" && message.includes("failed to advance"),
+      );
+  }
+
+  /**
+   * 「請求日が N 時間前のまま、その周期の課金だけは通っている」契約を作る。
+   * 課金完了は `analyzeBillingCycle` の集計窓 (請求日 -24h 以降) の内側に置く。
+   */
+  function stalledContract(
+    hours: number,
+    billingPolicy?: { interval: string; intervalCount: number },
+  ) {
+    getSubscriptionContractsMock.mockResolvedValue([
+      {
+        id: CONTRACT_GID,
+        nextBillingDate: hoursAgo(hours + 2),
+        ...(billingPolicy ? { billingPolicy } : {}),
+      },
+    ]);
+    getBillingAttemptsMock.mockResolvedValue([
+      completedAttempt(hoursAgo(hours + 1)),
+    ]);
+  }
+
+  /** 週次契約の閾値 = 168 + 24 = 192h。その 1h 後を見る。 */
+  const WEEKLY_STALL_HOURS = 24 * 7 + ADVANCE_STALL_GRACE_HOURS + 1;
+
+  it("週次契約は約 8 日で鳴る (月次固定では鳴らなかった時点)", async () => {
+    stalledContract(WEEKLY_STALL_HOURS, {
+      interval: "WEEK",
+      intervalCount: 1,
+    });
+
+    await runCron();
+
+    const calls = advanceStallMessages();
+    expect(calls).toHaveLength(1);
+    expect(calls[0]![1]).toMatchObject({ level: "error" });
+    // 判定に使った周期をイベントに載せる (閾値が契約ごとに変わるので必須)
+    expect(calls[0]![1]).toMatchObject({
+      extra: expect.objectContaining({
+        billingInterval: "WEEK",
+        billingIntervalCount: 1,
+        periodHours: 24 * 7,
+      }),
+    });
+  });
+
+  it("同じ経過時間でも月次契約なら鳴らさない (周期ごとに閾値が変わる)", async () => {
+    stalledContract(WEEKLY_STALL_HOURS, {
+      interval: "MONTH",
+      intervalCount: 1,
+    });
+
+    await runCron();
+
+    expect(advanceStallMessages()).toHaveLength(0);
+  });
+
+  it("2 週ごとの契約は intervalCount ぶん遅く鳴る", async () => {
+    // 週次の閾値を超えた時点ではまだ鳴らない
+    stalledContract(WEEKLY_STALL_HOURS, {
+      interval: "WEEK",
+      intervalCount: 2,
+    });
+
+    await runCron();
+
+    expect(advanceStallMessages()).toHaveLength(0);
+  });
+
+  it("billingPolicy が無ければ月次既定で判定する (挙動を変えない)", async () => {
+    stalledContract(ADVANCE_STALL_PERIOD_HOURS + ADVANCE_STALL_GRACE_HOURS + 1);
+
+    await runCron();
+
+    const calls = advanceStallMessages();
+    expect(calls).toHaveLength(1);
+    expect(calls[0]![1]).toMatchObject({
+      extra: expect.objectContaining({
+        billingInterval: null,
+        billingIntervalCount: null,
+        periodHours: ADVANCE_STALL_PERIOD_HOURS,
+      }),
+    });
+  });
+
+  it("日次契約は 2 日で鳴る (最短周期でも取りこぼさない)", async () => {
+    stalledContract(24 + ADVANCE_STALL_GRACE_HOURS + 1, {
+      interval: "DAY",
+      intervalCount: 1,
+    });
+
+    await runCron();
+
+    const calls = advanceStallMessages();
+    expect(calls).toHaveLength(1);
+    expect(calls[0]![1]).toMatchObject({
+      extra: expect.objectContaining({ periodHours: 24 }),
+    });
+  });
+
+  it("年次契約は 1 年を超えるまで鳴らさない (誤検知を作らない)", async () => {
+    stalledContract(24 * 200, { interval: "YEAR", intervalCount: 1 });
+
+    await runCron();
+
+    expect(advanceStallMessages()).toHaveLength(0);
   });
 });

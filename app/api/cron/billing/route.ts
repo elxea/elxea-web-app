@@ -15,11 +15,13 @@ import {
   notifySubscriptionPaused,
 } from "@/lib/line/monitoring-alerts";
 import {
+  advanceStallPeriodHours,
   analyzeBillingCycle,
   isAdvanceStalled,
   isReadyForRetry,
   isStaleInFlight,
   MAX_RETRY_ATTEMPTS,
+  type BillingPeriodPolicy,
 } from "@/lib/shopify/billing-dunning";
 import { getBillingCycleResetAt } from "@/lib/shopify/billing-cycle-reset";
 import {
@@ -77,8 +79,23 @@ import {
  *
  * 前進の失敗で `action` を `error` に倒さない (課金は成功しており、金は動いている)。
  * ただし **`failed` を `skipped` と同じ扱いで捨てない** — 捨てると今回と同じ無音停止が
- * 再発する。`advanceFailed` として summary に計上し、運営宛の run 通知にも載せ、
- * 失敗が 0 件の run でも `advanceFailed` があれば通知を出す。
+ * 再発する。`advance_failed` として summary に計上し、運営宛の run 通知にも載せ、
+ * 失敗が 0 件の run でも `advance_failed` があれば通知を出す。
+ *
+ * ## 前進の「失敗ではない無変更」も無音にしない (2026-08-12 / QA 条件 1)
+ *
+ * `advanced` / `failed` だけを数えていたため、`blocked_backward` と
+ * `no_unbilled_cycle` は**どのカウンタにも載らず運営通知にも出なかった** —
+ * これは本修正が消そうとした「無音」そのもの。とくに `no_unbilled_cycle` は
+ * cycle 走査が予期せず空で返った場合に毎日無音で繰り返され、唯一の網が
+ * 停止検知 (1 周期 + 猶予) しか無かった。よって:
+ *
+ *   - `advance_blocked` (`blocked_backward`) と `advance_no_unbilled_cycle`
+ *     (`no_unbilled_cycle`) に**独立カウンタ**を与え、通知の発火条件に含める
+ *   - lib 側の Sentry を warning から **error** に上げる (`next-billing-date.ts`)
+ *   - ただし **`advanceFailed` には数えない**。どちらも「書かないという判断が
+ *     正しく働いた」結末であり、「前進が失敗した」と伝えると運営が課金履歴を調べて
+ *     「問題なし」と誤結論する。別の軸として別の言葉で伝える
  *
  * Expected to be called by Vercel Cron (vercel.json) daily.
  * Protected by CRON_SECRET header check.
@@ -145,6 +162,22 @@ type BillingResult = {
    * 「実態と申告のずれ」を作ることになる。
    */
   advanceFailed?: boolean;
+  /**
+   * 前進が巻き戻りとして拒否された (`blocked_backward`)。
+   *
+   * **`advanceFailed` とは別の軸**。導出モデルでは「現在値より早い未課金 cycle が
+   * ある」= 未収の可能性を意味するので、健全な運用では起こり得ない。ただし保護は
+   * 正しく働いているので「前進の失敗」とは呼ばない (呼ぶと運営が課金履歴を見て
+   * 「問題なし」と誤結論する)。
+   */
+  advanceBlocked?: boolean;
+  /**
+   * 前進の導出元 (UNBILLED cycle) が 1 つも無かった (`no_unbilled_cycle`)。
+   *
+   * cron は課金が確定した契約に対してだけ前進を呼ぶので、次の未課金 cycle が
+   * 無いのは想定外。**カウンタに載せないと毎日無音で繰り返される**経路だった。
+   */
+  advanceNoUnbilledCycle?: boolean;
   /** 前進処理の結末 (`advanced` / `noop` / `blocked_backward` ...)。観測用。 */
   advanceAction?: AdvanceResult["action"];
 };
@@ -238,11 +271,18 @@ export async function GET(request: NextRequest) {
       // 「顧客に届かなかった督促メール」の件数。action とは独立に数える
       // (課金は正しく失敗と申告されているのに、顧客だけが知らない状態を隠さない)。
       dunning_email_failed: results.filter((r) => r.dunningEmailFailed).length,
-      // nextBillingDate を前進させた件数 / 前進に失敗した件数。どちらも action とは
-      // 独立した軸。advanced が 0 のまま billed が続く run は「課金は通っているのに
-      // 次が来ない」状態なので、この 2 つを出さないと 2026-08 の停止が再び見えなくなる。
+      // nextBillingDate の前進の結末。すべて action とは独立した軸。advanced が 0 のまま
+      // billed が続く run は「課金は通っているのに次が来ない」状態なので、これらを
+      // 出さないと 2026-08 の停止が再び見えなくなる。
+      //
+      // キーは snake_case (既存の慣習: TS プロパティは camelCase、summary の JSON キーは
+      // snake_case = `dunningEmailFailed` -> `dunning_email_failed`)。`advanced` は 1 語。
       advanced: results.filter((r) => r.advanced).length,
-      advanceFailed: results.filter((r) => r.advanceFailed).length,
+      advance_failed: results.filter((r) => r.advanceFailed).length,
+      // 「失敗ではないが前進しなかった」2 経路。advance_failed に混ぜず別に数える。
+      advance_blocked: results.filter((r) => r.advanceBlocked).length,
+      advance_no_unbilled_cycle: results.filter((r) => r.advanceNoUnbilledCycle)
+        .length,
     };
 
     console.log(`[Billing Cron] Summary:`, JSON.stringify(summary));
@@ -251,11 +291,16 @@ export async function GET(request: NextRequest) {
     // 失敗が 1 件でもあれば run 単位で 1 通だけ送る (契約ごとに送ると失敗が並んだ
     // 日に通知が溢れて読まれなくなる)。PAUSE は個別に送るのでここには数えない。
     //
-    // `advanceFailed` も発火条件に含める。課金が全部通った run (failureTotal = 0) で
-    // 前進だけが失敗していると、そこが**まさに 2026-08 の無音停止の形**になる:
-    // 金は動いているので誰も失敗と思わないまま、翌月以降の課金が来ない。
+    // 前進側の 3 経路 (`advance_failed` / `advance_blocked` /
+    // `advance_no_unbilled_cycle`) も発火条件に含める。課金が全部通った run
+    // (failureTotal = 0) で前進だけが進まないと、そこが**まさに 2026-08 の無音停止の
+    // 形**になる: 金は動いているので誰も失敗と思わないまま、翌月以降の課金が来ない。
     const failureTotal = summary.failed + summary.retry_failed + summary.errors;
-    if (failureTotal > 0 || summary.advanceFailed > 0) {
+    const advanceAnomalyTotal =
+      summary.advance_failed +
+      summary.advance_blocked +
+      summary.advance_no_unbilled_cycle;
+    if (failureTotal > 0 || advanceAnomalyTotal > 0) {
       // `.catch` は保険。monitoring-alerts は例外を外に出さないが、この await は
       // 外側の try の内側にあるため、万一漏れると「通知の失敗」が「cron の失敗」
       // (500 + 異常終了通知) に化ける。その化学変化をここで断つ。
@@ -264,14 +309,18 @@ export async function GET(request: NextRequest) {
         failed: summary.failed,
         retryFailed: summary.retry_failed,
         errors: summary.errors,
-        advanceFailed: summary.advanceFailed,
+        advanceFailed: summary.advance_failed,
+        advanceBlocked: summary.advance_blocked,
+        advanceNoUnbilledCycle: summary.advance_no_unbilled_cycle,
         contractIds: results
           .filter(
             (r) =>
               r.action === "failed" ||
               r.action === "retry_failed" ||
               r.action === "error" ||
-              r.advanceFailed === true
+              r.advanceFailed === true ||
+              r.advanceBlocked === true ||
+              r.advanceNoUnbilledCycle === true
           )
           .map((r) => r.contractId),
       }).catch((notifyError) =>
@@ -297,8 +346,21 @@ export async function GET(request: NextRequest) {
   }
 }
 
+/**
+ * cron が 1 契約を処理するのに必要な最小形。
+ *
+ * `billingPolicy` は**停止検知の閾値にだけ**使う (`advanceStallPeriodHours`)。
+ * 書き込む日付の計算には一切使わない (計算した瞬間に「アプリが自前でカレンダー演算
+ * する」という元の欠陥に戻る)。Shopify が返さない / 未知の値なら月次既定に落ちる。
+ */
+type BillableContract = {
+  id: string;
+  nextBillingDate: string | null;
+  billingPolicy?: Partial<BillingPeriodPolicy> | null;
+};
+
 async function processContract(
-  contract: { id: string; nextBillingDate: string | null },
+  contract: BillableContract,
   now: Date
 ): Promise<BillingResult> {
   if (!contract.nextBillingDate) {
@@ -354,7 +416,12 @@ async function processContract(
   //
   // 課金は一切追加しない (Case 1 の二重課金防止はそのまま)。
   if (cycle.completedAt) {
-    const stalled = isAdvanceStalled(cycle.completedAt, now);
+    // 閾値は**契約自身の課金周期から出す**。月次固定 (768h) にしていたため、週次契約が
+    // 詰まっても約 8 日で気づくべきところ 32 日かかっていた (2026-08-12 / QA 条件 2)。
+    // 誤検知は起きない: `nextBillingDate <= now` の due 抽出により、健全な契約は
+    // そもそもこの枝に到達しない。
+    const periodHours = advanceStallPeriodHours(contract.billingPolicy);
+    const stalled = isAdvanceStalled(cycle.completedAt, now, periodHours);
     const advance = await advanceNextBillingDate(contract.id);
 
     if (stalled) {
@@ -365,6 +432,11 @@ async function processContract(
           contractId: contract.id,
           nextBillingDate: contract.nextBillingDate,
           chargedAt: cycle.completedAt.toISOString(),
+          // どの周期で判定したかを同じイベントで読めるようにする (閾値が契約ごとに
+          // 変わるので、載せないと「なぜ今鳴ったのか」が追えない)。
+          billingInterval: contract.billingPolicy?.interval ?? null,
+          billingIntervalCount: contract.billingPolicy?.intervalCount ?? null,
+          periodHours,
           // 鳴らした時点で復旧が効いたのかどうかを同じイベントで見られるようにする。
           recoveryAction: advance.action,
           recoveryFrom: advance.from,
@@ -542,16 +614,22 @@ function describeAdvance(result: AdvanceResult): string {
 /**
  * 前進の結末を `BillingResult` のフラグに畳む。
  *
- * `failed` だけを `advanceFailed` に立てる。`blocked_backward` は lib 側で Sentry
- * warning が出ており「書かないという判断が正しく働いた」状態なので失敗に数えない
- * (数えると運営宛通知が正常な保護でも鳴る)。`advanceAction` には常に載せるので、
- * どちらも申告からは消えない。
+ * 結末ごとに**別の軸**へ立てる。`failed` だけが `advanceFailed`。
+ * `blocked_backward` と `no_unbilled_cycle` は「書かないという判断が正しく働いた」
+ * 状態なので `advanceFailed` には数えない (数えると運営が課金履歴を調べて
+ * 「問題なし」と誤結論する)。ただし**独立カウンタを与えて必ず数える** — 数えないと
+ * どのカウンタにも載らず通知にも出ない無音経路になる (2026-08-12 / QA 条件 1)。
+ * `noop` だけがフラグ無し (正常に「もう前進済み」の状態)。
  */
 function advanceFlags(result: AdvanceResult): Partial<BillingResult> {
   return {
     advanceAction: result.action,
     ...(result.action === "advanced" ? { advanced: true } : {}),
     ...(result.action === "failed" ? { advanceFailed: true } : {}),
+    ...(result.action === "blocked_backward" ? { advanceBlocked: true } : {}),
+    ...(result.action === "no_unbilled_cycle"
+      ? { advanceNoUnbilledCycle: true }
+      : {}),
   };
 }
 

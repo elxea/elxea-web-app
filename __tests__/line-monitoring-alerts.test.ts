@@ -76,6 +76,26 @@ describe("sanitizeDetail", () => {
   });
 });
 
+/**
+ * run 通知の必須フィールドを埋める。テストは注目する軸だけを上書きする
+ * (前進側の軸が増えても各テストの意図が読み取れるようにする)。
+ */
+function runAlert(
+  overrides: Partial<Parameters<typeof notifyBillingRunFailures>[0]> = {},
+): Parameters<typeof notifyBillingRunFailures>[0] {
+  return {
+    due: 1,
+    failed: 0,
+    retryFailed: 0,
+    errors: 0,
+    advanceFailed: 0,
+    advanceBlocked: 0,
+    advanceNoUnbilledCycle: 0,
+    contractIds: [],
+    ...overrides,
+  };
+}
+
 describe("notifyBillingRunFailures", () => {
   it("件数と契約 ID を載せ、level は warning", async () => {
     await notifyBillingRunFailures({
@@ -84,6 +104,8 @@ describe("notifyBillingRunFailures", () => {
       retryFailed: 1,
       errors: 0,
       advanceFailed: 0,
+      advanceBlocked: 0,
+      advanceNoUnbilledCycle: 0,
       contractIds: [contractGid(7001), contractGid(7002)],
     });
 
@@ -98,14 +120,13 @@ describe("notifyBillingRunFailures", () => {
   });
 
   it("契約が上限を超えたら「他 N 件」に畳む", async () => {
-    await notifyBillingRunFailures({
-      due: 7,
-      failed: 7,
-      retryFailed: 0,
-      errors: 0,
-      advanceFailed: 0,
-      contractIds: [1, 2, 3, 4, 5, 6, 7].map((n) => contractGid(n)),
-    });
+    await notifyBillingRunFailures(
+      runAlert({
+        due: 7,
+        failed: 7,
+        contractIds: [1, 2, 3, 4, 5, 6, 7].map((n) => contractGid(n)),
+      }),
+    );
 
     const body = sent().body;
     expect(body).toContain("1, 2, 3, 4, 5 他 2 件");
@@ -113,27 +134,20 @@ describe("notifyBillingRunFailures", () => {
   });
 
   it("契約 ID が空でも本文が壊れない", async () => {
-    await notifyBillingRunFailures({
-      due: 1,
-      failed: 0,
-      retryFailed: 0,
-      errors: 1,
-      advanceFailed: 0,
-      contractIds: [],
-    });
+    await notifyBillingRunFailures(runAlert({ errors: 1 }));
 
     expect(sent().body).toContain("契約: -");
   });
 
   it("次回請求日の更新失敗の件数を必ず本文に出す", async () => {
-    await notifyBillingRunFailures({
-      due: 2,
-      failed: 1,
-      retryFailed: 0,
-      errors: 0,
-      advanceFailed: 1,
-      contractIds: [contractGid(7001)],
-    });
+    await notifyBillingRunFailures(
+      runAlert({
+        due: 2,
+        failed: 1,
+        advanceFailed: 1,
+        contractIds: [contractGid(7001)],
+      }),
+    );
 
     expect(sent().body).toContain("次回請求日の更新失敗 1 件");
   });
@@ -141,18 +155,50 @@ describe("notifyBillingRunFailures", () => {
   it("課金は全部通って前進だけ失敗した run は件名を課金失敗にしない", async () => {
     // 課金の失敗が 0 件なのに「課金に失敗があります」と伝えると、運営が Shopify の
     // 課金履歴を見て「問題なし」と結論づけてしまう。止まっているのは次回以降の課金。
-    await notifyBillingRunFailures({
-      due: 1,
-      failed: 0,
-      retryFailed: 0,
-      errors: 0,
-      advanceFailed: 1,
-      contractIds: [contractGid(7001)],
-    });
+    await notifyBillingRunFailures(
+      runAlert({ advanceFailed: 1, contractIds: [contractGid(7001)] }),
+    );
 
     const payload = sent();
     expect(payload.subject).toBe("定期便の次回請求日を更新できませんでした");
     expect(payload.body).toContain("次回請求日の更新失敗 1 件");
+  });
+
+  // 2026-08-12 / QA 条件 1: 「失敗ではないが更新できていない」2 経路も必ず本文に出す。
+  it("巻き戻り拒否の件数を本文に出し、更新失敗とは別の言葉で伝える", async () => {
+    await notifyBillingRunFailures(
+      runAlert({ advanceBlocked: 1, contractIds: [contractGid(7001)] }),
+    );
+
+    const payload = sent();
+    expect(payload.body).toContain("請求日が巻き戻るため更新を中止 1 件");
+    // 「更新失敗」に混ぜない (混ぜると運営が課金履歴を見て「問題なし」と誤結論する)
+    expect(payload.body).toContain("次回請求日の更新失敗 0 件");
+    expect(payload.subject).toBe("定期便の次回請求日を更新できませんでした");
+  });
+
+  it("未課金周期が無い件数を本文に出す", async () => {
+    await notifyBillingRunFailures(
+      runAlert({ advanceNoUnbilledCycle: 2, contractIds: [contractGid(7001)] }),
+    );
+
+    const payload = sent();
+    expect(payload.body).toContain("次の未課金周期が無く更新不可 2 件");
+    expect(payload.body).toContain("次回請求日の更新失敗 0 件");
+    expect(payload.subject).toBe("定期便の次回請求日を更新できませんでした");
+  });
+
+  it("課金失敗があるときは件名を課金失敗にする (前進側の異常が併発しても)", async () => {
+    await notifyBillingRunFailures(
+      runAlert({
+        failed: 1,
+        advanceBlocked: 1,
+        advanceNoUnbilledCycle: 1,
+        contractIds: [contractGid(7001)],
+      }),
+    );
+
+    expect(sent().subject).toBe("定期便の課金に失敗があります");
   });
 });
 

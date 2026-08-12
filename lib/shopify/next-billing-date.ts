@@ -41,8 +41,11 @@
  *    整合させる」に徹する。ただし上記のとおり導出モデル自体が二重の安全網になっている:
  *    課金が確定するまで cycle は `UNBILLED` のままなので、誤って pending 中に呼んでも
  *    導出値は現在値と一致して `noop` に落ちる
- * 3. **前向き専用** — 導出値 < 現在値なら書かずに `blocked_backward` + Sentry warning。
- *    請求日の巻き戻りは「同じ周期をもう一度課金する」入口なので絶対に書かない
+ * 3. **前向き専用** — 導出値 < 現在値なら書かずに `blocked_backward` + Sentry error。
+ *    請求日の巻き戻りは「同じ周期をもう一度課金する」入口なので絶対に書かない。
+ *    error なのは、導出モデルではこの状態が「現在値より早い未課金 cycle がある」=
+ *    未収の可能性を意味し、健全な運用では起こり得ないため (書かない判断は正しいが、
+ *    起きた事実は埋もれさせない)
  * 4. **飛び幅トリップワイヤ** — 導出値が現在値より「1 周期 x
  *    `JUMP_TRIPWIRE_PERIOD_MULTIPLE`」を超えて先なら Sentry error を上げる。
  *    **止めない (warn して書く)**。値は Shopify 由来で信頼でき、ここで止めると
@@ -89,9 +92,9 @@ export type AdvanceAction =
   | "advanced"
   /** 導出値が現在値と同じ。mutation は呼んでいない。 */
   | "noop"
-  /** UNBILLED cycle が無い。無変更。 */
+  /** UNBILLED cycle が無い。無変更。**Sentry error で鳴らす** (無音にしない)。 */
   | "no_unbilled_cycle"
-  /** 導出値が現在値より過去。巻き戻りを拒否した。無変更。 */
+  /** 導出値が現在値より過去。巻き戻りを拒否した。無変更。**Sentry error で鳴らす**。 */
   | "blocked_backward"
   /** 導出・読み書きのいずれかが失敗。無変更 (書く前に失敗した場合)。 */
   | "failed";
@@ -309,8 +312,16 @@ export async function getEarliestUnbilledCycle(
   );
 }
 
+/**
+ * 巻き戻り拒否を鳴らす。
+ *
+ * **level は error** (2026-08-12 に warning から引き上げ)。導出モデルでは
+ * `blocked_backward` = 「現在値より早い未課金 cycle が存在する」であり、これは
+ * **未収の可能性**を意味する。書かない判断そのものは正しく働いているが、健全な運用では
+ * そもそも起こり得ない状態なので、warning のまま埋もれさせない。
+ */
 function reportBlockedBackward(contractId: string, result: AdvanceResult): void {
-  console.warn(
+  console.error(
     `[next-billing-date] ${contractId}: 巻き戻りを拒否 ` +
       `(${result.from} -> ${result.to})`,
     result.reason
@@ -318,13 +329,44 @@ function reportBlockedBackward(contractId: string, result: AdvanceResult): void 
   Sentry.captureMessage(
     "nextBillingDate advance blocked: derived date is earlier than current",
     {
-      level: "warning",
+      level: "error",
       tags: { module: "next-billing-date", action: result.action },
       extra: {
         contractId,
         from: result.from,
         to: result.to,
         cycleIndex: result.cycleIndex,
+        reason: result.reason,
+      },
+    }
+  );
+}
+
+/**
+ * 「UNBILLED cycle が無い」を鳴らす。
+ *
+ * この結末は**どのカウンタにも載らないまま毎日繰り返されうる**経路だった
+ * (2026-08-12 の QA 条件 1)。cron は課金が確定した契約に対してだけ前進を呼ぶので、
+ * 次の未課金 cycle が 1 つも無いのは想定外 (走査が予期せず空で返った状態)。
+ * 唯一の網が 32 日の停止検知しか無い状態にしないため、**level は error**。
+ */
+function reportNoUnbilledCycle(
+  contractId: string,
+  result: AdvanceResult
+): void {
+  console.error(
+    `[next-billing-date] ${contractId}: UNBILLED cycle が無いため前進しない ` +
+      `(現在値 ${result.from})`,
+    result.reason
+  );
+  Sentry.captureMessage(
+    "nextBillingDate advance skipped: no unbilled billing cycle",
+    {
+      level: "error",
+      tags: { module: "next-billing-date", action: result.action },
+      extra: {
+        contractId,
+        from: result.from,
         reason: result.reason,
       },
     }
@@ -409,6 +451,10 @@ export async function advanceNextBillingDate(
     }
     if (decision.action === "failed") {
       reportFailure(contractId, decision.reason ?? "判定に失敗");
+      return decision;
+    }
+    if (decision.action === "no_unbilled_cycle") {
+      reportNoUnbilledCycle(contractId, decision);
       return decision;
     }
     if (decision.action !== "advanced") {

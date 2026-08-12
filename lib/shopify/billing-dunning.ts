@@ -55,6 +55,7 @@
  *   - `createdAt` が読めない失敗は「この周期の失敗」として数える (課金を足す方向に倒さない)
  *   - 請求日が読めなければ何もしない (呼び出し側が skip する)
  */
+import type { SellingPlanInterval } from "./admin-types";
 
 /** 判定に必要な試行の最小形。`BillingAttempt` はこれを満たす。 */
 export type DunningAttempt = {
@@ -82,11 +83,16 @@ export const CYCLE_GRACE_HOURS = 24;
 export const STALE_IN_FLIGHT_HOURS = 48;
 
 /**
- * `nextBillingDate` の前進が詰まっていると見なす基準周期 (時間)。
+ * `nextBillingDate` の前進が詰まっていると見なす基準周期 (時間) の**既定値**。
  *
- * 月次定期便の 1 周期を**最長の月 (31 日)** で見る。ここを短く取ると、月末アンカーの
- * 契約で「まだ正常な待ち時間」を異常として鳴らしてしまう (狼少年になった監視は読まれ
- * なくなる)。長い月に合わせて false positive を消し、検知が数日遅れる側に倒す。
+ * 契約の周期が分からないときだけ使うフォールバックで、月次定期便の 1 周期を
+ * **最長の月 (31 日)** で見る。ここを短く取ると、月末アンカーの契約で「まだ正常な
+ * 待ち時間」を異常として鳴らしてしまう (狼少年になった監視は読まれなくなる)。
+ * 長い月に合わせて false positive を消し、検知が数日遅れる側に倒す。
+ *
+ * 実際の契約では `advanceStallPeriodHours(contract.billingPolicy)` で契約自身の
+ * 周期から閾値を出す (下記)。この既定値に固定すると**週次契約が詰まっても
+ * 約 8 日で気づくべきところ 32 日かかる** (2026-08-12 の QA 条件 2)。
  *
  * この定数は**検知にしか使わない**。実際に書き込む日付は
  * `lib/shopify/next-billing-date.ts` が Shopify の billing cycle から導出しており、
@@ -100,6 +106,56 @@ export const ADVANCE_STALL_PERIOD_HOURS = 24 * 31;
  * cycle status 反映ラグを吸収する。
  */
 export const ADVANCE_STALL_GRACE_HOURS = 24;
+
+/**
+ * 各 interval の「1 単位を最長で見た時間数」。
+ *
+ * **最長側に丸める**のは検知の false positive を消すため。月は 31 日、年は閏年の
+ * 366 日で見る (28 日や 365 日で見ると、長い月・閏年の契約で正常な待ちを異常と
+ * 鳴らす)。ここは検知の閾値専用で、書き込む日付の計算には一切使わない。
+ *
+ * `SellingPlanInterval` の 4 値を網羅する。`subscription-actions.ts` は
+ * DAY / WEEK / MONTH / YEAR をすべて受け付けるので、月次前提の固定値では
+ * 週次契約の詰まりが 1 か月見過ごされる。
+ */
+export const INTERVAL_MAX_HOURS: Record<SellingPlanInterval, number> = {
+  DAY: 24,
+  WEEK: 24 * 7,
+  MONTH: 24 * 31,
+  YEAR: 24 * 366,
+};
+
+/** 停止検知の閾値算出に使う契約周期。`SubscriptionContract.billingPolicy` を満たす。 */
+export type BillingPeriodPolicy = {
+  interval: SellingPlanInterval;
+  intervalCount: number;
+};
+
+/**
+ * 契約の課金周期 (`billingPolicy`) から停止検知の基準周期 (時間) を出す。
+ *
+ * `interval x intervalCount` を最長側で見る。読めない値 (未取得 / 未知の interval /
+ * 非数 / 0 以下) は**既定値 (月次) にフォールバック**する — 判断材料が無いときは
+ * 「鳴らすのが遅れる」側に倒し、誤検知を作らない。
+ *
+ * 純関数 (時計も外部状態も読まない)。呼び出し側 (cron) がこれで得た値を
+ * `isAdvanceStalled` の `periodHours` に渡す。
+ */
+export function advanceStallPeriodHours(
+  policy?: Partial<BillingPeriodPolicy> | null
+): number {
+  const table = INTERVAL_MAX_HOURS as Record<string, number | undefined>;
+  const unitHours = policy?.interval ? table[policy.interval] : undefined;
+  if (unitHours === undefined) return ADVANCE_STALL_PERIOD_HOURS;
+
+  const count = policy?.intervalCount;
+  const multiplier =
+    typeof count === "number" && Number.isFinite(count) && count >= 1
+      ? Math.floor(count)
+      : 1;
+
+  return unitHours * multiplier;
+}
 
 export type BillingCycleState = {
   /** 請求日が日時として読めたか。false なら他の値は判定不能として扱う。 */
@@ -265,9 +321,17 @@ export function isStaleInFlight(inFlightAt: Date, now: Date): boolean {
  *
  * 時計は引数で受ける (`analyzeBillingCycle` と同じ流儀)。純関数なのでテストできる。
  *
+ * ## 閾値は契約の周期に合わせる (2026-08-12)
+ *
+ * `periodHours` は**呼び出し側が契約の `billingPolicy` から出して渡す**
+ * (`advanceStallPeriodHours`)。既定値のまま (月次 31 日) 固定していたため、
+ * 週次契約が詰まっても約 8 日で気づくべきところ 32 日かかっていた。
+ * 誤検知は起こらない (`nextBillingDate <= now` の due 抽出により、健全な契約は
+ * そもそも Case 1 に到達しない) ので、これは純粋に検知遅れの是正。
+ *
  * @param completedAt この周期で課金が完了した時刻 (`BillingCycleState.completedAt`)
  * @param now         現在時刻
- * @param periodHours 想定する 1 周期 (時間)。既定は月次を最長の月で見た値
+ * @param periodHours 想定する 1 周期 (時間)。省略時は月次を最長の月で見た既定値
  */
 export function isAdvanceStalled(
   completedAt: Date,

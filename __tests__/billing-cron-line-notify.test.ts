@@ -215,6 +215,8 @@ describe("失敗が出た run", () => {
       retryFailed: 0,
       errors: 0,
       advanceFailed: 0,
+      advanceBlocked: 0,
+      advanceNoUnbilledCycle: 0,
       contractIds: [CONTRACT_A],
     });
   });

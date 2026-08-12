@@ -92,31 +92,52 @@ export type BillingRunFailureAlert = {
    * と読んで終わってしまう。
    */
   advanceFailed: number;
+  /**
+   * 前進を「巻き戻り」として拒否した件数 (`blocked_backward`)。
+   *
+   * 更新の失敗とは**別の軸**。導出モデルではこの状態は「今の請求日より早い未課金の
+   * 周期がある」= **未収の可能性**を意味する。保護は正しく働いている (書いていない) が、
+   * 健全な運用では起こり得ないので必ず本文に出す。「更新失敗」に混ぜて伝えると、
+   * 運営が課金履歴を見て「問題なし」と誤結論する。
+   */
+  advanceBlocked: number;
+  /**
+   * 前進の導出元 (未課金の周期) が 1 つも無かった件数 (`no_unbilled_cycle`)。
+   *
+   * 課金が確定した契約にだけ前進を試みるので、次の未課金周期が無いのは想定外。
+   * 件数に出さないと毎日無音で繰り返される経路だった (2026-08-12 / QA 条件 1)。
+   */
+  advanceNoUnbilledCycle: number;
   /** 上記に該当した契約の GID */
   contractIds: string[];
 };
 
 /**
- * 課金 cron の run 内で異常が出た (failed / retry_failed / error / 前進失敗)。
+ * 課金 cron の run 内で異常が出た (failed / retry_failed / error / 前進の 3 経路)。
  * run 単位で 1 通。契約ごとには送らない。
  */
 export async function notifyBillingRunFailures(
   alert: BillingRunFailureAlert,
 ): Promise<void> {
   const chargeFailures = alert.failed + alert.retryFailed + alert.errors;
+  const advanceAnomalies =
+    alert.advanceFailed + alert.advanceBlocked + alert.advanceNoUnbilledCycle;
 
   await push({
     level: "warning",
-    // 件名は「何が起きたか」で分ける。課金が全部通っていて前進だけ失敗している run を
+    // 件名は「何が起きたか」で分ける。課金が全部通っていて前進だけ止まっている run を
     // 「課金に失敗があります」と伝えると、運営が Shopify の課金履歴を見て「問題ない」
     // と結論づけてしまう (実際に止まっているのは次回以降の課金)。
     subject:
-      chargeFailures === 0 && alert.advanceFailed > 0
+      chargeFailures === 0 && advanceAnomalies > 0
         ? "定期便の次回請求日を更新できませんでした"
         : "定期便の課金に失敗があります",
     body: [
       `対象 ${alert.due} 件 / 初回失敗 ${alert.failed} 件 / 再試行失敗 ${alert.retryFailed} 件 / 処理エラー ${alert.errors} 件`,
       `次回請求日の更新失敗 ${alert.advanceFailed} 件 (放置すると次回以降の課金が行われません)`,
+      // 「失敗ではないが更新できていない」2 経路。件数 0 でも出す (0 と出ていることが
+      // 「この軸も見た」という情報になる。行が出たり消えたりする本文は読み間違えやすい)。
+      `請求日が巻き戻るため更新を中止 ${alert.advanceBlocked} 件 / 次の未課金周期が無く更新不可 ${alert.advanceNoUnbilledCycle} 件`,
       `契約: ${formatIdList(alert.contractIds)}`,
       "確認: Shopify Admin > 定期購入",
     ].join("\n"),

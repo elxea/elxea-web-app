@@ -568,7 +568,10 @@ describe("advanceNextBillingDate", () => {
     expect(store.nextBillingDate).toBe(REAL_DERIVED);
   });
 
-  it("導出値 < 現在値のとき書かず blocked_backward + Sentry warning (ガード 3)", async () => {
+  it("導出値 < 現在値のとき書かず blocked_backward + Sentry error (ガード 3)", async () => {
+    // level は error (2026-08-12 に warning から引き上げ)。導出モデルでは
+    // blocked_backward = 「現在値より早い未課金 cycle がある」= 未収の可能性であり、
+    // 健全な運用では起こり得ない。書かない判断は正しいが埋もれさせない。
     store.nextBillingDate = "2027-06-01T00:00:00Z";
     const result = await advanceNextBillingDate(CONTRACT_GID, NO_WAIT);
 
@@ -577,11 +580,13 @@ describe("advanceNextBillingDate", () => {
     expect(store.nextBillingDate).toBe("2027-06-01T00:00:00Z");
     expect(Sentry.captureMessage).toHaveBeenCalledWith(
       expect.stringContaining("blocked"),
-      expect.objectContaining({ level: "warning" })
+      expect.objectContaining({ level: "error" })
     );
   });
 
-  it("UNBILLED cycle が無いとき無変更", async () => {
+  it("UNBILLED cycle が無いとき無変更 + Sentry error (無音にしない)", async () => {
+    // 以前はここが**どこにも現れない**結末だった (カウンタにも Sentry にも乗らない)。
+    // cycle 走査が予期せず空で返ると毎日無音で繰り返されるので error で鳴らす。
     store.cycles = [cycle(1, { status: "BILLED" })];
     const result = await advanceNextBillingDate(CONTRACT_GID, {
       windowSize: 2,
@@ -591,6 +596,10 @@ describe("advanceNextBillingDate", () => {
     expect(result.action).toBe("no_unbilled_cycle");
     expect(store.writes).toEqual([]);
     expect(store.nextBillingDate).toBe(REAL_NEXT_BILLING_DATE);
+    expect(Sentry.captureMessage).toHaveBeenCalledWith(
+      expect.stringContaining("no unbilled billing cycle"),
+      expect.objectContaining({ level: "error" })
+    );
   });
 
   it("2 回連続実行しても状態は同じ (冪等・mutation は 1 回だけ)", async () => {
