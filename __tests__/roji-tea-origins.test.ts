@@ -118,17 +118,20 @@ describe("tea-origins", () => {
 
   it("既知の代表値を正しく引く", () => {
     // 11301 = やぶきたの上煎茶 / みとちゃ農園 (奈良県 山添村)
+    // 座標は正本 = Notion Supplier List の Place。
     expect(resolveTeaOrigin("11301")).toEqual({
       prefecture: "奈良県",
       area: "山添村",
       raw: "奈良県 山添村",
-      lat: 34.680874,
-      lng: 136.043472,
+      lat: 34.68088,
+      lng: 136.04343,
       precision: "area",
       geoTitle: "奈良県山辺郡山添村",
       needsReview: false,
     });
     // 51001 = 春摘みべにふうきの和紅茶 / つしま大石農園 (長崎県 対馬市 上県町)
+    // 正本を採らない唯一の例外。Notion の Place は対馬市全体の重心で、島の
+    // 南北 80km のうち南部を指してしまうため、GSI の上県町の代表点を残している。
     expect(resolveTeaOrigin("51001")).toEqual({
       prefecture: "長崎県",
       area: "対馬市上県町",
@@ -239,8 +242,8 @@ describe("teaOriginPoints", () => {
       menuNumber: "10101",
       prefecture: "静岡県",
       area: "静岡市",
-      lat: 34.975185,
-      lng: 138.383286,
+      lat: 34.97516,
+      lng: 138.38324,
       precision: "area",
     });
   });
@@ -268,6 +271,40 @@ describe("teaOriginPoints", () => {
       expect(p.lng).toBeGreaterThanOrEqual(122);
       expect(p.lng).toBeLessThanOrEqual(154);
     }
+  });
+});
+
+describe("座標の正本 (Notion Supplier List の Place)", () => {
+  /**
+   * 座標が 2 系統 (Notion `Place` / 国土地理院) に分かれていた二重管理を
+   * 2026-08-12 に解消し、正本を Notion に統一した。旧 GSI 値へ黙って戻るのを
+   * 防ぐため、判断が割れた 2 軒だけ実値で固定する。
+   */
+  it("hasama は正本 (Notion) の値を採る — GSI 値へ戻さない", () => {
+    // 51301 = ハサマ共同製茶組合。両系統とも「三重県四日市市川島町」に解決するが
+    // 代表点の取り方が 1.3km 違う。単一正本の原則どおり Notion を採用している。
+    const { lat, lng } = resolveTeaOrigin("51301");
+    expect({ lat, lng }).toEqual({ lat: 34.97434, lng: 136.56266 });
+    // 旧 GSI 値 (34.968712, 136.549942) に戻っていないこと
+    expect(lat).not.toBe(34.968712);
+  });
+
+  it("tsushima-oishi だけは GSI を残す — 対馬市の重心へ丸めない", () => {
+    // 51001 = つしま大石農園。Notion の Place は対馬市全体の重心 (34.20277) で、
+    // 南北 80km の島の南部を指し産地から約 45km 外れるため採用しない。
+    const { lat, lng } = resolveTeaOrigin("51001");
+    expect({ lat, lng }).toEqual({ lat: 34.566456, lng: 129.333176 });
+    expect(lat).not.toBe(34.20277);
+    // 島の北部 (上県町) 側にあること
+    expect(lat).toBeGreaterThan(34.4);
+  });
+
+  it("正本統一後も同一町の 2 軒は同一座標のまま (地図で 1 点に畳まれる)", () => {
+    // 40301 = 宮崎茶房 / 10401 = 緑碧茶園 五ヶ瀬茶園。どちらも五ヶ瀬町。
+    const a = resolveTeaOrigin("10401");
+    const b = resolveTeaOrigin("40301");
+    expect({ lat: a.lat, lng: a.lng }).toEqual({ lat: b.lat, lng: b.lng });
+    expect(teaOriginPoints(["10401", "40301"])).toHaveLength(1);
   });
 });
 

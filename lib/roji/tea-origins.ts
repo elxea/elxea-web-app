@@ -30,24 +30,46 @@
  * 中長期的には Sanity `teaMenu` に構造化産地フィールドを足し、Notion からの
  * 同期に乗せるのが単一正本として筋が良い (下の「将来の移行」を参照)。
  *
- * ## 緯度経度の出どころ
+ * ## 緯度経度の正本 (2026-08-12 二重管理を解消)
  *
- * Notion 側に座標は無い (Place 型の `Place` プロパティは全件空)。よって座標は
- * **国土地理院 (GSI) の住所検索 API** から取得した公開データを使う。
+ * **座標の正本は Notion Supplier List の `Place` プロパティ** (place 型) である。
+ * 12 軒すべてに緯度経度が入っている。`Place` は SQL クエリ (query_data_sources)
+ * では取得できず、各仕入先ページを個別に fetch すると
+ * `place:Place:latitude` / `place:Place:longitude` / `place:Place:name` として返る。
+ * 初版に「Notion 側に座標は無い」と書かれていたが、それは SQL で見えなかった
+ * だけで **誤り**。この取り違えが座標 2 系統 (Notion / GSI) の二重管理を生んだ。
+ *
+ * 国土地理院 (GSI) の住所検索 API は **当初の取得手段であって正本ではない**。
  *   https://msearch.gsi.go.jp/address-search/AddressSearch?q=<地名>
- * 問い合わせたのは `raw` から組み立てた **地名だけ** (仕入先名・番地は送っていない)。
- * 各エントリの `geoTitle` は GSI が返した正式名称で、どの地点に解決されたかを
- * 後から検証できるように原文のまま残している。
+ * 初版はここから座標を引いていたが、正本と食い違う 2 系統目になるため
+ * Notion 側へ寄せた。
  *
- * 座標は **推測で作らない**。GSI が解決できない地名は `lat`/`lng` を `null` にし
- * `needsReview: true` を立てる (地図に打たず、確認対象として数える)。
+ * 2 系統を突き合わせた結果 (距離は Haversine):
+ *   - 12 軒中 10 軒は **26m 以内で一致**。どちらも同じ市町村名を geocode した
+ *     結果なので実質同一。正本 (Notion) を採用。
+ *   - `hasama` のみ 1.3km ずれる。ただし両者とも「三重県四日市市川島町」に
+ *     解決しており、同じ町の代表点の取り方が違うだけ。町の広がりに収まるので
+ *     `precision: "area"` の粒度として許容し、正本 (Notion) を採用。
+ *   - `tsushima-oishi` のみ **GSI を残した** (唯一の例外)。理由は当該エントリの
+ *     コメントを参照。
+ *
+ * 各エントリの `coordSource` がどちら由来かを持ち、`geoTitle` はその座標に
+ * 紐づく地点の正式名称 (どこに解決されたかの根拠) を原文のまま残している。
+ *
+ * **Notion 側で `Place` が変われば、ここは自動では追随しない。** 仕入先の所在地が
+ * 更新されたら本ファイルも手で更新する必要がある (恒久策は「将来の移行」を参照)。
+ *
+ * 座標は **推測で作らない**。正本にも GSI にも無い地名は `lat`/`lng` を `null` に
+ * し `needsReview: true` を立てる (地図に打たず、確認対象として数える)。
  *
  * ## 将来の移行
  *
  * このファイルは **暫定の写し** であって正本ではない。Notion 側で仕入先の
- * Prefecture が変われば、ここは自動では追随しない。恒久策は
+ * Prefecture / Regions / Place が変われば、ここは自動では追随しない。恒久策は
  * `scripts/sync-notion-to-sanity.ts` に teaMenu の同期を足し、
- * Supplier の Prefecture / Regions を Sanity の構造化フィールドへ流し込むこと。
+ * Supplier の Prefecture / Regions / **Place (緯度経度)** を Sanity の構造化
+ * フィールドへ流し込むこと。同期を書くときは `Place` が SQL で取れない点に注意
+ * (仕入先ページを個別 fetch して `place:Place:*` を読む必要がある)。
  * それが入った時点でこのファイルは削除し、参照を Sanity クエリへ差し替える。
  *
  * ## 出さないもの
@@ -99,7 +121,8 @@ export interface TeaOrigin {
   /** 座標の粒度。`lat`/`lng` が `null` のときは必ず `none`。 */
   precision: OriginPrecision;
   /**
-   * 国土地理院の住所検索が返した正式名称。どの地点に解決されたかの根拠。
+   * 座標に紐づく地点の正式名称。どの地点に解決されたかの根拠。
+   * 正本由来の軒は Notion `Place` の name、GSI 由来の軒は GSI が返した title。
    * 座標が無いときは `null`。
    */
   geoTitle: string | null;
@@ -122,16 +145,29 @@ interface OriginSource {
   lat: number | null;
   lng: number | null;
   precision: OriginPrecision;
-  /** 国土地理院に投げた地名 (再取得・検証用)。 */
+  /**
+   * 座標の出どころ。既定は正本の `notion-place`。
+   * `gsi` は正本の値が明らかに劣るため例外的に国土地理院の値を残した軒で、
+   * その理由を必ずエントリのコメントに書く (無言の例外を作らないため)。
+   */
+  coordSource: "notion-place" | "gsi";
+  /**
+   * 国土地理院に投げた地名 (再取得・検証用)。
+   * `coordSource: "gsi"` の軒だけ持ち、正本由来の軒は `null`。
+   */
   geoQuery: string | null;
-  /** 国土地理院が返した正式名称。 */
+  /**
+   * 座標に紐づく地点の正式名称。
+   * 正本由来の軒は Notion `Place` の name、GSI 由来の軒は GSI が返した title。
+   */
   geoTitle: string | null;
 }
 
 /**
- * 産地の実体 (Notion Supplier List のスナップショット + GSI の座標)。
+ * 産地の実体 (Notion Supplier List のスナップショット)。
  * `area` は `raw` の先頭から都道府県名を落として区切りスペースを詰めたもの。
- * `lat`/`lng` は 2026-08-12 に GSI 住所検索から取得した値をそのまま使う (丸めない)。
+ * `lat`/`lng` は 2026-08-12 に Notion `Place` から読んだ値をそのまま使う (丸めない)。
+ * 例外は `tsushima-oishi` のみで、そこだけ GSI の値を残している (理由は当該コメント)。
  */
 const ORIGIN_SOURCES = {
   shibakiri: {
@@ -140,10 +176,11 @@ const ORIGIN_SOURCES = {
     area: "静岡市",
     raw: "静岡県 静岡市",
     // 静岡市は政令市で市域が広く、この座標は市全体の代表点。
-    lat: 34.975185,
-    lng: 138.383286,
+    lat: 34.97516,
+    lng: 138.38324,
     precision: "area",
-    geoQuery: "静岡県静岡市",
+    coordSource: "notion-place",
+    geoQuery: null,
     geoTitle: "静岡県静岡市",
   },
   "ryokuheki-gokase": {
@@ -151,10 +188,11 @@ const ORIGIN_SOURCES = {
     prefecture: "宮崎県",
     area: "西臼杵郡五ヶ瀬町",
     raw: "宮崎県 西臼杵郡五ヶ瀬町",
-    lat: 32.68338,
-    lng: 131.196915,
+    lat: 32.68345,
+    lng: 131.19693,
     precision: "area",
-    geoQuery: "宮崎県西臼杵郡五ヶ瀬町",
+    coordSource: "notion-place",
+    geoQuery: null,
     geoTitle: "宮崎県西臼杵郡五ヶ瀬町",
   },
   nakakubo: {
@@ -162,10 +200,11 @@ const ORIGIN_SOURCES = {
     prefecture: "京都府",
     area: "相楽郡南山城村",
     raw: "京都府 相楽郡 南山城村",
-    lat: 34.772709,
-    lng: 135.993774,
+    lat: 34.77275,
+    lng: 135.99359,
     precision: "area",
-    geoQuery: "京都府相楽郡南山城村",
+    coordSource: "notion-place",
+    geoQuery: null,
     geoTitle: "京都府相楽郡南山城村",
   },
   masui: {
@@ -173,10 +212,11 @@ const ORIGIN_SOURCES = {
     prefecture: "静岡県",
     area: "榛原郡川根本町",
     raw: "静岡県 榛原郡 川根本町",
-    lat: 35.046944,
-    lng: 138.081665,
+    lat: 35.04684,
+    lng: 138.08192,
     precision: "area",
-    geoQuery: "静岡県榛原郡川根本町",
+    coordSource: "notion-place",
+    geoQuery: null,
     geoTitle: "静岡県榛原郡川根本町",
   },
   mitocha: {
@@ -184,11 +224,13 @@ const ORIGIN_SOURCES = {
     prefecture: "奈良県",
     area: "山添村",
     raw: "奈良県 山添村",
-    // Regions は「山添村」だが正式には山辺郡山添村。GSI には郡名込みで問い合わせた。
-    lat: 34.680874,
-    lng: 136.043472,
+    // Regions は「山添村」だが正式には山辺郡山添村。Notion `Place` の name も
+    // 郡名込みで入っているので、そちらを geoTitle に採る。
+    lat: 34.68088,
+    lng: 136.04343,
     precision: "area",
-    geoQuery: "奈良県山辺郡山添村",
+    coordSource: "notion-place",
+    geoQuery: null,
     geoTitle: "奈良県山辺郡山添村",
   },
   chiyonoen: {
@@ -196,10 +238,11 @@ const ORIGIN_SOURCES = {
     prefecture: "福岡県",
     area: "八女市",
     raw: "福岡県 八女市",
-    lat: 33.211426,
-    lng: 130.558151,
+    lat: 33.21141,
+    lng: 130.55804,
     precision: "area",
-    geoQuery: "福岡県八女市",
+    coordSource: "notion-place",
+    geoQuery: null,
     geoTitle: "福岡県八女市",
   },
   kajihara: {
@@ -207,10 +250,11 @@ const ORIGIN_SOURCES = {
     prefecture: "熊本県",
     area: "葦北郡芦北町",
     raw: "熊本県 葦北郡芦北町",
-    lat: 32.299034,
-    lng: 130.493118,
+    lat: 32.29897,
+    lng: 130.49309,
     precision: "area",
-    geoQuery: "熊本県葦北郡芦北町",
+    coordSource: "notion-place",
+    geoQuery: null,
     geoTitle: "熊本県葦北郡芦北町",
   },
   "miyazaki-sabo": {
@@ -218,11 +262,13 @@ const ORIGIN_SOURCES = {
     prefecture: "宮崎県",
     area: "西臼杵郡五ヶ瀬町",
     raw: "宮崎県 西臼杵郡五ヶ瀬町",
-    // 緑碧茶園 五ヶ瀬茶園 と同一町。別の仕入先だが座標は同じ地域代表点になる。
-    lat: 32.68338,
-    lng: 131.196915,
+    // 緑碧茶園 五ヶ瀬茶園 と同一町。別の仕入先だが Notion `Place` も同値なので
+    // 座標は同じ地域代表点になる (地図側で 1 点に畳まれる)。
+    lat: 32.68345,
+    lng: 131.19693,
     precision: "area",
-    geoQuery: "宮崎県西臼杵郡五ヶ瀬町",
+    coordSource: "notion-place",
+    geoQuery: null,
     geoTitle: "宮崎県西臼杵郡五ヶ瀬町",
   },
   sakaguchi: {
@@ -230,10 +276,11 @@ const ORIGIN_SOURCES = {
     prefecture: "熊本県",
     area: "水俣市",
     raw: "熊本県 水俣市",
-    lat: 32.211784,
-    lng: 130.4086,
+    lat: 32.21181,
+    lng: 130.40858,
     precision: "area",
-    geoQuery: "熊本県水俣市",
+    coordSource: "notion-place",
+    geoQuery: null,
     geoTitle: "熊本県水俣市",
   },
   "tsushima-oishi": {
@@ -241,12 +288,17 @@ const ORIGIN_SOURCES = {
     prefecture: "長崎県",
     area: "対馬市上県町",
     raw: "長崎県 対馬市 上県町",
-    // 上県町は対馬市の旧町で GSI に単独の重心が無く、大字単位で複数返る。
-    // 先頭の「伊奈」を旧町域の代表点として採用した (対馬市の重心だと
-    // 島が南北に長いぶん実際の産地から離れるため)。
+    // === 正本 (Notion `Place`) を採らない唯一の例外 ===
+    // Notion `Place` は「長崎県対馬市」= 市全体の重心 (34.20277, 129.28751) で、
+    // 旧町 (上県町) まで降りていない。対馬は南北に約 80km あるため、市の重心は
+    // 島の南部 (旧厳原町あたり) を指し、島北部にある当該産地から大きく外れる。
+    // 実測: 正本の点は産地の大字 (上県町佐護) から約 45km、GSI の点は約 5km。
+    // 「県庁所在地レベルに丸められている」に相当する劣化なので、ここだけ GSI の
+    // 上県町の代表点を残す。Notion 側の `Place` が上県町まで絞られたら追随する。
     lat: 34.566456,
     lng: 129.333176,
     precision: "area",
+    coordSource: "gsi",
     geoQuery: "長崎県対馬市上県町",
     geoTitle: "長崎県対馬市上県町伊奈",
   },
@@ -255,10 +307,14 @@ const ORIGIN_SOURCES = {
     prefecture: "三重県",
     area: "四日市市川島町",
     raw: "三重県 四日市市 川島町",
-    lat: 34.968712,
-    lng: 136.549942,
+    // 正本と GSI が 1.3km ずれる唯一の軒。ただし両者とも「三重県四日市市川島町」
+    // に解決しており、同じ町の代表点の取り方が違うだけ (町の広がりの中に収まる)。
+    // どちらが劣るとは言えないので単一正本の原則どおり Notion を採る。
+    lat: 34.97434,
+    lng: 136.56266,
     precision: "area",
-    geoQuery: "三重県四日市市川島町",
+    coordSource: "notion-place",
+    geoQuery: null,
     geoTitle: "三重県四日市市川島町",
   },
   yoshida: {
@@ -266,10 +322,11 @@ const ORIGIN_SOURCES = {
     prefecture: "茨城県",
     area: "古河市",
     raw: "茨城県 古河市",
-    lat: 36.178242,
-    lng: 139.75502,
+    lat: 36.1782,
+    lng: 139.75491,
     precision: "area",
-    geoQuery: "茨城県古河市",
+    coordSource: "notion-place",
+    geoQuery: null,
     geoTitle: "茨城県古河市",
   },
 } as const satisfies Record<string, OriginSource>;
