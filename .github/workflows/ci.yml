@@ -601,9 +601,4 @@ jobs:
         # Nothing is lost by not building here — the `build` job above already
         # fails this workflow before the deploy on any build break.
         if: steps.arm.outputs.armed == 'true'
-        # TEMPORARY (wiring verification run only) — the real command is
-        # `vercel deploy --prod` and is restored in the very next commit. Held as
-        # an echo so that the first end-to-end run of this new gate cannot create
-        # a deployment even if the arming switch above misbehaves.
-        run: |
-          echo "[DRY RUN] would have run 'vercel deploy --prod' for sha=${GITHUB_SHA}"
+        run: vercel deploy --prod
