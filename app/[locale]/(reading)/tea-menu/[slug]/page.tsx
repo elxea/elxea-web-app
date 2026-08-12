@@ -8,6 +8,8 @@ import { Link } from "@/i18n/navigation";
 import { PortableText } from "@/components/sanity/portable-text";
 import { ImageCard } from "@/components/media/image-card";
 import { Breadcrumb } from "@/components/seo/breadcrumb";
+import { TeaOriginBlock } from "@/components/viz/map/tea-origin-block";
+import { resolveTeaOriginPlace } from "@/lib/roji/tea-origins";
 import type { PortableTextBlock } from "@portabletext/types";
 
 export async function generateMetadata({
@@ -58,6 +60,21 @@ export default async function TeaMenuDetailPage({
   }
 
   if (!tea) notFound();
+
+  /**
+   * 産地の地図の代替テキスト。地図の中に文字を置かない設計なので、
+   * 地図が何を指しているかはここでしか伝わらない。
+   *
+   * 産地が引けない銘柄では `TeaOriginBlock` がブロックごと描かないため、
+   * この文字列は使われずに捨てられる (先に組み立てても害はない)。
+   */
+  const originPlace =
+    tea.productNumber === null || tea.productNumber === undefined
+      ? null
+      : resolveTeaOriginPlace(String(tea.productNumber));
+  const originMapLabel = originPlace
+    ? t("originMapAlt", { place: originPlace })
+    : t("originMapAltUnknown");
 
   return (
     <div className="section-wide">
@@ -128,6 +145,15 @@ export default async function TeaMenuDetailPage({
           </div>
         </dl>
       </section>
+
+      {/* R1-A: 産地の地図。銘柄番号から座標が引けないときは自分で null を返す。
+          詳細表の「産地」(Sanity の自由記述) の直後に置き、同じ話題を
+          文字 → 図の順で読ませる。 */}
+      <TeaOriginBlock
+        menuNumber={tea.productNumber}
+        heading={t("origin")}
+        mapLabel={originMapLabel}
+      />
 
       {/* 変A: 淹れ方ガイド (3ボックス横並び / SP 積上げ) */}
       {tea.brewingGuide && (

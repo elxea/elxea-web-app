@@ -59,6 +59,9 @@ next-env.d.ts
 # audio assets (large files, deployed via Vercel but excluded from git)
 public/audio/
 
+# maplibre worker (node_modules から dev / build の先頭で複製する生成物)
+public/maplibre/
+
 # dev notes
 gtm-tag-name.md
 shopify-app-settings.md

@@ -122,6 +122,8 @@
     "details": "お茶の詳細",
     "variety": "品種",
     "origin": "産地",
+    "originMapAlt": "{place} の位置を示した地図",
+    "originMapAltUnknown": "産地の位置を示した地図",
     "season": "収穫時期",
     "netWeight": "内容量",
     "brewingGuide": "淹れ方ガイド",
