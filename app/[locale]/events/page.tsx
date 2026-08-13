@@ -61,7 +61,7 @@ async function EventsList() {
         : fetched;
 
     // 開催が終わったイベントは一覧に出さない (Sanity のデータは消さない)。
-    // `EVENTS_QUERY` 側にも `date >= now()` があるが、それを通らない経路が
+    // `EVENTS_QUERY` 側にも `coalesce(endDate, date) >= now()` があるが、それを通らない経路が
     // 残っている: preview seed は固定日付なので時間が経てば過去になるし、
     // 取得側を差し替えれば GROQ のフィルタごと外れる。**表示する直前**でもう
     // 一度落として、どの経路から来ても過去日のカードが並ばないようにする。

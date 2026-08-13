@@ -213,8 +213,25 @@ export const OTHER_FARMERS_QUERY = groq`
 `;
 
 // Events
+/**
+ * 一覧に出す「これからのイベント」。
+ *
+ * 締めは **開催日ではなく会期の終わり** で見る (`coalesce(endDate, date)`)。
+ * `date >= now()` だけだと、初日を過ぎた時点で **会期中の複数日イベントが
+ * 一覧から消える** — 8/10-8/14 の展示が 8/11 に落ちる、という取りこぼしが
+ * 実際に起きていた。`endDate` が無い単日イベントは従来どおり `date` で切る
+ * ので、単日イベントの挙動は変わらない。
+ *
+ * `date` / `endDate` は Sanity の `datetime` (UTC の ISO-8601) なので
+ * `now()` とそのまま比較できる。
+ *
+ * 表示側 (`isPastEvent`) は JST の「日」単位で切る二重のフィルタで、こちらは
+ * 時刻で切る。当日中に終わるイベントは終了時刻を過ぎた時点でこの取得から
+ * 落ちる (表示側の「その日いっぱいは残す」より少し早い)。会期の取りこぼしを
+ * 直すのが目的なので、日境界の吸収まではここでは持ち込まない。
+ */
 export const EVENTS_QUERY = groq`
-  *[_type == "event" && language == $language && date >= now()] | order(date asc) {
+  *[_type == "event" && language == $language && coalesce(endDate, date) >= now()] | order(date asc) {
     _id,
     title,
     slug,
