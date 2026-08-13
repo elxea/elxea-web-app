@@ -368,7 +368,12 @@
   },
   "event": {
     "lead": "",
-    "empty": "No upcoming events.",
+    "empty": {
+      "eyebrow": "0 items",
+      "title": "No upcoming events yet",
+      "body": "We are preparing the next gathering. It will appear here once the date is set.",
+      "ctaLabel": "Browse teas"
+    },
     "loadError": "Could not load events.",
     "detailsLink": "Details & Register →",
     "register": "Register",

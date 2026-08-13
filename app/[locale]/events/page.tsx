@@ -1,8 +1,11 @@
 import { useTranslations } from "next-intl";
 import { getLocale, getTranslations } from "next-intl/server";
+import { Sprout } from "lucide-react";
 import { Link } from "@/i18n/navigation";
 import { getClient } from "@/sanity/lib/client";
 import { ImageCard } from "@/components/media/image-card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { pillClass } from "@/components/ui/pill-button";
 import { EVENTS_QUERY } from "@/sanity/lib/queries";
 import { urlFor } from "@/sanity/lib/image";
 import { previewSeedEnabled, seedEvents } from "@/lib/preview-seed";
@@ -70,10 +73,22 @@ async function EventsList() {
     );
 
     if (!events || events.length === 0) {
+      /* P1 一覧そのものが空。障害 (loadError) とは必ず出し分ける — 再試行では
+         なく横に抜ける出口 (商品一覧) を出す。他の P1 一覧 (farmers /
+         tea-menu / collections 等) と同じ EmptyState + 4 部構成キーに揃える。 */
       return (
-        <p className="text-muted-foreground text-sm">
-          {t("empty")}
-        </p>
+        <EmptyState
+          className="mt-8 lg:mt-12"
+          icon={Sprout}
+          count={t("empty.eyebrow")}
+          title={t("empty.title")}
+          body={t("empty.body")}
+          action={
+            <Link href="/products" className={pillClass("outline")}>
+              {t("empty.ctaLabel")}
+            </Link>
+          }
+        />
       );
     }
 
