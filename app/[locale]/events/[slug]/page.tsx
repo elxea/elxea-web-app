@@ -5,6 +5,7 @@ import { getClient } from "@/sanity/lib/client";
 import { EVENT_BY_SLUG_QUERY } from "@/sanity/lib/queries";
 import { urlFor } from "@/sanity/lib/image";
 import { PortableText } from "@/components/sanity/portable-text";
+import { ArticleProse } from "@/components/journal/article-blocks";
 import { getMembershipTier } from "@/lib/shopify/auth";
 import type { MembershipTier } from "@/lib/shopify/customer";
 import { MemberGate } from "@/components/account/member-gate";
@@ -210,16 +211,20 @@ export default async function EventPage({
                   <EventBodyHeading>{t("detailsHeading")}</EventBodyHeading>
                   {event.description && (
                     // Figma 6661:13492 / 6664:8170 の本文は 16px。共有の
-                    // PortableText は段落を `text-sm` で描くので、**このページ枠の
-                    // 中だけ** 16px に上げる (記事本文の leading は C4-1 で確定した
-                    // DS 側をそのまま使う)。
-                    // 最終ブロックの下マージン落とし (`[&>*:last-child]:mb-0`) は
-                    // C9-1R で共有シリアライザ側 (`last:mb-0`) に移したので削除した。
-                    // 同じ漏れが農家詳細・プレイリスト・お茶メニュー詳細にもあったため、
-                    // ページごとに貼るのをやめて 1 箇所で閉じている。
-                    <div className="prose-custom [&_p]:text-base">
+                    // PortableText は段落を `text-sm` で描くので枠側で上げる。
+                    // 枠は共有の `ArticleProse` を使う。以前は
+                    // `prose-custom [&_p]:text-base` と書いていたが、`prose-custom`
+                    // は CSS に一度も存在せず (git 全履歴で 0 件) 効いておらず、
+                    // 16px は `[&_p]:text-base` だけが担っていた。`ArticleProse` の
+                    // `[&_p]:[font:var(--typography-style-body)]` は同じ 16px を
+                    // DS の body プリセット経由で当て、行間と字間も一緒に揃うので
+                    // `[&_p]:text-base` は不要になった (size だけの指定は lh/tracking を
+                    // 連れてこないため、トークン経由の方が Figma に近い)。
+                    // 最終ブロックの下マージン落としは C9-1R で共有シリアライザ側
+                    // (`last:mb-0`) に移してある。
+                    <ArticleProse>
                       <PortableText value={event.description} />
-                    </div>
+                    </ArticleProse>
                   )}
                   {event.externalUrl && (
                     <EventDetailsLink href={event.externalUrl}>

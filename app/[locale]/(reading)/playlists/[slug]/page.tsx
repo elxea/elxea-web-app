@@ -11,6 +11,7 @@ import { urlFor } from "@/sanity/lib/image";
 import { Breadcrumb } from "@/components/seo/breadcrumb";
 import { AudioBlock } from "@/components/journal/audio-block";
 import { AuthorByline } from "@/components/journal/author-byline";
+import { ArticleProse } from "@/components/journal/article-blocks";
 import { SpecBand } from "@/components/editorial/section-blocks";
 import { PortableText } from "@/components/sanity/portable-text";
 import {
@@ -394,9 +395,12 @@ export default async function PlaylistDetailPage({
           置く (既存データを落とさないため)。 */}
       {pl.body ? (
         <PlaylistSection>
-          <div className="prose-custom max-w-160">
+          {/* 枠は共有の `ArticleProse`。以前は `prose-custom` と書いていたが
+              そのクラスは CSS に一度も存在せず (git 全履歴で 0 件)、段落が DS の
+              body プリセットではなく共有シリアライザの `text-sm` のままだった。 */}
+          <ArticleProse className="max-w-160">
             <PortableText value={pl.body} />
-          </div>
+          </ArticleProse>
         </PlaylistSection>
       ) : null}
 

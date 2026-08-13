@@ -28,6 +28,7 @@ import {
   RelatedReadingsSection,
   TeaDetailSection,
 } from "@/components/journal/article-modal-sections";
+import { ArticleProse } from "@/components/journal/article-blocks";
 import { BookmarkButton } from "@/components/journal/bookmark-button";
 import { ArticleReadTracker } from "@/components/journal/article-read-tracker";
 import { ReadingProgress } from "@/components/journal/reading-progress";
@@ -324,20 +325,40 @@ export default async function ArticlePage({
 
           {hasAccess ? (
             <>
-              {/* 本文 — 段落間 24 / H2 前 56 後 20 (Figma の縦リズム) */}
-              {/* 本文の縦リズム: `prose-custom` 自身が持つ段落マージン (実測
-                  74px) は Figma の 24 と食い違うため important 付きで上書きする。
-                  下マージンを 0 に倒し、間隔は隣接セレクタの上マージンだけで
-                  作る (マージン相殺の影響を受けないようにするため)。
-                  節見出しの「後 20」も同じ原則で見出し側の mb ではなく直後要素の
-                  mt で作る (mb 20 と段落 mt 24 が相殺すると大きい 24 が勝ち、
-                  実レンダリングが Figma 実測 20 とずれるため)。
-                  `.prose-custom h2 + *` は型セレクタを含み `.prose-custom > * + *`
-                  より詳細度が高いので、隣接段落の mt-6 を確実に上書きする。 */}
+              {/* 本文 — 段落間 24 / H2 前 56 後 20 (Figma の縦リズム)
+
+                  枠は共有の `ArticleProse` を使う。ここは以前 `prose-custom` という
+                  クラス名を書いていたが、**そのクラスは globals.css にも dist にも
+                  一度も存在したことがない** (git 全履歴の *.css を `.prose-custom`
+                  で検索して 0 件)。つまり枠として何も効いておらず、
+                  - 段落が DS の body プリセット (16 / lh 1.75) ではなく共有
+                    シリアライザの `text-sm` (14) のままだった
+                  - `globals.css` の `[data-slot="article-prose"] h2` (PC で節見出しを
+                    jp/h1 32 に上げる規則) が当たらず PC でも 24 のままだった
+                  という 2 点で、同じ blockContent を出す elxea Journal 記事詳細
+                  (`ArticleProse` 使用) と体裁が食い違っていた。
+                  旧コメントにあった「`prose-custom` 自身が持つ段落マージン (実測
+                  74px)」も、存在しないクラスについての記述なので削除した。
+
+                  縦リズムは `ArticleProse` の既定 (節見出し 前 80 / 後 44) を
+                  そのまま使う。ここは一度 `[&_h2]:mt-14!` / `[&_h2+*]:mt-5!` で
+                  56 / 20 に上書きしていたが、**Figma 実測で 80 / 44 が正だと確定した**
+                  ので上書きを外した。
+
+                  Figma (`AWLnI0XF07e8rScuxPYPc7`) の本文カラム `Column 640` は
+                  VERTICAL auto-layout の `itemSpacing: 24`。節見出しはその中に置かれた
+                  **高さ 114 のフレーム `H2 (前56/後20)`** (8110:46909) で、内訳は
+                  上パディング 56 + 見出しテキスト 38 + 下パディング 20 = 114。
+                  つまり「前 56 / 後 20」はフレーム内パディングであって、
+                  **文字から文字までの実距離は 24 + 56 = 80 / 20 + 24 = 44**。
+                  REST の絶対座標でも一致する (直前画像の下端 15002 → 見出しテキスト上端
+                  15082 = 80、見出し下端 15120 → 次テキスト上端 15164 = 44)。
+                  旧コードの 56 / 20 はフレーム内パディングの数字をそのまま margin に
+                  読み替えたもので、実距離が 24px ずつ足りていなかった。 */}
               {article.body && (
-                <div className="prose-custom mt-6 [&>*]:mb-0! [&>*+*]:mt-6! [&_h2]:mt-14! [&_h2]:mb-0! [&_h3]:mt-14! [&_h3]:mb-0! [&_h2+*]:mt-5! [&_h3+*]:mt-5!">
+                <ArticleProse className="mt-6">
                   <PortableText value={article.body} />
-                </div>
+                </ArticleProse>
               )}
 
               {/* 記事の音声 — サイト内で鳴らす (Setaka 確定 2026-08-11)。

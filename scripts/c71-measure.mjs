@@ -79,7 +79,14 @@ const probe = () => {
   const regNote = q('[data-slot="event-registration-note"]');
   const body = q('[data-slot="event-body"]');
   const bodyHead = q('h2[data-slot="event-section-title"]');
-  const bodyProse = body ? q(".prose-custom", body) : null;
+  // 本文枠は `ArticleProse` (data-slot="article-prose")。
+  //
+  // 以前はここで `.prose-custom` を探していた。`.prose-custom` は **CSS 上は一度も
+  // 定義が無く体裁には何も効いていなかった**が、className の文字列としては要素に
+  // 実在したので querySelector 自体はマッチしており、計測は取れていた。
+  // 2bbbc8e で枠を `ArticleProse` に寄せてこのクラス名を外したため、セレクタを
+  // 更新しないと**これ以降**空振りして常に null になる。だから合わせて更新する。
+  const bodyProse = body ? q('[data-slot="article-prose"]', body) : null;
   const detailsLink = q('[data-slot="event-details-link"]');
   const secCS = cs(sec);
 
