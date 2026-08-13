@@ -163,3 +163,23 @@ export function isSameEventDay(
   if (!startDate || !endDate) return false;
   return jstDayKey(startDate) === jstDayKey(endDate);
 }
+
+/**
+ * 開催が JST で**今日より前に終わっている**か (= 一覧に出さないイベント)。
+ *
+ * 判定は「日」単位で行い、時刻では切らない。当日の朝に開催が終わるイベントでも
+ * その日いっぱいは一覧に残す方が、来場者の「今日これだったよね」に応える。
+ * 複数日開催は `endDate` を見るので、会期中のイベントは初日を過ぎても落ちない。
+ *
+ * 日付が読めない値では **false** を返す (隠す側に倒さない)。表示ロジックの
+ * フィルタが、壊れた 1 件を理由に正しいイベントまで消すことは避ける。
+ */
+export function isPastEvent(
+  start: string | number | Date | null | undefined,
+  end: string | number | Date | null | undefined,
+  now: Date = new Date(),
+): boolean {
+  const last = toDate(end) ?? toDate(start);
+  if (!last) return false;
+  return jstDayKey(last) < jstDayKey(now);
+}

@@ -6,7 +6,7 @@ import { ImageCard } from "@/components/media/image-card";
 import { EVENTS_QUERY } from "@/sanity/lib/queries";
 import { urlFor } from "@/sanity/lib/image";
 import { previewSeedEnabled, seedEvents } from "@/lib/preview-seed";
-import { isSameEventDay } from "@/lib/format-date";
+import { isPastEvent, isSameEventDay } from "@/lib/format-date";
 
 export default function EventsPage() {
   const t = useTranslations("common");
@@ -41,10 +41,19 @@ async function EventsList() {
     // Preview-only: the production dataset has no future events, so the list is
     // empty. Fall back to the shared seed events (same 3 as the top page) so the
     // layout can be reviewed. No effect when the flag is unset.
-    const events =
+    const source =
       (!fetched || fetched.length === 0) && previewSeedEnabled()
         ? seedEvents()
         : fetched;
+
+    // 開催が終わったイベントは一覧に出さない (Sanity のデータは消さない)。
+    // `EVENTS_QUERY` 側にも `date >= now()` があるが、それを通らない経路が
+    // 残っている: preview seed は固定日付なので時間が経てば過去になるし、
+    // 取得側を差し替えれば GROQ のフィルタごと外れる。**表示する直前**でもう
+    // 一度落として、どの経路から来ても過去日のカードが並ばないようにする。
+    const events = ((source ?? []) as { date: string; endDate?: string }[]).filter(
+      (event) => !isPastEvent(event.date, event.endDate)
+    );
 
     if (!events || events.length === 0) {
       return (

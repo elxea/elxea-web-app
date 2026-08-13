@@ -32,7 +32,7 @@ import {
   FEATURED_ARTICLES_QUERY,
   TOP_FARMER_VOICES_QUERY,
 } from "@/sanity/lib/queries";
-import { formatArticleDate } from "@/lib/format-date";
+import { formatArticleDate, isPastEvent } from "@/lib/format-date";
 import {
   isSeedId,
   previewSeedEnabled,
@@ -413,6 +413,7 @@ type EventRow = {
   title: string;
   slug: { current: string };
   date: string;
+  endDate?: string;
   location?: string;
 };
 
@@ -429,7 +430,13 @@ async function EventsSection() {
     return null;
   }
 
-  const items: FeedItem[] = (events ?? []).slice(0, 3).map((event) => {
+  // 過去日のイベントはトップにも出さない。一覧 (`/events`) と同じ判定を使う
+  // ので、片方だけ過去日が残る状態にならない。
+  const upcoming = (events ?? []).filter(
+    (event) => !isPastEvent(event.date, event.endDate)
+  );
+
+  const items: FeedItem[] = upcoming.slice(0, 3).map((event) => {
     const date = formatArticleDate(event.date);
     return {
       // seed イベントには詳細ルートが無いので一覧へ通す。
