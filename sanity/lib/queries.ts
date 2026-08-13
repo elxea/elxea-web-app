@@ -363,7 +363,9 @@ export const OTHER_PLAYLISTS_QUERY = groq`
   }
 `;
 
-// elxea Journal (newsletter)
+// elxea Journal / Set Edition — アソートセット購入者が見るプリセット版 roji 体験。
+// 呼称は Setaka 2026-08-11 確定 (「ニュースレター」は廃語)。Sanity の型名
+// `journal` と URL `/elxea-journal` は互換のため据え置き。
 export const JOURNALS_QUERY = groq`
   *[_type == "journal" && language == $language] | order(title asc) {
     _id,

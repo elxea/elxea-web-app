@@ -177,7 +177,15 @@
     "audioExternalNote": "曲単位のフル尺・ダウンロードは SoundCloud で",
     "audioInterviewNote": "このページで再生します。外部の配信サービスには公開していません。",
     "audioInterviewLabel": "インタビュー音声",
-    "readTime": "{minutes} 分で読める"
+    "readTime": "{minutes} 分で読める",
+    "audioTrackLabel": "この号の音楽",
+    "emptyFilteredCount": "該当 0 件",
+    "emptyFilteredTitle": "この絞り込みに合う読みものはまだありません",
+    "emptyFilteredBody": "別のカテゴリを選ぶか、絞り込みを解除するとすべての読みものが表示されます。",
+    "emptyFilteredAction": "絞り込みを解除する",
+    "bookmarkSaved": "保存済み",
+    "bookmarkSaving": "保存中…",
+    "bookmarkLoginToSave": "ログインして保存"
   },
   "teaMenu": {
     "title": "お茶メニュー",
@@ -223,7 +231,7 @@
   },
   "elxeaJournal": {
     "title": "elxea Journal",
-    "description": "季節のお茶と、その向こうにある産地の話。定期便とともにお届けする読みもの。",
+    "description": "季節のお茶と、その向こうにある産地の話。お手元のアソートセットに沿って読める、Set Edition の読みもの。",
     "empty": "次号を準備しています。季節のお便りをお楽しみに。",
     "loadError": "ジャーナルを読み込めませんでした。時間をおいて、もう一度お試しください。",
     "teaSection": "お届けのお茶について",

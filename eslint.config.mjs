@@ -97,6 +97,22 @@ const eslintConfig = [
       "elxea-tokens/no-colorless-border": "error",
     },
   },
+
+  // roji 判断2 の機械強制（2026-08-08）:
+  //   「新しいカルテの項目は必ず未連携カルテ（cx-agent の lineUsers）側に足す。3か所目を作らない」。
+  //   未連携の人のカルテが 2 か所にある状態を今は畳まない代わりに、web-app 側のカルテ型を凍結して
+  //   「web 側にだけ項目が足されて合流で落ちる」を lint で止める。error 級（pnpm lint は
+  //   --max-warnings 0）。逃げ道は allowlist の更新のみで、差分に必ず現れる。
+  //   根拠: https://www.notion.so/3b570c9d064c81d68610f9360f50c965 判断2
+  {
+    files: ["lib/firebase/types.ts"],
+    plugins: {
+      "elxea-tokens": elxeaTokens,
+    },
+    rules: {
+      "elxea-tokens/no-new-karte-fields": "error",
+    },
+  },
 ];
 
 export default eslintConfig;

@@ -520,6 +520,24 @@ dl[data-slot="spec-band"][data-emphasis="true"] > [data-slot="spec-item"] > dd {
   font-size: var(--typography-size-lg);
 }
 
+/* ページ内モーダルの見出し (Figma Modal 8172:280)。SP は h4 (16px / 500)、
+ * PC は h3 (20px / 400) と Figma でサイズが切り替わるので、単純縮小ではなく
+ * ブレークポイントで組み替える。Radix の DialogTitle は h2 を描画するため
+ * セレクタは h2。Unlayered な理由・`:lang()` 前置の理由は catalog-card-title と
+ * 同じ (globals.css の素の `h2 { font: … }` に Tailwind utilities が勝てない)。 */
+:lang(ja) h2[data-slot="modal-title"],
+:lang(en) h2[data-slot="modal-title"] {
+  font: var(--typography-style-h4);
+  letter-spacing: var(--typography-style-h4-tracking);
+}
+@media (min-width: 64rem) {
+  :lang(ja) h2[data-slot="modal-title"],
+  :lang(en) h2[data-slot="modal-title"] {
+    font: var(--typography-style-h3);
+    letter-spacing: var(--typography-style-h3-tracking);
+  }
+}
+
 :root {
   /* Third-party brand colors */
   --brand-line: #06C755;

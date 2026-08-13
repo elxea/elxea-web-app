@@ -9,7 +9,10 @@ import {
   ARTICLES_BY_CATEGORY_QUERY,
   CATEGORIES_WITH_COUNTS_QUERY,
 } from "@/sanity/lib/queries";
+import { Link } from "@/i18n/navigation";
 import { Breadcrumb } from "@/components/seo/breadcrumb";
+import { EmptyState } from "@/components/ui/empty-state";
+import { pillClass } from "@/components/ui/pill-button";
 import { Section } from "@/components/layout/container";
 import { CatalogToolbar } from "@/components/catalog/catalog-toolbar";
 import { ListPageHead, MoreRow } from "@/components/catalog/catalog-list";
@@ -23,6 +26,11 @@ import { getPopularArticles, orderByPopularity } from "@/lib/journal/popular-art
  * (8083:4073) の「◯◯を、もっと見る →」の降り先として必要なため、同じ確定版の
  * タグページ (8082:3855) と同一骨格で実装している (チップ列がカテゴリになる
  * だけの差)。タグページとの違いは下部のタグマップを置かないこと。
+ *
+ * 取得は `?show=` 連動のサーバサイド範囲取得 (A4)。以前は `[0...60]` 固定だった
+ * ため、1 カテゴリに 61 件以上あると残りへ到達できなかった。古い順は
+ * `[...list].reverse()` では取得した窓の中しか反転できないので、Sanity 側で
+ * 昇順に並べたクエリを使う。
  */
 
 /** Figma の記事グリッドは 2 列 x 3 段 = 6 件 (8082:3883 と同じ)。 */
@@ -208,7 +216,21 @@ export default async function CategoryPage({
 
       <JournalLayout className="mt-8 lg:mt-12">
         {visible.length === 0 ? (
-          <p className="order-1 text-sm text-muted-foreground">{t("empty")}</p>
+          <div className="order-1">
+            {/* 絞り込みの結果として 0 件。障害 (loadError) とは必ず出し分ける
+                — こちらは再試行ではなく絞り込みの解除を促す
+                (Figma EmptyState 8173:298 の注記)。 */}
+            <EmptyState
+              count={t("emptyFilteredCount")}
+              title={t("emptyFilteredTitle")}
+              body={t("emptyFilteredBody")}
+              action={
+                <Link href="/journal" className={pillClass("outline")}>
+                  {t("emptyFilteredAction")}
+                </Link>
+              }
+            />
+          </div>
         ) : (
           <JournalGrid>
             {visible.map((article) => (

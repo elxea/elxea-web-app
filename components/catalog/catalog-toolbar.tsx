@@ -32,6 +32,13 @@ import { cn } from "@/lib/utils";
  *                 溝 = border 色 / つまみ = muted-foreground 色
  *                 つまみ幅 = 可視範囲の割合、位置 = スクロール量の割合
  * どちらも SP 限定 (`lg:hidden`)。PC はチップ列が全部見えていて隠れ幅が無いため。
+ * SP の並び替え (意図的な Figma 差分):
+ * Figma の SP フレームには Select が無いが、以前の実装は `hidden lg:block` を
+ * `<select>` 自体に当てていたため、SP では並び替えが一切できず、かつ
+ * NativeSelect のラッパ (相対配置 + シェブロン絶対配置) だけが残って
+ * シェブロンが浮く状態だった。SP でも並び替えは使えるべき機能なので、
+ * 「PC は右端に横並び / SP はチップ列の下に右寄せで 1 段落とす」に変える
+ * (見た目は PC と同じ DS の NativeSelect をそのまま使い、追加の意匠は足さない)。
  *
  * 絞り込み・並び替えの状態は URL クエリに載せる (`?category=` / `?sort=`)。
  * 戻る・共有・SSR いずれでも同じ結果になるようにするため、クライアント state に
@@ -163,12 +170,26 @@ export function CatalogToolbar({
       >
         {chips.map((chip) => {
           const selected = chip.value === current;
+          // 状態は Figma `Chip / Category (Module)` 8171:269 の 6 バリアント
+          // (default / hover / focus / selected / selected-hover / disabled) に
+          // 揃える。Figma に無い状態は足さない (unselected の active は Chip に
+          // 定義が無いので作らない)。
+          //
+          // 意図的な Figma 差分: 角丸。Chip Module は radius-lg (8px) だが、
+          // このツールバーの正本は R2 確定版の共通リストパターン Toolbar
+          // (8061:1789) で全丸めであり、商品一覧・お茶メニューも同じ部品を
+          // 共有している。Figma 側に 2 つの正本が併存している状態なので、
+          // ここでは形は既存 (全丸め) のまま「状態だけ」を Chip Module へ寄せる。
+          // 形の統一は Chip Module の注記どおり Figma 側の次回改訂で決める。
           const chipClass = cn(
             bodySmClass,
-            "flex h-11 shrink-0 items-center rounded-full px-4 py-2 whitespace-nowrap",
+            "flex h-11 shrink-0 items-center rounded-full px-3 py-3 whitespace-nowrap lg:px-4 lg:py-2",
+            "transition-colors duration-200",
+            "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none",
             selected
-              ? "bg-primary text-primary-foreground"
-              : "border border-border text-foreground hover:bg-muted"
+              ? "bg-primary text-primary-foreground hover:bg-brand-charcoal"
+              : "border border-border text-foreground hover:bg-secondary",
+            "aria-disabled:pointer-events-none aria-disabled:text-muted-foreground aria-disabled:opacity-50"
           );
 
           if (chip.href) {

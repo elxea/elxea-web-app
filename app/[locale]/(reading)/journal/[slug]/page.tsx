@@ -15,6 +15,7 @@ import { Breadcrumb } from "@/components/seo/breadcrumb";
 import { PortableText } from "@/components/sanity/portable-text";
 import { ImageCard } from "@/components/media/image-card";
 import { MemberGate } from "@/components/account/member-gate";
+import { pillClass } from "@/components/ui/pill-button";
 import {
   bodySmClass,
   captionClass,
@@ -129,16 +130,25 @@ export default async function ArticlePage({
   const tierRank: Record<MembershipTier, number> = { none: 0, standard: 1, premium: 2 };
   const hasAccess = !isGated || tierRank[userTier] >= tierRank[requiredTier];
 
-  // 記事末尾の関連記事 (Figma は 3 行)
+  // 記事末尾の関連記事 (Figma は 3 行)。
+  //
+  // A8: 以前は「カテゴリが設定されている記事」だけが関連記事を引いていたため、
+  // カテゴリ未設定の記事はタグが付いていても関連記事の fetch すらせず、
+  // 記事末尾が完全な行き止まりになっていた (クエリ自体はタグ一致も見ている)。
+  // カテゴリかタグのどちらかがあれば引く。
+  const tagIds: string[] = article.tags?.map((tag: { _id: string }) => tag._id) ?? [];
   let relatedArticles: RelatedArticle[] = [];
-  if (hasAccess && article.category?._id) {
+  if (hasAccess && (article.category?._id || tagIds.length > 0)) {
     try {
       const client = getClient();
       relatedArticles = await client.fetch(RELATED_ARTICLES_QUERY, {
         language: locale,
         currentId: article._id,
-        categoryId: article.category._id,
-        tagIds: article.tags?.map((tag: { _id: string }) => tag._id) ?? [],
+        // カテゴリ未設定のときに null を渡すと `category._ref == null` が
+        // 「カテゴリ未設定の記事すべて」に当たってしまう。決して一致しない
+        // 番兵を渡してタグ一致だけを効かせる。
+        categoryId: article.category?._id ?? "__no-category__",
+        tagIds,
       });
     } catch {
       // 関連記事は本文の必須要素ではないので黙って落とす
@@ -223,8 +233,9 @@ export default async function ArticlePage({
                 }
                 addLabel={t("addToBookmarks")}
                 removeLabel={t("removeFromBookmarks")}
-                loadingLabel={t("bookmarkLoading")}
-                loginRequiredLabel={t("bookmarkLoginRequired")}
+                savedLabel={t("bookmarkSaved")}
+                loadingLabel={t("bookmarkSaving")}
+                loginRequiredLabel={t("bookmarkLoginToSave")}
                 statusUnknownLabel={t("bookmarkStatusUnknown")}
                 addedMessage={t("addedToBookmarks")}
                 removedMessage={t("removedFromBookmarks")}
@@ -441,12 +452,10 @@ export default async function ArticlePage({
               {/* NextRead — 行き止まりを作らない (カテゴリ回遊) */}
               {article.category?.slug?.current && (
                 <div className="mt-6 flex justify-center">
+                  {/* 手組みの pill を DS 部品 (Figma 8171:286) へ寄せる。 */}
                   <Link
                     href={`/journal?category=${article.category.slug.current}`}
-                    className={cn(
-                      bodySmClass,
-                      "flex h-12 items-center rounded-full border border-border px-4 text-foreground transition-colors hover:bg-muted"
-                    )}
+                    className={pillClass("outline")}
                   >
                     {t("moreInCategory", { name: article.category.title })}
                   </Link>

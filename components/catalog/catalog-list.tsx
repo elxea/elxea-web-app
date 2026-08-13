@@ -2,6 +2,7 @@ import * as React from "react";
 
 import { Link } from "@/i18n/navigation";
 import { ImageCard } from "@/components/media/image-card";
+import { pillClass } from "@/components/ui/pill-button";
 import {
   bodySmClass,
   captionClass,
@@ -229,17 +230,11 @@ export function MoreRow({
 }) {
   return (
     <div data-slot="more-row" className={cn("flex justify-center", className)}>
-      <Link
-        href={href}
-        className={cn(
-          bodySmClass,
-          /* 左右内余白は Figma 実測どおり BP で分ける (SP 12 / PC 16)。
-             Figma PC 8061:2008 / 8063:2182 は text x16、SP 8063:2420 は x12。
-             C9-1 注10 が [粗] として残していた 4px 差を閉じる。 */
-          "flex h-12 items-center rounded-full border border-border px-3 text-foreground lg:px-4",
-          "transition-colors hover:bg-muted"
-        )}
-      >
+      {/* Figma `Button / Pill (Module)` 8171:286 の注記「Journal R2 の手作り
+          『Button / もっと見る (pill)』フレーム群は本部品のインスタンスへ
+          置換すること」に従い、手組みの pill を DS 部品へ寄せる。
+          hover / active / disabled は pillClass が一括で持つ。 */}
+      <Link href={href} className={pillClass("outline")}>
         {label}
       </Link>
     </div>

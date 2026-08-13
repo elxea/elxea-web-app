@@ -177,7 +177,15 @@
     "audioExternalNote": "Full-length tracks and downloads are on SoundCloud",
     "audioInterviewNote": "Plays on this page. Not published to external streaming services.",
     "audioInterviewLabel": "Interview audio",
-    "readTime": "{minutes} min read"
+    "readTime": "{minutes} min read",
+    "audioTrackLabel": "Music in this issue",
+    "emptyFilteredCount": "0 results",
+    "emptyFilteredTitle": "No readings match this filter yet",
+    "emptyFilteredBody": "Choose another category, or clear the filter to see every reading.",
+    "emptyFilteredAction": "Clear the filter",
+    "bookmarkSaved": "Saved",
+    "bookmarkSaving": "Saving…",
+    "bookmarkLoginToSave": "Log in to save"
   },
   "teaMenu": {
     "title": "Tea Menu",
@@ -223,7 +231,7 @@
   },
   "elxeaJournal": {
     "title": "elxea Journal",
-    "description": "A newsletter about seasonal tea and everyday life",
+    "description": "The Set Edition — seasonal tea and the places it comes from, sent with your assortment.",
     "empty": "No journals yet.",
     "loadError": "Could not load journals.",
     "teaSection": "About the Tea in This Issue",

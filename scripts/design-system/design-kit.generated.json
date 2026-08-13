@@ -170,7 +170,7 @@
           "css_var": "--color-secondary-foreground"
         },
         "muted": {
-          "value": "oklch(0.892 0.018 99.8)",
+          "value": "oklch(0.893 0.018 99.0)",
           "css_var": "--color-muted"
         },
         "muted-foreground": {
@@ -1397,7 +1397,7 @@
   "components": {
     "code_sot": {
       "path": "components/ui",
-      "count_tsx": 58,
+      "count_tsx": 60,
       "list": [
         "accordion",
         "alert",
@@ -1422,6 +1422,7 @@
         "drawer",
         "dropdown-menu",
         "empty",
+        "empty-state",
         "field",
         "form",
         "hover-card",
@@ -1447,6 +1448,7 @@
         "sheet",
         "sidebar",
         "skeleton",
+        "skeleton-bar",
         "slider",
         "sonner",
         "spinner",
@@ -2410,6 +2412,6 @@
     "_figma_node_count_method": "components.figma_mirror 配下に現れる distinct な Figma node ID (\\d+:\\d+) を、直近の verified_at の有無で分類した実カウント。",
     "figma_nodes_verified": 48,
     "figma_nodes_unverified": 0,
-    "code_ui_components": 58
+    "code_ui_components": 60
   }
 }

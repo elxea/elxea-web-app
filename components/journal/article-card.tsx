@@ -33,7 +33,17 @@ import { cn } from "@/lib/utils";
  * 根拠: Figma 8085:4299 では `HeroFeature` と `Main (グリッド + サイドバー)` が
  * どちらも `Content` 直下の**兄弟フレーム**で、グリッドを束ねる節フレームが無い。
  * 体裁は h2 / h3 のどちらでも同一 (globals.css の当該規則を参照)。
+ * W3-2 (共通インタラクション状態): カードの各リンクは hover では下線が出るのに
+ * キーボードフォーカスでは何も出ず、Tab で辿っている人には現在位置が見えなかった。
+ * Chip (Figma 8171:269) の focus と同じ表現 (ring 2px / mode-ring) を当てて揃える。
+ * あわせて写真リンクを tab 順から外す — 見出しリンクと同じ行き先を指す 2 つ目の
+ * タブ停止でしかなく、キーボード利用者には同じ場所を 2 回踏ませるだけのため
+ * (マウス・タッチでの写真クリックは従来どおり効く)。
  */
+
+/** Chip / Pill と同じフォーカス表現。DS 全体で 1 つの見え方に揃えるための共有値。 */
+const focusRing =
+  "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none";
 type ArticleCardProps = {
   article: {
     _id: string;
@@ -81,19 +91,32 @@ export function ArticleCard({
 
   return (
     <div data-slot="article-card" className={cn("group flex flex-col gap-4", className)}>
-      <Link href={`${hrefBase}/${article.slug.current}`} className="block">
+      <Link
+        href={`${hrefBase}/${article.slug.current}`}
+        className={cn("block rounded-md", focusRing)}
+        tabIndex={-1}
+        aria-hidden="true"
+      >
         <ImageCard image={resolvedImage} alt={image?.alt || article.title} hover />
       </Link>
       <div className="space-y-1.5">
         {article.category && (
           <Link
             href={`${hrefBase}?category=${article.category.slug.current}`}
-            className={cn(captionClass, "block text-muted-foreground hover:text-foreground")}
+            className={cn(
+              captionClass,
+              "block rounded-sm text-muted-foreground transition-colors duration-200",
+              "hover:text-foreground active:text-muted-foreground",
+              focusRing
+            )}
           >
             {article.category.title}
           </Link>
         )}
-        <Link href={`${hrefBase}/${article.slug.current}`} className="block">
+        <Link
+          href={`${hrefBase}/${article.slug.current}`}
+          className={cn("block rounded-sm", focusRing)}
+        >
           <Heading
             data-slot="article-card-title"
             className={cn(bodySmClass, "text-foreground underline-offset-4 group-hover:underline")}

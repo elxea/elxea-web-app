@@ -38,14 +38,15 @@
       },
       "secondary": {
         "$value": "oklch(0.863 0.026 102.0)",
-        "$description": "sand (#d5d3c0) — Figma Variable `secondary` の実値 (c6-3 / c7-1 忠実度表の実測、node 8109:46558 の `sand` と同値)。Figma が正本なのでコードを合わせた (旧値 oklch(0.846 0.173 85.6) = Gold #ffc200 は Webflow secondary-color 由来で、Figma で secondary を指定した要素が実行時に金色に解決していた)。`tokens/elxea-custom.json` はビルド対象外なので二重定義ではなく、実効定義はこの 1 つだけ。secondary-foreground (#464748) との対比 5.751 → 6.167。"
+        "$description": "gray-40 (#d5d3c0) — sand。Figma `mode/secondary` の実測値 (file AWLnI0XF07e8rScuxPYPc7 / node 8171:269・8171:299 を get_variable_defs = #d5d3c0)。2026-08-11 に Gold (#ffc200) から是正。旧値は Webflow の secondary-color をそのまま持ち込んだもので、Figma の mode コレクションと意味が反転していた (Figma で gold は accent 専用)。原則 Figma 準拠。tokens/elxea-custom.json の color.light.secondary と一致。"
       },
       "secondary-foreground": {
-        "$value": "oklch(0.397 0.002 247.9)"
+        "$value": "oklch(0.397 0.002 247.9)",
+        "$description": "gray-120 (#464748) — graphite。Figma `foreground` と同値なので値は据え置き。sand 面上のコントラストは 6.17:1 で WCAG AA Normal (4.5:1) 通過 — gold 時代の 5.75:1 より改善する。"
       },
       "muted": {
-        "$value": "oklch(0.892 0.018 99.8)",
-        "$description": "#dedccf — Figma Variable `muted` の実値 (get_variable_defs 2026-08-09 / node 8109:46558)。Figma が正本なのでコードを合わせた (旧値 oklch(0.933 0.012 96.4) は `background` と完全同値で、写真プレースホルダ枠や muted 面が地に溶けて不可視 1.00:1 だった)。background との差は 1.133:1 / ΔL* 4.7 で面の区別がつく。muted-foreground との対比 5.875 → 5.187 (AA 達成) / foreground との対比 5.330 → 6.759。注意: 罫線 `border` (#888675) を muted 面の内側に引くと 2.668:1 で 3:1 を下回るので、両側が muted になる罫線は作らない。"
+        "$value": "oklch(0.893 0.018 99.0)",
+        "$description": "#dedccf — cream と sand の中間。Figma `mode/muted` の実測値 (file AWLnI0XF07e8rScuxPYPc7 / node 8171:286 Button・Pill Module を get_variable_defs = #dedccf)。2026-08-11 に cream #ebe9e0 から是正。旧値は `background` と完全同値でコントラスト 1.0000:1 となり、cream 背景の上で `hover:bg-muted` / `disabled:bg-muted` が一切見えなかった (Wave 6 で B2 SoundCloud リンク hover 不可視の真因と特定)。原則 Figma 準拠。是正後 background とのコントラストは 1.1325:1 で面の差が視認でき、muted-foreground (#585854) を載せたときは 5.19:1 で WCAG AA Normal (4.5:1) を通過する。tokens/elxea-custom.json の color.light.muted と完全一致。"
       },
       "muted-foreground": {
         "$value": "oklch(0.460 0.006 106.6)",
