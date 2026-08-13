@@ -118,28 +118,26 @@ describe("tea-origins", () => {
 
   it("既知の代表値を正しく引く", () => {
     // 11301 = やぶきたの上煎茶 / みとちゃ農園 (奈良県 山添村)
-    // 座標は正本 = Notion Supplier List の Place。
+    // 座標は 2026-08-14 の調査値 (公開された所在地の住所 -> 国土地理院ジオコーダ)。
     expect(resolveTeaOrigin("11301")).toEqual({
       prefecture: "奈良県",
       area: "山添村",
       raw: "奈良県 山添村",
-      lat: 34.68088,
-      lng: 136.04343,
+      lat: 34.684731,
+      lng: 135.973053,
       precision: "area",
       geoTitle: "奈良県山辺郡山添村",
       needsReview: false,
     });
     // 51001 = 春摘みべにふうきの和紅茶 / つしま大石農園 (長崎県 対馬市 上県町)
-    // 正本を採らない唯一の例外。Notion の Place は対馬市全体の重心で、島の
-    // 南北 80km のうち南部を指してしまうため、GSI の上県町の代表点を残している。
     expect(resolveTeaOrigin("51001")).toEqual({
       prefecture: "長崎県",
       area: "対馬市上県町",
       raw: "長崎県 対馬市 上県町",
-      lat: 34.566456,
-      lng: 129.333176,
+      lat: 34.607712,
+      lng: 129.353561,
       precision: "area",
-      geoTitle: "長崎県対馬市上県町伊奈",
+      geoTitle: "長崎県対馬市上県町",
       needsReview: false,
     });
     expect(resolveTeaSupplier("10701")).toBe("中窪製茶園");
@@ -242,8 +240,8 @@ describe("teaOriginPoints", () => {
       menuNumber: "10101",
       prefecture: "静岡県",
       area: "静岡市",
-      lat: 34.97516,
-      lng: 138.38324,
+      lat: 35.081059,
+      lng: 138.494431,
       precision: "area",
     });
   });
@@ -274,37 +272,75 @@ describe("teaOriginPoints", () => {
   });
 });
 
-describe("座標の正本 (Notion Supplier List の Place)", () => {
+describe("座標 (2026-08-14 の調査値)", () => {
   /**
-   * 座標が 2 系統 (Notion `Place` / 国土地理院) に分かれていた二重管理を
-   * 2026-08-12 に解消し、正本を Notion に統一した。旧 GSI 値へ黙って戻るのを
-   * 防ぐため、判断が割れた 2 軒だけ実値で固定する。
+   * 2026-08-12 版の座標は Notion Supplier List の `Place` = **市町村の代表点
+   * (役場の位置)** で、産地から最大 25km 以上ずれていた。2026-08-14 に 12 軒すべてを
+   * 公開所在地の住所ベースで取り直している。
+   *
+   * ここで守りたいのは「役場の座標へ静かに戻らないこと」。Notion 同期を足すとき、
+   * 単一正本の原則を素直に適用して `Place` を書き戻す変更が最も起こりやすい。
    */
-  it("hasama は正本 (Notion) の値を採る — GSI 値へ戻さない", () => {
-    // 51301 = ハサマ共同製茶組合。両系統とも「三重県四日市市川島町」に解決するが
-    // 代表点の取り方が 1.3km 違う。単一正本の原則どおり Notion を採用している。
+
+  /** 廃止した市町村代表点。銘柄番号は各仕入先の代表 1 件。 */
+  const RETIRED_MUNICIPAL_CENTROIDS: Record<string, { lat: number; lng: number }> = {
+    "10101": { lat: 34.97516, lng: 138.38324 }, // しばきり園
+    "10401": { lat: 32.68345, lng: 131.19693 }, // 緑碧茶園 五ヶ瀬茶園
+    "10701": { lat: 34.77275, lng: 135.99359 }, // 中窪製茶園
+    "10801": { lat: 35.04684, lng: 138.08192 }, // 益井園
+    "11301": { lat: 34.68088, lng: 136.04343 }, // みとちゃ農園
+    "11601": { lat: 33.21141, lng: 130.55804 }, // お茶の千代乃園
+    "40201": { lat: 32.29897, lng: 130.49309 }, // お茶のカジハラ
+    "40301": { lat: 32.68345, lng: 131.19693 }, // 宮崎茶房
+    "50401": { lat: 32.21181, lng: 130.40858 }, // お茶の坂口園
+    "51001": { lat: 34.566456, lng: 129.333176 }, // つしま大石農園 (旧 GSI 値)
+    "51301": { lat: 34.97434, lng: 136.56266 }, // ハサマ共同製茶組合
+    "51501": { lat: 36.1782, lng: 139.75491 }, // 吉田茶園
+  };
+
+  it.each(Object.entries(RETIRED_MUNICIPAL_CENTROIDS))(
+    "%s は廃止した市町村代表点へ戻っていない",
+    (menuNumber, retired) => {
+      const { lat, lng } = resolveTeaOrigin(menuNumber);
+      expect({ lat, lng }).not.toEqual(retired);
+    },
+  );
+
+  it("hasama は住所ベースの調査値を持つ", () => {
+    // 51301 = ハサマ共同製茶組合 (三重県四日市市川島町)
     const { lat, lng } = resolveTeaOrigin("51301");
-    expect({ lat, lng }).toEqual({ lat: 34.97434, lng: 136.56266 });
-    // 旧 GSI 値 (34.968712, 136.549942) に戻っていないこと
-    expect(lat).not.toBe(34.968712);
+    expect({ lat, lng }).toEqual({ lat: 34.968712, lng: 136.549942 });
   });
 
-  it("tsushima-oishi だけは GSI を残す — 対馬市の重心へ丸めない", () => {
-    // 51001 = つしま大石農園。Notion の Place は対馬市全体の重心 (34.20277) で、
-    // 南北 80km の島の南部を指し産地から約 45km 外れるため採用しない。
+  it("tsushima-oishi は島北部 (上県町) を指す — 対馬市の重心へ丸めない", () => {
+    // 51001 = つしま大石農園。対馬は南北 80km あり、市の重心 (34.20277) は
+    // 島の南部を指して産地から約 45km 外れる。
     const { lat, lng } = resolveTeaOrigin("51001");
-    expect({ lat, lng }).toEqual({ lat: 34.566456, lng: 129.333176 });
+    expect({ lat, lng }).toEqual({ lat: 34.607712, lng: 129.353561 });
     expect(lat).not.toBe(34.20277);
-    // 島の北部 (上県町) 側にあること
     expect(lat).toBeGreaterThan(34.4);
   });
 
-  it("正本統一後も同一町の 2 軒は同一座標のまま (地図で 1 点に畳まれる)", () => {
-    // 40301 = 宮崎茶房 / 10401 = 緑碧茶園 五ヶ瀬茶園。どちらも五ヶ瀬町。
+  it("chiyonoen は八女市東部の山間を指す — 市役所 (西端) ではない", () => {
+    // 11601 = お茶の千代乃園。八女市は合併で東西に長く、市役所は西端の平地にある。
+    const { lng } = resolveTeaOrigin("11601");
+    expect(lng).toBeGreaterThan(130.8);
+  });
+
+  it("五ヶ瀬町の 2 軒が同一座標なのは正しい状態 (見た目のためにずらさない)", () => {
+    // 40301 = 宮崎茶房 / 10401 = 緑碧茶園 五ヶ瀬茶園。別会社で番地も別だが、
+    // 無料のジオコーダでは大字の代表点までしか解決できないため同値になる。
     const a = resolveTeaOrigin("10401");
     const b = resolveTeaOrigin("40301");
     expect({ lat: a.lat, lng: a.lng }).toEqual({ lat: b.lat, lng: b.lng });
     expect(teaOriginPoints(["10401", "40301"])).toHaveLength(1);
+  });
+
+  it("同一座標は五ヶ瀬町の 2 軒だけ (他の軒が同じ点に落ちていない)", () => {
+    const points = teaOriginPoints(TEA_MENU_NUMBERS);
+    // 仕入先 12 軒 -> 畳んだあと 11 点。差の 1 が五ヶ瀬町の 2 軒。
+    expect(points).toHaveLength(11);
+    expect(new Set(points.map((p) => `${p.lat},${p.lng}`)).size).toBe(11);
   });
 });
 

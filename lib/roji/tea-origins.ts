@@ -30,47 +30,57 @@
  * 中長期的には Sanity `teaMenu` に構造化産地フィールドを足し、Notion からの
  * 同期に乗せるのが単一正本として筋が良い (下の「将来の移行」を参照)。
  *
- * ## 緯度経度の正本 (2026-08-12 二重管理を解消)
+ * ## この地図が指しているもの — 茶畑ではない (2026-08-14 確定)
  *
- * **座標の正本は Notion Supplier List の `Place` プロパティ** (place 型) である。
- * 12 軒すべてに緯度経度が入っている。`Place` は SQL クエリ (query_data_sources)
- * では取得できず、各仕入先ページを個別に fetch すると
- * `place:Place:latitude` / `place:Place:longitude` / `place:Place:name` として返る。
- * 初版に「Notion 側に座標は無い」と書かれていたが、それは SQL で見えなかった
- * だけで **誤り**。この取り違えが座標 2 系統 (Notion / GSI) の二重管理を生んだ。
+ * 座標は **茶畑の位置ではない**。仕入先の事務所・製茶所の位置である。
+ * 茶畑そのものの区画は公開情報から特定できないことを 2026-08-14 の調査で確定した。
+ * 農地の筆界は公開されておらず、農家は複数の圃場を山あいに分散して持つのが普通で、
+ * そもそも「1 点」に還元できない。
  *
- * 国土地理院 (GSI) の住所検索 API は **当初の取得手段であって正本ではない**。
- *   https://msearch.gsi.go.jp/address-search/AddressSearch?q=<地名>
- * 初版はここから座標を引いていたが、正本と食い違う 2 系統目になるため
- * Notion 側へ寄せた。
+ * よってこの地図が伝えるのは「その茶がどの畑で摘まれたか」ではなく、
+ * **つくり手が拠って立つ土地はどこか** である。地図の周りに置く文言もこの意味で
+ * 書く (「茶畑の場所」と言わない)。
  *
- * 2 系統を突き合わせた結果 (距離は Haversine):
- *   - 12 軒中 10 軒は **26m 以内で一致**。どちらも同じ市町村名を geocode した
- *     結果なので実質同一。正本 (Notion) を採用。
- *   - `hasama` のみ 1.3km ずれる。ただし両者とも「三重県四日市市川島町」に
- *     解決しており、同じ町の代表点の取り方が違うだけ。町の広がりに収まるので
- *     `precision: "area"` の粒度として許容し、正本 (Notion) を採用。
- *   - `tsushima-oishi` のみ **GSI を残した** (唯一の例外)。理由は当該エントリの
- *     コメントを参照。
+ * ## 緯度経度の出どころ (2026-08-14 に全 12 軒を取り直し)
  *
- * 各エントリの `coordSource` がどちら由来かを持ち、`geoTitle` はその座標に
- * 紐づく地点の正式名称 (どこに解決されたかの根拠) を原文のまま残している。
+ * 初版 (2026-08-12) は Notion Supplier List の `Place` プロパティを正本にしていたが、
+ * `Place` に入っていたのは **市町村の代表点 (役場の位置)** であって仕入先の所在地
+ * ではなかった。「静岡県静岡市」を geocode した点は市役所を指し、実際の産地から
+ * 20km 以上離れる。産地を指す地図としては事実誤りなので 12 軒すべて置き換えた。
  *
- * **Notion 側で `Place` が変われば、ここは自動では追随しない。** 仕入先の所在地が
- * 更新されたら本ファイルも手で更新する必要がある (恒久策は「将来の移行」を参照)。
+ * 取得手順 (`coordSource: "survey-2026-08"`):
+ *   1. 各仕入先が自ら公開している所在地 (自社サイト・組合の公表資料) を集める
+ *   2. その住所を国土地理院のジオコーダに掛けて緯度経度に変換する
+ *      https://msearch.gsi.go.jp/address-search/AddressSearch?q=<住所>
  *
- * 座標は **推測で作らない**。正本にも GSI にも無い地名は `lat`/`lng` を `null` に
+ * つまり **公開された住所に基づく点** であり、市町村の代表点ではない。
+ * `precision: "area"` のままなのは、住所の解決精度が大字〜番地の間で軒ごとに
+ * 揺れるためで、粒度の主張を実態より強くしないため。
+ *
+ * ### 同一座標の 2 軒は正しい状態 — ずらして誤魔化さない
+ *
+ * 緑碧茶園 五ヶ瀬茶園 と 宮崎茶房 は同じ座標を持つ。両者は **別会社で番地も別**
+ * だが、無料で使えるジオコーダでは大字の代表点までしか解決できないため同値になる。
+ * これは不具合ではない。見た目のために座標をずらすと、地図が事実でなくなる。
+ * 分離したければ番地まで解決する有料ジオコーダを入れるのが筋 (未導入)。
+ *
+ * **Notion 側の `Place` はもう参照していない。** 仕入先の所在地が変わったら
+ * 本ファイルを調査し直して手で更新する。
+ *
+ * 座標は **推測で作らない**。住所が公開されていない軒は `lat`/`lng` を `null` に
  * し `needsReview: true` を立てる (地図に打たず、確認対象として数える)。
+ * 2026-08-14 時点で該当は無い。
  *
  * ## 将来の移行
  *
- * このファイルは **暫定の写し** であって正本ではない。Notion 側で仕入先の
- * Prefecture / Regions / Place が変われば、ここは自動では追随しない。恒久策は
+ * 都道府県・地域名は Notion Supplier List の写しであって正本ではない。Notion 側で
+ * 仕入先の Prefecture / Regions が変われば、ここは自動では追随しない。恒久策は
  * `scripts/sync-notion-to-sanity.ts` に teaMenu の同期を足し、
- * Supplier の Prefecture / Regions / **Place (緯度経度)** を Sanity の構造化
- * フィールドへ流し込むこと。同期を書くときは `Place` が SQL で取れない点に注意
- * (仕入先ページを個別 fetch して `place:Place:*` を読む必要がある)。
- * それが入った時点でこのファイルは削除し、参照を Sanity クエリへ差し替える。
+ * Supplier の Prefecture / Regions を Sanity の構造化フィールドへ流し込むこと。
+ *
+ * ただし **緯度経度は同期に乗せない**。Notion の `Place` は市町村の代表点しか
+ * 持っておらず (2026-08-14 に判明)、同期すると調査で取り直した座標が
+ * 役場の位置へ戻ってしまう。座標は調査結果として本ファイルが持ち続ける。
  *
  * ## 出さないもの
  *
@@ -146,28 +156,40 @@ interface OriginSource {
   lng: number | null;
   precision: OriginPrecision;
   /**
-   * 座標の出どころ。既定は正本の `notion-place`。
-   * `gsi` は正本の値が明らかに劣るため例外的に国土地理院の値を残した軒で、
-   * その理由を必ずエントリのコメントに書く (無言の例外を作らないため)。
+   * 座標の出どころ。
+   *
+   * - `survey-2026-08` 2026-08-14 の調査。仕入先が公開している所在地の住所を
+   *                    国土地理院のジオコーダに掛けた値。現行の全 12 軒がこれ。
+   * - `notion-place`   Notion Supplier List の `Place`。市町村の代表点 (役場) を
+   *                    指し産地から最大 20km 以上ずれるため 2026-08-14 に全廃。
+   *                    値を戻す変更を目で検知できるよう、列挙値だけ残してある。
+   * - `gsi`            市町村名だけを geocode した旧値。同上の理由で全廃。
+   *
+   * 新しい軒を足すときは `survey-2026-08` 系 (= 住所ベース) を使う。
+   * 市町村名だけを geocode した値を混ぜない — 軒ごとに地図の意味が変わるため。
    */
-  coordSource: "notion-place" | "gsi";
+  coordSource: "survey-2026-08" | "notion-place" | "gsi";
   /**
-   * 国土地理院に投げた地名 (再取得・検証用)。
-   * `coordSource: "gsi"` の軒だけ持ち、正本由来の軒は `null`。
+   * ジオコーダに投げた文字列 (再取得・検証用)。
+   *
+   * 仕入先の番地入り住所そのものはここに書かない (取引先の所在地詳細を
+   * このファイルに持たない方針。ファイル冒頭「出さないもの」を参照)。
    */
   geoQuery: string | null;
-  /**
-   * 座標に紐づく地点の正式名称。
-   * 正本由来の軒は Notion `Place` の name、GSI 由来の軒は GSI が返した title。
-   */
+  /** 座標が属する自治体の正式名称。どこに落ちたかを目で確かめるための根拠。 */
   geoTitle: string | null;
 }
 
 /**
- * 産地の実体 (Notion Supplier List のスナップショット)。
+ * 産地の実体。
+ *
+ * `prefecture` / `area` / `raw` は Notion Supplier List のスナップショット。
  * `area` は `raw` の先頭から都道府県名を落として区切りスペースを詰めたもの。
- * `lat`/`lng` は 2026-08-12 に Notion `Place` から読んだ値をそのまま使う (丸めない)。
- * 例外は `tsushima-oishi` のみで、そこだけ GSI の値を残している (理由は当該コメント)。
+ *
+ * `lat`/`lng` は 2026-08-14 の調査値 (公開された所在地の住所 → 国土地理院の
+ * ジオコーダ)。**丸めない** — 丸めると軒ごとに精度が変わり、どこまで信じてよいかが
+ * 読めなくなる。これらが指すのは事務所・製茶所であって茶畑ではない
+ * (ファイル冒頭「この地図が指しているもの」を参照)。
  */
 const ORIGIN_SOURCES = {
   shibakiri: {
@@ -175,11 +197,12 @@ const ORIGIN_SOURCES = {
     prefecture: "静岡県",
     area: "静岡市",
     raw: "静岡県 静岡市",
-    // 静岡市は政令市で市域が広く、この座標は市全体の代表点。
-    lat: 34.97516,
-    lng: 138.38324,
+    // 静岡市は政令市で南北に長い。旧値 (34.97516, 138.38324) は市役所付近を
+    // 指していたが、実際の所在地は市域北部の山あいで 20km 以上北にある。
+    lat: 35.081059,
+    lng: 138.494431,
     precision: "area",
-    coordSource: "notion-place",
+    coordSource: "survey-2026-08",
     geoQuery: null,
     geoTitle: "静岡県静岡市",
   },
@@ -188,10 +211,10 @@ const ORIGIN_SOURCES = {
     prefecture: "宮崎県",
     area: "西臼杵郡五ヶ瀬町",
     raw: "宮崎県 西臼杵郡五ヶ瀬町",
-    lat: 32.68345,
-    lng: 131.19693,
+    lat: 32.722046,
+    lng: 131.222107,
     precision: "area",
-    coordSource: "notion-place",
+    coordSource: "survey-2026-08",
     geoQuery: null,
     geoTitle: "宮崎県西臼杵郡五ヶ瀬町",
   },
@@ -200,10 +223,10 @@ const ORIGIN_SOURCES = {
     prefecture: "京都府",
     area: "相楽郡南山城村",
     raw: "京都府 相楽郡 南山城村",
-    lat: 34.77275,
-    lng: 135.99359,
+    lat: 34.778164,
+    lng: 136.00592,
     precision: "area",
-    coordSource: "notion-place",
+    coordSource: "survey-2026-08",
     geoQuery: null,
     geoTitle: "京都府相楽郡南山城村",
   },
@@ -212,10 +235,10 @@ const ORIGIN_SOURCES = {
     prefecture: "静岡県",
     area: "榛原郡川根本町",
     raw: "静岡県 榛原郡 川根本町",
-    lat: 35.04684,
-    lng: 138.08192,
+    lat: 35.086945,
+    lng: 138.120773,
     precision: "area",
-    coordSource: "notion-place",
+    coordSource: "survey-2026-08",
     geoQuery: null,
     geoTitle: "静岡県榛原郡川根本町",
   },
@@ -224,12 +247,11 @@ const ORIGIN_SOURCES = {
     prefecture: "奈良県",
     area: "山添村",
     raw: "奈良県 山添村",
-    // Regions は「山添村」だが正式には山辺郡山添村。Notion `Place` の name も
-    // 郡名込みで入っているので、そちらを geoTitle に採る。
-    lat: 34.68088,
-    lng: 136.04343,
+    // Regions は「山添村」だが正式には山辺郡山添村。geoTitle は郡名込みで持つ。
+    lat: 34.684731,
+    lng: 135.973053,
     precision: "area",
-    coordSource: "notion-place",
+    coordSource: "survey-2026-08",
     geoQuery: null,
     geoTitle: "奈良県山辺郡山添村",
   },
@@ -238,10 +260,12 @@ const ORIGIN_SOURCES = {
     prefecture: "福岡県",
     area: "八女市",
     raw: "福岡県 八女市",
-    lat: 33.21141,
-    lng: 130.55804,
+    // 八女市は 2010 年の合併で東西に長い。旧値 (33.21141, 130.55804) は
+    // 市役所 (西端の平地) で、産地のある東部山間からは 25km 以上ずれていた。
+    lat: 33.162601,
+    lng: 130.835953,
     precision: "area",
-    coordSource: "notion-place",
+    coordSource: "survey-2026-08",
     geoQuery: null,
     geoTitle: "福岡県八女市",
   },
@@ -250,10 +274,10 @@ const ORIGIN_SOURCES = {
     prefecture: "熊本県",
     area: "葦北郡芦北町",
     raw: "熊本県 葦北郡芦北町",
-    lat: 32.29897,
-    lng: 130.49309,
+    lat: 32.263771,
+    lng: 130.581467,
     precision: "area",
-    coordSource: "notion-place",
+    coordSource: "survey-2026-08",
     geoQuery: null,
     geoTitle: "熊本県葦北郡芦北町",
   },
@@ -262,12 +286,14 @@ const ORIGIN_SOURCES = {
     prefecture: "宮崎県",
     area: "西臼杵郡五ヶ瀬町",
     raw: "宮崎県 西臼杵郡五ヶ瀬町",
-    // 緑碧茶園 五ヶ瀬茶園 と同一町。別の仕入先だが Notion `Place` も同値なので
-    // 座標は同じ地域代表点になる (地図側で 1 点に畳まれる)。
-    lat: 32.68345,
-    lng: 131.19693,
+    // 緑碧茶園 五ヶ瀬茶園 と同一座標。**別会社で番地も別だが**、無料の
+    // ジオコーダでは大字の代表点までしか解決できないため同値になる。
+    // これは正しい状態であって不具合ではない (地図側で 1 点に畳まれる)。
+    // 見た目のためにずらすと地図が事実でなくなるので、ずらさない。
+    lat: 32.722046,
+    lng: 131.222107,
     precision: "area",
-    coordSource: "notion-place",
+    coordSource: "survey-2026-08",
     geoQuery: null,
     geoTitle: "宮崎県西臼杵郡五ヶ瀬町",
   },
@@ -276,10 +302,10 @@ const ORIGIN_SOURCES = {
     prefecture: "熊本県",
     area: "水俣市",
     raw: "熊本県 水俣市",
-    lat: 32.21181,
-    lng: 130.40858,
+    lat: 32.147873,
+    lng: 130.446335,
     precision: "area",
-    coordSource: "notion-place",
+    coordSource: "survey-2026-08",
     geoQuery: null,
     geoTitle: "熊本県水俣市",
   },
@@ -288,32 +314,24 @@ const ORIGIN_SOURCES = {
     prefecture: "長崎県",
     area: "対馬市上県町",
     raw: "長崎県 対馬市 上県町",
-    // === 正本 (Notion `Place`) を採らない唯一の例外 ===
-    // Notion `Place` は「長崎県対馬市」= 市全体の重心 (34.20277, 129.28751) で、
-    // 旧町 (上県町) まで降りていない。対馬は南北に約 80km あるため、市の重心は
-    // 島の南部 (旧厳原町あたり) を指し、島北部にある当該産地から大きく外れる。
-    // 実測: 正本の点は産地の大字 (上県町佐護) から約 45km、GSI の点は約 5km。
-    // 「県庁所在地レベルに丸められている」に相当する劣化なので、ここだけ GSI の
-    // 上県町の代表点を残す。Notion 側の `Place` が上県町まで絞られたら追随する。
-    lat: 34.566456,
-    lng: 129.333176,
+    // 対馬は南北に約 80km あり、市の重心 (旧値 34.20277) は島の南部を指して
+    // 産地から約 45km 外れていた。調査値は島北部の上県町側に落ちる。
+    lat: 34.607712,
+    lng: 129.353561,
     precision: "area",
-    coordSource: "gsi",
-    geoQuery: "長崎県対馬市上県町",
-    geoTitle: "長崎県対馬市上県町伊奈",
+    coordSource: "survey-2026-08",
+    geoQuery: null,
+    geoTitle: "長崎県対馬市上県町",
   },
   hasama: {
     supplier: "ハサマ共同製茶組合",
     prefecture: "三重県",
     area: "四日市市川島町",
     raw: "三重県 四日市市 川島町",
-    // 正本と GSI が 1.3km ずれる唯一の軒。ただし両者とも「三重県四日市市川島町」
-    // に解決しており、同じ町の代表点の取り方が違うだけ (町の広がりの中に収まる)。
-    // どちらが劣るとは言えないので単一正本の原則どおり Notion を採る。
-    lat: 34.97434,
-    lng: 136.56266,
+    lat: 34.968712,
+    lng: 136.549942,
     precision: "area",
-    coordSource: "notion-place",
+    coordSource: "survey-2026-08",
     geoQuery: null,
     geoTitle: "三重県四日市市川島町",
   },
@@ -322,10 +340,10 @@ const ORIGIN_SOURCES = {
     prefecture: "茨城県",
     area: "古河市",
     raw: "茨城県 古河市",
-    lat: 36.1782,
-    lng: 139.75491,
+    lat: 36.176147,
+    lng: 139.715469,
     precision: "area",
-    coordSource: "notion-place",
+    coordSource: "survey-2026-08",
     geoQuery: null,
     geoTitle: "茨城県古河市",
   },
