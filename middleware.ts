@@ -41,6 +41,15 @@ async function hashSitePasswordEdge(password: string): Promise<string> {
  */
 const IS_VERCEL_PREVIEW = process.env.VERCEL_ENV === "preview";
 
+/**
+ * 本番 (`VERCEL_ENV=production`) かどうか。`/dev/*` を本番だけ閉じるために使う。
+ *
+ * Preview と同じく Vercel が自動注入する値だけで判定するので、ダッシュボード
+ * 操作も env の追加も要らない。ローカル (`VERCEL_ENV` 未設定) は false なので
+ * 開発時の `/dev/*` はこれまでどおり開く。
+ */
+const IS_VERCEL_PRODUCTION = process.env.VERCEL_ENV === "production";
+
 async function checkSitePassword(request: NextRequest): Promise<NextResponse | null> {
   if (!SITE_PASSWORD) return null;
   if (IS_VERCEL_PREVIEW) return null;
@@ -92,6 +101,20 @@ export default async function middleware(request: NextRequest) {
   // サイトパスワードの検査より **後** に置いてあるのは意図的で、staging では
   // このプレビューにもパスワードが掛かる (公開面を増やさない)。
   if (pathname === "/dev" || pathname.startsWith("/dev/")) {
+    // 本番では存在しない扱いにする。`/dev/*` は実装確認用のプレビュー面で、
+    // ナビゲーションからリンクしていない・`robots` も noindex にしてあるが、
+    // それは「見つけにくい」だけで到達はできる。公開後はサイトパスワードが
+    // 外れて誰でも URL を叩けるので、noindex では公開面に出ないことを保証
+    // できない。ここで 404 を返して**本番だけ**確実に閉じる。
+    //
+    // 判定は URL 単位でしか要らないので、ルート自体は消さない (削除すると
+    // preview でもレビューできなくなる)。preview / ローカルは素通り。
+    if (IS_VERCEL_PRODUCTION) {
+      return new NextResponse("Not Found", {
+        status: 404,
+        headers: { "content-type": "text/plain; charset=utf-8" },
+      });
+    }
     return NextResponse.next();
   }
 
