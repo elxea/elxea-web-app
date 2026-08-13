@@ -9,7 +9,6 @@ import {
   GET_PRODUCTS_QUERY,
   GET_PRODUCT_BY_HANDLE_QUERY,
   GET_COLLECTIONS_QUERY,
-  GET_COLLECTION_BY_HANDLE_QUERY,
   SEARCH_PRODUCTS_QUERY,
   GET_CART_QUERY,
 } from "./queries";
@@ -229,28 +228,10 @@ export async function getCollections(first = 20) {
   return flattenConnection(data.collections);
 }
 
-export async function getCollectionByHandle(
-  handle: string,
-  options?: { first?: number; after?: string; sortKey?: string; reverse?: boolean }
-) {
-  const data = await shopifyFetch<{
-    collection: (Omit<Collection, "products"> & {
-      products: ShopifyConnection<Record<string, unknown>>;
-    }) | null;
-  }>({
-    query: GET_COLLECTION_BY_HANDLE_QUERY,
-    variables: { handle, ...options },
-    tags: ["collections"],
-  });
-
-  if (!data.collection) return null;
-
-  return {
-    ...data.collection,
-    products: flattenConnection(data.collection.products).map(reshapeProduct),
-    pageInfo: data.collection.products.pageInfo,
-  };
-}
+// コレクション詳細 (/collections/[handle]) の廃止 (2026-08-14) に伴い、
+// この画面だけが呼んでいた getCollectionByHandle と
+// GET_COLLECTION_BY_HANDLE_QUERY を削除した。コレクションの着地先は商品一覧の
+// カテゴリ絞り込み (/products?category=) に一本化する。
 
 // Search
 export async function searchProducts(

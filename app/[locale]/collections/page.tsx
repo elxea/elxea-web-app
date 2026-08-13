@@ -89,7 +89,11 @@ async function CollectionsContent() {
       {collections.map((collection) => (
         <CatalogCard
           key={collection.id}
-          href={`/collections/${collection.handle}`}
+          /* コレクション詳細 (/collections/[handle]) は 2026-08-14 に廃止。
+             着地先は商品一覧のカテゴリ絞り込み (軸 = Shopify の productType)。
+             商品一覧側は未知の category を「すべて」に落とすので、名前が
+             productType と一致しないコレクションでも 404 や 0 件にはならない。 */
+          href={`/products?category=${encodeURIComponent(collection.title)}`}
           image={collection.image?.url}
           imageAlt={collection.image?.altText || collection.title}
           title={collection.title}

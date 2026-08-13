@@ -357,7 +357,12 @@ async function CategoriesSection() {
           {collections.map((collection, i) => (
             <ActionTile
               key={collection.handle}
-              href={`/collections/${collection.handle}`}
+              /* コレクション詳細 (/collections/[handle]) は 2026-08-14 に廃止。
+                 着地先は商品一覧のカテゴリ絞り込みに一本化する。絞り込みの軸は
+                 Shopify の productType なのでコレクション名を渡す。商品一覧側は
+                 未知の category を「すべて」に落とすので、名前が productType と
+                 一致しないコレクションでも 404 や 0 件にはならない。 */
+              href={`/products?category=${encodeURIComponent(collection.title)}`}
               image={collection.image?.url}
               imageAlt={collection.image?.altText || collection.title}
               label={collection.title}

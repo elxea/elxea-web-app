@@ -109,51 +109,6 @@ export const GET_COLLECTIONS_QUERY = /* GraphQL */ `
   }
 `;
 
-export const GET_COLLECTION_BY_HANDLE_QUERY = /* GraphQL */ `
-  query GetCollectionByHandle($handle: String!, $first: Int = 20, $after: String, $sortKey: ProductCollectionSortKeys = BEST_SELLING, $reverse: Boolean = false) {
-    collection(handle: $handle) {
-      id
-      handle
-      title
-      description
-      image {
-        url
-        altText
-        width
-        height
-      }
-      seo {
-        title
-        description
-      }
-      products(first: $first, after: $after, sortKey: $sortKey, reverse: $reverse) {
-        edges {
-          node {
-            ...ProductFields
-            variants(first: 10) {
-              edges {
-                node {
-                  ...ProductVariantFields
-                }
-              }
-            }
-          }
-          cursor
-        }
-        pageInfo {
-          hasNextPage
-          hasPreviousPage
-          startCursor
-          endCursor
-        }
-      }
-    }
-  }
-  ${IMAGE_FRAGMENT}
-  ${PRODUCT_FRAGMENT}
-  ${PRODUCT_VARIANT_FRAGMENT}
-`;
-
 export const SEARCH_PRODUCTS_QUERY = /* GraphQL */ `
   query SearchProducts($query: String!, $first: Int = 20, $after: String) {
     search(query: $query, first: $first, after: $after, types: PRODUCT) {

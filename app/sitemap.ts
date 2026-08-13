@@ -36,7 +36,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   // Dynamic pages from Shopify
   try {
-    const { getProducts, getCollections } = await import("@/lib/shopify");
+    const { getProducts } = await import("@/lib/shopify");
 
     const { products } = await getProducts({ first: 100 });
     for (const product of products) {
@@ -50,18 +50,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       }
     }
 
-    const collections = await getCollections();
-    for (const collection of collections) {
-      for (const locale of locales) {
-        entries.push({
-          url: `${BASE_URL}/${locale}/collections/${collection.handle}`,
-          changeFrequency: "weekly",
-          priority: 0.6,
-        });
-      }
-    }
+    // コレクション詳細 (/collections/[handle]) は 2026-08-14 に廃止したので
+    // 動的エントリは出さない。コレクション一覧 (/collections) は static 側にある。
   } catch {
-    // Shopify API not available — skip dynamic product/collection entries
+    // Shopify API not available — skip dynamic product entries
   }
 
   // Dynamic pages from Sanity
