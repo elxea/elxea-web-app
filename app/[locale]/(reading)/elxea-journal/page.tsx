@@ -2,8 +2,13 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { getLocale, getTranslations } from "next-intl/server";
 
+import { FilterX, Sprout } from "lucide-react";
+
 import { getClient } from "@/sanity/lib/client";
 import { JOURNALS_QUERY } from "@/sanity/lib/queries";
+import { Link } from "@/i18n/navigation";
+import { EmptyState } from "@/components/ui/empty-state";
+import { pillClass } from "@/components/ui/pill-button";
 import { Breadcrumb } from "@/components/seo/breadcrumb";
 import { Section } from "@/components/layout/container";
 import { CatalogToolbar } from "@/components/catalog/catalog-toolbar";
@@ -188,7 +193,22 @@ async function JournalContent({ params }: { params: SearchParams }) {
   const journals = withSeedJournals(fetched) as JournalItem[];
 
   if (journals.length === 0) {
-    return <p className="mt-8 text-sm text-muted-foreground lg:mt-12">{t("empty")}</p>;
+    /* P1 号が 1 本も無い状態。解除できる絞り込みが無いので、横に抜ける出口
+       (ジャーナル) を出す。障害 (loadError) とは必ず出し分ける。 */
+    return (
+      <EmptyState
+        className="mt-8 lg:mt-12"
+        icon={Sprout}
+        count={t("emptyAll.eyebrow")}
+        title={t("emptyAll.title")}
+        body={t("emptyAll.body")}
+        action={
+          <Link href="/journal" className={pillClass("outline")}>
+            {t("emptyAll.ctaLabel")}
+          </Link>
+        }
+      />
+    );
   }
 
   const sort = params.sort === "oldest" ? "oldest" : "newest";
@@ -206,8 +226,14 @@ async function JournalContent({ params }: { params: SearchParams }) {
   // 今月号は「編集判断で指定」(Figma 8085:4308)。Sanity の featured フラグを
   // 唯一の根拠にし、無ければ先頭の号を充てる。絞り込み中は出さない
   // (絞り込み結果と特集が食い違うため)。
-  const featured =
-    activeTheme === "all" ? (journals.find((j) => j.featured) ?? journals[0]) : undefined;
+  //
+  // 号が 1 本しかないときに特集へ吸い上げると一覧グリッドが空になり、実際には
+  // 1 本あるのに「該当 0 件」が出ていた。総件数が 1 なら特集枠は出さず、その
+  // 1 本を一覧に出す (ジャーナル一覧 journal/page.tsx の canFeature と同条件)。
+  const canFeature = activeTheme === "all" && journals.length > 1;
+  const featured = canFeature
+    ? (journals.find((j) => j.featured) ?? journals[0])
+    : undefined;
 
   const pool = journals.filter((j) => j._id !== featured?._id);
   const filtered =
@@ -275,7 +301,21 @@ async function JournalContent({ params }: { params: SearchParams }) {
 
       <JournalLayout className="mt-8 lg:mt-12">
         {visible.length === 0 ? (
-          <p className="order-1 text-sm text-muted-foreground">{t("empty")}</p>
+          <div className="order-1">
+            {/* P2 絞り込みの結果として 0 件。障害 (loadError) とは必ず出し分ける
+                — こちらは再試行ではなく絞り込みの解除を促す。 */}
+            <EmptyState
+              icon={FilterX}
+              count={t("emptyFiltered.eyebrow")}
+              title={t("emptyFiltered.title")}
+              body={t("emptyFiltered.body")}
+              action={
+                <Link href="/elxea-journal" className={pillClass("outline")}>
+                  {t("emptyFiltered.ctaLabel")}
+                </Link>
+              }
+            />
+          </div>
         ) : (
           <JournalGrid>
             {visible.map((journal) => (
