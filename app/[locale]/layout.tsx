@@ -7,6 +7,7 @@ import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
 import { CartProviderWrapper } from "@/components/cart/cart-provider-wrapper";
 import { CookieConsent } from "@/components/layout/cookie-consent";
+import { TypekitScript } from "@/components/layout/typekit-script";
 import { Toaster } from "@/components/ui/sonner";
 import { LenisProvider } from "@/components/providers/lenis-provider";
 import { ChatProvider } from "@/components/chat/chat-provider";
@@ -102,18 +103,10 @@ export default async function LocaleLayout({
      * ケースなのでここで抑制する。 */
     <html lang={locale} suppressHydrationWarning>
       <head>
-        {/* Adobe Fonts (Typekit kit fwg7gtf) — loaded via the official async JS
-         * embed. The kit is configured as JS-only: the CSS endpoint
-         * (use.typekit.net/fwg7gtf.css) returns HTTP 412, while the JS endpoint
-         * (use.typekit.net/fwg7gtf.js) serves 200. The loader adds wf-loading →
-         * wf-active/wf-inactive classes on <html> and injects the @font-face CSS. */}
-        <link rel="preconnect" href="https://use.typekit.net" crossOrigin="anonymous" />
-        <link rel="preconnect" href="https://p.typekit.net" crossOrigin="anonymous" />
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `(function(d){var config={kitId:'fwg7gtf',scriptTimeout:3000,async:true},h=d.documentElement,t=setTimeout(function(){h.className=h.className.replace(/\\bwf-loading\\b/g,"")+" wf-inactive";},config.scriptTimeout),tk=d.createElement("script"),f=false,s=d.getElementsByTagName("script")[0],a;h.className+=" wf-loading";tk.src='https://use.typekit.net/'+config.kitId+'.js';tk.async=true;tk.onload=tk.onreadystatechange=function(){a=this.readyState;if(f||a&&a!="complete"&&a!="loaded")return;f=true;clearTimeout(t);try{Typekit.load(config)}catch(e){}};s.parentNode.insertBefore(tk,s)})(document);`,
-          }}
-        />
+        {/* Adobe Fonts (Typekit kit fwg7gtf)。ローダー本体と「なぜ JS 埋め込みか」の
+         * 説明は components/layout/typekit-script.tsx が正本 (サイト共通 chrome を
+         * 持たない app/(liff)/layout.tsx と共有するため部品化してある)。 */}
+        <TypekitScript />
         <link rel="alternate" hrefLang={locale} href={`https://elxea.com/${locale}`} />
         <link rel="alternate" hrefLang={alternateLocale} href={`https://elxea.com/${alternateLocale}`} />
         <link rel="alternate" hrefLang="x-default" href="https://elxea.com/ja" />
