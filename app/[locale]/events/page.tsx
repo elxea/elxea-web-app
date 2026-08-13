@@ -8,6 +8,20 @@ import { urlFor } from "@/sanity/lib/image";
 import { previewSeedEnabled, seedEvents } from "@/lib/preview-seed";
 import { isPastEvent, isSameEventDay } from "@/lib/format-date";
 
+/** 一覧カード 1 件が使うフィールド (Sanity / preview seed の共通部分)。 */
+type EventCard = {
+  _id: string;
+  slug: { current: string };
+  imageUrl?: string;
+  image?: { asset: object; alt?: string };
+  title: string;
+  date: string;
+  endDate?: string;
+  location?: string;
+  memberOnly?: boolean;
+  externalUrl?: string;
+};
+
 export default function EventsPage() {
   const t = useTranslations("common");
   const te = useTranslations("event");
@@ -51,7 +65,7 @@ async function EventsList() {
     // 残っている: preview seed は固定日付なので時間が経てば過去になるし、
     // 取得側を差し替えれば GROQ のフィルタごと外れる。**表示する直前**でもう
     // 一度落として、どの経路から来ても過去日のカードが並ばないようにする。
-    const events = ((source ?? []) as { date: string; endDate?: string }[]).filter(
+    const events = ((source ?? []) as EventCard[]).filter(
       (event) => !isPastEvent(event.date, event.endDate)
     );
 
@@ -67,18 +81,7 @@ async function EventsList() {
       // 変A: image-top card grid (page-local card). PC 3col / SP 1col.
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-14">
         {events.map(
-          (event: {
-            _id: string;
-            slug: { current: string };
-            imageUrl?: string;
-            image?: { asset: object; alt?: string };
-            title: string;
-            date: string;
-            endDate?: string;
-            location?: string;
-            memberOnly?: boolean;
-            externalUrl?: string;
-          }) => {
+          (event) => {
             const cardClass = "group block";
             const inner = (
               <>
