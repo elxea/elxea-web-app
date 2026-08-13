@@ -18,7 +18,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   // Static pages
   const staticPages = [
-    "", "/products", "/collections", "/journal", "/farmers", "/events",
+    // 農家一覧 (/farmers) は廃止 (2026-08-14)。農家詳細 (/farmers/[slug]) は
+    // 下の Sanity ループで個別に載せる。
+    "", "/products", "/collections", "/journal", "/events",
     "/tea-menu", "/playlists", "/elxea-journal", "/about", "/faq", "/contact",
   ];
   for (const locale of locales) {

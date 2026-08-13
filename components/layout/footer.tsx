@@ -116,14 +116,6 @@ export function Footer({ groups: externalGroups }: FooterProps) {
                   </li>
                   <li>
                     <Link
-                      href="/farmers"
-                      className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      {t("common.farmers")}
-                    </Link>
-                  </li>
-                  <li>
-                    <Link
                       href="/events"
                       className="text-sm text-muted-foreground hover:text-foreground transition-colors"
                     >

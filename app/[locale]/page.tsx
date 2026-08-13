@@ -513,20 +513,27 @@ async function VoicesSection() {
       <SectionHead overline="VOICES" title={t("voicesTitle")} />
       <SectionBody>
         <TripleColumn
-          items={items.map((voice) => ({
-            // 農家詳細への導線。seed は詳細ルートが無いので一覧へ通す。
-            title: (
-              <Link
-                href={
-                  isSeedId(voice._id) ? "/farmers" : `/farmers/${voice.slug.current}`
-                }
-                className="underline-offset-4 hover:underline"
-              >
-                {voice.region ? `${voice.region} ${voice.name}` : voice.name}
-              </Link>
-            ),
-            body: voice.quote,
-          }))}
+          items={items.map((voice) => {
+            const label = voice.region
+              ? `${voice.region} ${voice.name}`
+              : voice.name;
+            return {
+              /* 農家詳細への導線。seed は詳細ルートを持たず、逃がし先だった
+                 農家一覧 (/farmers) も 2026-08-14 に廃止したので、seed のときは
+                 リンクを張らず見出しだけ出す (404 になる導線を作らない)。 */
+              title: isSeedId(voice._id) ? (
+                label
+              ) : (
+                <Link
+                  href={`/farmers/${voice.slug.current}`}
+                  className="underline-offset-4 hover:underline"
+                >
+                  {label}
+                </Link>
+              ),
+              body: voice.quote,
+            };
+          })}
         />
       </SectionBody>
     </TopSection>

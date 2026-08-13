@@ -261,12 +261,9 @@ test.describe("Community API — Unauthenticated", () => {
 });
 
 test.describe("Community features — Page load verification", () => {
-  test("farmers page loads for community interaction", async ({ page }) => {
-    await page.goto("/ja/farmers");
-    await expect(page.locator("h1")).toBeVisible();
-    // Page should not show error
-    await expect(page.locator("body")).not.toContainText("エラーが発生しました");
-  });
+  // 農家一覧 (/ja/farmers) は 2026-08-14 に廃止。フォロー / コメントの導線は
+  // 農家詳細 (/ja/farmers/[slug]) 側に残るが、slug は実データ依存なのでここでは
+  // 検証しない (API レベルの検証は本ファイル上部の describe が担う)。
 
   test("events page loads for event registration", async ({ page }) => {
     await page.goto("/ja/events");

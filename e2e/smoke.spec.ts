@@ -51,10 +51,8 @@ test.describe("Smoke tests", () => {
     });
   });
 
-  test("farmers page loads", async ({ page }) => {
-    await page.goto("/ja/farmers");
-    await expect(page.locator("h1")).toBeVisible();
-  });
+  // 農家一覧 (/ja/farmers) は 2026-08-14 に廃止。農家詳細 (/ja/farmers/[slug])
+  // は存続するが、slug は Sanity の実データ依存なので smoke には載せない。
 
   test("events page loads", async ({ page }) => {
     await page.goto("/ja/events");
@@ -81,11 +79,12 @@ test.describe("Navigation", () => {
   }) => {
     await page.goto("/ja");
 
-    // Desktop nav has products, journal, farmers, events links
+    // Desktop nav has products, journal, events links
+    // (農家 は一覧ページ廃止 2026-08-14 に伴い nav からも外した)
     const nav = page.locator("nav").first();
     await expect(nav.getByText("商品一覧")).toBeVisible();
     await expect(nav.getByText("ジャーナル")).toBeVisible();
-    await expect(nav.getByText("農家")).toBeVisible();
+    await expect(nav.getByText("農家")).toHaveCount(0);
     await expect(nav.getByText("イベント")).toBeVisible();
 
     // Click products link and verify navigation
@@ -132,7 +131,8 @@ test.describe("Footer", () => {
 
     await expect(footer.getByText("コンテンツ")).toBeVisible();
     await expect(footer.getByText("ジャーナル")).toBeVisible();
-    await expect(footer.getByText("農家")).toBeVisible();
+    // 農家一覧の廃止 (2026-08-14) でフッターからも外した。
+    await expect(footer.getByText("農家")).toHaveCount(0);
     await expect(footer.getByText("イベント")).toBeVisible();
   });
 

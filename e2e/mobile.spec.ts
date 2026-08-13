@@ -36,7 +36,8 @@ test.describe("Mobile viewport", () => {
     // Navigation links should be visible in mobile menu
     await expect(sheet.getByText("商品一覧")).toBeVisible();
     await expect(sheet.getByText("ジャーナル")).toBeVisible();
-    await expect(sheet.getByText("農家")).toBeVisible();
+    // 農家一覧の廃止 (2026-08-14) で nav 項目からも外した。
+    await expect(sheet.getByText("農家")).toHaveCount(0);
     await expect(sheet.getByText("イベント")).toBeVisible();
   });
 

@@ -319,8 +319,8 @@ type Farmer = {
 const MAKERS_COUNT = 3;
 
 /**
- * 04 つくり手。農家一覧 (`app/[locale]/farmers/page.tsx`) と同じデータ経路
- * (`FARMERS_QUERY` → 架空プロフィール除外 → Preview 限定の見本補完) を使う。
+ * 04 つくり手。データ経路は `FARMERS_QUERY` → 架空プロフィール除外 →
+ * Preview 限定の見本補完 (廃止した農家一覧ページと同じ経路をここが引き継ぐ)。
  * 0 件なら節そのものを描画しない (空の枠を出さない)。
  */
 async function MakersSection() {

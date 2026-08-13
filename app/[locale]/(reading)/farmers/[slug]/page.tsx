@@ -320,10 +320,12 @@ export default async function FarmerPage({
           ) : undefined
         }
       >
+        {/* 農家一覧 (/farmers) は 2026-08-14 に廃止したので、中間の階層を持たず
+            トップ直下に置く。存在しない URL をパンくずに残すと 404 へ誘導し、
+            BreadcrumbList 構造化データにも死んだ URL が載るため。 */}
         <Breadcrumb
           items={[
             { label: bt("home"), href: "/" },
-            { label: t("heading"), href: "/farmers" },
             { label: farmer.name },
           ]}
           locale={locale}
