@@ -26,6 +26,7 @@ import {
   ArticleReadRow,
   articlePagePadding,
 } from "@/components/journal/article-blocks";
+import { JournalWashTheme } from "@/components/viz/wash/journal-wash-theme";
 import { Link } from "@/i18n/navigation";
 import {
   previewImageForKey,
@@ -237,6 +238,11 @@ export default async function ElxeaJournalDetailPage({
 
   return (
     <>
+      {/* 号のテーマ色を背景のにじみへ渡す (描画は持たない・null を返す)。
+          確定版の記事詳細はテーマのバッジを持たないため、号の色は
+          `(reading)` の `ReadingWash` の面としてだけ現れる。 */}
+      <JournalWashTheme theme={journal.theme} />
+
       <ReadingProgress />
 
       <Section spacing="none" className={articlePagePadding}>
