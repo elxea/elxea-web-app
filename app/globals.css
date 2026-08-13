@@ -562,11 +562,13 @@ dl[data-slot="spec-band"][data-emphasis="true"] > [data-slot="spec-item"] > dd {
    * なので brand-* には入れない。 */
   --graphite-pressed: oklch(0.333 0.007 274.8);
 
-  /* 名前付き z レイヤー。SoT は `tokens/elxea-custom.json` の `z-index`
-   * (sticky 1020 / fixed 1030 / overlay 1040 / modal 1050)。Style Dictionary の
-   * source は `tokens/base.json` だけなのでこのグループは dist/tokens.css に
-   * 出てこない。ここは SoT の写しであって値を決める場所ではない
-   * (`--page-margin` が layout.grid.margin の写しなのと同じ扱い)。 */
+  /* 名前付き z レイヤー。**ここが SoT**。`tokens/base.json` の `depth.zIndex`
+   * は 0-50 の raw scale で別物なので混同しないこと (名前付きレイヤーは
+   * base.json 側に存在しない)。Style Dictionary の source は base.json と
+   * overrides/cjk.json だけなので、このグループは dist/tokens.css には出ず
+   * この宣言だけが実効値になる。値を変えるならここを直す。
+   * (旧 SoT と書かれていた `tokens/elxea-custom.json` は参照ゼロの死にファイル
+   *  だったため 2026-08-14 に削除。旧値は git 履歴 c54335a を参照) */
   --z-sticky: 1020;
   --z-overlay: 1040;
   --z-modal: 1050;

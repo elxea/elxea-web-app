@@ -96,7 +96,7 @@ pre-commit install --hook-type pre-commit --hook-type pre-push
 - 色はOKLCHカラースペースで統一（知覚的均一性）
 - フォントは `--typography-family-sans`（本文）/ `--typography-family-heading`（見出し）/ `--typography-family-secondary` / `--typography-family-mono` / `--typography-family-special`。**`--font-sans` / `--font-heading` という変数は存在しない**（過去のCLAUDE.md記述の誤り。2026-08-07訂正）
 
-> **`tokens/elxea-custom.json` はビルドに入っていない**。`sd.config.mjs` の `source` は `tokens/base.json` と `tokens/overrides/cjk.json` のみで、`elxea-custom.json` は読まれない。したがって同ファイルの値（darkパレット一式・低不透明度shadow等）は**実際の画面に一切効いていない**。参考資料として残っているだけなので、これを正本と扱わないこと。詳細は `scripts/design-system/design-kit.generated.json` の `conflicts[c-01]` / `[c-02]`。
+> **`tokens/elxea-custom.json` は削除済み（2026-08-14）**。同ファイルは `sd.config.mjs` の `source` に入っておらず読むコードが0件の死にファイルで、値（darkパレット一式・低不透明度shadow等）が実装値だと誤読される事故を複数回起こしたため除去した。**トークンの正本は `tokens/base.json`**（+ `tokens/overrides/cjk.json`）。未使用の重複configだった `tokens/config.mjs` も同時に削除（実効は `sd.config.mjs`）。darkパレットの旧値が要るときはgit履歴 `c54335a` から復元できる。過去の監査記録（`scripts/design-system/design-kit.generated.json` の `conflicts[c-01]` / `[c-02]`、`docs/fidelity/*`）に残る `elxea-custom.json` 言及は当時の記録であり、現在のファイル構成ではない。
 
 ### 確定値ファイルの勘定（対外3本 + ビルド内部入力1本）
 
