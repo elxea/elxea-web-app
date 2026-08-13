@@ -99,11 +99,28 @@
     "removedFromFavorites": "お気に入りから削除しました",
     "favoriteError": "操作に失敗しました。もう一度お試しください。",
     "loginRequiredForFavorite": "お気に入りに追加するにはログインが必要です。",
-    "listLead": "日本各地の茶農家から届いたお茶と茶器。旬のものから日常の一杯まで。"
+    "listLead": "日本各地の茶農家から届いたお茶と茶器。旬のものから日常の一杯まで。",
+    "noProductsFiltered": {
+      "eyebrow": "該当 0 件",
+      "title": "この絞り込みに合う商品はありません",
+      "body": "別のカテゴリを選ぶか、絞り込みを解除するとすべての商品が表示されます。",
+      "ctaLabel": "絞り込みを解除する"
+    }
   },
   "collection": {
-    "empty": "コレクションはまだありません",
-    "loadError": "コレクションを読み込めませんでした。"
+    "empty": {
+      "eyebrow": "0 件",
+      "title": "コレクションはまだありません",
+      "body": "季節のセットを準備しています。整いしだい、こちらに並びます。",
+      "ctaLabel": "お茶を見る"
+    },
+    "loadError": "コレクションを読み込めませんでした。",
+    "emptyProducts": {
+      "eyebrow": "0 件",
+      "title": "このコレクションの商品はいまありません",
+      "body": "ほかのコレクションや、商品一覧からお探しいただけます。",
+      "ctaLabel": "ほかのコレクションを見る"
+    }
   },
   "search": {
     "placeholder": "お茶やキーワードで探す",
@@ -123,7 +140,6 @@
     "tagArchiveDescription": "「{name}」に関する記事一覧",
     "categoryArchiveTitle": "カテゴリ: {name}",
     "categoryArchiveDescription": "「{name}」にまつわるストーリー",
-    "empty": "最初の記事を準備しています。もう少しお待ちください。",
     "loadError": "記事を読み込めませんでした。時間をおいて、もう一度お試しください。",
     "loading": "記事を読み込んでいます",
     "writtenBy": "執筆",
@@ -179,18 +195,49 @@
     "audioInterviewLabel": "インタビュー音声",
     "readTime": "{minutes} 分で読める",
     "audioTrackLabel": "この号の音楽",
-    "emptyFilteredCount": "該当 0 件",
-    "emptyFilteredTitle": "この絞り込みに合う読みものはまだありません",
-    "emptyFilteredBody": "別のカテゴリを選ぶか、絞り込みを解除するとすべての読みものが表示されます。",
-    "emptyFilteredAction": "絞り込みを解除する",
     "bookmarkSaved": "保存済み",
     "bookmarkSaving": "保存中…",
-    "bookmarkLoginToSave": "ログインして保存"
+    "bookmarkLoginToSave": "ログインして保存",
+    "emptyAll": {
+      "eyebrow": "0 件",
+      "title": "読みものはまだありません",
+      "body": "最初の記事を準備しています。もう少しお待ちください。",
+      "ctaLabel": "お茶を見る"
+    },
+    "emptyFiltered": {
+      "eyebrow": "該当 0 件",
+      "title": "この絞り込みに合う読みものはまだありません",
+      "body": "別のカテゴリを選ぶか、絞り込みを解除するとすべての読みものが表示されます。",
+      "ctaLabel": "絞り込みを解除する"
+    },
+    "emptyCategoryList": {
+      "eyebrow": "0 件",
+      "title": "カテゴリはまだありません",
+      "body": "読みものが増えたら、カテゴリごとに並べていきます。",
+      "ctaLabel": "ジャーナルを見る"
+    },
+    "emptyCategory": {
+      "eyebrow": "0 件",
+      "title": "このカテゴリの記事はまだありません",
+      "body": "ほかのカテゴリには読みものがあります。",
+      "ctaLabel": "ほかのカテゴリを見る"
+    },
+    "emptyTag": {
+      "eyebrow": "0 件",
+      "title": "このタグの読みものはまだありません",
+      "body": "ほかのタグや、ジャーナル全体からも探せます。",
+      "ctaLabel": "ジャーナルをすべて見る"
+    }
   },
   "teaMenu": {
     "title": "お茶メニュー",
     "description": "日本各地の茶農家から厳選した、シングルオリジンのお茶。今日の一杯を、ここから選ぶ。",
-    "empty": "お茶メニューを準備しています。もう少しお待ちください。",
+    "empty": {
+      "eyebrow": "0 件",
+      "title": "お茶メニューはまだありません",
+      "body": "淹れ方とともに、順に載せていきます。",
+      "ctaLabel": "商品を見る"
+    },
     "loadError": "お茶メニューを読み込めませんでした。時間をおいて、もう一度お試しください。",
     "details": "お茶の詳細",
     "variety": "品種",
@@ -211,7 +258,6 @@
     "artistsNote": "紹介文と写真は、各アーティストのプロフィールから引いています。",
     "curatedBy": "選盤",
     "description": "湯気の向こうに流れる、自然の音。お茶の時間に寄り添う音楽を。",
-    "empty": "プレイリストを準備しています。もう少しお待ちください。",
     "featured": "特集",
     "heading": "プレイリスト",
     "lead": "茶の時間に流す音楽。淹れるあいだ、待つあいだ、飲むあいだ。",
@@ -227,12 +273,23 @@
     "title": "Sound from Nature",
     "tracks": "TRACKS",
     "tracksHead": "収録曲をたどる",
-    "tracksShort": "曲"
+    "tracksShort": "曲",
+    "emptyAll": {
+      "eyebrow": "0 件",
+      "title": "プレイリストはまだありません",
+      "body": "お茶の時間に添える一曲を選んでいるところです。",
+      "ctaLabel": "ジャーナルを読む"
+    },
+    "emptyFiltered": {
+      "eyebrow": "該当 0 件",
+      "title": "この絞り込みに合うプレイリストはまだありません",
+      "body": "別のシーンを選ぶか、絞り込みを解除するとすべてのプレイリストが表示されます。",
+      "ctaLabel": "絞り込みを解除する"
+    }
   },
   "elxeaJournal": {
     "title": "elxea Journal",
     "description": "季節のお茶と、その向こうにある産地の話。お手元のアソートセットに沿って読める、Set Edition の読みもの。",
-    "empty": "次号を準備しています。季節のお便りをお楽しみに。",
     "loadError": "ジャーナルを読み込めませんでした。時間をおいて、もう一度お試しください。",
     "teaSection": "お届けのお茶について",
     "teaDetailLink": "詳しくみる",
@@ -253,7 +310,19 @@
     "nextReadTag": "「{name}」の読みものをこのまま開く",
     "featuredIssue": "今月号",
     "otherIssues": "ほかの号",
-    "themes": "テーマ"
+    "themes": "テーマ",
+    "emptyAll": {
+      "eyebrow": "0 件",
+      "title": "elxea Journal はまだ公開していません",
+      "body": "次号を準備しています。季節のお便りをお楽しみに。",
+      "ctaLabel": "ジャーナルを読む"
+    },
+    "emptyFiltered": {
+      "eyebrow": "該当 0 件",
+      "title": "この絞り込みに合う号はまだありません",
+      "body": "別のテーマを選ぶか、絞り込みを解除するとすべての号が表示されます。",
+      "ctaLabel": "絞り込みを解除する"
+    }
   },
   "people": {
     "loadError": "プロフィールを読み込めませんでした。",
@@ -273,7 +342,12 @@
   "farmer": {
     "heading": "茶畑をたずねて",
     "lead": "日本各地の小規模茶農家をたずね、手摘みの茶葉を一つひとつ厳選しています。つくり手の顔から、一杯がはじまる。",
-    "empty": "農家プロフィールを準備しています。もう少しお待ちください。",
+    "empty": {
+      "eyebrow": "0 件",
+      "title": "茶農家のプロフィールはまだありません",
+      "body": "産地を訪ね、お話をうかがっているところです。",
+      "ctaLabel": "お茶を見る"
+    },
     "loadError": "農家プロフィールを読み込めませんでした。時間をおいて、もう一度お試しください。",
     "byRegion": "産地から探す",
     "follow": "フォローする",
@@ -946,7 +1020,12 @@
   "tastingNoteR2": {
     "title": "テイスティングノート",
     "lead": "飲んだお茶と、そのときのひとこと。次に届くお茶は、ここから決まります。",
-    "empty": "まだ記録がありません。お茶を飲んだら、ここに残していけます。",
+    "empty": {
+      "eyebrow": "0 件",
+      "title": "まだ記録がありません",
+      "body": "お茶を飲んだら、ここに残していけます。",
+      "ctaLabel": "お茶を選ぶ"
+    },
     "moodAgain": "また淹れたい",
     "moodMatched": "合っていた",
     "moodLogged": "記録だけ",

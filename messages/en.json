@@ -99,11 +99,28 @@
     "removedFromFavorites": "Removed from favorites",
     "favoriteError": "Action failed. Please try again.",
     "loginRequiredForFavorite": "Please log in to add to favorites.",
-    "listLead": "Single-origin teas and teaware, from seasonal picks to everyday cups."
+    "listLead": "Single-origin teas and teaware, from seasonal picks to everyday cups.",
+    "noProductsFiltered": {
+      "eyebrow": "0 results",
+      "title": "No products match this filter",
+      "body": "Choose another category, or clear the filter to see every product.",
+      "ctaLabel": "Clear the filter"
+    }
   },
   "collection": {
-    "empty": "No collections available",
-    "loadError": "Could not load collections."
+    "empty": {
+      "eyebrow": "0 items",
+      "title": "No collections yet",
+      "body": "Seasonal sets are being prepared. They will appear here once ready.",
+      "ctaLabel": "Browse teas"
+    },
+    "loadError": "Could not load collections.",
+    "emptyProducts": {
+      "eyebrow": "0 items",
+      "title": "No products in this collection right now",
+      "body": "You can look through other collections or the full product list.",
+      "ctaLabel": "See other collections"
+    }
   },
   "search": {
     "placeholder": "Search tea or keywords",
@@ -123,7 +140,6 @@
     "tagArchiveDescription": "Articles tagged “{name}”",
     "categoryArchiveTitle": "Category: {name}",
     "categoryArchiveDescription": "Stories about {name}",
-    "empty": "No articles yet.",
     "loadError": "Could not load articles.",
     "loading": "Loading articles",
     "writtenBy": "Written by",
@@ -179,18 +195,49 @@
     "audioInterviewLabel": "Interview audio",
     "readTime": "{minutes} min read",
     "audioTrackLabel": "Music in this issue",
-    "emptyFilteredCount": "0 results",
-    "emptyFilteredTitle": "No readings match this filter yet",
-    "emptyFilteredBody": "Choose another category, or clear the filter to see every reading.",
-    "emptyFilteredAction": "Clear the filter",
     "bookmarkSaved": "Saved",
     "bookmarkSaving": "Saving…",
-    "bookmarkLoginToSave": "Log in to save"
+    "bookmarkLoginToSave": "Log in to save",
+    "emptyAll": {
+      "eyebrow": "0 items",
+      "title": "No readings yet",
+      "body": "The first article is in preparation. Please wait a little longer.",
+      "ctaLabel": "Browse teas"
+    },
+    "emptyFiltered": {
+      "eyebrow": "0 results",
+      "title": "No readings match this filter yet",
+      "body": "Choose another category, or clear the filter to see every reading.",
+      "ctaLabel": "Clear the filter"
+    },
+    "emptyCategoryList": {
+      "eyebrow": "0 items",
+      "title": "No categories yet",
+      "body": "As readings grow, we will arrange them by category.",
+      "ctaLabel": "See the journal"
+    },
+    "emptyCategory": {
+      "eyebrow": "0 items",
+      "title": "No articles in this category yet",
+      "body": "Other categories do have readings.",
+      "ctaLabel": "See other categories"
+    },
+    "emptyTag": {
+      "eyebrow": "0 items",
+      "title": "No readings with this tag yet",
+      "body": "You can also browse other tags, or the journal as a whole.",
+      "ctaLabel": "See all of the journal"
+    }
   },
   "teaMenu": {
     "title": "Tea Menu",
     "description": "Our curated selection of specialty teas",
-    "empty": "No tea items yet.",
+    "empty": {
+      "eyebrow": "0 items",
+      "title": "No tea menu yet",
+      "body": "We will add them in turn, together with how to brew each one.",
+      "ctaLabel": "Browse products"
+    },
     "loadError": "Could not load tea menu.",
     "details": "Details",
     "variety": "Variety",
@@ -211,7 +258,6 @@
     "artistsNote": "Photos and descriptions come from each artist's profile.",
     "curatedBy": "Curated by",
     "description": "Playlists inspired by the sounds of nature",
-    "empty": "No playlists yet.",
     "featured": "Featured",
     "heading": "Playlists",
     "lead": "Music for tea time — while you brew, while you wait, while you drink.",
@@ -227,12 +273,23 @@
     "title": "Sound from Nature",
     "tracks": "TRACKS",
     "tracksHead": "Track by track",
-    "tracksShort": "tracks"
+    "tracksShort": "tracks",
+    "emptyAll": {
+      "eyebrow": "0 items",
+      "title": "No playlists yet",
+      "body": "We are choosing a piece of music to sit alongside your tea.",
+      "ctaLabel": "Read the journal"
+    },
+    "emptyFiltered": {
+      "eyebrow": "0 results",
+      "title": "No playlists match this filter yet",
+      "body": "Choose another scene, or clear the filter to see every playlist.",
+      "ctaLabel": "Clear the filter"
+    }
   },
   "elxeaJournal": {
     "title": "elxea Journal",
     "description": "The Set Edition — seasonal tea and the places it comes from, sent with your assortment.",
-    "empty": "No journals yet.",
     "loadError": "Could not load journals.",
     "teaSection": "About the Tea in This Issue",
     "teaDetailLink": "Learn more",
@@ -253,7 +310,19 @@
     "nextReadTag": "Keep reading “{name}”",
     "featuredIssue": "This issue",
     "otherIssues": "Other issues",
-    "themes": "Themes"
+    "themes": "Themes",
+    "emptyAll": {
+      "eyebrow": "0 items",
+      "title": "elxea Journal is not published yet",
+      "body": "The next issue is in preparation. Look forward to a seasonal letter.",
+      "ctaLabel": "Read the journal"
+    },
+    "emptyFiltered": {
+      "eyebrow": "0 results",
+      "title": "No issues match this filter yet",
+      "body": "Choose another theme, or clear the filter to see every issue.",
+      "ctaLabel": "Clear the filter"
+    }
   },
   "people": {
     "loadError": "Could not load profile.",
@@ -273,7 +342,12 @@
   "farmer": {
     "heading": "Farmers",
     "lead": "",
-    "empty": "No farmer profiles yet.",
+    "empty": {
+      "eyebrow": "0 items",
+      "title": "No farmer profiles yet",
+      "body": "We are visiting the growing regions and hearing their stories.",
+      "ctaLabel": "Browse teas"
+    },
     "loadError": "Could not load farmer profiles.",
     "byRegion": "Browse by region",
     "follow": "Follow",
@@ -946,7 +1020,12 @@
   "tastingNoteR2": {
     "title": "Tasting Notes",
     "lead": "The teas you have drunk, and a line about each. What comes next is decided here.",
-    "empty": "No notes yet. Once you have had a cup, you can keep a record of it here.",
+    "empty": {
+      "eyebrow": "0 items",
+      "title": "No notes yet",
+      "body": "Once you have had a cup, you can keep a record of it here.",
+      "ctaLabel": "Choose a tea"
+    },
     "moodAgain": "Would brew again",
     "moodMatched": "Good match",
     "moodLogged": "Just a note",
