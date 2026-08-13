@@ -19,7 +19,9 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
+import { bodyClass, overlineClass } from "@/components/editorial/rule-list";
+import { PillButton, pillClass } from "@/components/ui/pill-button";
+import { cn } from "@/lib/utils";
 
 type Phase =
   | "loading" // 初期化・通信中
@@ -168,54 +170,106 @@ export function LiffLinkClient({ locale }: { locale: string }) {
     }
   }, []);
 
+  /* 本文 (`body` トークン 16 / 行高 1.75)。測度は Figma のテキスト枠 PC 640 に
+     合わせる (`max-w-160`)。SP は page-inset の外余白で 343 に収まる。 */
+  const bodyTextClass = cn(bodyClass, "max-w-160 text-muted-foreground");
+
   return (
-    <div className="mx-auto flex min-h-[70vh] max-w-sm flex-col items-center justify-center px-6 py-16 text-center">
-      <p className="mb-8 text-xs uppercase tracking-widest text-muted-foreground">
-        {t.title}
-      </p>
+    <>
+      {/*
+       * LinkBand — 左揃えの帯 (Figma 8316:779 / 8316:871 / 8316:967 ほか)。
+       *
+       * roji 確定版の作法どおり、内容は帯の左肩から始める。中央寄せのカードに
+       * しないのは、この面だけがサイトの他のページと違う組み方になるため
+       * (見出し・本文の左端が揃っているのがこのブランドの読ませ方)。
+       *
+       * Figma 実測 (px) → 実装:
+       * - 帯の高さ            384                          → `min-h-96`
+       * - 左端                SP 16 / PC 64                → `page-inset` (--page-margin)
+       * - アクセント罫の上端  SP 64 / PC 112               → `pt-16 lg:pt-28`
+       * - アクセント罫        w32 h2 / accent              → `h-0.5 w-8 bg-accent`
+       * - 要素間              20 (罫→キッカー→見出し→本文) → `gap-5`
+       * - 測度                PC 640 / SP 343              → `max-w-160` + page-inset
+       */}
+      <section
+        data-slot="link-band"
+        className="page-inset flex min-h-96 flex-col items-start gap-5 pt-16 lg:pt-28"
+      >
+        {/* アクセント罫。意味を持たない装飾なので支援技術からは隠す。 */}
+        <span aria-hidden="true" className="h-0.5 w-8 rounded-full bg-accent" />
 
-      {phase === "loading" && (
-        <p className="text-sm leading-relaxed text-muted-foreground" role="status" aria-live="polite">
-          {t.loading}
-        </p>
-      )}
+        {/* キッカーは overline ティア (12 / 600 / tracking .125em)。生の text-xs +
+            tracking-widest ではトークン変更に追従しないため使わない。 */}
+        <p className={cn(overlineClass, "text-muted-foreground")}>{t.title}</p>
 
-      {phase === "success" && (
-        <div className="space-y-6">
-          <h1 className="text-xl font-normal">{t.successTitle}</h1>
-          <p className="text-sm leading-relaxed text-muted-foreground">
-            {hasActivity ? t.successBodyWithActivity : t.successBodyNoActivity}
+        {phase === "loading" && (
+          <p className={bodyTextClass} role="status" aria-live="polite">
+            {t.loading}
           </p>
-          <Button variant="outline" className="w-full" onClick={closeLiff}>
+        )}
+
+        {/* 見出しは要素そのまま (globals.css の `h1 { font: var(--typography-style-h1) }`
+            = 32px)。`.page-title` (md+ で 44px) は当てない — Figma 確定版の LIFF は
+            PC 8316:874 も SP 8317:1018 も高さ 38 = 32 x 1.2 で、PC でも 32 だから。
+            ページ主見出しの全体裁定 (PC 44 / SP 32) はサイトの chrome を持つ面の
+            ものであり、chrome を外したこの面は対象外。 */}
+        {phase === "success" && (
+          <>
+            <h1 className="max-w-160">{t.successTitle}</h1>
+            <p className={bodyTextClass}>
+              {hasActivity ? t.successBodyWithActivity : t.successBodyNoActivity}
+            </p>
+          </>
+        )}
+
+        {phase === "needs_shopify_login" && (
+          <>
+            <h1 className="max-w-160">{t.loginTitle}</h1>
+            <p className={bodyTextClass}>{t.loginBody}</p>
+          </>
+        )}
+
+        {phase === "error" && (
+          <>
+            <h1 className="max-w-160">{t.errorTitle}</h1>
+            <p className={bodyTextClass}>{t.errorBody}</p>
+          </>
+        )}
+
+        {phase === "unavailable" && <p className={bodyTextClass}>{t.unavailableBody}</p>}
+      </section>
+
+      {/*
+       * NextAction — 1 画面 1 アクション (Figma 8316:876 / 8317:1020 ほか)。
+       * 帯の外に置き、幅は内容なり・左端は帯と揃える。
+       * 上下余白 SP 48 (`py-12`) / PC 22 → 実装 24 (`lg:py-6`、spacing scale の最寄り)。
+       * style は Figma のインスタンスどおり: ログイン = solid (主要導線 / 8317:1040 は
+       * primary 面)、トークに戻る・もう一度試す = outline (副次導線 / 8316:877)。
+       */}
+      {phase === "success" && (
+        <div className="page-inset py-12 lg:py-6">
+          <PillButton pillStyle="outline" onClick={closeLiff}>
             {t.close}
-          </Button>
+          </PillButton>
         </div>
       )}
 
       {phase === "needs_shopify_login" && (
-        <div className="space-y-6">
-          <h1 className="text-xl font-normal">{t.loginTitle}</h1>
-          <p className="text-sm leading-relaxed text-muted-foreground">{t.loginBody}</p>
+        <div className="page-inset py-12 lg:py-6">
           {/* Shopify Customer Account OAuth（locale を渡してログイン後 /account に戻る）。 */}
-          <Button asChild className="w-full">
-            <a href={`/api/auth/login?locale=${encodeURIComponent(locale)}`}>{t.loginCta}</a>
-          </Button>
+          <a className={pillClass("solid")} href={`/api/auth/login?locale=${encodeURIComponent(locale)}`}>
+            {t.loginCta}
+          </a>
         </div>
       )}
 
       {phase === "error" && (
-        <div className="space-y-6">
-          <h1 className="text-xl font-normal">{t.errorTitle}</h1>
-          <p className="text-sm leading-relaxed text-muted-foreground">{t.errorBody}</p>
-          <Button variant="outline" className="w-full" onClick={() => void run()}>
+        <div className="page-inset py-12 lg:py-6">
+          <PillButton pillStyle="outline" onClick={() => void run()}>
             {t.retry}
-          </Button>
+          </PillButton>
         </div>
       )}
-
-      {phase === "unavailable" && (
-        <p className="text-sm leading-relaxed text-muted-foreground">{t.unavailableBody}</p>
-      )}
-    </div>
+    </>
   );
 }
