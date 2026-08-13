@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { getLocale, getTranslations } from "next-intl/server";
+import { FilterX, Sprout } from "lucide-react";
 
 import { getClient } from "@/sanity/lib/client";
 import {
@@ -222,10 +223,21 @@ async function JournalContent({ params }: { params: SearchParams }) {
   }
 
   if ((total ?? 0) === 0) {
-    // 絞り込み以前に記事が 1 本も無い状態。解除できる絞り込みが無いので
-    // アクションは置かない (押せない導線を出さない)。
+    // P1 絞り込み以前に記事が 1 本も無い状態。解除できる絞り込みが無いので、
+    // 導線は横に抜ける出口 (商品一覧) にする。
     return (
-      <EmptyState className="mt-8 lg:mt-12" title={t("empty")} />
+      <EmptyState
+        className="mt-8 lg:mt-12"
+        icon={Sprout}
+        count={t("emptyAll.eyebrow")}
+        title={t("emptyAll.title")}
+        body={t("emptyAll.body")}
+        action={
+          <Link href="/products" className={pillClass("outline")}>
+            {t("emptyAll.ctaLabel")}
+          </Link>
+        }
+      />
     );
   }
 
@@ -328,12 +340,13 @@ async function JournalContent({ params }: { params: SearchParams }) {
                 — こちらは再試行ではなく絞り込みの解除を促す
                 (Figma EmptyState 8173:298 の注記)。 */}
             <EmptyState
-              count={t("emptyFilteredCount")}
-              title={t("emptyFilteredTitle")}
-              body={t("emptyFilteredBody")}
+              icon={FilterX}
+              count={t("emptyFiltered.eyebrow")}
+              title={t("emptyFiltered.title")}
+              body={t("emptyFiltered.body")}
               action={
                 <Link href="/journal" className={pillClass("outline")}>
-                  {t("emptyFilteredAction")}
+                  {t("emptyFiltered.ctaLabel")}
                 </Link>
               }
             />

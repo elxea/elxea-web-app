@@ -2,10 +2,15 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 
+import { Sprout } from "lucide-react";
+
 import { decodeHandle } from "@/lib/handle";
 import { getCollectionByHandle } from "@/lib/shopify";
+import { Link } from "@/i18n/navigation";
 import { Section } from "@/components/layout/container";
 import { Breadcrumb } from "@/components/seo/breadcrumb";
+import { EmptyState } from "@/components/ui/empty-state";
+import { pillClass } from "@/components/ui/pill-button";
 import { CatalogToolbar } from "@/components/catalog/catalog-toolbar";
 import {
   CatalogGrid,
@@ -104,7 +109,6 @@ export default async function CollectionPage({
   const sp = await searchParams;
 
   const t = await getTranslations("collection");
-  const tp = await getTranslations("product");
   const tl = await getTranslations("catalog");
   const tc = await getTranslations("common");
   const bt = await getTranslations("breadcrumb");
@@ -173,9 +177,21 @@ export default async function CollectionPage({
       />
 
       {visible.length === 0 ? (
-        <p className="mt-8 text-sm text-muted-foreground lg:mt-12">
-          {tp("noProducts")}
-        </p>
+        /* P3 URL 自体がスコープ (このコレクション) で、その中身が 0 件。解除
+           できる絞り込みではないので、導線は親一覧 (コレクション一覧) へ戻す。
+           障害 (loadError) とは必ず出し分ける。 */
+        <EmptyState
+          className="mt-8 lg:mt-12"
+          icon={Sprout}
+          count={t("emptyProducts.eyebrow")}
+          title={t("emptyProducts.title")}
+          body={t("emptyProducts.body")}
+          action={
+            <Link href="/collections" className={pillClass("outline")}>
+              {t("emptyProducts.ctaLabel")}
+            </Link>
+          }
+        />
       ) : (
         <CatalogGrid className="mt-8 lg:mt-12">
           {visible.map((product) => (

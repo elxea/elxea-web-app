@@ -1,14 +1,18 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 
+import { NotebookPen } from "lucide-react";
+
 import { ListPageHead } from "@/components/catalog/catalog-list";
-import { bodyClass, bodySmClass } from "@/components/editorial/rule-list";
+import { bodyClass } from "@/components/editorial/rule-list";
 import {
   TastingNoteList,
   type TastingNoteRecord,
 } from "@/components/karte/tasting-notes";
 import { Section } from "@/components/layout/container";
 import { Breadcrumb } from "@/components/seo/breadcrumb";
+import { EmptyState } from "@/components/ui/empty-state";
+import { pillClass } from "@/components/ui/pill-button";
 import { Link } from "@/i18n/navigation";
 import { seedTastingNotes } from "@/lib/preview-seed";
 import { cn } from "@/lib/utils";
@@ -94,9 +98,20 @@ export default async function TastingNotePage() {
           moodLabels={moodLabels}
         />
       ) : (
-        <p className={cn(bodySmClass, "mt-8 text-muted-foreground lg:mt-12")}>
-          {t("empty")}
-        </p>
+        /* P4 自分の記録がまだ 1 件も無い状態。読み枠 (max-w-224) の中に置いて
+           カードの体裁を R2 から外さない。障害とは出し分ける。 */
+        <EmptyState
+          className="mt-8 max-w-224 lg:mt-12"
+          icon={NotebookPen}
+          count={t("empty.eyebrow")}
+          title={t("empty.title")}
+          body={t("empty.body")}
+          action={
+            <Link href="/products" className={pillClass("outline")}>
+              {t("empty.ctaLabel")}
+            </Link>
+          }
+        />
       )}
 
       {/* 茶葉導線 (R2 8105:1200 / 8105:1330) — 中央寄せの静かな 1 本。

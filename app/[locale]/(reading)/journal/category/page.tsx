@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { getLocale, getTranslations } from "next-intl/server";
+import { Sprout } from "lucide-react";
 
 import { getClient } from "@/sanity/lib/client";
 import {
@@ -7,8 +8,11 @@ import {
   ARTICLES_QUERY,
   CATEGORIES_WITH_COUNTS_QUERY,
 } from "@/sanity/lib/queries";
+import { Link } from "@/i18n/navigation";
 import { Breadcrumb } from "@/components/seo/breadcrumb";
 import { Section } from "@/components/layout/container";
+import { EmptyState } from "@/components/ui/empty-state";
+import { pillClass } from "@/components/ui/pill-button";
 import { CatalogToolbar } from "@/components/catalog/catalog-toolbar";
 import { ArticleCard } from "@/components/journal/article-card";
 import { CategoryShelf, StackPageHead } from "@/components/journal/journal-list";
@@ -174,7 +178,20 @@ export default async function JournalCategoryIndexPage() {
       />
 
       {categories.length === 0 ? (
-        <p className="mt-8 text-sm text-muted-foreground lg:mt-12">{t("empty")}</p>
+        /* P1 カテゴリが 1 つも無い状態。障害 (loadError) とは必ず出し分ける
+           — 再試行ではなくジャーナル本体へ抜ける出口を出す。 */
+        <EmptyState
+          className="mt-8 lg:mt-12"
+          icon={Sprout}
+          count={t("emptyCategoryList.eyebrow")}
+          title={t("emptyCategoryList.title")}
+          body={t("emptyCategoryList.body")}
+          action={
+            <Link href="/journal" className={pillClass("outline")}>
+              {t("emptyCategoryList.ctaLabel")}
+            </Link>
+          }
+        />
       ) : (
         categories.map((cat, catIndex) => {
           const shelf = shelves[catIndex] ?? [];

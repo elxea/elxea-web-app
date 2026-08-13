@@ -1,9 +1,14 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 
+import { FilterX } from "lucide-react";
+
 import { getProducts } from "@/lib/shopify";
 import type { Product } from "@/lib/shopify/types";
+import { Link } from "@/i18n/navigation";
 import { Breadcrumb } from "@/components/seo/breadcrumb";
+import { EmptyState } from "@/components/ui/empty-state";
+import { pillClass } from "@/components/ui/pill-button";
 import { Section } from "@/components/layout/container";
 import { CatalogToolbar } from "@/components/catalog/catalog-toolbar";
 import {
@@ -139,7 +144,24 @@ async function ProductsContent({ params }: { params: SearchParams }) {
       />
 
       {visible.length === 0 ? (
-        <p className="mt-8 text-sm text-muted-foreground lg:mt-12">{t("noProducts")}</p>
+        /* P2 絞り込みの結果として 0 件。障害 (loadError) とは必ず出し分ける
+           — こちらは再試行ではなく絞り込みの解除を促す。在庫・取扱の話なので
+           文言に「まだ」は付けない (Figma 8272:4460 の注記)。解除できる絞り込みが
+           無いとき (取扱そのものが 0 件) は押せない導線を出さない。 */
+        <EmptyState
+          className="mt-8 lg:mt-12"
+          icon={FilterX}
+          count={t("noProductsFiltered.eyebrow")}
+          title={t("noProductsFiltered.title")}
+          body={t("noProductsFiltered.body")}
+          action={
+            activeCategory === "all" ? undefined : (
+              <Link href="/products" className={pillClass("outline")}>
+                {t("noProductsFiltered.ctaLabel")}
+              </Link>
+            )
+          }
+        />
       ) : (
         <CatalogGrid className="mt-8 lg:mt-12">
           {visible.map((product) => (

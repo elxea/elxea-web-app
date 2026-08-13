@@ -1,9 +1,14 @@
 import type { Metadata } from "next";
 import { getLocale, getTranslations } from "next-intl/server";
 
+import { Sprout } from "lucide-react";
+
 import { getClient } from "@/sanity/lib/client";
 import { FARMERS_QUERY } from "@/sanity/lib/queries";
 import { urlFor } from "@/sanity/lib/image";
+import { Link } from "@/i18n/navigation";
+import { EmptyState } from "@/components/ui/empty-state";
+import { pillClass } from "@/components/ui/pill-button";
 import { Breadcrumb } from "@/components/seo/breadcrumb";
 import { Section } from "@/components/layout/container";
 import { CatalogToolbar } from "@/components/catalog/catalog-toolbar";
@@ -125,7 +130,22 @@ async function FarmersList({ params }: { params: SearchParams }) {
   const farmers = withSeedFarmers(real, 14) as Farmer[];
 
   if (farmers.length === 0) {
-    return <p className="mt-8 text-sm text-muted-foreground lg:mt-12">{t("empty")}</p>;
+    /* P1 一覧そのものが空。障害 (loadError) とは必ず出し分ける — 再試行では
+       なく横に抜ける出口 (商品一覧) を出す。 */
+    return (
+      <EmptyState
+        className="mt-8 lg:mt-12"
+        icon={Sprout}
+        count={t("empty.eyebrow")}
+        title={t("empty.title")}
+        body={t("empty.body")}
+        action={
+          <Link href="/products" className={pillClass("outline")}>
+            {t("empty.ctaLabel")}
+          </Link>
+        }
+      />
+    );
   }
 
   // チップは実データの産地から組む (Figma の固定文言は焼かない)。

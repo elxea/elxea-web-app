@@ -1,9 +1,14 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 
+import { Sprout } from "lucide-react";
+
 import { getCollections } from "@/lib/shopify";
+import { Link } from "@/i18n/navigation";
 import { Section } from "@/components/layout/container";
 import { Breadcrumb } from "@/components/seo/breadcrumb";
+import { EmptyState } from "@/components/ui/empty-state";
+import { pillClass } from "@/components/ui/pill-button";
 import { CatalogCard, CatalogGrid, ListPageHead } from "@/components/catalog/catalog-list";
 
 /**
@@ -61,7 +66,22 @@ async function CollectionsContent() {
   }
 
   if (collections.length === 0) {
-    return <p className="mt-8 text-sm text-muted-foreground lg:mt-12">{t("empty")}</p>;
+    /* P1 一覧そのものが空。障害 (loadError) とは必ず出し分ける — 再試行では
+       なく横に抜ける出口 (商品一覧) を出す (Figma 8272:4460 の注記)。 */
+    return (
+      <EmptyState
+        className="mt-8 lg:mt-12"
+        icon={Sprout}
+        count={t("empty.eyebrow")}
+        title={t("empty.title")}
+        body={t("empty.body")}
+        action={
+          <Link href="/products" className={pillClass("outline")}>
+            {t("empty.ctaLabel")}
+          </Link>
+        }
+      />
+    );
   }
 
   return (

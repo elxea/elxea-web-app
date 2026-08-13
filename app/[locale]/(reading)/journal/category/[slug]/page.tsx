@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getLocale, getTranslations } from "next-intl/server";
+import { Sprout } from "lucide-react";
 
 import { getClient } from "@/sanity/lib/client";
 import {
@@ -217,16 +218,17 @@ export default async function CategoryPage({
       <JournalLayout className="mt-8 lg:mt-12">
         {visible.length === 0 ? (
           <div className="order-1">
-            {/* 絞り込みの結果として 0 件。障害 (loadError) とは必ず出し分ける
-                — こちらは再試行ではなく絞り込みの解除を促す
-                (Figma EmptyState 8173:298 の注記)。 */}
+            {/* P3 URL 自体がスコープ (このカテゴリ) で、その中身が 0 件。解除
+                できる絞り込みではないので、導線は親一覧 (カテゴリ一覧) へ戻す。
+                障害 (loadError) とは必ず出し分ける。 */}
             <EmptyState
-              count={t("emptyFilteredCount")}
-              title={t("emptyFilteredTitle")}
-              body={t("emptyFilteredBody")}
+              icon={Sprout}
+              count={t("emptyCategory.eyebrow")}
+              title={t("emptyCategory.title")}
+              body={t("emptyCategory.body")}
               action={
-                <Link href="/journal" className={pillClass("outline")}>
-                  {t("emptyFilteredAction")}
+                <Link href="/journal/category" className={pillClass("outline")}>
+                  {t("emptyCategory.ctaLabel")}
                 </Link>
               }
             />
