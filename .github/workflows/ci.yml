@@ -408,7 +408,16 @@ jobs:
 
   staging-smoke:
     name: staging-smoke
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    # 出荷しているブランチを見る。ここが `main` に留まっていたため、この監視は
+    # **一度も走っていなかった**: main は出荷ブランチより ~205 commit 遅れていて
+    # push が来ないので、ref が一致せず毎回 skip される。skip された job は
+    # Actions の一覧で成功と見分けがつかないため、無音のまま「監視あり」と
+    # 見做されていた (下の deploy-production が DEPLOY_BRANCH で直したのと同じ
+    # 誤り)。デプロイ判定 (DEPLOY_ENABLED) には触らない — これは監視の対象を
+    # 実際に出荷する側へ向け直すだけ。
+    #
+    # !! DEPLOY_BRANCH を変えるときは、この行も一緒に変える。!!
+    if: github.ref == 'refs/heads/feat/c1-ds-foundation' && github.event_name == 'push'
     needs: [unit-tests, e2e-tests]
     runs-on: ubuntu-latest
     timeout-minutes: 5
