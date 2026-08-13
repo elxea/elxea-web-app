@@ -27,7 +27,7 @@ import {
 } from "@/lib/viz/map-style";
 import { cn } from "@/lib/utils";
 
-import { createOriginPinElement } from "./origin-pin";
+import { createOriginPinElement, type OriginPinScale } from "./origin-pin";
 
 export interface OriginMapProps {
   /** 産地の緯度 (WGS84)。 */
@@ -36,6 +36,12 @@ export interface OriginMapProps {
   lng: number;
   /** 画角。既定は品目ページの小地図。 */
   zoom?: number;
+  /**
+   * ピンの大きさをどの画面の基準で採るか。
+   * 既定が `item` なのは、このコンポーネントが今のところ品目ページ専用のため。
+   * 生産者一覧を作るときは `producerList` を明示して渡す (点が近接するため)。
+   */
+  pinScale?: OriginPinScale;
   /** スクリーンリーダー向けの説明。地図の中に文字を置かないので必須。 */
   label: string;
   className?: string;
@@ -51,6 +57,7 @@ export function OriginMap({
   lat,
   lng,
   zoom = ITEM_MAP_ZOOM,
+  pinScale = "item",
   label,
   className,
 }: OriginMapProps) {
@@ -100,7 +107,7 @@ export function OriginMap({
 
     // ピンは Marker (DOM) で描く。symbol レイヤーにしないのは意匠を CSS で持つため。
     const marker = new Marker({
-      element: createOriginPinElement(),
+      element: createOriginPinElement(pinScale),
       anchor: "center",
     })
       .setLngLat([lng, lat])
@@ -119,7 +126,7 @@ export function OriginMap({
       marker.remove();
       map.remove();
     };
-  }, [lat, lng, zoom]);
+  }, [lat, lng, zoom, pinScale]);
 
   return (
     <div

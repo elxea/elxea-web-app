@@ -19,7 +19,11 @@ import {
   MAPLIBRE_PUBLIC_DIR,
   MAPLIBRE_WORKER_FILES,
 } from "@/scripts/copy-maplibre-worker.mjs";
-import { PIN_DOT_SIZE, PIN_RIM_WIDTH } from "@/components/viz/map/origin-pin";
+import {
+  PIN_DOT_SIZE,
+  PIN_RIM_WIDTH,
+  pinOuterSize,
+} from "@/components/viz/map/origin-pin";
 
 /**
  * 産地の地図のスタイル。守るのは 4 つ。
@@ -263,9 +267,24 @@ describe("Figma 実測値との対応", () => {
     expect(ITEM_MAP_SIZE.sp).toEqual({ width: 335, height: 180 });
   });
 
-  it("ピンは実点 ø5 + 縁 1.5px", () => {
-    expect(PIN_DOT_SIZE).toBe(5);
+  it("品目ページのピンは実点 ø7 + 縁 1.5px (外径 10px)", () => {
+    expect(PIN_DOT_SIZE.item).toBe(7);
     expect(PIN_RIM_WIDTH).toBe(1.5);
+    expect(pinOuterSize("item")).toBe(10);
+  });
+
+  it("生産者一覧のピンは ø5 のまま — 最も近い 2 軒の間に紙が残る", () => {
+    // 11 点表示で最も近い 2 軒 (みとちゃ農園 / 中窪製茶園) の中心間距離。
+    const CLOSEST_GAP_PX = 7.6;
+    /** 点の縁どうしの隙間。ここが詰まると 2 軒が 1 つの点に見える。 */
+    const paperBetween = (dot: number) => CLOSEST_GAP_PX - dot;
+
+    expect(PIN_DOT_SIZE.producerList).toBe(5);
+    expect(pinOuterSize("producerList")).toBe(8);
+    // ø5 なら 2.6px の紙が残る。品目ページと同じ ø7 にすると 0.6px しか残らず
+    // 2 軒が 1 点に潰れるので、こちらは上げられない。
+    expect(paperBetween(PIN_DOT_SIZE.producerList)).toBeGreaterThanOrEqual(2);
+    expect(paperBetween(PIN_DOT_SIZE.item)).toBeLessThan(2);
   });
 
   it("zoom はモック実描画を正本とした 7.35 (仕様テキストの 8.2 ではない)", () => {
