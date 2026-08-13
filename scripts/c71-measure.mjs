@@ -79,7 +79,10 @@ const probe = () => {
   const regNote = q('[data-slot="event-registration-note"]');
   const body = q('[data-slot="event-body"]');
   const bodyHead = q('h2[data-slot="event-section-title"]');
-  const bodyProse = body ? q(".prose-custom", body) : null;
+  // 本文枠は `ArticleProse` (data-slot="article-prose")。以前は `.prose-custom` を
+  // 探していたが、そのクラスは CSS に一度も存在せず、要素側の className からも
+  // 外したのでセレクタが空振りしていた (計測値が常に null になる)。
+  const bodyProse = body ? q('[data-slot="article-prose"]', body) : null;
   const detailsLink = q('[data-slot="event-details-link"]');
   const secCS = cs(sec);
 

@@ -27,6 +27,7 @@ import {
   RelatedReadingsSection,
   TeaDetailSection,
 } from "@/components/journal/article-modal-sections";
+import { ArticleProse } from "@/components/journal/article-blocks";
 import { BookmarkButton } from "@/components/journal/bookmark-button";
 import { ArticleReadTracker } from "@/components/journal/article-read-tracker";
 import { ReadingProgress } from "@/components/journal/reading-progress";
@@ -313,20 +314,33 @@ export default async function ArticlePage({
 
           {hasAccess ? (
             <>
-              {/* 本文 — 段落間 24 / H2 前 56 後 20 (Figma の縦リズム) */}
-              {/* 本文の縦リズム: `prose-custom` 自身が持つ段落マージン (実測
-                  74px) は Figma の 24 と食い違うため important 付きで上書きする。
-                  下マージンを 0 に倒し、間隔は隣接セレクタの上マージンだけで
-                  作る (マージン相殺の影響を受けないようにするため)。
-                  節見出しの「後 20」も同じ原則で見出し側の mb ではなく直後要素の
-                  mt で作る (mb 20 と段落 mt 24 が相殺すると大きい 24 が勝ち、
-                  実レンダリングが Figma 実測 20 とずれるため)。
-                  `.prose-custom h2 + *` は型セレクタを含み `.prose-custom > * + *`
-                  より詳細度が高いので、隣接段落の mt-6 を確実に上書きする。 */}
+              {/* 本文 — 段落間 24 / H2 前 56 後 20 (Figma の縦リズム)
+
+                  枠は共有の `ArticleProse` を使う。ここは以前 `prose-custom` という
+                  クラス名を書いていたが、**そのクラスは globals.css にも dist にも
+                  一度も存在したことがない** (git 全履歴の *.css を `.prose-custom`
+                  で検索して 0 件)。つまり枠として何も効いておらず、
+                  - 段落が DS の body プリセット (16 / lh 1.75) ではなく共有
+                    シリアライザの `text-sm` (14) のままだった
+                  - `globals.css` の `[data-slot="article-prose"] h2` (PC で節見出しを
+                    jp/h1 32 に上げる規則) が当たらず PC でも 24 のままだった
+                  という 2 点で、同じ blockContent を出す elxea Journal 記事詳細
+                  (`ArticleProse` 使用) と体裁が食い違っていた。
+                  旧コメントにあった「`prose-custom` 自身が持つ段落マージン (実測
+                  74px)」も、存在しないクラスについての記述なので削除した。
+
+                  縦リズムはこのページの実測値 (H2 前 56 = mt-14 / 後 20 = mt-5) を
+                  className で明示して従来どおり維持する。`ArticleProse` の既定は
+                  elxea Journal 側の実測 (前 80 / 後 44) で値が違うため、ここで
+                  上書きしないと見た目が動く。`cn` (tailwind-merge) は同じ
+                  arbitrary variant + 同じプロパティを衝突として後勝ちに解決するので
+                  `[&_h2]:mt-20!` は `[&_h2]:mt-14!` に置き換わる (実行して確認済み)。
+                  ※ 前 56 と 80 のどちらが正かは Figma と突き合わせる別件。ここでは
+                  「クラスが効いていない」断線だけを塞ぎ、実測値は動かさない。 */}
               {article.body && (
-                <div className="prose-custom mt-6 [&>*]:mb-0! [&>*+*]:mt-6! [&_h2]:mt-14! [&_h2]:mb-0! [&_h3]:mt-14! [&_h3]:mb-0! [&_h2+*]:mt-5! [&_h3+*]:mt-5!">
+                <ArticleProse className="mt-6 [&_h2]:mt-14! [&_h3]:mt-14! [&_h2+*]:mt-5! [&_h3+*]:mt-5!">
                   <PortableText value={article.body} />
-                </div>
+                </ArticleProse>
               )}
 
               {/* 記事の音声 — サイト内で鳴らす (Setaka 確定 2026-08-11)。

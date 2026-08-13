@@ -11,6 +11,7 @@ import {
 import { urlFor } from "@/sanity/lib/image";
 import { Breadcrumb } from "@/components/seo/breadcrumb";
 import { AuthorByline } from "@/components/journal/author-byline";
+import { ArticleProse } from "@/components/journal/article-blocks";
 import { SpecBand } from "@/components/editorial/section-blocks";
 import { PortableText } from "@/components/sanity/portable-text";
 import { FollowButton } from "@/components/farmers/follow-button";
@@ -361,9 +362,12 @@ export default async function FarmerPage({
       {/* 確定版に枠は無いが、既存の紹介文を落とさないため読み物として残す。 */}
       {farmer.bio ? (
         <FarmerSection>
-          <div className="prose-custom max-w-160">
+          {/* 枠は共有の `ArticleProse`。以前は `prose-custom` と書いていたが
+              そのクラスは CSS に一度も存在せず (git 全履歴で 0 件)、段落が DS の
+              body プリセットではなく共有シリアライザの `text-sm` のままだった。 */}
+          <ArticleProse className="max-w-160">
             <PortableText value={farmer.bio} />
-          </div>
+          </ArticleProse>
         </FarmerSection>
       ) : null}
 

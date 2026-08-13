@@ -21,7 +21,7 @@ import type { PortableTextBlock } from "@portabletext/types";
  *
  * 対処は各ブロックに `last:mb-0` (`:last-child` のとき下マージン 0) を付けること。
  * **ラッパ要素は足さない**。呼び出し側が
- * `[&>*]:mb-0!` / `[&>*+*]:mt-6!` (記事詳細 `prose-custom` 枠・`ArticleProse`) と
+ * `[&>*]:mb-0!` / `[&>*+*]:mt-6!` (`ArticleProse`) と
  * **直下子セレクタ**で縦リズムを組んでいるため、`div` を 1 枚挟むと
  * (`display: contents` でも) それらが全滅して段落間 24 が消える。
  *
