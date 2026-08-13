@@ -200,6 +200,46 @@ const nextConfig: NextConfig = {
         destination: "/ja/people/:slug",
         permanent: true,
       },
+      /* 旧 `/roji/*` → `/journal/*` の恒久転送。
+       *
+       * ジャーナルは旧サイトで `roji` (路地) という名前の面として公開されていて、
+       * 記事の Published URL が `elxea.com/roji/<slug>` の形で外に出ている
+       * (実例: `/roji/winter-wazuka-tea-fields-morning`)。現行の記事ルートは
+       * `app/[locale]/(reading)/journal/[slug]` だけなので、旧 URL を踏むと 404 に
+       * なる。slug 空間は同じ (記事側の slug をそのまま使って公開していた) ため、
+       * パスの頭だけ差し替えれば旧 URL は漏れなく現行記事へ着地する。
+       *
+       * ページ側の `permanentRedirect()` ではなく本ブロックで転送するのは
+       * membership (C13-1) / 著者ページ (C17-1) と同じ理由 — App Router が
+       * シェルを流し始めたあとの redirect は 200 + クライアント遷移に畳まれ、
+       * 恒久移動のシグナルにならない。
+       *
+       * ステータスは他の恒久転送と同じ `permanent: true` (= 308) に揃える。
+       * 301 と 308 はどちらも恒久移動で検索側の扱いも同じ (308 はメソッドを
+       * 保つぶん厳密) なので、このファイル内で 1 件だけ `statusCode: 301` を
+       * 混ぜる理由がない。
+       *
+       * `/en/*` は middleware が先に 301 で `/ja/*` へ送るため ja だけで足りる。 */
+      {
+        source: "/ja/roji/:slug",
+        destination: "/ja/journal/:slug",
+        permanent: true,
+      },
+      {
+        source: "/roji/:slug",
+        destination: "/ja/journal/:slug",
+        permanent: true,
+      },
+      {
+        source: "/ja/roji",
+        destination: "/ja/journal",
+        permanent: true,
+      },
+      {
+        source: "/roji",
+        destination: "/ja/journal",
+        permanent: true,
+      },
     ];
   },
   async headers() {
