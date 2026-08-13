@@ -1,8 +1,17 @@
 import type { MetadataRoute } from "next";
 import { isFictionalFarmerSlug } from "@/lib/fictional-farmers";
+import { siteUrl } from "@/lib/site-url";
 
-const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://elxea.com";
-const locales = ["ja", "en"];
+// 環境変数に混ざった改行・末尾スラッシュを落としてから使う。生の値をそのまま
+// 連結していたため、本番の <loc> が全件 "https://elxea.com\n/ja/..." になり、
+// sitemap のエントリ 172 件がまるごと不正な URL になっていた。
+const BASE_URL = siteUrl();
+
+// 出すのは ja だけ。`middleware.ts` が /en/* を /ja/* へ 301 で恒久リダイレクト
+// する (英語コンテンツが未完のため) ので、en の URL を載せるとリダイレクト先
+// でしか到達できない URL を sitemap に並べることになる。実体のある URL だけを
+// 載せる。英語を出す判断がついた時点でここに "en" を戻す。
+const locales = ["ja"];
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const entries: MetadataRoute.Sitemap = [];

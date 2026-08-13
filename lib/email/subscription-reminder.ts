@@ -2,6 +2,7 @@ import { Resend } from "resend";
 
 import { formatPrice } from "@/lib/format-price";
 import { placeholderValue } from "@/lib/placeholders";
+import { siteUrl } from "@/lib/site-url";
 
 let _resend: Resend | null = null;
 
@@ -17,7 +18,7 @@ function getResend(): Resend {
 }
 
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "info@elxea.com";
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://elxea.com";
+const SITE_URL = siteUrl();
 
 /**
  * 変更・停止・解約の受付期限。特商法ページ IV-6 と同じ基準を使う。
