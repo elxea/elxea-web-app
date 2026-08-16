@@ -340,7 +340,7 @@ function CsatStep({
             aria-label={`${rating} / 5`}
           >
             <span
-              className={`flex size-12 items-center justify-center rounded-full border-2 transition-all duration-200 ${
+              className={`flex size-12 items-center justify-center rounded-full border-2 transition-all duration-fast ${
                 value !== null && rating <= value
                   ? "border-primary bg-primary text-primary-foreground"
                   : "border-border bg-background text-muted-foreground hover:border-primary hover:text-foreground"
@@ -379,7 +379,7 @@ function WouldUseAgainStep({
             key={option}
             type="button"
             onClick={() => onChange(option)}
-            className={`rounded-lg border px-4 py-3 text-left text-sm transition-all duration-200 ${
+            className={`rounded-lg border px-4 py-3 text-left text-sm transition-all duration-fast ${
               value === option
                 ? "border-primary bg-primary/5 text-foreground"
                 : "border-border bg-background text-muted-foreground hover:border-primary hover:text-foreground"
@@ -428,7 +428,7 @@ function BestAspectsStep({
               key={key}
               type="button"
               onClick={() => toggle(aspectValue)}
-              className={`rounded-full border px-4 py-2 text-sm transition-all duration-200 ${
+              className={`rounded-full border px-4 py-2 text-sm transition-all duration-fast ${
                 selected
                   ? "border-primary bg-primary text-primary-foreground"
                   : "border-border bg-background text-muted-foreground hover:border-primary hover:text-foreground"
@@ -498,7 +498,7 @@ function NpsStep({
               key={i}
               type="button"
               onClick={() => onChange(i)}
-              className={`flex h-10 items-center justify-center rounded-md text-sm font-medium transition-all duration-200 ${
+              className={`flex h-10 items-center justify-center rounded-md text-sm font-medium transition-all duration-fast ${
                 value === i
                   ? "bg-primary text-primary-foreground"
                   : "border border-border bg-background text-muted-foreground hover:border-primary hover:text-foreground"

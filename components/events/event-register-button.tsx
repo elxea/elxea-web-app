@@ -219,7 +219,7 @@ export function EventRegisterButton({ className }: { className?: string }) {
       aria-label={label}
       aria-pressed={isRegistered}
       className={cn(
-        "w-full transition-all duration-200",
+        "w-full transition-all duration-fast",
         isChecked ? "opacity-100" : "opacity-80",
         className,
       )}

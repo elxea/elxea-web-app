@@ -4,6 +4,7 @@ import { useState, useSyncExternalStore } from "react";
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 function subscribeToConsent(callback: () => void) {
   window.addEventListener("storage", callback);
@@ -26,15 +27,24 @@ export function CookieConsent() {
     getServerConsentSnapshot
   );
   const [dismissed, setDismissed] = useState(false);
+  // 退出の動きを見せてから消すための「閉じかけ」。選択自体はボタンを押した
+  // 時点で保存し、DOM から外すのだけを `animationend` まで遅らせる。
+  const [closing, setClosing] = useState(false);
   const visible = needsConsent && !dismissed;
 
   const handleAccept = () => {
     localStorage.setItem("cookie-consent", "all");
-    setDismissed(true);
+    setClosing(true);
   };
 
   const handleDecline = () => {
     localStorage.setItem("cookie-consent", "essential");
+    setClosing(true);
+  };
+
+  const handleAnimationEnd = (event: React.AnimationEvent<HTMLDivElement>) => {
+    // 子要素のアニメーションが上がってくるので、自分の分だけ拾う。
+    if (!closing || event.target !== event.currentTarget) return;
     setDismissed(true);
   };
 
@@ -46,7 +56,14 @@ export function CookieConsent() {
     // 同意ボタンが隠れて押せなくなる。非表示時は 0px で従来の位置。
     <div
       style={{ bottom: "var(--audio-bar-h, 0px)" }}
-      className="fixed left-0 right-0 z-50 w-full max-w-full border-t border-border bg-background"
+      onAnimationEnd={handleAnimationEnd}
+      className={cn(
+        "fixed left-0 right-0 z-50 w-full max-w-full border-t border-border bg-background",
+        // 音声バーが出入りするときの退避はスライドではなく滑らかに。ChatBar に
+        // だけ入っていた指定をここにも広げて、3つの下端要素の挙動を揃える。
+        "transition-[bottom] duration-normal ease-enter",
+        closing ? "animate-recede" : "animate-rise"
+      )}
     >
       <div className="page-container py-4 flex flex-col sm:flex-row items-start sm:items-center gap-4">
         <p className="text-sm text-muted-foreground flex-1 min-w-0 break-words">

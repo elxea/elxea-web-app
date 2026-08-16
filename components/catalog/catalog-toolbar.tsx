@@ -184,7 +184,7 @@ export function CatalogToolbar({
           const chipClass = cn(
             bodySmClass,
             "flex h-11 shrink-0 items-center rounded-full px-3 py-3 whitespace-nowrap lg:px-4 lg:py-2",
-            "transition-colors duration-200",
+            "transition-colors duration-fast",
             "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none",
             selected
               ? "bg-primary text-primary-foreground hover:bg-brand-charcoal"

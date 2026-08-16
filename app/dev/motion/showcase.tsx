@@ -254,21 +254,20 @@ export function MotionShowcase() {
             値を持たない (見本が正本になると二重管理になるため)。
           </p>
           <div className="rounded-lg border border-border bg-card p-4 text-sm leading-relaxed">
-            <p className="font-medium">この面で決めること</p>
+            <p className="font-medium">決まったこと (2026-08-16)</p>
             <ul className="mt-2 flex flex-col gap-2 text-muted-foreground">
               <li>
-                <span className="font-mono text-xs">D-1</span> 速さのトーン —
-                上のトグルで3段を往復して、roji の「静けさ」に合うのはどれか。
+                速さは <span className="font-mono text-xs">150 / 300 / 500ms</span>{" "}
+                の静かなトーン。上のトグルの既定 (M) が本番の登場速度で、退出は
+                その1段下。
               </li>
               <li>
-                <span className="font-mono text-xs">D-2</span> 拡大ズームの可否 —
-                いちばん下の「拡大あり / なし」を並べて比較。
+                拡大ズームは不採用。ダイアログもメニューも「フェード + 8px の上昇」
+                だけで開く。跳ね返り (バネ) も使わない。
               </li>
               <li>
-                <span className="font-mono text-xs">D-3</span> 実装方式 —
-                この面の動きは全部トークンから出ている。同じ見え方を既存の
-                17ファイルに配るとき、外部パッケージを1つ足すか (案A)
-                自前で配るか (案B)。
+                実装は @theme の一括上書き。外部パッケージは足さず、動いていなかった
+                開閉クラス184箇所に roji トークンで実体を与えた。
               </li>
             </ul>
           </div>
@@ -531,7 +530,7 @@ export function MotionShowcase() {
           <Sample
             title="ホバー"
             kind="型ではなく既定の transition"
-            note="ホバーは常に S 固定 (上のトグルの対象外)。左が配線後、右が現状よく書かれている直書き。狙いは見た目を変えることではなく、70ファイルに散った値をトークン1本に寄せること。"
+            note="ホバーは常に S 固定 (上のトグルの対象外)。左が今の書き方、右が置き換え前の直書き。狙いは見た目を変えることではなく、70ファイルに散った値をトークン1本に寄せること。"
             tokens={[
               "duration-fast (= --motion-duration-fast)",
               "ease-enter (= --motion-easing-ease-out)",
@@ -556,13 +555,13 @@ export function MotionShowcase() {
               </div>
               <div className="flex flex-col gap-2">
                 <p className="font-mono text-xs text-muted-foreground">
-                  duration-200 (直書き・40箇所)
+                  duration-200 (旧・直書き 38箇所)
                 </p>
                 <button
                   type="button"
                   className="flex-1 rounded-lg border border-border bg-card text-sm transition-colors duration-200 hover:bg-muted"
                 >
-                  現状
+                  置き換え前
                 </button>
               </div>
             </div>
@@ -571,11 +570,11 @@ export function MotionShowcase() {
 
         {/* ── D-2 比較 ─────────────────────────────────────────────────────── */}
         <section className="flex flex-col gap-4">
-          <h2 className="text-xl">拡大ズーム — あり / なし (D-2)</h2>
+          <h2 className="text-xl">拡大ズーム — あり / なし (判断の記録)</h2>
           <p className="text-sm leading-relaxed text-muted-foreground">
             同じモーダルを、左は「上に 8px 動くだけ」、右は「95% から原寸へ拡大」で
-            開く。右が shadcn の既定 (今は CSS が無いので実際には出ていない) の
-            見え方。速さのトグルはこちらにも効く。
+            開く。左を採用し、右は本番では使わない (この比較欄にだけ残している)。
+            速さのトグルはこちらにも効く。
           </p>
           <div className="flex flex-wrap items-center gap-2">
             <Button type="button" size="sm" onClick={zoomCompare.play}>
@@ -596,14 +595,14 @@ export function MotionShowcase() {
               [
                 {
                   id: "rise",
-                  heading: "案A — 拡大なし (推奨)",
+                  heading: "案A — 拡大なし (採用)",
                   body: "fade + rise",
                   enterClass: "animate-rise",
                   tokens: ["--animate-rise", "--motion-rise-distance"],
                 },
                 {
                   id: "zoom",
-                  heading: "案B — 拡大あり",
+                  heading: "案B — 拡大あり (不採用)",
                   body: "fade + zoom (95% → 100%)",
                   enterClass: "animate-zoom",
                   tokens: ["--animate-zoom", "--motion-zoom-from"],
@@ -658,13 +657,21 @@ export function MotionShowcase() {
         </section>
 
         <section className="flex flex-col gap-3 border-t border-border pt-8">
-          <h2 className="text-xl">この面の範囲</h2>
+          <h2 className="text-xl">どこまで入っているか</h2>
           <p className="text-sm leading-relaxed text-muted-foreground">
-            入れたのはトークンの配線 (
+            定義はすべて{" "}
             <span className="font-mono text-xs">app/globals.css</span>{" "}
-            のモーション節) と、この見本だけ。既存の部品の動きは変えていない。
-            全体への適用 — Tailwind の既定カーブの上書きと、開閉アニメの
-            クラス184箇所の復活 — は、上の3問に答えが出てからの別ステップ。
+            のモーション節にある。Tailwind の既定の時間とカーブをトークンに
+            差し替えたので、<span className="font-mono text-xs">transition-colors</span>{" "}
+            とだけ書いてある約70ファイルは無編集で乗り換わっている。動いていなかった
+            開閉クラス184箇所にも実体を与えたので、モーダル・メニュー・ドロワー・
+            アコーディオンが実際に動く。音声バーと全画面パネル、Cookie
+            バーの出入りもこの語彙で書き直した。
+          </p>
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            触っていないのはトースト (sonner) の出入りと、ページ遷移・スクロール
+            登場。前者はライブラリ同梱の動きで既に成立しており、後者は実装ゼロからの
+            新規追加になるため別で判断する。
           </p>
         </section>
       </div>

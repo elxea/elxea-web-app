@@ -47,6 +47,16 @@ import { AudioWaveform } from "./audio-waveform";
 /** バーの実高さ。ChatBar のオフセットと合わせるためここを SoT にする。 */
 const BAR_HEIGHT_PX = 64;
 
+/**
+ * 自分自身のアニメーションの終わりだけを拾う。
+ *
+ * `animationend` は子から親へ上がってくるので、素で受けると中のアイコン等の
+ * アニメーションでも発火してしまう (バーが出ている最中に消える、等)。
+ */
+function isOwnAnimationEnd(event: React.AnimationEvent<HTMLElement>) {
+  return event.target === event.currentTarget;
+}
+
 export function AudioDock() {
   const t = useTranslations("journal");
   const { current, status, currentTime, duration, toggle, seek, stop, isExpanded, setExpanded } =
@@ -55,11 +65,39 @@ export function AudioDock() {
   // 擦っている最中の見かけの位置。確定するまで実再生位置は動かさない。
   const [scrubRatio, setScrubRatio] = React.useState<number | null>(null);
 
-  const isVisible = Boolean(current);
+  // --- 退出アニメを最後まで見せるための2つの「閉じかけ」状態 --------------
+  // 素直に書くと `current` が消えた瞬間・`isExpanded` が false になった瞬間に
+  // DOM から外れ、退出の動きが1フレームも再生されない。閉じる操作をいったん
+  // ここで受け止め、`animationend` が来てから本当の状態を変える。
+  const [barClosing, setBarClosing] = React.useState(false);
+  const [panelClosing, setPanelClosing] = React.useState(false);
+
+  const requestBarClose = () => setBarClosing(true);
+  const finishBarClose = (event: React.AnimationEvent<HTMLElement>) => {
+    if (!barClosing || !isOwnAnimationEnd(event)) return;
+    setBarClosing(false);
+    stop();
+  };
+
+  const requestPanelClose = React.useCallback(() => setPanelClosing(true), []);
+  const finishPanelClose = (event: React.AnimationEvent<HTMLElement>) => {
+    if (!panelClosing || !isOwnAnimationEnd(event)) return;
+    setPanelClosing(false);
+    setExpanded(false);
+  };
+
+  const openPanel = () => {
+    setPanelClosing(false);
+    setExpanded(true);
+  };
+
+  const isVisible = Boolean(current) && !barClosing;
 
   // --- ChatBar に自分の高さを知らせる ------------------------------------
   // 変数はルート要素に置く。ChatBar は DOM 上の兄弟なので、共通の祖先である
   // <html> 経由でしか渡せない。
+  // 閉じかけ (`barClosing`) の時点で 0px に落とすのは、上に載っている ChatBar
+  // や Cookie バーが、バーが降りていくのと同じタイミングで一緒に下りるため。
   React.useEffect(() => {
     const root = document.documentElement;
     root.style.setProperty("--audio-bar-h", isVisible ? `${BAR_HEIGHT_PX}px` : "0px");
@@ -83,11 +121,11 @@ export function AudioDock() {
   React.useEffect(() => {
     if (!isExpanded) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setExpanded(false);
+      if (event.key === "Escape") requestPanelClose();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [isExpanded, setExpanded]);
+  }, [isExpanded, requestPanelClose]);
 
   if (!current) return null;
 
@@ -115,10 +153,15 @@ export function AudioDock() {
       <div
         data-slot="audio-dock-bar"
         style={{ zIndex: "var(--z-sticky)", height: BAR_HEIGHT_PX }}
+        onAnimationEnd={finishBarClose}
         className={cn(
           "fixed inset-x-0 bottom-0 flex w-full items-center gap-2 border-t border-border bg-card px-2 lg:px-4",
           // バー付近を触ったときにページが動かないようにする。
-          "[overscroll-behavior:contain]"
+          "[overscroll-behavior:contain]",
+          // 画面の端に出入りする面なので `sheet` 型。下から上がってきて、
+          // 閉じるときは1段速い時間で下へ戻る。
+          "motion-from-bottom",
+          barClosing ? "animate-sheet-out" : "animate-sheet-in"
         )}
       >
         {/* 進捗は細い線で出すだけにして、掴めるのは展開後の波形に寄せる。
@@ -138,7 +181,7 @@ export function AudioDock() {
           aria-busy={isLoading}
           className={cn(
             "flex size-11 shrink-0 items-center justify-center rounded-full",
-            "transition-colors duration-200",
+            "transition-colors duration-fast",
             isLoading
               ? "bg-muted text-muted-foreground"
               : "bg-foreground text-background hover:bg-brand-charcoal",
@@ -156,12 +199,12 @@ export function AudioDock() {
             導線は展開後に別途置く。 */}
         <button
           type="button"
-          onClick={() => setExpanded(true)}
+          onClick={openPanel}
           aria-expanded={isExpanded}
           aria-label={t("audioExpand")}
           className={cn(
             "flex min-w-0 flex-1 items-center gap-3 rounded-md px-2 py-1 text-left",
-            "transition-colors duration-200 hover:bg-muted/60",
+            "transition-colors duration-fast hover:bg-muted/60",
             "focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
           )}
         >
@@ -185,11 +228,11 @@ export function AudioDock() {
 
         <button
           type="button"
-          onClick={stop}
+          onClick={requestBarClose}
           aria-label={t("audioClose")}
           className={cn(
             "flex size-11 shrink-0 items-center justify-center rounded-full text-foreground",
-            "transition-colors duration-200 hover:bg-muted",
+            "transition-colors duration-fast hover:bg-muted",
             "focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
           )}
         >
@@ -202,9 +245,13 @@ export function AudioDock() {
         <>
           <div
             aria-hidden="true"
-            onClick={() => setExpanded(false)}
+            onClick={requestPanelClose}
             style={{ zIndex: "var(--z-overlay)" }}
-            className="fixed inset-0 bg-foreground/40"
+            className={cn(
+              "fixed inset-0 bg-foreground/40",
+              // 面で覆うものなので位置は動かさない = `fade`。
+              panelClosing ? "animate-fade-out" : "animate-fade"
+            )}
           />
           <div
             role="dialog"
@@ -212,23 +259,29 @@ export function AudioDock() {
             aria-label={current.title}
             data-slot="audio-dock-panel"
             style={{ zIndex: "var(--z-modal)", boxShadow: "var(--elevation-shadow-modal)" }}
+            onAnimationEnd={finishPanelClose}
             className={cn(
               "fixed inset-0 flex flex-col bg-background",
               // PC は全画面を占めず、中央の大型パネルにする。
               "lg:inset-auto lg:bottom-6 lg:left-1/2 lg:h-auto lg:w-full lg:max-w-3xl",
               "lg:-translate-x-1/2 lg:rounded-lg lg:border lg:border-border",
-              "[overscroll-behavior:contain]"
+              "[overscroll-behavior:contain]",
+              // 下端のバーから続けて上がってくる面なので `sheet`。横位置合わせは
+              // `translate` プロパティ側 (lg:-translate-x-1/2) に残るので、
+              // `transform` を使う型と重ねても中央寄せは崩れない。
+              "motion-from-bottom",
+              panelClosing ? "animate-sheet-out" : "animate-sheet-in"
             )}
           >
             <div className="flex items-center justify-between gap-2 px-4 py-3 lg:px-6">
               <p className={cn(captionClass, "text-muted-foreground")}>{t("audioNowPlaying")}</p>
               <button
                 type="button"
-                onClick={() => setExpanded(false)}
+                onClick={requestPanelClose}
                 aria-label={t("audioCollapse")}
                 className={cn(
                   "flex size-11 shrink-0 items-center justify-center rounded-full text-foreground",
-                  "transition-colors duration-200 hover:bg-muted",
+                  "transition-colors duration-fast hover:bg-muted",
                   "focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                 )}
               >
@@ -285,7 +338,7 @@ export function AudioDock() {
                   aria-busy={isLoading}
                   className={cn(
                     "flex size-16 shrink-0 items-center justify-center rounded-full",
-                    "transition-colors duration-200",
+                    "transition-colors duration-fast",
                     isLoading
                       ? "bg-muted text-muted-foreground"
                       : "bg-foreground text-background hover:bg-brand-charcoal",
@@ -314,7 +367,7 @@ export function AudioDock() {
                   className={cn(
                     captionClass,
                     "mx-auto inline-flex min-h-11 items-center rounded-full border border-border px-5",
-                    "text-foreground transition-colors duration-200 hover:bg-muted",
+                    "text-foreground transition-colors duration-fast hover:bg-muted",
                     "focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                   )}
                 >

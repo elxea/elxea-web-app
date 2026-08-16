@@ -55,7 +55,7 @@ export function TrackRow({
       data-slot="track-row"
       data-state={isLoading ? "loading" : isPlaying ? "playing" : "default"}
       className={cn(
-        "flex min-h-17 w-full items-center gap-4 py-2 transition-colors duration-200",
+        "flex min-h-17 w-full items-center gap-4 py-2 transition-colors duration-fast",
         isPlaying ? "rounded-md bg-card px-3" : "px-0",
         isLoading && "opacity-70",
         className
@@ -67,7 +67,7 @@ export function TrackRow({
         aria-label={`${isPlaying ? labels.pause : labels.play}: ${track.title}`}
         aria-busy={isLoading}
         className={cn(
-          "flex size-11 shrink-0 items-center justify-center rounded-full transition-colors duration-200",
+          "flex size-11 shrink-0 items-center justify-center rounded-full transition-colors duration-fast",
           isPlaying
             ? "bg-primary text-primary-foreground"
             : "text-foreground hover:bg-muted active:bg-secondary",

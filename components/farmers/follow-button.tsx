@@ -152,7 +152,7 @@ export function FollowButton({
         aria-label={isFollowing ? unfollowLabel : followLabel}
         aria-pressed={isFollowing}
         className={cn(
-          "transition-colors duration-200",
+          "transition-colors duration-fast",
           isChecked ? "opacity-100" : "opacity-60",
           className
         )}
@@ -174,7 +174,7 @@ export function FollowButton({
       disabled={isLoading}
       aria-label={isFollowing ? unfollowLabel : followLabel}
       aria-pressed={isFollowing}
-      className={cn("gap-2 transition-all duration-200", className)}
+      className={cn("gap-2 transition-all duration-fast", className)}
     >
       {isFollowing ? (
         <UserCheck className="size-4" />

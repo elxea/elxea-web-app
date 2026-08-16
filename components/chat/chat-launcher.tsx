@@ -27,7 +27,9 @@ export function ChatLauncher({ onClick, hasMessages }: ChatLauncherProps) {
       className={cn(
         "fixed right-6 z-40 size-12 rounded-full shadow-lg",
         "md:hidden",
-        "transition-transform duration-200",
+        // 音声バーの出入りに合わせて滑らかに上下する。ChatBar / Cookie バーと
+        // 同じ指定にして、3つの下端要素が同じ速さで動くようにする。
+        "transition-[bottom,transform] duration-normal ease-enter",
         "hover:scale-105 active:scale-95",
       )}
     >

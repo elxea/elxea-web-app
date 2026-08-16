@@ -161,7 +161,7 @@ export function FavoriteButton({
       >
         <Heart
           className={cn(
-            "size-4 transition-colors duration-200",
+            "size-4 transition-colors duration-fast",
             isFavorited
               ? "fill-red-500 text-red-500"
               : "fill-none text-current"
@@ -181,14 +181,14 @@ export function FavoriteButton({
       aria-label={isFavorited ? removeLabel : addLabel}
       aria-pressed={isFavorited}
       className={cn(
-        "transition-colors duration-200",
+        "transition-colors duration-fast",
         isChecked ? "opacity-100" : "opacity-60",
         className
       )}
     >
       <Heart
         className={cn(
-          "size-5 transition-colors duration-200",
+          "size-5 transition-colors duration-fast",
           isFavorited
             ? "fill-red-500 text-red-500"
             : "fill-none text-muted-foreground"

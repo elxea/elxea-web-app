@@ -205,7 +205,7 @@ export function AudioBlock(props: AudioBlockProps) {
               className={cn(
                 captionClass,
                 "inline-flex items-center gap-2 rounded-full border border-border px-5 py-2.5 text-foreground",
-                "transition-colors duration-200 hover:bg-muted active:bg-secondary",
+                "transition-colors duration-fast hover:bg-muted active:bg-secondary",
                 "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
               )}
             >
