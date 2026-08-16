@@ -27,5 +27,14 @@ export default defineConfig({
     command: "pnpm dev",
     url: "http://localhost:3000",
     reuseExistingServer: !process.env.CI,
+    env: {
+      // Deterministic container id for e2e/cookie-consent.spec.ts, which has to
+      // assert both that GTM stays absent (no consent / declined) and that it
+      // appears (accepted). Without a fixed id the component renders nothing
+      // and the "accepted" case would pass vacuously. Requests to
+      // googletagmanager.com are aborted inside that spec, so nothing leaves
+      // the runner.
+      NEXT_PUBLIC_GTM_ID: "GTM-E2ETEST",
+    },
   },
 });

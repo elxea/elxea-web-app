@@ -2,6 +2,8 @@
 // These push ecommerce events to the GTM dataLayer.
 // GTM container must be configured to forward these to GA4.
 
+import { isAnalyticsAllowed, readStoredConsent } from "@/lib/consent";
+
 declare global {
   interface Window {
     dataLayer: Record<string, unknown>[];
@@ -10,6 +12,10 @@ declare global {
 
 function push(data: Record<string, unknown>) {
   if (typeof window === "undefined") return;
+  // Without this the queue keeps filling while consent is absent or declined,
+  // and GTM replays the whole backlog the moment a later "同意する" boots the
+  // container — i.e. pre-consent browsing would be sent retroactively.
+  if (!isAnalyticsAllowed(readStoredConsent())) return;
   window.dataLayer = window.dataLayer || [];
   window.dataLayer.push(data);
 }
