@@ -20,15 +20,25 @@ const AromaField = dynamic(() => import("./aroma-field").then((m) => m.AromaFiel
 export interface AromaFieldBlockProps {
   /** 銘柄番号。Sanity `teaMenu.productNumber`。 */
   menuNumber: string | number | null | undefined;
+  /** Sanity `teaMenu.category` の生値 (カテゴリー判定の二の矢。flavor と同じ)。 */
+  category?: string | null;
   /** 図の代替テキスト (i18n 済み)。 */
   label: string;
   className?: string;
 }
 
-export function AromaFieldBlock({ menuNumber, label, className }: AromaFieldBlockProps) {
+export function AromaFieldBlock({
+  menuNumber,
+  category,
+  label,
+  className,
+}: AromaFieldBlockProps) {
   const [ref, inView] = useInViewOnce<HTMLDivElement>();
   // 描画側の effect は `data` の同一性で描き直しを判断する (flavor と同じ)。
-  const data = useMemo(() => aromaFieldFor(menuNumber), [menuNumber]);
+  const data = useMemo(
+    () => aromaFieldFor(menuNumber, category),
+    [menuNumber, category]
+  );
 
   return (
     <div ref={ref} data-slot="aroma-field-block" className={cn(className)}>

@@ -12,6 +12,7 @@ import { pillClass } from "@/components/ui/pill-button";
 import { Breadcrumb } from "@/components/seo/breadcrumb";
 import { Section } from "@/components/layout/container";
 import { CatalogToolbar } from "@/components/catalog/catalog-toolbar";
+import { TerroirOverviewBlock } from "@/components/viz/terroir/terroir-overview-block";
 import {
   CatalogCard,
   CatalogGrid,
@@ -49,6 +50,8 @@ type TeaMenuItem = {
   slug: { current: string };
   photo?: { asset: object; alt?: string };
   displayName: string;
+  /** 銘柄番号。5 桁採番なら産地の実測座標が引ける (テロワール地図の入力)。 */
+  productNumber?: string | number | null;
   category: string;
   variety: string;
   origin: string;
@@ -160,6 +163,23 @@ async function TeaMenuList({ params }: { params: SearchParams }) {
 
   return (
     <>
+      {/* テロワール地図 — いま一覧に出ているお茶の産地を 1 枚に置く。
+          表示中の産地が全部収まる尺度に自動で合わせるので、上のカテゴリー
+          チップで絞り込むと画角もそれに追従する (単品詳細の「土地を読む」は
+          産地ごとの固定尺度のままで、そちらは変えていない)。
+          点の色はお茶のカテゴリー — `docs/roji-dataviz-rules.md`。
+          座標が 1 件も引けないときはブロックごと出ない。 */}
+      <TerroirOverviewBlock
+        className="mt-8 lg:mt-12"
+        items={visible.map((item) => ({
+          id: item._id,
+          menuNumber: item.productNumber,
+          origin: item.origin,
+          category: item.category,
+        }))}
+        label={t("originsMapAlt")}
+      />
+
       <CatalogToolbar
         className="mt-8 lg:mt-12"
         chips={chips}

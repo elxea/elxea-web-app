@@ -7,6 +7,14 @@
  * 3 段の等高線に落として塗る。**点ではなく「領域」の地図**になり、近い香りどうしが
  * 地峡でつながる。系統が重なる場所がそのまま「香りの通じ合い」として出る。
  *
+ * ## 載るのは同じカテゴリーの香りだけ / 場は 1 色
+ *
+ * 何を載せるかは **データ層が決める** (`lib/roji/tea-aroma.ts`)。色は
+ * `data.category` から 1 色だけ引き、系統では色を変えない — 図の色はお茶の
+ * カテゴリーを表すという恒久ルールに従う (`docs/roji-dataviz-rules.md`)。
+ * 系統は色ではなく **場を別々に起こすこと** で分かれる。単色でも島は分かれ、
+ * 重なった場所は塗りが重なって濃くなるので「通じ合い」はそのまま読める。
+ *
  * ## roji の見え方にするための 2 点
  *
  * 1. **塗りは 3 段だけ** (不透明度 0.09 / 0.12 / 0.15)。ヒートマップ的な連続
@@ -26,11 +34,13 @@ import { useEffect, useRef } from "react";
 
 import {
   AROMA_AXIS,
-  AROMA_FAMILY_COLOR,
-  AROMA_FAMILY_LABEL,
   AROMA_FAMILY_ORDER,
   type AromaFieldData,
 } from "@/lib/roji/tea-aroma";
+import {
+  TEA_CATEGORY_COLOR,
+  TEA_CATEGORY_LABEL,
+} from "@/lib/roji/tea-category";
 import { asContourValues, traceContour } from "@/lib/viz/contour-path";
 import { drawQuadrantAxesCanvas, isNarrowLayout, quadrantLayout } from "@/lib/viz/quadrant";
 import { ROJI_VIZ_COLOR, ROJI_VIZ_SERIF } from "@/lib/viz/roji-viz-palette";
@@ -84,6 +94,8 @@ export function AromaField({ data, label, className }: AromaFieldProps) {
 
       const nx = Math.ceil(width / CELL);
       const ny = Math.ceil(height / CELL);
+      // 場に載るのは 1 カテゴリーだけなので、色は 1 回引けば足りる。
+      const fieldColor = TEA_CATEGORY_COLOR[data.category];
 
       ctx.save();
       // 重なりが「紙に染みが溜まる」見え方になる。source-over だと後の系統が
@@ -126,7 +138,7 @@ export function AromaField({ data, label, className }: AromaFieldProps) {
         bands.forEach((band, index) => {
           ctx.beginPath();
           traceContour(ctx, band, CELL);
-          ctx.fillStyle = AROMA_FAMILY_COLOR[family];
+          ctx.fillStyle = fieldColor;
           ctx.globalAlpha = ALPHAS[index] ?? 0.16;
           ctx.fill();
           ctx.globalAlpha = 1;
@@ -138,7 +150,7 @@ export function AromaField({ data, label, className }: AromaFieldProps) {
           traceContour(ctx, bands[0], CELL);
           ctx.globalAlpha = 0.3;
           ctx.lineWidth = 0.7;
-          ctx.strokeStyle = AROMA_FAMILY_COLOR[family];
+          ctx.strokeStyle = fieldColor;
           ctx.stroke();
           ctx.globalAlpha = 1;
         }
@@ -201,17 +213,19 @@ export function AromaField({ data, label, className }: AromaFieldProps) {
           className="absolute inset-0 block h-full w-full"
         />
       </div>
+      {/* 凡例は 1 行。色 = カテゴリーで、この場には 1 カテゴリーしか載らない。 */}
       <ul className="flex flex-wrap gap-x-6 gap-y-2" data-slot="aroma-legend">
-        {AROMA_FAMILY_ORDER.map((family) => (
-          <li key={family} className="flex items-center gap-2 text-xs text-muted-foreground">
-            <span
-              aria-hidden="true"
-              className="inline-block h-2 w-3.5 rounded-full opacity-50"
-              style={{ backgroundColor: AROMA_FAMILY_COLOR[family] }}
-            />
-            {AROMA_FAMILY_LABEL[family]}
-          </li>
-        ))}
+        <li
+          className="flex items-center gap-2 text-xs text-muted-foreground"
+          data-category={data.category}
+        >
+          <span
+            aria-hidden="true"
+            className="inline-block h-2 w-3.5 rounded-full opacity-50"
+            style={{ backgroundColor: TEA_CATEGORY_COLOR[data.category] }}
+          />
+          {TEA_CATEGORY_LABEL[data.category]}
+        </li>
       </ul>
     </div>
   );

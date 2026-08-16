@@ -4,10 +4,8 @@ import {
   AROMA_FAMILY_ORDER,
   aromaFieldFor,
 } from "@/lib/roji/tea-aroma";
-import {
-  TEA_PROCESS_ORDER,
-  flavorMatrixFor,
-} from "@/lib/roji/tea-flavor";
+import { TEA_CATEGORY_ORDER } from "@/lib/roji/tea-category";
+import { flavorMatrixFor } from "@/lib/roji/tea-flavor";
 import {
   CONTOUR_RAMP,
   ELEVATION_RAMP,
@@ -41,7 +39,7 @@ describe("味の四象限のデータ層", () => {
       expect(point.y).toBeLessThanOrEqual(1);
       expect(point.weight).toBeGreaterThanOrEqual(0.7);
       expect(point.weight).toBeLessThanOrEqual(1.2);
-      expect(TEA_PROCESS_ORDER).toContain(point.process);
+      expect(TEA_CATEGORY_ORDER).toContain(point.category);
     }
   });
 

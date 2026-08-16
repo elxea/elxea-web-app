@@ -26,16 +26,32 @@ const FlavorMatrix = dynamic(
 export interface FlavorMatrixBlockProps {
   /** 銘柄番号。Sanity `teaMenu.productNumber`。 */
   menuNumber: string | number | null | undefined;
+  /**
+   * Sanity `teaMenu.category` の生値。
+   *
+   * 銘柄番号が 5 桁採番でない (Sanity のダミー等) ときの **カテゴリー判定の
+   * 二の矢**。比較対象を同一カテゴリーに絞るための入力なので、渡し忘れると
+   * 既定カテゴリーの図になる。
+   */
+  category?: string | null;
   /** 図の代替テキスト (i18n 済み)。図の中に説明文を置かないので必須。 */
   label: string;
   className?: string;
 }
 
-export function FlavorMatrixBlock({ menuNumber, label, className }: FlavorMatrixBlockProps) {
+export function FlavorMatrixBlock({
+  menuNumber,
+  category,
+  label,
+  className,
+}: FlavorMatrixBlockProps) {
   const [ref, inView] = useInViewOnce<HTMLDivElement>();
   // 描画側の effect は `data` の同一性で組み直しを判断する。毎 render で
   // 作り直すと、絵が落ち着くたびに組み直しが走る。
-  const data = useMemo(() => flavorMatrixFor(menuNumber), [menuNumber]);
+  const data = useMemo(
+    () => flavorMatrixFor(menuNumber, category),
+    [menuNumber, category]
+  );
 
   return (
     <div ref={ref} data-slot="flavor-matrix-block" className={cn(className)}>
