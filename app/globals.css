@@ -625,6 +625,145 @@ dl[data-slot="spec-band"][data-emphasis="true"] > [data-slot="spec-item"] > dd {
   to { transform: rotate(360deg); }
 }
 
+/* ───────────────────────────────────────────────────────────────────────────
+ * モーション — 配線 (層2) と動きの型 (層3)
+ *
+ * 値の正本 (層1) は `tokens/base.json` の `motion` で、Style Dictionary が
+ * `dist/tokens.css` に `--motion-*` として出す。ここは **値を持たない**:
+ * トークンを Tailwind の名前空間へ橋渡しする層と、型の定義だけを置く。
+ * 設計: [roji] モーションシステム Spec
+ *   https://www.notion.so/3be70c9d064c81ee82fac2f3b09f4a5f
+ * 見本: /dev/motion (実装確認用のプレビュー面・本番からはリンクしない)
+ *
+ * 採用は3段 (fast 150 / normal 300 / slow 500) と2カーブ (enter=ease-out /
+ * exit=ease-in)。「退出は登場の1段下」の規則は時間の値ではなく
+ * `--motion-exit-duration` の既定 (= fast) で表す。
+ *
+ * NOTE — まだ入れていないもの (意図的):
+ *   Spec B-5 の `--default-transition-duration` /
+ *   `--default-transition-timing-function` の既定上書きはここに書かない。
+ *   入れた瞬間に既存 70 ファイルのホバーのカーブが変わる = 承認前に本番の
+ *   見た目が動く。D-1 (速さのトーン) の回答後に別ステップで入れる。
+ *   `/dev/motion` はその上書きが入った後の見え方を先に確かめるための面。
+ * ─────────────────────────────────────────────────────────────────────────── */
+:root {
+  /* 実行時の速さ。既定は Spec B-1 の M (登場) / S (退出)。
+   * この2つを差し替えるだけで、型を書き換えずに速さ3段を切り替えられる
+   * (/dev/motion の速さトグルはこれを上書きしている)。 */
+  --motion-enter-duration: var(--motion-duration-normal);
+  --motion-exit-duration: var(--motion-duration-fast);
+
+  /* 移動距離。Spec B-3「距離の原則」= 移動は 8px 以内・退出はその半分。
+   * SP は 6px。spacing スケールに 6px の刻みが無いので、ここだけ実値で持つ
+   * (md 以上の 8px と退出の 4px は spacing トークンから引く)。 */
+  --motion-rise-distance: 0.375rem;
+  --motion-recede-distance: var(--spacing-1);
+
+  /* `sheet` は画面外からの移動なので距離は割合。既定は右端から。
+   * 下端から出す面 (モバイルメニュー等) は x=0% / y=100% に差し替える。 */
+  --motion-sheet-x: 100%;
+  --motion-sheet-y: 0%;
+
+  /* D-2 の比較専用。shadcn 既定の `zoom-in-95` 相当の倍率で、案A (拡大なし)
+   * が採用されたらこの変数と `--animate-zoom` ごと消す。 */
+  --motion-zoom-from: 0.95;
+}
+
+@media (min-width: 48rem) {
+  :root {
+    --motion-rise-distance: var(--spacing-2);
+  }
+}
+
+@theme {
+  /* 層2 / 配線 — 名前付きユーティリティを生やす。
+   * `duration-fast|normal|slow` と `ease-enter|ease-exit` が使えるようになる。 */
+  --transition-duration-fast: var(--motion-duration-fast);
+  --transition-duration-normal: var(--motion-duration-normal);
+  --transition-duration-slow: var(--motion-duration-slow);
+  --ease-enter: var(--motion-easing-ease-out);
+  --ease-exit: var(--motion-easing-ease-in);
+
+  /* 層3 / 型 — Spec B-3 の5種。登場と退出で別ユーティリティにするのは、
+   * 「退出は登場より速く・逆カーブで」を呼び出し側が書き忘れられないため。 */
+  --animate-fade: fade var(--motion-enter-duration) var(--motion-easing-ease-out) both;
+  --animate-fade-out: fade-out var(--motion-exit-duration) var(--motion-easing-ease-in) both;
+  --animate-rise: rise var(--motion-enter-duration) var(--motion-easing-ease-out) both;
+  --animate-recede: recede var(--motion-exit-duration) var(--motion-easing-ease-in) both;
+  --animate-expand: expand var(--motion-enter-duration) var(--motion-easing-ease-out) both;
+  --animate-collapse: collapse var(--motion-exit-duration) var(--motion-easing-ease-in) both;
+  --animate-sheet-in: sheet-in var(--motion-enter-duration) var(--motion-easing-ease-out) both;
+  --animate-sheet-out: sheet-out var(--motion-exit-duration) var(--motion-easing-ease-in) both;
+
+  /* 比較用 (D-2)。採用案が決まるまでの暫定で、本番の部品では使わない。 */
+  --animate-zoom: zoom var(--motion-enter-duration) var(--motion-easing-ease-out) both;
+}
+
+@keyframes fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(var(--motion-rise-distance)); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes recede {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(var(--motion-recede-distance)); }
+}
+
+/* `expand` / `collapse` だけは transform ではなく grid-template-rows を動かす。
+ * CLAUDE.md「transform/opacity のみ」の唯一の例外で、Spec B-4 原則5 のとおり
+ * 対象を短いテキストの開閉に限定する。使う側は
+ *   <div class="grid animate-expand"><div class="overflow-hidden">…</div></div>
+ * の2層で書く (内側の overflow-hidden が無いと中身がはみ出す)。 */
+@keyframes expand {
+  from { grid-template-rows: 0fr; opacity: 0; }
+  to { grid-template-rows: 1fr; opacity: 1; }
+}
+
+@keyframes collapse {
+  from { grid-template-rows: 1fr; opacity: 1; }
+  to { grid-template-rows: 0fr; opacity: 0; }
+}
+
+@keyframes sheet-in {
+  from { transform: translate(var(--motion-sheet-x), var(--motion-sheet-y)); }
+  to { transform: translate(0, 0); }
+}
+
+@keyframes sheet-out {
+  from { transform: translate(0, 0); }
+  to { transform: translate(var(--motion-sheet-x), var(--motion-sheet-y)); }
+}
+
+@keyframes zoom {
+  from { opacity: 0; transform: scale(var(--motion-zoom-from)); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* Spec B-4 原則4 — 「動きを減らす」設定では移動と拡大を消し、不透明度の変化
+ * だけ残す。`animation: none` にはしない (完全に消すと出入りが読み取れず、
+ * 何が起きたのか分からなくなる)。距離を 0 にするだけで全ての型に効くので、
+ * 型を増やしてもここを直す必要はない。
+ * 上の md クエリより **後** に置くこと (同じ :root の後勝ちで上書きする)。 */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-rise-distance: 0;
+    --motion-recede-distance: 0;
+    --motion-sheet-x: 0%;
+    --motion-sheet-y: 0%;
+    --motion-zoom-from: 1;
+  }
+}
+
 @layer base {
   /* Border color — no `* { border-color: … }` rule here on purpose.
    *
