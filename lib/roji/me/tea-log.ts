@@ -30,8 +30,8 @@ import {
   TEA_CATEGORY_COLOR,
   TEA_CATEGORY_LABEL,
   type TeaCategory,
+  type TeaProcess,
 } from "@/lib/roji/me/tea-catalog";
-import { type TeaProcess } from "@/lib/roji/tea-flavor";
 import { ROJI_VIZ_COLOR, seededRandom } from "@/lib/viz/roji-viz-palette";
 
 /**

@@ -19,8 +19,36 @@
  * 出典: viz 査定 `verdicts.md` 第7ラウンド `31-flavor-interactive/catalog.js`。
  */
 
-import { TEA_PROCESS_COLOR, TEA_PROCESS_LABEL, type TeaProcess } from "@/lib/roji/tea-flavor";
 import { ROJI_VIZ_COLOR } from "@/lib/viz/roji-viz-palette";
+
+/**
+ * 製法系統。`/dev/me` のモックアップ**専用**の語彙。
+ *
+ * もとは `lib/roji/tea-flavor.ts` にあったが、「1 枚の図に並べてよいのは同じ
+ * カテゴリーだけ」という確定ルールの適用で本番の図から製法系統という軸自体が
+ * 外れ、tea-flavor は カテゴリー (`lib/roji/tea-category.ts`) だけを持つように
+ * なった。/dev/me は銘柄カードの**言葉**としてこの語彙をまだ使うため、唯一の
+ * 利用者であるここに移設して持つ。**本番の図 (tea-menu) からは参照しない。**
+ */
+export type TeaProcess = "mushi" | "kama" | "hoiro" | "hakko";
+
+const TEA_PROCESS_COLOR: Record<TeaProcess, string> = {
+  /** 蒸し製 */
+  mushi: ROJI_VIZ_COLOR.koke,
+  /** 釜炒り */
+  kama: ROJI_VIZ_COLOR.usukoke,
+  /** 焙煎 */
+  hoiro: ROJI_VIZ_COLOR.hoji,
+  /** 発酵 */
+  hakko: ROJI_VIZ_COLOR.hojiFuka,
+};
+
+const TEA_PROCESS_LABEL: Record<TeaProcess, string> = {
+  mushi: "蒸 し 製",
+  kama: "釜 炒 り",
+  hoiro: "焙 煎",
+  hakko: "発 酵",
+};
 
 /** 半発酵を足した 5 系統。色はこれだけで決まる (品種でも産地でもない)。 */
 export type MeTeaProcess = TeaProcess | "hankou";
