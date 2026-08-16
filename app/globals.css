@@ -1121,3 +1121,16 @@ dl[data-slot="spec-band"][data-emphasis="true"] > [data-slot="spec-item"] > dd {
     @apply active:scale-100 active:brightness-100;
   }
 }
+
+/* ─── roji データ表現の「図の文字」 ─────────────────────────────────────────
+ *
+ * 味の四象限 / 香りの場 / 土地を読む の 3 枚は、本文とは別の文字組みを持つ。
+ * 小さな文字を 0.2〜0.28em 空けて置く組みで、これは **UI の文字ではなく図に
+ * 添える文字**。typography トークンの字間スケールは widest = 0.125em までで、
+ * ここまで空いた値を持たない。
+ *
+ * トークン側に足さないのは、UI の字間として使われると本文の組みが壊れるため
+ * (図の外で使う想定がない)。`components/viz/**` からだけ参照する。
+ * 値の正本は viz 査定 verdicts.md (roji コピー路線候補 — 実組み込み査定)。 */
+.roji-viz-caption { letter-spacing: 0.2em; }
+.roji-viz-caption-wide { letter-spacing: 0.28em; }
