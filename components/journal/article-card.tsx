@@ -105,7 +105,7 @@ export function ArticleCard({
             href={`${hrefBase}?category=${article.category.slug.current}`}
             className={cn(
               captionClass,
-              "block rounded-sm text-muted-foreground transition-colors duration-200",
+              "block rounded-sm text-muted-foreground transition-colors duration-fast",
               "hover:text-foreground active:text-muted-foreground",
               focusRing
             )}

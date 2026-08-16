@@ -193,7 +193,7 @@ export default async function PlaylistDetailPage({
     0
   );
 
-  // AudioBlock / AudioPlayer / TrackRow / MiniPlayer が使う文言。client 側では
+  // AudioBlock / AudioPlayer / TrackRow / AudioDock が使う文言。client 側では
   // `getTranslations` を呼べないのでここで解決して渡す。音まわりの語彙は記事側と
   // 同じものを使う (同じ部品なので、同じ言葉で出す)。
   const tj = await getTranslations("journal");
@@ -333,6 +333,7 @@ export default async function PlaylistDetailPage({
               <AudioBlock
                 variant="track"
                 contentId={pl.slug.current}
+                href={`/${locale}/playlists/${slug}`}
                 kicker={t("listenKicker")}
                 title={pl.title}
                 meta={[

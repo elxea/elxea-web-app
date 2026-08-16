@@ -65,7 +65,7 @@ function ReadingRow({
       onClick={onSelect}
       className={cn(
         "flex h-18 w-full items-center gap-4 py-2 text-left",
-        "transition-colors duration-200 hover:bg-muted active:bg-secondary",
+        "transition-colors duration-fast hover:bg-muted active:bg-secondary",
         "focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
         className
       )}
@@ -236,7 +236,7 @@ export function TeaDetailSection({
               }}
               className={cn(
                 "flex w-full gap-4 text-left lg:gap-6",
-                "transition-colors duration-200 hover:bg-muted active:bg-secondary",
+                "transition-colors duration-fast hover:bg-muted active:bg-secondary",
                 "focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
               )}
             >

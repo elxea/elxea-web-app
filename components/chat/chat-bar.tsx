@@ -368,7 +368,12 @@ function DesktopChatBar() {
     <div
       ref={panelRef}
       data-slot="chat-bar-desktop"
-      className="fixed bottom-0 left-0 right-0 z-40 hidden md:block"
+      // 音声プレイヤーのバー (components/audio/audio-dock.tsx) が下端に出て
+      // いる間は、その分だけ上へ退く。重ねると鳴っている音を止める手段か
+      // チャット入力のどちらかが埋まる。変数は AudioDock が <html> に立て、
+      // 非表示のときは 0px なので通常時の見た目は変わらない。
+      style={{ bottom: "var(--audio-bar-h, 0px)" }}
+      className="fixed left-0 right-0 z-40 hidden transition-[bottom] duration-fast ease-enter md:block"
     >
       {/* Expanded chat panel — Figma 6859:316 (components/chat/chat-panel.tsx) */}
       {isOpen && messages.length > 0 && (

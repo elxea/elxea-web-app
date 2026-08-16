@@ -49,7 +49,7 @@ export function ImageGallery({ images }: { images: ImageType[] }) {
             <Button
               key={i}
               variant="ghost"
-              className={`w-20 h-20 p-0 flex-shrink-0 overflow-hidden border transition-all duration-200 ${
+              className={`w-20 h-20 p-0 flex-shrink-0 overflow-hidden border transition-all duration-fast ${
                 i === selected ? "border-foreground" : "border-transparent hover:border-muted-foreground/30"
               }`}
               onClick={() => setSelected(i)}

@@ -1,16 +1,10 @@
 "use client";
 
-import * as React from "react";
-
 import { ImageCard } from "@/components/media/image-card";
 import { captionClass } from "@/components/editorial/rule-list";
 import { AudioPlayer } from "@/components/audio/audio-player";
-import { MiniPlayer } from "@/components/audio/mini-player";
 import { TrackRow } from "@/components/audio/track-row";
-import {
-  ArticleAudioProvider,
-  type ArticleAudioTrack,
-} from "@/components/audio/article-audio-provider";
+import { type ArticleAudioTrack } from "@/components/audio/article-audio-provider";
 import { cn } from "@/lib/utils";
 
 /**
@@ -63,6 +57,12 @@ type CommonProps = {
   title: string;
   /** 「選曲: elxea 編集部 / 6 曲 · 27 分」等。 */
   meta?: string;
+  /**
+   * この音源が載っているページの URL。
+   * 再生したまま別ページへ移れるようになったので、下部バーの展開から
+   * 「元の記事へ戻る」導線を出すために持たせる。
+   */
+  href?: string;
   labels: AudioBlockLabels;
   className?: string;
 };
@@ -81,24 +81,18 @@ export type AudioBlockProps =
     });
 
 /**
- * 音源の状態は provider が持つので、本体・曲リスト・MiniPlayer をまとめて
- * その内側に置く。provider を記事ページ側ではなくここに置いているのは、
- * 「音声のあるブロックが 1 つも無い記事では audio 要素も作らない」ため。
+ * 音源の状態を持つ provider は **ルートレイアウト**に移した
+ * (`app/[locale]/layout.tsx`)。以前はこのブロックが provider を内包していて
+ * 「音声の無い記事では audio 要素を作らない」を実現していたが、その構造では
+ * ページ遷移で provider ごと消えて再生が必ず止まる。遷移しても鳴り続ける
+ * ことを優先し、常駐へ切り替えた (audio 要素 1 つ・src 未設定なら無通信)。
+ *
+ * 追従表示も MiniPlayer (本体が画面外のときだけ出す) を廃し、
+ * `components/audio/audio-dock.tsx` が常時表示するようになったため、
+ * このブロックは「記事本文の中の見た目」だけを担う。
  */
 export function AudioBlock(props: AudioBlockProps) {
-  return (
-    <ArticleAudioProvider
-      contentId={props.contentId}
-      kind={props.variant === "interview" ? "interview" : "track"}
-    >
-      <AudioBlockInner {...props} />
-    </ArticleAudioProvider>
-  );
-}
-
-function AudioBlockInner(props: AudioBlockProps) {
   const { kicker, title, meta, labels, className } = props;
-  const anchorRef = React.useRef<HTMLDivElement | null>(null);
 
   const playerLabels = {
     play: labels.play,
@@ -110,17 +104,22 @@ function AudioBlockInner(props: AudioBlockProps) {
 
   if (props.variant === "interview") {
     const track: ArticleAudioTrack = {
-      id: "interview",
+      // provider が常駐になり、記事をまたいで同じ id が並ぶようになったので
+      // 記事 slug で修飾する。素の "interview" のままだと、別の記事へ移って
+      // 再生しても「同じ曲」と判定されて src が差し替わらない。
+      id: `interview:${props.contentId}`,
       src: props.src,
       title,
       artworkUrl: undefined,
+      contentId: props.contentId,
+      kind: "interview",
+      href: props.href,
     };
     return (
       <>
         <section
           data-slot="audio-block"
           data-variant="interview"
-          ref={anchorRef}
           className={cn(
             "mt-6 flex w-full flex-col gap-4 rounded-lg border border-border bg-card p-6",
             className
@@ -136,26 +135,22 @@ function AudioBlockInner(props: AudioBlockProps) {
               置いていないボタンの不在は理由が伝わらないため。 */}
           <p className={cn(captionClass, "text-muted-foreground")}>{labels.interviewNote}</p>
         </section>
-        <MiniPlayer
-          anchorRef={anchorRef}
-          labels={{
-            play: labels.play,
-            pause: labels.pause,
-            close: labels.close,
-            nowPlaying: labels.nowPlaying,
-          }}
-        />
       </>
     );
   }
 
   const { coverUrl, tracks, soundcloudUrl } = props;
   const audioTracks: ArticleAudioTrack[] = tracks.map((t) => ({
-    id: t.id,
+    // 曲 id も記事 (プレイリスト) 単位で修飾する。provider は常駐なので、
+    // 別ページの "1" と衝突させない。
+    id: `${props.contentId}:${t.id}`,
     src: t.src,
     title: t.title,
     album: title,
     artworkUrl: coverUrl,
+    contentId: props.contentId,
+    kind: "track" as const,
+    href: props.href,
   }));
   const leadTrack = audioTracks[0];
 
@@ -164,7 +159,6 @@ function AudioBlockInner(props: AudioBlockProps) {
       <section
         data-slot="audio-block"
         data-variant="track"
-        ref={anchorRef}
         className={cn(
           "mt-6 flex w-full flex-col gap-4 rounded-lg border border-border bg-background p-4 lg:p-6",
           className
@@ -211,7 +205,7 @@ function AudioBlockInner(props: AudioBlockProps) {
               className={cn(
                 captionClass,
                 "inline-flex items-center gap-2 rounded-full border border-border px-5 py-2.5 text-foreground",
-                "transition-colors duration-200 hover:bg-muted active:bg-secondary",
+                "transition-colors duration-fast hover:bg-muted active:bg-secondary",
                 "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
               )}
             >
@@ -222,15 +216,6 @@ function AudioBlockInner(props: AudioBlockProps) {
           </div>
         ) : null}
       </section>
-      <MiniPlayer
-        anchorRef={anchorRef}
-        labels={{
-          play: labels.play,
-          pause: labels.pause,
-          close: labels.close,
-          nowPlaying: labels.nowPlaying,
-        }}
-      />
     </>
   );
 }

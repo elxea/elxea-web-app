@@ -35,7 +35,7 @@ import { cn } from "@/lib/utils";
 const pillBase = cn(
   bodySmClass,
   "inline-flex min-h-12 items-center justify-center rounded-full px-6 py-3 text-center whitespace-nowrap",
-  "transition-colors duration-200",
+  "transition-colors duration-fast",
   "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none",
   "disabled:pointer-events-none disabled:opacity-60",
   "aria-disabled:pointer-events-none aria-disabled:opacity-60"

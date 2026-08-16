@@ -227,7 +227,10 @@
       "title": "このタグの読みものはまだありません",
       "body": "ほかのタグや、ジャーナル全体からも探せます。",
       "ctaLabel": "ジャーナルをすべて見る"
-    }
+    },
+    "audioExpand": "プレイヤーを開く",
+    "audioCollapse": "プレイヤーを閉じる",
+    "audioOpenArticle": "この音声の記事を開く"
   },
   "teaMenu": {
     "title": "お茶メニュー",

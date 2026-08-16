@@ -21,10 +21,15 @@ export function ChatLauncher({ onClick, hasMessages }: ChatLauncherProps) {
       size="icon"
       onClick={onClick}
       aria-label="Open chat"
+      // 音声バーの高さぶん持ち上げる。素の bottom-10 (40px) はバー (64px) の
+      // 内側に入ってしまい、ボタンがバーの裏に隠れる。
+      style={{ bottom: "calc(var(--audio-bar-h, 0px) + 2.5rem)" }}
       className={cn(
-        "fixed bottom-10 right-6 z-40 size-12 rounded-full shadow-lg",
+        "fixed right-6 z-40 size-12 rounded-full shadow-lg",
         "md:hidden",
-        "transition-transform duration-200",
+        // 音声バーの出入りに合わせて滑らかに上下する。ChatBar / Cookie バーと
+        // 同じ指定にして、3つの下端要素が同じ速さで動くようにする。
+        "transition-[bottom,transform] duration-fast ease-enter",
         "hover:scale-105 active:scale-95",
       )}
     >

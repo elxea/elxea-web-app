@@ -625,6 +625,351 @@ dl[data-slot="spec-band"][data-emphasis="true"] > [data-slot="spec-item"] > dd {
   to { transform: rotate(360deg); }
 }
 
+/* ───────────────────────────────────────────────────────────────────────────
+ * モーション — 配線 (層2) と動きの型 (層3)
+ *
+ * 値の正本 (層1) は `tokens/base.json` の `motion` で、Style Dictionary が
+ * `dist/tokens.css` に `--motion-*` として出す。ここは **値を持たない**:
+ * トークンを Tailwind の名前空間へ橋渡しする層と、型の定義だけを置く。
+ * 設計: [roji] モーションシステム Spec
+ *   https://www.notion.so/3be70c9d064c81ee82fac2f3b09f4a5f
+ * 見本: /dev/motion (実装確認用のプレビュー面・本番からはリンクしない)
+ *
+ * 採用は3段 (fast 150 / normal 300 / slow 500) と2カーブ (enter=ease-out /
+ * exit=ease-in)。「退出は登場の1段下」の規則は時間の値ではなく
+ * `--motion-exit-duration` の既定 (= fast) で表す。
+ *
+ * 確定事項 (Setaka 2026-08-16): 速さの目盛は 150/300/500 / 実際に使う標準は
+ * S = 150ms / 拡大ズームは不採用 / 実装は @theme の一括上書き。跳ね返り
+ * (spring) と拡大縮小は使わない。
+ * ─────────────────────────────────────────────────────────────────────────── */
+:root {
+  /* 実行時の速さ。標準は S = 150ms (Setaka 確定 2026-08-16。見本ページで
+   * 3段を実際に見比べた上での選択)。開閉・出入り・シート展開まで例外なく
+   * この1段に寄せている。
+   *
+   * 登場も退出も同じ 150ms。Spec B-1 の「退出は登場の1段下」を外したわけでは
+   * なく、S の下の段 (fastest 50ms) が凍結済みで下げようがないため。速さを
+   * 上げた型を個別に作るときは、その型の中で1段下の退出を指定する。
+   *
+   * この2つを差し替えるだけで、型を書き換えずに速さを切り替えられる
+   * (/dev/motion の速さトグルはこれを上書きしている)。 */
+  --motion-enter-duration: var(--motion-duration-fast);
+  --motion-exit-duration: var(--motion-duration-fast);
+
+  /* 移動距離。Spec B-3「距離の原則」= 移動は 8px 以内・退出はその半分。
+   * SP は 6px。spacing スケールに 6px の刻みが無いので、ここだけ実値で持つ
+   * (md 以上の 8px と退出の 4px は spacing トークンから引く)。 */
+  --motion-rise-distance: 0.375rem;
+  --motion-recede-distance: var(--spacing-1);
+
+  /* `sheet` は画面外からの移動なので距離は割合。既定は右端から。
+   * 下端から出す面 (モバイルメニュー等) は x=0% / y=100% に差し替える。 */
+  --motion-sheet-x: 100%;
+  --motion-sheet-y: 0%;
+
+  /* D-2 の比較専用。shadcn 既定の `zoom-in-95` 相当の倍率。案A (拡大なし) が
+   * 採用されたので本番の部品では使わず、/dev/motion の比較欄にだけ残す。 */
+  --motion-zoom-from: 0.95;
+
+  /* 移動量と拡大量にかかる係数。1 = そのまま / 0 = 動かさない。
+   * 「動きを減らす」設定はこの1つを 0 にするだけで全ての型に効く
+   * (型を増やしてもここを直す必要がない)。 */
+  --motion-travel: 1;
+}
+
+@media (min-width: 48rem) {
+  :root {
+    --motion-rise-distance: var(--spacing-2);
+  }
+}
+
+@theme {
+  /* 層2 / 配線 — Tailwind の既定そのものをトークンに差し替える。
+   * これが最も効率が高い: `transition-colors` とだけ書いてある約70ファイルが
+   * 一切の編集なしでトークン値に乗り換わる。既定カーブを対称の
+   * `ease-in-out` から `ease-out` (減速) に変えるのは、roji では「入りは減速」
+   * を全ての既定にするため。 */
+  --default-transition-duration: var(--motion-duration-fast);
+  --default-transition-timing-function: var(--motion-easing-ease-out);
+
+  /* 名前付きユーティリティも生やす。
+   * `duration-fast|normal|slow` と `ease-enter|ease-exit` が使えるようになる。 */
+  --transition-duration-fast: var(--motion-duration-fast);
+  --transition-duration-normal: var(--motion-duration-normal);
+  --transition-duration-slow: var(--motion-duration-slow);
+  --ease-enter: var(--motion-easing-ease-out);
+  --ease-exit: var(--motion-easing-ease-in);
+
+  /* 層3 / 型 — Spec B-3 の5種。登場と退出で別ユーティリティにするのは、
+   * 「退出は登場より速く・逆カーブで」を呼び出し側が書き忘れられないため。 */
+  --animate-fade: fade var(--motion-enter-duration) var(--motion-easing-ease-out) both;
+  --animate-fade-out: fade-out var(--motion-exit-duration) var(--motion-easing-ease-in) both;
+  --animate-rise: rise var(--motion-enter-duration) var(--motion-easing-ease-out) both;
+  --animate-recede: recede var(--motion-exit-duration) var(--motion-easing-ease-in) both;
+  --animate-expand: expand var(--motion-enter-duration) var(--motion-easing-ease-out) both;
+  --animate-collapse: collapse var(--motion-exit-duration) var(--motion-easing-ease-in) both;
+  --animate-sheet-in: sheet-in var(--motion-enter-duration) var(--motion-easing-ease-out) both;
+  --animate-sheet-out: sheet-out var(--motion-exit-duration) var(--motion-easing-ease-in) both;
+
+  /* 比較用 (D-2)。採用案が決まるまでの暫定で、本番の部品では使わない。 */
+  --animate-zoom: zoom var(--motion-enter-duration) var(--motion-easing-ease-out) both;
+}
+
+@keyframes fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(calc(var(--motion-rise-distance) * var(--motion-travel)));
+  }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes recede {
+  from { opacity: 1; transform: translateY(0); }
+  to {
+    opacity: 0;
+    transform: translateY(calc(var(--motion-recede-distance) * var(--motion-travel)));
+  }
+}
+
+/* `expand` / `collapse` だけは transform ではなく grid-template-rows を動かす。
+ * CLAUDE.md「transform/opacity のみ」の唯一の例外で、Spec B-4 原則5 のとおり
+ * 対象を短いテキストの開閉に限定する。使う側は
+ *   <div class="grid animate-expand"><div class="overflow-hidden">…</div></div>
+ * の2層で書く (内側の overflow-hidden が無いと中身がはみ出す)。 */
+@keyframes expand {
+  from { grid-template-rows: 0fr; opacity: 0; }
+  to { grid-template-rows: 1fr; opacity: 1; }
+}
+
+@keyframes collapse {
+  from { grid-template-rows: 1fr; opacity: 1; }
+  to { grid-template-rows: 0fr; opacity: 0; }
+}
+
+@keyframes sheet-in {
+  from {
+    transform: translate(
+      calc(var(--motion-sheet-x) * var(--motion-travel)),
+      calc(var(--motion-sheet-y) * var(--motion-travel))
+    );
+  }
+  to { transform: translate(0, 0); }
+}
+
+@keyframes sheet-out {
+  from { transform: translate(0, 0); }
+  to {
+    transform: translate(
+      calc(var(--motion-sheet-x) * var(--motion-travel)),
+      calc(var(--motion-sheet-y) * var(--motion-travel))
+    );
+  }
+}
+
+@keyframes zoom {
+  from {
+    opacity: 0;
+    transform: scale(calc(1 - (1 - var(--motion-zoom-from)) * var(--motion-travel)));
+  }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* `sheet` の向き。使う側は `animate-sheet-in motion-from-bottom` のように
+ * 型と向きを2つ並べて書く (向きだけ差し替えられるようにするため)。 */
+@utility motion-from-bottom {
+  --motion-sheet-x: 0%;
+  --motion-sheet-y: 100%;
+}
+
+@utility motion-from-top {
+  --motion-sheet-x: 0%;
+  --motion-sheet-y: -100%;
+}
+
+@utility motion-from-left {
+  --motion-sheet-x: -100%;
+  --motion-sheet-y: 0%;
+}
+
+@utility motion-from-right {
+  --motion-sheet-x: 100%;
+  --motion-sheet-y: 0%;
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+ * shadcn/ui 由来の開閉クラスの実体
+ *
+ * `animate-in` / `fade-in-0` / `slide-in-from-top-2` … は shadcn の部品が
+ * 17ファイル・184箇所で使っているが、提供元パッケージ (tw-animate-css) が
+ * 入っていないため CSS が1行も生成されておらず、全部が無効だった
+ * (クラスは DOM に付くのに何も起きない)。ここでその実体を **自前で** 与える。
+ *
+ * 外部パッケージを足さないのは、パッケージが roji と無関係な既定値
+ * (跳ね返り・拡大) を持ち込むため。ここに書けば時間もカーブも距離も
+ * `--motion-*` トークンからしか来ない。17ファイルは無編集のまま復活する。
+ *
+ * 意図的に用意しないもの:
+ *   - `zoom-in-*` / `zoom-out-*` … 拡大縮小は不採用 (Setaka 確定 2026-08-16)。
+ *     ユーティリティを定義しないので、これらのクラスは何も生成せず無効のまま
+ *     になり、ダイアログ類は fade (+ slide) だけで開く。
+ *   - `spin` / `bounce` 等の跳ねる動き … roji のトーンと衝突する。
+ *
+ * 時間は `--tw-duration` (= `duration-*` ユーティリティ) を **見ない**。
+ * 部品側に散らばった 500 / 300 の直書きを効かせるとトーンが再びばらけるので、
+ * 登場は M・退出は S にトークンで固定する。
+ * ─────────────────────────────────────────────────────────────────────────── */
+@utility animate-in {
+  animation: motion-enter var(--motion-enter-duration) var(--motion-easing-ease-out) both;
+}
+
+@utility animate-out {
+  animation: motion-exit var(--motion-exit-duration) var(--motion-easing-ease-in) both;
+}
+
+@utility fade-in-0 {
+  --motion-in-opacity: 0;
+}
+
+@utility fade-out-0 {
+  --motion-out-opacity: 0;
+}
+
+/* 数値付きの slide は Tailwind の spacing 目盛と同じ読み方 (2 = 0.5rem = 8px)。
+ * 数値なしは画面外から = 100%。Spec B-3「移動は8px以内」に収まるのは `-2` まで
+ * で、それ以外の大きい値を使っている箇所は要調整として洗い出す。 */
+@utility slide-in-from-top-* {
+  --motion-in-y: calc(--value(integer) * var(--spacing) * -1);
+}
+
+@utility slide-in-from-bottom-* {
+  --motion-in-y: calc(--value(integer) * var(--spacing));
+}
+
+@utility slide-in-from-left-* {
+  --motion-in-x: calc(--value(integer) * var(--spacing) * -1);
+}
+
+@utility slide-in-from-right-* {
+  --motion-in-x: calc(--value(integer) * var(--spacing));
+}
+
+@utility slide-out-to-top-* {
+  --motion-out-y: calc(--value(integer) * var(--spacing) * -1);
+}
+
+@utility slide-out-to-bottom-* {
+  --motion-out-y: calc(--value(integer) * var(--spacing));
+}
+
+@utility slide-out-to-left-* {
+  --motion-out-x: calc(--value(integer) * var(--spacing) * -1);
+}
+
+@utility slide-out-to-right-* {
+  --motion-out-x: calc(--value(integer) * var(--spacing));
+}
+
+@utility slide-in-from-top {
+  --motion-in-y: -100%;
+}
+
+@utility slide-in-from-bottom {
+  --motion-in-y: 100%;
+}
+
+@utility slide-in-from-left {
+  --motion-in-x: -100%;
+}
+
+@utility slide-in-from-right {
+  --motion-in-x: 100%;
+}
+
+@utility slide-out-to-top {
+  --motion-out-y: -100%;
+}
+
+@utility slide-out-to-bottom {
+  --motion-out-y: 100%;
+}
+
+@utility slide-out-to-left {
+  --motion-out-x: -100%;
+}
+
+@utility slide-out-to-right {
+  --motion-out-x: 100%;
+}
+
+/* 中央寄せは Tailwind v4 では `translate` プロパティで書かれる
+ * (`translate-x-[-50%]` → `translate: -50% …`)。ここが `transform` を使うのは
+ * その中央寄せと **合成させる** ため。同じ `translate` を動かすと、ダイアログが
+ * 開く瞬間に中央から左上へ飛ぶ。 */
+@keyframes motion-enter {
+  from {
+    opacity: var(--motion-in-opacity, 1);
+    transform: translate3d(
+      calc(var(--motion-in-x, 0px) * var(--motion-travel)),
+      calc(var(--motion-in-y, 0px) * var(--motion-travel)),
+      0
+    );
+  }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+@keyframes motion-exit {
+  from { opacity: 1; transform: translate3d(0, 0, 0); }
+  to {
+    opacity: var(--motion-out-opacity, 1);
+    transform: translate3d(
+      calc(var(--motion-out-x, 0px) * var(--motion-travel)),
+      calc(var(--motion-out-y, 0px) * var(--motion-travel)),
+      0
+    );
+  }
+}
+
+/* アコーディオンは高さが変わる動きなので `expand` と同じ扱い。高さは Radix が
+ * `--radix-accordion-content-height` に入れてくれる。 */
+@utility animate-accordion-down {
+  animation: motion-accordion-down var(--motion-enter-duration) var(--motion-easing-ease-out) both;
+}
+
+@utility animate-accordion-up {
+  animation: motion-accordion-up var(--motion-exit-duration) var(--motion-easing-ease-in) both;
+}
+
+@keyframes motion-accordion-down {
+  from { height: 0; opacity: 0; }
+  to { height: var(--radix-accordion-content-height); opacity: 1; }
+}
+
+@keyframes motion-accordion-up {
+  from { height: var(--radix-accordion-content-height); opacity: 1; }
+  to { height: 0; opacity: 0; }
+}
+
+/* Spec B-4 原則4 — 「動きを減らす」設定では移動と拡大を消し、不透明度の変化
+ * だけ残す。`animation: none` にはしない (完全に消すと出入りが読み取れず、
+ * 何が起きたのか分からなくなる)。
+ * 上の md クエリより **後** に置くこと (同じ :root の後勝ちで上書きする)。 */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-travel: 0;
+  }
+}
+
 @layer base {
   /* Border color — no `* { border-color: … }` rule here on purpose.
    *

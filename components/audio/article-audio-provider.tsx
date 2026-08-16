@@ -17,14 +17,29 @@ import { trackAudioPlay } from "@/lib/firebase/behavior-tracker";
  * - playing  実際に音が出ている
  * - error    再生できなかった
  *
- * Figma AudioPlayer 7047:6363 の注記どおり、loading では経過・総尺を `--:--` に
- * しシークを不能に見せる (A1 の「押しても無言」を作らないため)。
+ * loading では経過・総尺を `--:--` にしシークを不能に見せる
+ * (「押しても無言」の窓を作らないため)。
  *
  * BGM との排他は `lib/audio/audio-bus.ts` 経由。再生開始を放送し、他が鳴り
  * 始めたら自分を止める。
  *
  * Media Session API に載せるのはこちら側だけ。BGM は環境音なので、ロック画面や
  * イヤホンのボタンに出るべきは「いま読んでいる記事の音」の方。
+ *
+ * ## 設置場所 — ルートレイアウト (2026-08-16 改修)
+ *
+ * 以前はこの provider を `AudioBlock` の内側 (= 記事ページ) に置いていた。
+ * 「音声ブロックの無い記事では audio 要素を作らない」ためだったが、その代償と
+ * して **ページ遷移で provider ごと unmount され、再生が必ず止まっていた**。
+ * SoundCloud 方式 (遷移しても鳴り続ける) は provider がルートに常駐している
+ * ことが前提なので、`app/[locale]/layout.tsx` へ引き上げた。
+ *
+ * 常駐化による負荷は `new Audio()` を 1 つ持つだけ。`src` は最初の再生要求まで
+ * 空で、`preload="metadata"` も src が入って初めて効くのでネットワークは動かない。
+ *
+ * 引き上げに伴い、行動ログ用の `contentId` / `kind` は provider の props では
+ * なく **トラック側** (`ArticleAudioTrack`) が持つ。provider はもうどの記事に
+ * いるかを知らないため。
  */
 
 export type ArticleAudioStatus = "idle" | "loading" | "playing" | "error";
@@ -37,6 +52,18 @@ export type ArticleAudioTrack = {
   /** Media Session に出すアルバム・番組名。 */
   album?: string;
   artworkUrl?: string;
+  /**
+   * 事前計算した波形。0..1 に正規化した振幅の配列。
+   * 無い場合は `lib/audio/peaks.ts` が src から決定的なプレースホルダを作る
+   * (クライアントで全量デコードはしない)。
+   */
+  peaks?: number[];
+  /** 行動ログに残すコンテンツ ID (記事 slug)。 */
+  contentId?: string;
+  /** 行動ログに残す種別。 */
+  kind?: "track" | "interview";
+  /** 展開パネルから記事へ戻るための導線。 */
+  href?: string;
 };
 
 type ArticleAudioContextValue = {
@@ -50,8 +77,11 @@ type ArticleAudioContextValue = {
   /** 押した曲が今のものなら一時停止、違えば読み込んで再生する。 */
   toggle: (track: ArticleAudioTrack) => void;
   seek: (seconds: number) => void;
-  /** MiniPlayer の「閉じる」。停止して選択も解除する。 */
+  /** 下部バーの「閉じる」。停止して選択も解除する。 */
   stop: () => void;
+  /** 全画面 (SP) / 大型パネル (PC) を開いているか。 */
+  isExpanded: boolean;
+  setExpanded: (next: boolean) => void;
 };
 
 const noop = () => {};
@@ -64,24 +94,17 @@ const ArticleAudioContext = React.createContext<ArticleAudioContextValue>({
   toggle: noop,
   seek: noop,
   stop: noop,
+  isExpanded: false,
+  setExpanded: noop,
 });
 
-export function ArticleAudioProvider({
-  children,
-  /** 行動ログに残すコンテンツ ID (記事 slug)。 */
-  contentId,
-  /** 行動ログに残す種別。 */
-  kind = "track",
-}: {
-  children: React.ReactNode;
-  contentId: string;
-  kind?: "track" | "interview";
-}) {
+export function ArticleAudioProvider({ children }: { children: React.ReactNode }) {
   const audioRef = React.useRef<HTMLAudioElement | null>(null);
   const [current, setCurrent] = React.useState<ArticleAudioTrack | null>(null);
   const [status, setStatus] = React.useState<ArticleAudioStatus>("idle");
   const [currentTime, setCurrentTime] = React.useState(0);
   const [duration, setDuration] = React.useState<number | null>(null);
+  const [isExpanded, setExpanded] = React.useState(false);
 
   // --- <audio> の生成とイベント配線 -------------------------------------
   React.useEffect(() => {
@@ -144,7 +167,7 @@ export function ArticleAudioProvider({
       const audio = audioRef.current;
       if (!audio) return;
 
-      const isSameTrack = current?.id === track.id;
+      const isSameTrack = current?.id === track.id && current?.src === track.src;
 
       if (isSameTrack && !audio.paused) {
         audio.pause();
@@ -168,7 +191,13 @@ export function ArticleAudioProvider({
       audio
         .play()
         .then(() => {
-          trackAudioPlay({ contentId, kind, title: track.title });
+          if (track.contentId) {
+            trackAudioPlay({
+              contentId: track.contentId,
+              kind: track.kind ?? "track",
+              title: track.title,
+            });
+          }
         })
         .catch(() => {
           // 握り潰さない。自動再生ブロックも音源の失敗もユーザーからは
@@ -176,7 +205,7 @@ export function ArticleAudioProvider({
           setStatus("error");
         });
     },
-    [current, contentId, kind]
+    [current]
   );
 
   const seek = React.useCallback((seconds: number) => {
@@ -196,6 +225,7 @@ export function ArticleAudioProvider({
     setStatus("idle");
     setCurrentTime(0);
     setDuration(null);
+    setExpanded(false);
   }, []);
 
   // --- Media Session (ロック画面・イヤホンのボタン) ----------------------
@@ -233,8 +263,18 @@ export function ArticleAudioProvider({
   }, [current, status, toggle, seek]);
 
   const value = React.useMemo(
-    () => ({ current, status, currentTime, duration, toggle, seek, stop }),
-    [current, status, currentTime, duration, toggle, seek, stop]
+    () => ({
+      current,
+      status,
+      currentTime,
+      duration,
+      toggle,
+      seek,
+      stop,
+      isExpanded,
+      setExpanded,
+    }),
+    [current, status, currentTime, duration, toggle, seek, stop, isExpanded]
   );
 
   return (
@@ -246,7 +286,7 @@ export function useArticleAudio() {
   return React.useContext(ArticleAudioContext);
 }
 
-/** `0:00` / `12:34` 形式。総尺が不明なうちは Figma どおり `--:--`。 */
+/** `0:00` / `12:34` 形式。総尺が不明なうちは `--:--`。 */
 export function formatTime(seconds: number | null): string {
   if (seconds === null || !Number.isFinite(seconds)) return "--:--";
   const total = Math.max(0, Math.floor(seconds));
