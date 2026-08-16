@@ -29,7 +29,7 @@ export function ChatLauncher({ onClick, hasMessages }: ChatLauncherProps) {
         "md:hidden",
         // 音声バーの出入りに合わせて滑らかに上下する。ChatBar / Cookie バーと
         // 同じ指定にして、3つの下端要素が同じ速さで動くようにする。
-        "transition-[bottom,transform] duration-normal ease-enter",
+        "transition-[bottom,transform] duration-fast ease-enter",
         "hover:scale-105 active:scale-95",
       )}
     >

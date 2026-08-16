@@ -23,6 +23,60 @@ function record(name, ok, detail) {
   console.log(`${ok ? "[OK]  " : "[FAIL]"} ${name} — ${detail}`);
 }
 
+/**
+ * 進入アニメが終わり、座標が動かなくなってから境界を返す。
+ *
+ * 動きが付く前は「出た瞬間 = 最終位置」だったので測ってすぐ掴めたが、
+ * 展開パネルは下から 300ms かけて上がってくるようになった。その最中に
+ * `boundingBox()` を採ると画面外に近い座標 (実測 y=1089 / 静止後 y=362) を
+ * 掴んでしまい、そこへドラッグしても波形に当たらずシークが空振りする。
+ * 製品の不具合ではなく測り方の問題なので、待ちを検証側に入れる。
+ *
+ * 固定の `waitForTimeout` にしないのは、時間を伸ばしても「たまたま間に合った」
+ * だけで根拠にならないため。(1) Web Animations API で当該要素のアニメーション
+ * 完了を待ち、(2) それでも残るレイアウトの揺れに備えて同じ座標が続けて取れる
+ * ことまで確かめる、の2段で待つ。
+ */
+async function waitForStableBox(locator, { timeout = 10000, settleSamples = 3 } = {}) {
+  // (1) この要素に掛かっているアニメーションが終わるまで待つ。
+  //     subtree を見ないのは、中の読み込み中スピナー (無限ループ) を拾うと
+  //     永遠に終わらないため。
+  await locator
+    .evaluate(
+      (el) => Promise.all(el.getAnimations().map((a) => a.finished.catch(() => undefined))),
+      undefined,
+      { timeout }
+    )
+    .catch(() => undefined);
+
+  // (2) 同じ座標が settleSamples 回続けて取れたら静止とみなす。
+  const deadline = Date.now() + timeout;
+  let previous = null;
+  let stable = 0;
+
+  while (Date.now() < deadline) {
+    const box = await locator.boundingBox();
+    const settled =
+      box &&
+      previous &&
+      Math.abs(box.x - previous.x) < 0.5 &&
+      Math.abs(box.y - previous.y) < 0.5 &&
+      Math.abs(box.width - previous.width) < 0.5 &&
+      Math.abs(box.height - previous.height) < 0.5;
+
+    if (settled) {
+      stable += 1;
+      if (stable >= settleSamples) return box;
+    } else {
+      stable = 0;
+    }
+    previous = box;
+    await locator.page().waitForTimeout(50);
+  }
+
+  throw new Error(`要素の位置が ${timeout}ms 以内に静止しなかった`);
+}
+
 /** バーに出ている `0:12 / 3:45` の経過側を秒に直す。 */
 async function elapsedSeconds(page) {
   const text = await page
@@ -50,7 +104,10 @@ async function main() {
 
   // ---------- 1. 記事ページで再生を開始する ----------
   await page.goto(BASE + ARTICLE, { waitUntil: "domcontentloaded" });
-  const block = page.locator('[data-slot="audio-block"]');
+  // 記事ページには `[data-slot="audio-block"]` が2個あり、うち1個は hidden
+  // (レイアウト都合の控え)。素で掴むと strict mode 違反で初回だけ落ちるので、
+  // 見えている方に限定する。
+  const block = page.locator('[data-slot="audio-block"]').filter({ visible: true }).first();
   await block.waitFor({ state: "visible", timeout: 30000 });
   record("記事に AudioBlock がある", true, await block.getAttribute("data-variant"));
 
@@ -58,11 +115,31 @@ async function main() {
   const barBefore = await page.locator('[data-slot="audio-dock-bar"]').count();
   record("再生前は下部バーが無い", barBefore === 0, `count=${barBefore}`);
 
-  await block.locator('[data-slot="audio-player"] button').first().click();
-
   const bar = page.locator('[data-slot="audio-dock-bar"]');
-  await bar.waitFor({ state: "visible", timeout: 30000 });
-  record("再生開始で下部バーが出る", true, "data-slot=audio-dock-bar visible");
+  const playButton = block.locator('[data-slot="audio-player"] button').first();
+
+  // ハイドレーションが済む前に押すと、見た目は押せてもハンドラがまだ付いて
+  // おらず何も起きない (Playwright の actionability チェックは「押せる状態に
+  // 見えるか」しか見ないので、この空振りは検出できない)。バーが出るまで
+  // 押し直す。バーは `current` が入った時点で即描画されるので、出ない =
+  // クリックが届いていない、と判断してよい。
+  await page.waitForLoadState("load");
+  let barAppeared = false;
+  let clicks = 0;
+  for (let attempt = 1; attempt <= 5 && !barAppeared; attempt += 1) {
+    await playButton.click();
+    clicks = attempt;
+    barAppeared = await bar
+      .waitFor({ state: "visible", timeout: 6000 })
+      .then(() => true)
+      .catch(() => false);
+    if (!barAppeared) {
+      console.log(`  [retry] 再生ボタンのクリックが届かず (${attempt} 回目) — 押し直す`);
+      await page.waitForTimeout(1000);
+    }
+  }
+  record("再生開始で下部バーが出る", barAppeared, `data-slot=audio-dock-bar visible (クリック ${clicks} 回)`);
+  if (!barAppeared) throw new Error("再生が開始できず、以降の検証が成立しない");
 
   // ---------- 2. 実際に音が進んでいるか (数値で確認) ----------
   await page.waitForFunction(
@@ -84,7 +161,8 @@ async function main() {
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.waitForTimeout(600);
   const visibleAtTop = await bar.isVisible();
-  const boxTop = await bar.boundingBox();
+  // バーも下から上がってくるようになったので、下端に着いてから測る。
+  const boxTop = await waitForStableBox(bar);
   const vh = page.viewportSize().height;
   record(
     "最上部でもバーが残る (スクロール連動の廃止)",
@@ -167,10 +245,13 @@ async function main() {
   await bar.getByRole("button", { name: "プレイヤーを開く" }).click();
   const panel = page.locator('[data-slot="audio-dock-panel"]');
   await panel.waitFor({ state: "visible", timeout: 15000 });
+  // パネルが上がりきってから中身を測る。ここを待たずに測ると、後段の
+  // 波形ドラッグが「まだ画面外にある座標」を掴んで空振りする。
+  await waitForStableBox(panel);
   const wave = panel.locator('[data-slot="audio-waveform"]');
   await wave.waitFor({ state: "visible", timeout: 15000 });
 
-  const waveBox = await wave.boundingBox();
+  const waveBox = await waitForStableBox(wave);
   record(
     "展開パネルに波形が出る",
     Boolean(waveBox),
@@ -265,7 +346,10 @@ async function main() {
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.waitForTimeout(800);
   await page.keyboard.press("Escape");
-  await page.waitForTimeout(500);
+  // 閉じるときも退出アニメを最後まで見せてから DOM を外す作りなので、
+  // 固定待ちではなくパネルが実際に消えるまで待つ。
+  await panel.waitFor({ state: "detached", timeout: 10000 }).catch(() => undefined);
+  await waitForStableBox(bar);
 
   const coex = await page.evaluate(() => {
     const bar = document.querySelector('[data-slot="audio-dock-bar"]');

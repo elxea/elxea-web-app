@@ -61,7 +61,7 @@ export function CookieConsent() {
         "fixed left-0 right-0 z-50 w-full max-w-full border-t border-border bg-background",
         // 音声バーが出入りするときの退避はスライドではなく滑らかに。ChatBar に
         // だけ入っていた指定をここにも広げて、3つの下端要素の挙動を揃える。
-        "transition-[bottom] duration-normal ease-enter",
+        "transition-[bottom] duration-fast ease-enter",
         closing ? "animate-recede" : "animate-rise"
       )}
     >

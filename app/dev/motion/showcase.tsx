@@ -185,8 +185,10 @@ function Scrim({
  * ────────────────────────────────────────────────────────────────────────── */
 
 export function MotionShowcase() {
-  const [speedId, setSpeedId] = useState<Speed["id"]>("normal");
-  const speed = SPEEDS.find((s) => s.id === speedId) ?? SPEEDS[1];
+  // 既定は S。本番で使っている標準の速さ (Setaka 確定 2026-08-16) と同じ状態で
+  // 開かないと、この面で見るものと実物がずれる。
+  const [speedId, setSpeedId] = useState<Speed["id"]>("fast");
+  const speed = SPEEDS.find((s) => s.id === speedId) ?? SPEEDS[0];
 
   const modal = useReveal();
   const bar = useReveal();
@@ -257,9 +259,10 @@ export function MotionShowcase() {
             <p className="font-medium">決まったこと (2026-08-16)</p>
             <ul className="mt-2 flex flex-col gap-2 text-muted-foreground">
               <li>
-                速さは <span className="font-mono text-xs">150 / 300 / 500ms</span>{" "}
-                の静かなトーン。上のトグルの既定 (M) が本番の登場速度で、退出は
-                その1段下。
+                標準の速さは <span className="font-mono text-xs">S / 150ms</span>。
+                開閉も出入りもシートの展開も、例外なくこの1段に寄せている。
+                上のトグルの既定 (S) が本番そのままの速さで、M と L
+                は見比べのために残している。
               </li>
               <li>
                 拡大ズームは不採用。ダイアログもメニューも「フェード + 8px の上昇」
@@ -349,7 +352,6 @@ export function MotionShowcase() {
             tokens={[
               "--animate-rise",
               "--animate-recede",
-              "--motion-duration-normal",
               "--motion-duration-fast",
             ]}
             controls={
@@ -400,7 +402,7 @@ export function MotionShowcase() {
             tokens={[
               "--animate-expand",
               "--animate-collapse",
-              "--motion-duration-normal",
+              "--motion-duration-fast",
             ]}
             controls={
               <>
