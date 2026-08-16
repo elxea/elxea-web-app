@@ -41,7 +41,13 @@ export function CookieConsent() {
   if (!visible) return null;
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 w-full max-w-full border-t border-border bg-background">
+    // 音声プレイヤーのバー (components/audio/audio-dock.tsx) が出ている間は
+    // その分だけ上へ退く。z では音声バーが前 (1020 > 50) なので、重ねると
+    // 同意ボタンが隠れて押せなくなる。非表示時は 0px で従来の位置。
+    <div
+      style={{ bottom: "var(--audio-bar-h, 0px)" }}
+      className="fixed left-0 right-0 z-50 w-full max-w-full border-t border-border bg-background"
+    >
       <div className="page-container py-4 flex flex-col sm:flex-row items-start sm:items-center gap-4">
         <p className="text-sm text-muted-foreground flex-1 min-w-0 break-words">
           {t("message")}{" "}

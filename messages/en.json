@@ -227,7 +227,10 @@
       "title": "No readings with this tag yet",
       "body": "You can also browse other tags, or the journal as a whole.",
       "ctaLabel": "See all of the journal"
-    }
+    },
+    "audioExpand": "Open player",
+    "audioCollapse": "Collapse player",
+    "audioOpenArticle": "Open the article"
   },
   "teaMenu": {
     "title": "Tea Menu",
