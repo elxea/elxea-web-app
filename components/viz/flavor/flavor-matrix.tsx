@@ -7,6 +7,14 @@
  * 6 つの粒が gooey フィルタで融け合った **絶えず輪郭の変わる塊**。
  * 「比較する図」ではなく「生き物の領域」に見せることでダッシュボードから離す。
  *
+ * ## 載るのは同じカテゴリーの銘柄だけ / 色は 1 色
+ *
+ * 何を載せるかは **データ層が決める** (`lib/roji/tea-flavor.ts`)。ここは
+ * `data.points` をそのまま描くだけで、絞り込みも色の出し分けもしない。
+ * 色は `data.category` から 1 色だけ引く — 図の色はお茶のカテゴリーを表すので、
+ * 同一カテゴリーしか載らないこの図では**全ての塊が同色**になるのが正しい。
+ * 恒久ルールの全文は `docs/roji-dataviz-rules.md`。
+ *
  * ## gooey フィルタの作法 (踏むと痛い 2 点)
  *
  * 1. **フィルタは茶ごとの小さな `<g>` に掛ける**。画面全体の `<g>` に掛けると
@@ -17,7 +25,7 @@
  *
  * ## なぜ React で宣言的に書かないのか
  *
- * 粒は 10 銘柄 × 6 = 60 個あり、毎フレーム全部の `cx` / `cy` が動く。React の
+ * 粒は 1 銘柄あたり 6 個で、毎フレーム全部の `cx` / `cy` が動く。React の
  * 再レンダリングに載せると 60 要素の差分計算が毎フレーム走る。既存の
  * `components/viz/map/origin-map.tsx` と同じく、**描画は effect の中で DOM を
  * 直接触る**。React が持つのは枠と凡例だけ。
@@ -28,12 +36,10 @@
 import { useEffect, useId, useRef } from "react";
 
 import {
-  FLAVOR_AXIS,
-  TEA_PROCESS_COLOR,
-  TEA_PROCESS_LABEL,
-  TEA_PROCESS_ORDER,
-  type FlavorMatrixData,
-} from "@/lib/roji/tea-flavor";
+  TEA_CATEGORY_COLOR,
+  TEA_CATEGORY_LABEL,
+} from "@/lib/roji/tea-category";
+import { FLAVOR_AXIS, type FlavorMatrixData } from "@/lib/roji/tea-flavor";
 import { drawQuadrantAxesSvg, isNarrowLayout, quadrantLayout } from "@/lib/viz/quadrant";
 import { ROJI_VIZ_COLOR, ROJI_VIZ_SERIF, seededRandom } from "@/lib/viz/roji-viz-palette";
 import { cn } from "@/lib/utils";
@@ -129,6 +135,8 @@ export function FlavorMatrix({ data, label, className }: FlavorMatrixProps) {
        * 位置と塊は残るので図の意味は失われない。
        */
       const narrow = isNarrowLayout(layout);
+      // 図に載るのは 1 カテゴリーだけなので、色は 1 回引けば足りる。
+      const markColor = TEA_CATEGORY_COLOR[data.category];
 
       const bodies: {
         x: number;
@@ -162,7 +170,7 @@ export function FlavorMatrix({ data, label, className }: FlavorMatrixProps) {
             cx: x,
             cy: y,
             r: radius * (0.38 + rnd() * 0.26),
-            fill: TEA_PROCESS_COLOR[tea.process],
+            fill: markColor,
           });
           group.appendChild(circle);
           parts.push({
@@ -270,17 +278,20 @@ export function FlavorMatrix({ data, label, className }: FlavorMatrixProps) {
           className="absolute inset-0 block h-full w-full"
         />
       </div>
+      {/* 凡例は 1 行しかない。色 = カテゴリーで、この図には 1 カテゴリーしか
+          載らないため (色の出し分けが無いことを凡例でも明示する)。 */}
       <ul className="flex flex-wrap gap-x-6 gap-y-2" data-slot="flavor-legend">
-        {TEA_PROCESS_ORDER.map((process) => (
-          <li key={process} className="flex items-center gap-2 text-xs text-muted-foreground">
-            <span
-              aria-hidden="true"
-              className="inline-block size-2.5 rounded-[44%_56%_60%_40%] opacity-70"
-              style={{ backgroundColor: TEA_PROCESS_COLOR[process] }}
-            />
-            {TEA_PROCESS_LABEL[process]}
-          </li>
-        ))}
+        <li
+          className="flex items-center gap-2 text-xs text-muted-foreground"
+          data-category={data.category}
+        >
+          <span
+            aria-hidden="true"
+            className="inline-block size-2.5 rounded-[44%_56%_60%_40%] opacity-70"
+            style={{ backgroundColor: TEA_CATEGORY_COLOR[data.category] }}
+          />
+          {TEA_CATEGORY_LABEL[data.category]}
+        </li>
       </ul>
     </div>
   );

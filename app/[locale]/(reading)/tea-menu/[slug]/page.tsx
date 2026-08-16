@@ -14,6 +14,7 @@ import { TeaOriginBlock } from "@/components/viz/map/tea-origin-block";
 import { FlavorMatrixBlock } from "@/components/viz/flavor/flavor-matrix-block";
 import { AromaFieldBlock } from "@/components/viz/aroma/aroma-field-block";
 import { TerroirLensBlock } from "@/components/viz/terroir/terroir-lens-block";
+import { teaCategoryLabel, teaCategoryOf } from "@/lib/roji/tea-category";
 import { resolveTeaOrigin, resolveTeaOriginPlace } from "@/lib/roji/tea-origins";
 import { Button } from "@/components/ui/button";
 import {
@@ -211,6 +212,17 @@ export default async function TeaMenuDetailPage({
       ? ""
       : String(tea.productNumber)
   );
+  /**
+   * 図に載る比較対象のカテゴリー名 (「緑茶」/「紅茶」…)。
+   *
+   * 図そのものは色でカテゴリーを示すが、色だけでは何のカテゴリーか伝わらない。
+   * 図の外の一文で必ず名指しする — 「同じ緑茶だけを並べています」。
+   * 判定は `teaCategoryOf` が一手に握る (`lib/roji/tea-category.ts`)。
+   */
+  const categoryText = teaCategoryLabel(
+    teaCategoryOf(tea.productNumber, tea.category),
+    locale
+  );
   const flavorMapLabel = t("flavorMapAlt", { place: tea.displayName });
   const terroirMapLabel = originPlace
     ? t("terroirMapAlt", { place: originPlace })
@@ -286,24 +298,38 @@ export default async function TeaMenuDetailPage({
 
       {/* R1-B-1: 味の四象限。詳細表 (品種・産地・収穫時期) が「何であるか」を
           語った直後に、「どんな味か」を図で置く。文字 → 図 の順で読ませるのは
-          産地の地図と同じ作法。 */}
+          産地の地図と同じ作法。
+          載るのは **同じカテゴリーの銘柄だけ** (`docs/roji-dataviz-rules.md`)。
+          絞り込みはデータ層が行うので、ここは判定材料 (銘柄番号とカテゴリー) を
+          渡すだけでよい。 */}
       <PageSection>
         <SectionHead overline={t("flavorMapOverline")} title={t("flavorMap")} />
         <SectionBody>
-          <FlavorMatrixBlock menuNumber={tea.productNumber} label={flavorMapLabel} />
+          <FlavorMatrixBlock
+            menuNumber={tea.productNumber}
+            category={tea.category}
+            label={flavorMapLabel}
+          />
           <p className={cn(captionClass, "mt-5 text-muted-foreground lg:mt-8")}>
+            {t("flavorMapScope", { category: categoryText })}{" "}
             {t("flavorMapNote")}
           </p>
         </SectionBody>
       </PageSection>
 
       {/* R1-B-2: 香りの場。味の次に香り。点ではなく領域で置くので、四象限の
-          作法は共有しつつ「比べる図」には見せない。 */}
+          作法は共有しつつ「比べる図」には見せない。比較対象は味と同じく
+          同一カテゴリーに限る。 */}
       <PageSection>
         <SectionHead overline={t("aromaMapOverline")} title={t("aromaMap")} />
         <SectionBody>
-          <AromaFieldBlock menuNumber={tea.productNumber} label={t("aromaMapAlt")} />
+          <AromaFieldBlock
+            menuNumber={tea.productNumber}
+            category={tea.category}
+            label={t("aromaMapAlt")}
+          />
           <p className={cn(captionClass, "mt-5 text-muted-foreground lg:mt-8")}>
+            {t("aromaMapScope", { category: categoryText })}{" "}
             {t("aromaMapNote")}
           </p>
         </SectionBody>
