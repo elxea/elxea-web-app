@@ -429,7 +429,8 @@
     "message": "このサイトではCookieを使用して、お客様の閲覧体験の向上とサイトの分析を行っています。",
     "accept": "同意する",
     "decline": "必要なもののみ",
-    "learnMore": "詳しく見る"
+    "learnMore": "詳しく見る",
+    "settings": "Cookie 設定"
   },
   "subscriptionLp": {
     "title": "シングルオリジンティーの定期便",
