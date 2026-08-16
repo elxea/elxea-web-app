@@ -142,21 +142,38 @@ test.describe("google tag manager consent gate", () => {
     );
   });
 
+  /**
+   * Opens the first product detail page, which mounts ProductViewTracker and
+   * pushes a `view_item` — a real dataLayer write on page load, not a synthetic
+   * one. Returns the resulting dataLayer length.
+   */
+  async function dataLayerLengthAfterViewingAProduct(page: Page): Promise<number> {
+    await page.goto("/ja/products");
+    const productLink = page.locator("a[href*='/products/']").first();
+    await productLink.click();
+    await page.waitForURL(/\/ja\/products\/.+/);
+    await expect(page.locator("h1")).toBeVisible();
+    return page.evaluate(
+      () => (window as unknown as { dataLayer?: unknown[] }).dataLayer?.length ?? 0,
+    );
+  }
+
   test("(b) declining also stops dataLayer pushes", async ({ page }) => {
     await trapGtmRequests(page);
     await seedChoice(page, "essential");
 
-    // The search box calls trackSearch() on submit — a real dataLayer push
-    // that must not happen. Nothing may queue up either: GTM replays the whole
-    // backlog if the visitor later consents, which would retroactively send
-    // pre-consent browsing.
-    await page.goto("/ja/products");
-    await page.goto("/ja/search?q=%E7%85%8E%E8%8C%B6");
+    // Nothing may even queue up: GTM replays the whole backlog when a visitor
+    // consents later, which would send pre-consent browsing retroactively.
+    expect(await dataLayerLengthAfterViewingAProduct(page)).toBe(0);
+  });
 
-    const queued = await page.evaluate(
-      () => (window as unknown as { dataLayer?: unknown[] }).dataLayer?.length ?? 0,
-    );
-    expect(queued).toBe(0);
+  test("(c) accepting lets the same page view reach the dataLayer", async ({ page }) => {
+    // Positive control for the test above: without this, "0 events" could just
+    // mean the page never tracked anything.
+    await trapGtmRequests(page);
+    await seedChoice(page, "all");
+
+    expect(await dataLayerLengthAfterViewingAProduct(page)).toBeGreaterThan(0);
   });
 
   test("(c) loads after 同意する, in the same page and after a reload", async ({
