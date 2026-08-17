@@ -328,6 +328,63 @@ describe("one-shot flow cookies are also expired at both scopes", () => {
     expect(sortedKeys(directivesOf(a))).toEqual(sortedKeys(directivesOf(b)));
   });
 
+  it("PLATFORM CONSTRAINT: raw Set-Cookie appends do not survive a later cookies.set()", () => {
+    /* Not a wish — a measured property of Next's cookie jar, pinned so a future
+     * release changing it is noticed deliberately rather than silently.
+     *
+     * `cookies.set()` routes through `replace()`, which deletes every Set-Cookie
+     * header and rebuilds the list from the name-keyed jar, discarding any raw
+     * append. This exercises the platform DIRECTLY (no clearing helper involved),
+     * because that hazard is the sole reason the guard in `lib/auth/cookies.ts`
+     * exists. If this test ever goes green on its own, the guard can be
+     * reconsidered — until then the next test proves the guard neutralises it. */
+    const res = NextResponse.redirect("https://www.elxea.com/ja");
+    res.cookies.set("seed", "1", { path: "/" });
+    res.headers.append("set-cookie", "raw_append=; Path=/; Max-Age=0; Domain=.elxea.com");
+    expect(res.headers.getSetCookie().some((c) => c.startsWith("raw_append="))).toBe(true);
+
+    res.cookies.set("unrelated", "1", { path: "/" });
+    expect(
+      res.headers.getSetCookie().some((c) => c.startsWith("raw_append=")),
+      "platform: replace() rebuilds Set-Cookie from the jar alone",
+    ).toBe(false);
+  });
+
+  it("REGRESSION (CRITICAL-2): a later cookies.set() no longer erases the expiries", () => {
+    /* QA measured 10 -> 0 here and judged the fix STOP: "order-independent" only
+     * held for clear-vs-clear, not for clear mixed with an unrelated set(). The
+     * guard installed by `expireAtBothScopes` re-flushes PASS 2 after every
+     * jar operation, so ordering is no longer a correctness concern. */
+    const res = NextResponse.redirect("https://www.elxea.com/ja");
+    clearAuthCookies(res, "all");
+    expect(directivesOf(res).filter((d) => d.domain === ".elxea.com")).toHaveLength(10);
+
+    res.cookies.set("unrelated", "1", { path: "/" });
+    expect(
+      directivesOf(res).filter((d) => d.domain === ".elxea.com"),
+      "the ten shared-domain expiries must survive an unrelated set()",
+    ).toHaveLength(10);
+
+    // Still exact, not additive, after several more unrelated writes.
+    res.cookies.set("unrelated2", "2", { path: "/" });
+    res.cookies.delete("unrelated");
+    expect(directivesOf(res).filter((d) => d.domain === ".elxea.com")).toHaveLength(10);
+  });
+
+  it("REGRESSION (CRITICAL-2): clearing survives an interleaved set between two clears", () => {
+    const res = NextResponse.redirect("https://www.elxea.com/ja");
+    clearFlowCookie(res, "line_oauth_state");
+    res.cookies.set("interleaved", "1", { path: "/" });
+    clearAuthCookies(res, "all");
+    res.cookies.set("trailing", "1", { path: "/" });
+
+    /* 22 clearing directives (10 names x 2 scopes, plus line_oauth_state x 2)
+     * and the 2 unrelated cookies the route happened to set. */
+    expect(directivesOf(res)).toHaveLength(24);
+    expect(directivesOf(res).filter((d) => d.domain === ".elxea.com")).toHaveLength(11);
+    expect(directivesOf(res).filter((d) => d.domain === undefined)).toHaveLength(13);
+  });
+
   it("is idempotent — calling twice does not duplicate directives", () => {
     const res = NextResponse.redirect("https://www.elxea.com/ja");
     clearAuthCookies(res, "all");

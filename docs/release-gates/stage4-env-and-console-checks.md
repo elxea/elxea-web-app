@@ -42,11 +42,24 @@ Consequences, applied:
   ability to read Shopify's registered list. So the origin source is preserved
   and the protection is added in front of it as a gate that is inert until
   `LINE_ALLOWED_CALLBACK_HOSTS` is deliberately set.
-- Because `LINE_ALLOWED_CALLBACK_HOSTS` and `AUTH_COOKIE_APEX` are both unset in
-  production, every new gate ships **inert**: `isRegisteredAuthHost` returns
-  `true`, `getBaseUrl(request)` falls through to the env chain, and
-  `AUTH_COOKIE_APEX` defaults to `elxea.com` — the value previously hard-coded.
-  Rollback is deleting an env var, with no deploy.
+- `LINE_ALLOWED_CALLBACK_HOSTS` and `AUTH_COOKIE_APEX` are both unset in
+  production. `isRegisteredAuthHost` therefore returns `true`, and
+  `getBaseUrl(request)` falls through to the env chain.
+
+### CORRECTION — rollback is NOT an env deletion
+
+An earlier revision of this file claimed "rollback is deleting an env var, with
+no deploy". **That was wrong and is retracted.**
+
+`AUTH_COOKIE_APEX` defaults to `"elxea.com"` in code, so the shared-domain
+cookie machinery — the dual-scope deletion, the Domain-scoped issuing, the
+apex-derived host trust — is **always active**, entirely outside any env gate.
+Deleting env vars does not disable it.
+
+**Rolling back this change requires `git revert` and a deploy.** The env
+variables only control the additional host allow-list; they cannot switch the
+core behaviour off. Anyone planning the release should size the rollback on that
+basis.
 
 A separate defect WAS confirmed and fixed while checking this: `nextUrl.origin`
 reports the origin the server is bound to, not the host the user addressed. On
@@ -87,4 +100,41 @@ No value in this file is a secret; the table records presence and truth only.
 2. Decide whether `LINE_ALLOWED_CALLBACK_HOSTS` should be set at all yet. Nothing
    in this change requires it — every gate is inert without it.
 
-Neither blocks the code: with these variables unset, behaviour matches today's.
+Neither blocks the code. Note, however, that "with these variables unset,
+behaviour matches today's" is true only of the allow-list; the cookie-scope
+change itself is unconditional (see the correction above).
+
+## Symptom 3 — root cause confirmed (preview scope)
+
+**`NEXTAUTH_URL` is not set in the preview environment.**
+
+| Variable | production | preview | development |
+|---|---|---|---|
+| `NEXTAUTH_URL` | set | **not set** | not set |
+| `NEXT_PUBLIC_SITE_URL` | set | set | not set |
+| `SITE_PASSWORD` | set | set | not set |
+| `NEXT_PUBLIC_APP_URL` | not set | not set | not set |
+| `LINE_ALLOWED_CALLBACK_HOSTS` | not set | not set | not set |
+| `AUTH_COOKIE_APEX` | not set | not set | not set |
+
+(Names only; no value was read.)
+
+This explains the "goes to the top page and shows the old design" half of symptom
+3. `getBaseUrl()` walks `NEXTAUTH_URL` -> `VERCEL_PROJECT_PRODUCTION_URL` ->
+`VERCEL_URL`. Vercel injects `VERCEL_PROJECT_PRODUCTION_URL` into **every**
+environment, including preview. With `NEXTAUTH_URL` absent in preview, the second
+entry wins and resolves to the **production** origin — so a LINE login started
+from a preview deployment completed against production and landed the user on the
+production top page, which is the older design.
+
+Fixed by refusing rather than redirecting: `/api/line-login/init`,
+`/api/line-login` and `/api/auth/login` now return
+`503 auth_host_not_registered` when the request host is not at or under our own
+apex (and not explicitly allow-listed). Production and `www` satisfy that with no
+configuration; a preview deployment gets a legible error instead of being
+silently switched to another deployment.
+
+Residual: this stops the wrong landing, it does not make LINE login work on
+previews. Doing that needs a registered callback host, which is the
+`LINE_ALLOWED_CALLBACK_HOSTS` + console-registration work in section 4c above and
+requires a human.

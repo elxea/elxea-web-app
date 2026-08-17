@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { getBaseUrl } from "@/lib/base-url";
+import { getBaseUrl, getRequestOrigin } from "@/lib/base-url";
 import { encryptToken } from "@/lib/shopify/customer";
 import {
   clearFlowCookie,
@@ -21,6 +21,18 @@ import {
 /**
  * I4: Resolve locale from cookie or accept-language header, defaulting to "ja".
  */
+/**
+ * Base for LINE's API endpoints.
+ *
+ * Env-overridable for the same reason `SHOPIFY_CUSTOMER_ACCOUNT_*_URL` already
+ * is: these calls are made server-side, so a browser-level test harness cannot
+ * intercept them, and without an override there is no way to drive this route's
+ * SUCCESS path in an end-to-end test. That gap is not hypothetical — it is why a
+ * change that destroyed the session cookies this route issues passed a full green
+ * suite. Unset (production, and every normal run) it is the real LINE host.
+ */
+const LINE_API_BASE = process.env.LINE_API_BASE_URL || "https://api.line.me";
+
 function resolveLocale(request: NextRequest): string {
   // Check NEXT_LOCALE cookie first (set by next-intl)
   const localeCookie = request.cookies.get("NEXT_LOCALE")?.value;
@@ -34,6 +46,20 @@ function resolveLocale(request: NextRequest): string {
 }
 
 export async function GET(request: NextRequest) {
+  /* Redirect targets are built from the origin the USER addressed, not from
+   * `request.url`.
+   *
+   * `request.url` / `nextUrl` report the origin the server is bound to. On Vercel
+   * that coincides with the request host, which is why this route appeared to
+   * work; anywhere else — a dev server, anything behind a proxy — it does not,
+   * and the callback bounced the user to the server's own origin. Landing on a
+   * different origin also means the apex-scoped session cookies just issued do
+   * not apply there, so the user arrives logged out.
+   *
+   * `getRequestOrigin` is fail-closed: an unrecognised Host falls back to
+   * `nextUrl.origin`, so a spoofed header cannot turn this into an open
+   * redirect. */
+  const requestOrigin = getRequestOrigin(request);
   const searchParams = request.nextUrl.searchParams;
   const code = searchParams.get("code");
   const state = searchParams.get("state");
@@ -43,11 +69,11 @@ export async function GET(request: NextRequest) {
   // Handle LINE auth errors
   if (error) {
     console.error("[line-callback] LINE auth error:", error);
-    return NextResponse.redirect(new URL(`/${locale}/login?error=LineAuthFailed`, request.url));
+    return NextResponse.redirect(new URL(`/${locale}/login?error=LineAuthFailed`, requestOrigin));
   }
 
   if (!code || !state) {
-    return NextResponse.redirect(new URL(`/${locale}/login?error=MissingParams`, request.url));
+    return NextResponse.redirect(new URL(`/${locale}/login?error=MissingParams`, requestOrigin));
   }
 
   // Verify state (CSRF protection)
@@ -56,7 +82,7 @@ export async function GET(request: NextRequest) {
 
   if (!savedState || savedState !== state) {
     console.error("[line-callback] State mismatch");
-    return NextResponse.redirect(new URL(`/${locale}/login?error=StateMismatch`, request.url));
+    return NextResponse.redirect(new URL(`/${locale}/login?error=StateMismatch`, requestOrigin));
   }
 
   const baseUrl = getBaseUrl(request);
@@ -85,12 +111,12 @@ export async function GET(request: NextRequest) {
   const channelSecret = process.env.AUTH_LINE_SECRET;
 
   if (!channelId || !channelSecret) {
-    return clearState(NextResponse.redirect(new URL(`/${locale}/login?error=NotConfigured`, request.url)));
+    return clearState(NextResponse.redirect(new URL(`/${locale}/login?error=NotConfigured`, requestOrigin)));
   }
 
   try {
     // Exchange code for tokens
-    const tokenRes = await fetch("https://api.line.me/oauth2/v2.1/token", {
+    const tokenRes = await fetch(`${LINE_API_BASE}/oauth2/v2.1/token`, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
@@ -105,19 +131,19 @@ export async function GET(request: NextRequest) {
     if (!tokenRes.ok) {
       const err = await tokenRes.text();
       console.error("[line-callback] Token exchange failed:", err);
-      return clearState(NextResponse.redirect(new URL(`/${locale}/login?error=TokenFailed`, request.url)));
+      return clearState(NextResponse.redirect(new URL(`/${locale}/login?error=TokenFailed`, requestOrigin)));
     }
 
     const tokens = await tokenRes.json();
 
     // Get user profile
-    const profileRes = await fetch("https://api.line.me/v2/profile", {
+    const profileRes = await fetch(`${LINE_API_BASE}/v2/profile`, {
       headers: { Authorization: `Bearer ${tokens.access_token}` },
     });
 
     if (!profileRes.ok) {
       console.error("[line-callback] Profile fetch failed");
-      return clearState(NextResponse.redirect(new URL(`/${locale}/login?error=ProfileFailed`, request.url)));
+      return clearState(NextResponse.redirect(new URL(`/${locale}/login?error=ProfileFailed`, requestOrigin)));
     }
 
     const profile = await profileRes.json();
@@ -128,7 +154,7 @@ export async function GET(request: NextRequest) {
     let email: string | null = null;
     if (tokens.id_token) {
       try {
-        const verifyRes = await fetch("https://api.line.me/oauth2/v2.1/verify", {
+        const verifyRes = await fetch(`${LINE_API_BASE}/oauth2/v2.1/verify`, {
           method: "POST",
           headers: { "Content-Type": "application/x-www-form-urlencoded" },
           body: new URLSearchParams({
@@ -193,7 +219,7 @@ export async function GET(request: NextRequest) {
       displayName,
     });
 
-    const response = NextResponse.redirect(new URL(`/${locale}/login/complete?linked=true`, request.url));
+    const response = NextResponse.redirect(new URL(`/${locale}/login/complete?linked=true`, requestOrigin));
 
     /* Scope session cookies to the apex so the user stays logged in whether they
      * browse `elxea.com` or `www.elxea.com`. See the init route for context.
@@ -248,6 +274,6 @@ export async function GET(request: NextRequest) {
     return clearState(response);
   } catch (err) {
     console.error("[line-callback] Unexpected error:", err);
-    return clearState(NextResponse.redirect(new URL(`/${locale}/login?error=Unexpected`, request.url)));
+    return clearState(NextResponse.redirect(new URL(`/${locale}/login?error=Unexpected`, requestOrigin)));
   }
 }

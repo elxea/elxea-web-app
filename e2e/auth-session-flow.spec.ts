@@ -84,7 +84,107 @@ function sharedDomainLineCookies(cookies: { name: string; domain: string }[]) {
     .sort();
 }
 
+/**
+ * Drive the REAL /api/line-callback success path.
+ *
+ * The state cookie is issued by /api/line-login/init, so the flow is started
+ * properly rather than forged: init sets the CSRF state, and the callback is then
+ * given the matching value. LINE's own endpoints are served by the local stub.
+ */
+async function completeLineLogin(page: Page, context: BrowserContext) {
+  await page.goto("/ja");
+
+  const init = await page.evaluate(async () => {
+    const r = await fetch("/api/line-login/init", { method: "POST", credentials: "same-origin" });
+    return { status: r.status, body: await r.text() };
+  });
+  expect(init.status, `init must succeed on the fake apex: ${init.body}`).toBe(200);
+
+  const state = new URL(JSON.parse(init.body).authUrl).searchParams.get("state");
+  expect(state, "init must have issued a CSRF state").toBeTruthy();
+
+  await page.goto(`/api/line-callback?code=ring2-code&state=${state}`);
+  await page.waitForLoadState("domcontentloaded");
+
+  return { cookies: await context.cookies(`http://${BASE_HOST}`) };
+}
+
 test.describe.serial("auth session flow", () => {
+  test("S3: the real LINE callback logs the user in and scopes the session to the apex", async ({
+    page,
+    context,
+  }) => {
+    const { cookies } = await completeLineLogin(page, context);
+
+    /* The exact regression that shipped: the callback issued these four and then
+     * cleared the state cookie on the same response, and the clear was deleting
+     * them. A suite that never drove this path could not see it. */
+    const session = cookies.filter(
+      (c) => LINE_SESSION_COOKIES.includes(c.name as never) && c.value !== "",
+    );
+    expect(
+      session.map((c) => c.name).sort(),
+      "all four session cookies must reach the browser with a value",
+    ).toEqual([...LINE_SESSION_COOKIES].sort());
+    expect(session.every((c) => c.domain === FAKE_APEX), "must be apex-scoped").toBe(true);
+
+    /* The one-shot state cookie must be gone. */
+    expect(cookies.filter((c) => c.name === "line_oauth_state" && c.value !== "")).toEqual([]);
+
+    /* And the session must actually authorise — the point of having one. */
+    await page.goto("/ja/account");
+    expect(await page.content()).toContain("RingTwoUser");
+  });
+
+  test("S2: an authenticated user can navigate the site normally", async ({ page, context }) => {
+    await completeLineLogin(page, context);
+
+    const non2xx: string[] = [];
+    page.on("response", (r) => {
+      if (r.status() >= 400) non2xx.push(`${r.status()} ${new URL(r.url()).pathname}`);
+    });
+
+    await page.goto("/ja/cart");
+    await page.waitForURL(/\/ja\/cart/);
+    expect(new URL(page.url()).origin).toBe(`http://${BASE_HOST}`);
+
+    /* Favourites / follows need Firebase credentials the harness does not have,
+     * and answer 401 — measured at stage 0, and the only non-2xx allowed here. */
+    const unexpected = non2xx.filter((s) => !/401 \/api\/user\//.test(s));
+    expect(unexpected, `unexpected non-2xx: ${non2xx.join(" | ")}`).toEqual([]);
+  });
+
+  test("S7: a full login-then-logout round trip leaves no session behind", async ({
+    page,
+    context,
+  }) => {
+    const externalHosts = new Set<string>();
+    page.on("request", (r) => {
+      const host = new URL(r.url()).host;
+      if (host !== BASE_HOST && !host.startsWith("127.0.0.1:")) externalHosts.add(host);
+    });
+
+    await completeLineLogin(page, context);
+    await page.goto("/ja/account");
+    expect(await page.content()).toContain("RingTwoUser");
+
+    await page.goto("/api/auth/logout?locale=ja");
+    await page.waitForLoadState("domcontentloaded");
+
+    const after = await context.cookies(`http://${BASE_HOST}`);
+    expect(
+      after.filter((c) => LINE_SESSION_COOKIES.includes(c.name as never) && c.value !== ""),
+      "no session cookie may survive logout",
+    ).toEqual([]);
+
+    await page.goto("/ja/account");
+    await page.waitForURL(/\/ja\/login/);
+
+    for (const host of externalHosts) {
+      expect(ALLOWED_EXTERNAL_HOSTS.has(host), `unexpected external host ${host}`).toBe(true);
+    }
+  });
+
   test("S0: unauthenticated home identifies its build and shows no logout link", async ({
     page,
   }) => {

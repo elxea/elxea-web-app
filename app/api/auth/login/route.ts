@@ -7,7 +7,7 @@ import {
   buildAuthorizeUrl,
 } from "@/lib/shopify/customer";
 import { sanitizeReturnTo } from "@/lib/auth/return-to";
-import { getRequestHostname, getRequestOrigin, isRegisteredAuthHost } from "@/lib/base-url";
+import { getRequestHostname, getRequestOrigin, isTrustedAuthHost } from "@/lib/base-url";
 
 export async function GET(request: NextRequest) {
   /* Refuse to start an OAuth round trip we know cannot come back.
@@ -20,12 +20,14 @@ export async function GET(request: NextRequest) {
    * 503 rather than a 4xx: the host is not wrong, it is not configured yet, and
    * that is a server-side condition an operator fixes by registering it.
    *
-   * `isRegisteredAuthHost` is fail-open while `LINE_ALLOWED_CALLBACK_HOSTS` is
-   * unset — which it currently is in production (verified 2026-08-18 by listing
-   * variable names only). So this is inert until somebody deliberately turns it
-   * on, and turning it off again is a single env deletion with no deploy. */
+   * `isTrustedAuthHost` is fail-CLOSED: it accepts a host only at or under our
+   * own apex, or one named explicitly in `LINE_ALLOWED_CALLBACK_HOSTS`. Production
+   * and www therefore pass with no configuration at all, while a preview
+   * deployment is refused rather than silently authenticating against production
+   * — which is what used to happen, because `NEXTAUTH_URL` is unset in preview
+   * while Vercel injects `VERCEL_PROJECT_PRODUCTION_URL` everywhere. */
   const hostname = getRequestHostname(request);
-  if (!isRegisteredAuthHost(hostname)) {
+  if (!isTrustedAuthHost(hostname)) {
     return NextResponse.json(
       { error: "auth_host_not_registered", host: hostname },
       { status: 503 },

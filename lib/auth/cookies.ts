@@ -164,7 +164,15 @@ export const COOKIE_REGISTRY: readonly CookieSpec[] = [
    * land on apex or www, and the callback returns to whichever host is pinned. A
    * host-only state cookie misses the opposite host and the CSRF check fails —
    * this was seen in production as "session expired" on login. */
-  { name: "line_oauth_state", group: "transient", scope: "shared-domain", secure: "always" },
+  /* `secure` is prod-only, not `always`, for the same reason the LINE session
+   * cookies are: a Secure cookie is not stored over plain http, so with `always`
+   * the CSRF state issued by /api/line-login/init never reaches the browser in
+   * any http environment and the callback always fails the state check. That
+   * makes the LINE login flow impossible to exercise outside production —
+   * including in Ring 2, which must run against `next dev` over http. In
+   * production `NODE_ENV === "production"`, so the emitted attribute is
+   * unchanged. */
+  { name: "line_oauth_state", group: "transient", scope: "shared-domain", secure: "prod-only" },
   /* Name verified against lib/line/account-link.ts:22 — it is `acct_link_tk`,
    * not the longer form the design assumed. */
   { name: "acct_link_tk", group: "transient", scope: "host-only", secure: "prod-only" },
@@ -363,32 +371,130 @@ function namesToClear(scope: ClearScope): readonly string[] {
  */
 const pendingSharedDomainExpiry = new WeakMap<NextResponse, Set<string>>();
 
-function expireAtBothScopes(response: NextResponse, names: readonly string[]): void {
-  const pending = pendingSharedDomainExpiry.get(response) ?? new Set<string>();
-  for (const name of names) pending.add(name);
-  pendingSharedDomainExpiry.set(response, pending);
+/** Responses whose jar has already been wrapped, so the guard installs once. */
+const guardedResponses = new WeakSet<NextResponse>();
 
-  // PASS 1 — host-only expiry, through the cookie jar.
-  for (const name of names) {
-    response.cookies.set(name, "", { path: "/", maxAge: 0 });
-  }
+/* Derived from `NextResponse` rather than imported from
+ * `next/dist/compiled/@edge-runtime/cookies`, so this does not depend on an
+ * internal module path that Next is free to move between releases. */
+type ResponseCookies = NextResponse["cookies"];
 
-  /* PASS 2 — shared-domain expiry as raw headers, strictly after every `set()`.
-   *
-   * The whole accumulated set is re-emitted, and any previously appended copies
-   * are dropped first, because `set()` above has just re-serialised the jar and
-   * discarded them. Without the drop, a second call would duplicate the first
-   * call's directives. */
-  const kept = response.headers
-    .getSetCookie()
-    .filter((raw) => !raw.includes(`Domain=${SHARED_COOKIE_DOMAIN}`));
-  response.headers.delete("set-cookie");
-  for (const raw of kept) response.headers.append("set-cookie", raw);
+/**
+ * PASS 2 — re-emit every pending shared-domain expiry as raw `Set-Cookie` lines.
+ *
+ * No existing header is inspected, filtered or deleted here. An earlier version
+ * dropped every line containing `Domain=.elxea.com` before re-appending, on the
+ * theory that it was removing its own stale directives. It was also matching
+ * cookies the caller had just ISSUED at that Domain, and deleting them:
+ * `/api/line-callback` sets the four LINE session cookies with `domain=.elxea.com`
+ * and then clears the state cookie, so all four were destroyed on the way out and
+ * the user was never actually logged in. That turned a logout fix into a login
+ * outage.
+ *
+ * Appending the full accumulated set is exact rather than additive, because this
+ * only ever runs immediately after a `cookies.set()`, and `set()` goes through
+ * `replace()`, which begins with `headers.delete("set-cookie")`. No raw append
+ * from an earlier call can still be present.
+ */
+function flushSharedDomainExpiry(response: NextResponse): void {
+  const pending = pendingSharedDomainExpiry.get(response);
+  if (!pending) return;
   for (const name of pending) {
     response.headers.append(
       "set-cookie",
       `${name}=; Path=/; Max-Age=0; Domain=${SHARED_COOKIE_DOMAIN}`,
     );
+  }
+}
+
+/** Duck-type the jar, so a chained `set()` keeps returning the guarded view. */
+function isCookieJar(value: unknown): value is ResponseCookies {
+  if (typeof value !== "object" || value === null) return false;
+  const candidate = value as { set?: unknown; getAll?: unknown };
+  return typeof candidate.set === "function" && typeof candidate.getAll === "function";
+}
+
+/**
+ * Make the shared-domain expiries survive ANY later cookie operation.
+ *
+ * The expiries have to be raw `Set-Cookie` headers, because the jar is a Map
+ * keyed by cookie name (`@edge-runtime/cookies:295`) and cannot hold two
+ * directives — host-only and Domain-scoped — for one name. But every
+ * `cookies.set()` runs `replace()` (`:313-319`), which does
+ * `headers.delete("set-cookie")` and rebuilds the header list from the jar alone.
+ * A single later `set()` anywhere on the response therefore erased all of them:
+ * measured, one unrelated `set()` after a clear left 0 of 10 expiries.
+ *
+ * Rather than leave "clear last" as a rule for every future route author to
+ * remember, the jar is wrapped so that each `set()`/`delete()` re-flushes PASS 2
+ * straight after `replace()` has run. Ordering stops being a correctness concern.
+ *
+ * ## Why the wrapper goes on the response, not on the jar
+ *
+ * An earlier attempt assigned `response.cookies.set = wrapper` and hit a
+ * RangeError (maximum call stack exceeded), which was read as proof that the
+ * platform makes this undefendable. The real cause is narrower: `NextResponse`
+ * exposes the jar through a Proxy whose `get` trap answers `set`/`delete` with
+ * `Reflect.apply(target[prop], target, args)` (`next/dist/server/web/spec-extension/response.js:47-66`).
+ * Assigning through that Proxy installs the wrapper as an own property ON THE
+ * TARGET, so the trap then invokes the wrapper again — it re-enters itself.
+ *
+ * So the inner Proxy is left untouched. Instead an own `cookies` data property is
+ * defined on the response, shadowing the `get cookies()` accessor inherited from
+ * `NextResponse.prototype`, and it returns an outer Proxy that delegates to the
+ * inner one. Nothing is ever written back through the inner Proxy, so there is no
+ * recursion.
+ */
+function installSharedDomainExpiryGuard(response: NextResponse): void {
+  if (guardedResponses.has(response)) return;
+  guardedResponses.add(response);
+
+  const jar = response.cookies;
+
+  const guarded: ResponseCookies = new Proxy(jar, {
+    get(target, prop, receiver) {
+      if (prop !== "set" && prop !== "delete") {
+        return Reflect.get(target, prop, receiver);
+      }
+      /* Read through the inner Proxy's trap, which hands back a fresh closure
+       * already bound to the real jar. It is never written back. */
+      const original = Reflect.get(target, prop) as (...args: unknown[]) => unknown;
+      return (...args: unknown[]) => {
+        const result = original(...args);
+        flushSharedDomainExpiry(response);
+        /* `set()` returns the jar for chaining; hand back the guarded view so a
+         * chained call cannot slip past this wrapper. */
+        return isCookieJar(result) ? guarded : result;
+      };
+    },
+  }) as ResponseCookies;
+
+  Object.defineProperty(response, "cookies", {
+    value: guarded,
+    configurable: true,
+    enumerable: false,
+    writable: false,
+  });
+}
+
+function expireAtBothScopes(response: NextResponse, names: readonly string[]): void {
+  /* PASS 2's exactness depends on PASS 1 having re-serialised the jar at least
+   * once, which only happens when there is something to set. */
+  if (names.length === 0) return;
+
+  const pending = pendingSharedDomainExpiry.get(response) ?? new Set<string>();
+  for (const name of names) pending.add(name);
+  pendingSharedDomainExpiry.set(response, pending);
+
+  /* Installed BEFORE pass 1 so that pass 1's own `set()` calls flush through it.
+   * That is also why there is no explicit PASS 2 call at the end of this
+   * function: the guard has already run after the last `set()` below, and adding
+   * a trailing flush here would append the whole set a second time. */
+  installSharedDomainExpiryGuard(response);
+
+  // PASS 1 — host-only expiry, through the cookie jar.
+  for (const name of names) {
+    response.cookies.set(name, "", { path: "/", maxAge: 0 });
   }
 }
 

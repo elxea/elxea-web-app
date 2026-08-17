@@ -119,6 +119,50 @@ describe("both state cookies are issued through the same scope rule", () => {
   });
 });
 
+describe("an untrusted host is refused rather than sent to production (symptom 3)", () => {
+  /* `NEXTAUTH_URL` is unset in preview while Vercel injects
+   * `VERCEL_PROJECT_PRODUCTION_URL` into every environment, so `getBaseUrl()`
+   * resolved to the PRODUCTION origin on a preview deployment and the LINE round
+   * trip delivered the user to the production top page. Refusing is the correct
+   * outcome; silently switching deployments is not. */
+  it.each([
+    "preview-abc.vercel.app",
+    "elxea-web-app-git-feat-x.vercel.app",
+    "evil.example",
+    "evil-elxea.com",
+  ])("POST /api/line-login/init on %s returns 503", async (host) => {
+    const { POST } = await import("@/app/api/line-login/init/route");
+    const res = await POST(
+      new NextRequest("https://internal.example/api/line-login/init", { headers: { host } }),
+    );
+    expect(res.status).toBe(503);
+    expect((await res.json()).error).toBe("auth_host_not_registered");
+  });
+
+  it.each(["www.elxea.com", "elxea.com", "WWW.ELXEA.COM:443"])(
+    "still serves our own host %s",
+    async (host) => {
+      const { POST } = await import("@/app/api/line-login/init/route");
+      const res = await POST(
+        new NextRequest("https://www.elxea.com/api/line-login/init", { headers: { host } }),
+      );
+      expect(res.status).toBe(200);
+      expect(new URL((await res.json()).authUrl).host).toBe("access.line.me");
+    },
+  );
+
+  it("GET /api/auth/login on an untrusted host returns 503", async () => {
+    const { GET } = await import("@/app/api/auth/login/route");
+    const res = await GET(
+      new NextRequest("https://internal.example/api/auth/login?locale=ja", {
+        headers: { host: "preview-abc.vercel.app" },
+      }),
+    );
+    expect(res.status).toBe(503);
+    expect((await res.json()).error).toBe("auth_host_not_registered");
+  });
+});
+
 describe("unconfigured LINE channel fails closed with 503", () => {
   it("returns 503 auth_not_configured rather than 500", async () => {
     delete process.env.AUTH_LINE_ID;

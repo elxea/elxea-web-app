@@ -328,6 +328,7 @@ function scan(files: string[]): ScanResult {
     };
 
     visit(sf);
+
   }
 
   return result;

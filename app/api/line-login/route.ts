@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import crypto from "crypto";
-import { getBaseUrl } from "@/lib/base-url";
+import { getBaseUrl, getRequestHostname, isTrustedAuthHost } from "@/lib/base-url";
 import { getCookieSpec, isSecure, resolveCookieDomain } from "@/lib/auth/cookies";
 
 /**
@@ -19,6 +19,27 @@ import { getCookieSpec, isSecure, resolveCookieDomain } from "@/lib/auth/cookies
  * After LINE auth, callback goes to /api/line-callback
  */
 export async function GET(request: NextRequest) {
+
+  /* Fail closed on a host that is not ours.
+   *
+   * This is the fix for "login from a preview lands on the production top page".
+   * `NEXTAUTH_URL` is not set in the preview environment (verified 2026-08-18 by
+   * listing variable names only), while Vercel injects
+   * `VERCEL_PROJECT_PRODUCTION_URL` into every environment — so `getBaseUrl()`
+   * resolved to the PRODUCTION origin on previews, and the LINE round trip
+   * quietly delivered the user to production instead of the deployment they were
+   * testing. Silently sending someone to a different deployment is worse than
+   * refusing, so an untrusted host now gets a legible 503 instead.
+   *
+   * `isTrustedAuthHost` is satisfied by any host at or under our apex, so
+   * production and www are unaffected without any configuration. */
+  const hostname = getRequestHostname(request);
+  if (!isTrustedAuthHost(hostname)) {
+    return NextResponse.json(
+      { error: "auth_host_not_registered", host: hostname },
+      { status: 503 },
+    );
+  }
   const channelId = process.env.AUTH_LINE_ID;
   if (!channelId) {
     // Same rationale as /api/line-login/init: unconfigured, not broken.

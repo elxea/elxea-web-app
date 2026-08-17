@@ -49,6 +49,7 @@ const commitSha = execSync("git rev-parse --short HEAD", { encoding: "utf8" }).t
 const repoRoot = path.resolve(__dirname, "..");
 
 const STUB_PORT = 3311;
+const LINE_STUB_PORT = 3312;
 /* The stub appends one JSON line per hit here. Specs read this file to assert on
  * stub hits, which is what makes the assertion possible at all — see the
  * webServer comment below. */
@@ -108,6 +109,18 @@ export default defineConfig({
      * `/health` is used for readiness because the logout path answers 400 to a
      * hint-less request — that IS the contract, and Playwright would read a 400
      * as "not ready yet". */
+    /* LINE's API, so the /api/line-callback SUCCESS path is reachable. Those
+     * calls are server-side, so no browser-level interception can stand in for
+     * them — and without them the suite can only ever exercise this route's error
+     * redirects, which is the blind spot that let a session-destroying change
+     * pass fully green. */
+    {
+      command: `node scripts/e2e/line-api-stub.mjs ${LINE_STUB_PORT}`,
+      cwd: repoRoot,
+      url: `http://127.0.0.1:${LINE_STUB_PORT}/health`,
+      reuseExistingServer: !process.env.CI,
+      timeout: 30_000,
+    },
     {
       command: `node scripts/e2e/shopify-logout-stub.mjs ${STUB_PORT} ${STUB_LOG}`,
       cwd: repoRoot,
@@ -136,6 +149,11 @@ export default defineConfig({
         SHOPIFY_CUSTOMER_ACCOUNT_LOGOUT_URL: `http://127.0.0.1:${STUB_PORT}/authentication/00000000/logout`,
         /* Lets the specs read the stub's hit log. */
         SHOPIFY_LOGOUT_STUB_LOG: STUB_LOG,
+        /* Points the LINE callback at the local LINE stub. */
+        LINE_API_BASE_URL: `http://127.0.0.1:${LINE_STUB_PORT}`,
+        NEXT_PUBLIC_CHAT_API_URL: `http://127.0.0.1:${LINE_STUB_PORT}/api/chat`,
+        AUTH_LINE_ID: "ring2-channel-id",
+        AUTH_LINE_SECRET: "ring2-channel-secret",
         /* Telemetry off — the "no unexpected external hosts" assertion counts
          * every outbound host, and Sentry would make it non-deterministic. */
         NEXT_PUBLIC_SENTRY_DSN: "",

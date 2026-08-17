@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 
+import { AUTH_COOKIE_APEX } from "@/lib/auth/cookies";
 import { normalizeHost } from "@/lib/auth/normalize-host";
 
 /**
@@ -96,6 +97,30 @@ export function isRegisteredAuthHost(hostname: string): boolean {
 }
 
 /**
+ * Is this a host we are willing to build an auth URL or a redirect target from?
+ *
+ * Unlike `isRegisteredAuthHost`, this is **fail-closed**: an unknown host is
+ * never trusted, whether or not `LINE_ALLOWED_CALLBACK_HOSTS` is configured. A
+ * host qualifies only by being at or under our own apex, or by being named
+ * explicitly in the allow-list.
+ *
+ * The two functions answer different questions and both are needed.
+ * `isRegisteredAuthHost` asks "has an operator declared this host to the IdP?",
+ * and has to stay fail-open so that introducing the variable cannot take
+ * production down. This one asks "is this host ours?", which we can answer from
+ * the apex alone, with no configuration and no trust in the request.
+ *
+ * The apex suffix test uses a leading dot so that `evil-elxea.com` does not pass
+ * as a subdomain of `elxea.com`.
+ */
+export function isTrustedAuthHost(hostname: string): boolean {
+  if (!hostname) return false;
+  if (hostname === AUTH_COOKIE_APEX) return true;
+  if (hostname.endsWith(`.${AUTH_COOKIE_APEX}`)) return true;
+  return Boolean(process.env.LINE_ALLOWED_CALLBACK_HOSTS) && isRegisteredAuthHost(hostname);
+}
+
+/**
  * Resolve the application base URL.
  *
  * With no argument, identical to the original env-only implementation
@@ -171,14 +196,32 @@ export function getRequestHostname(request: NextRequest): string {
  * divergence, rather than the other way round. `nextUrl.origin` remains the
  * fallback for the case where no Host header is present at all.
  *
- * `Host` is preferred over `X-Forwarded-Host` for the same reason as everywhere
- * else in this module: the latter is attacker-controlled. That is safe here
- * because this value is only used for SAME-SITE redirects and, where it reaches
- * an IdP, is gated by `isRegisteredAuthHost` at the call site.
+ * ## The host is validated before it is trusted (fail-closed)
+ *
+ * `Host` is an attacker-controlled header. This origin is used as a redirect
+ * target (`/api/auth/logout` sends the user to `${origin}/${locale}` on its
+ * local-completion branch), so echoing it back unchecked is an open redirect:
+ * `Host: evil.example` would bounce the user off-site.
+ *
+ * An earlier revision claimed this was "gated by `isRegisteredAuthHost` at the
+ * call site". It was not, as shipped — that gate is fail-OPEN while
+ * `LINE_ALLOWED_CALLBACK_HOSTS` is unset, which it is in production, so nothing
+ * validated the host at all. The claim also contradicted this codebase's own
+ * stated position that no upstream host filtering may be assumed
+ * (`lib/auth/cookies.ts`).
+ *
+ * So the check is made here and made unconditional: the host is used only when it
+ * is recognised — at or under our own apex, or explicitly allow-listed. Anything
+ * else falls back to `request.nextUrl.origin`, the origin the server is actually
+ * bound to, which no header can influence. Production hosts are under the apex,
+ * so this changes nothing there; an unrecognised host simply loses the ability to
+ * steer a redirect.
  */
 export function getRequestOrigin(request: NextRequest): string {
   const authority = readRequestAuthority(request);
   if (!authority) return request.nextUrl.origin;
+
+  if (!isTrustedAuthHost(normalizeHost(authority))) return request.nextUrl.origin;
 
   const forwardedProto = request.headers.get("x-forwarded-proto")?.split(",")[0].trim();
   const protocol =

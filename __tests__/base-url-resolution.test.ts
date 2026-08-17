@@ -272,21 +272,57 @@ describe("getRequestOrigin — the Shopify-family routes keep their previous ori
    * `request.nextUrl.origin`, independent of every env var. */
   it.each([
     ["https://www.elxea.com/api/auth/login", "https://www.elxea.com"],
-    ["http://www.elxea.test:3310/api/auth/logout", "http://www.elxea.test:3310"],
+    ["https://elxea.com/api/auth/login", "https://elxea.com"],
     ["https://preview-abc.vercel.app/api/auth/callback", "https://preview-abc.vercel.app"],
   ])("%s -> %s", (url, expected) => {
+    setEnv({ NODE_ENV: "test" });
     const req = new NextRequest(url);
     expect(getRequestOrigin(req)).toBe(expected);
   });
 
-  it("is unaffected by NEXTAUTH_URL and by the allow-list", () => {
-    setEnv({
-      NEXTAUTH_URL: "https://www.elxea.com",
-      LINE_ALLOWED_CALLBACK_HOSTS: "www.elxea.com",
-      NODE_ENV: "test",
+  describe("a spoofed Host cannot steer the redirect (fail-closed)", () => {
+    /* This origin becomes a redirect target on logout's local-completion branch,
+     * so trusting the Host header unchecked would be an open redirect. */
+    it("ignores an attacker Host and falls back to the server's own origin", () => {
+      setEnv({ NODE_ENV: "test" });
+      const req = new NextRequest("https://www.elxea.com/api/auth/logout", {
+        headers: { host: "evil.example" },
+      });
+      expect(getRequestOrigin(req)).toBe("https://www.elxea.com");
+      expect(getRequestOrigin(req)).not.toContain("evil.example");
     });
-    const req = new NextRequest("https://preview-abc.vercel.app/api/auth/login");
-    expect(getRequestOrigin(req)).toBe("https://preview-abc.vercel.app");
+
+    it("ignores a lookalike that merely ends with the apex string", () => {
+      setEnv({ NODE_ENV: "test" });
+      const req = new NextRequest("https://www.elxea.com/api/auth/logout", {
+        headers: { host: "evil-elxea.com" },
+      });
+      expect(getRequestOrigin(req)).toBe("https://www.elxea.com");
+    });
+
+    it("accepts a host under our own apex", () => {
+      setEnv({ NODE_ENV: "test" });
+      const req = new NextRequest("https://internal.example/api/auth/logout", {
+        headers: { host: "www.elxea.com", "x-forwarded-proto": "https" },
+      });
+      expect(getRequestOrigin(req)).toBe("https://www.elxea.com");
+    });
+
+    it("accepts a host the allow-list names, once the allow-list exists", () => {
+      setEnv({ LINE_ALLOWED_CALLBACK_HOSTS: "staging.example", NODE_ENV: "test" });
+      const req = new NextRequest("https://internal.example/api/auth/logout", {
+        headers: { host: "staging.example", "x-forwarded-proto": "https" },
+      });
+      expect(getRequestOrigin(req)).toBe("https://staging.example");
+    });
+
+    it("does NOT accept an arbitrary host just because the allow-list is unset", () => {
+      setEnv({ NODE_ENV: "test" });
+      const req = new NextRequest("https://internal.example/api/auth/logout", {
+        headers: { host: "staging.example", "x-forwarded-proto": "https" },
+      });
+      expect(getRequestOrigin(req)).toBe("https://internal.example");
+    });
   });
 });
 
