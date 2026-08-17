@@ -20,11 +20,23 @@ name: sync-notion-to-sanity
 # (GitHub の job 上限 6 時間 / 非公開リポの無料枠 月 2000 分に対して十分小さい)。
 
 on:
-  schedule:
-    # 毎時 5 分 (UTC)。Spec の完了基準「1 時間以内に出る」に合わせる。
-    # cron の起動は数十分遅れることがある (GitHub の仕様) が、1 時間粒度の
-    # 要件には収まる。
-    - cron: "5 * * * *"
+  # 定時実行は一時停止中 (2026-08-18)。
+  #
+  # 理由: この workflow が必要とする secret (NOTION_API_KEY /
+  # NOTION_CONTENT_HUB_DB_ID / NEXT_PUBLIC_SANITY_PROJECT_ID /
+  # SANITY_API_WRITE_TOKEN) がリポジトリに未登録のため、毎時走っても必ず失敗し、
+  # 失敗通知と tracking issue だけが積み上がる。本番サイトへの影響は無い
+  # (この workflow はデプロイに関与しない) が、無意味な赤を出し続けないよう
+  # cron を止めてある。
+  #
+  # 再開手順: 上記 4 つの secret を登録し、workflow_dispatch (dry_run: true) で
+  # 1 回成功させてから、下の schedule ブロックのコメントを外す。
+  #
+  # schedule:
+  #   # 毎時 5 分 (UTC)。Spec の完了基準「1 時間以内に出る」に合わせる。
+  #   # cron の起動は数十分遅れることがある (GitHub の仕様) が、1 時間粒度の
+  #   # 要件には収まる。
+  #   - cron: "5 * * * *"
   workflow_dispatch:
     inputs:
       dry_run:
