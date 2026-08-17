@@ -43,7 +43,9 @@ concurrency:
   # Effect: on the deploy branch runs QUEUE instead of cancelling (FIFO, so the
   # newest commit still ends up as the final production deploy). Every other
   # branch keeps the old cheap cancel-the-stale-run behaviour.
-  cancel-in-progress: ${{ github.ref != 'refs/heads/feat/c1-ds-foundation' }}
+  # 出荷ブランチ (= 本番の正本 main) の run はキャンセルしない。2026-08-17 の
+  # 一本化で feat/c1-ds-foundation から main へ変更。
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 env:
   NODE_VERSION: "22"
@@ -139,6 +141,19 @@ jobs:
 
       - name: Run unit tests
         run: pnpm test --project unit --reporter=junit --outputFile=test-results/junit.xml
+
+      - name: Verify unit test floor (P5 — 空回り検知)
+        # A green run with ~0 tests is the "検証停止" failure mode from the
+        # 2026-08 incident. Assert a minimum executed count so a silently empty
+        # or over-filtered run FAILS instead of passing vacuously.
+        # Raise TEST_FLOOR_UNIT toward the real count over time.
+        # docs/ops/test-floor.md
+        #
+        # 移植元: main #58 (e1b778b)。一本化 (2026-08-17) で ci.yml をデプロイ配線の
+        # 正本に統一する際、c1-ds 側の ci.yml にこの step が無かったため戻した。
+        env:
+          TEST_FLOOR_UNIT: "150"
+        run: node scripts/ops/check-test-floor.mjs --file test-results/junit.xml --min "${TEST_FLOOR_UNIT}" --label unit
 
       - name: Upload test results
         if: always()
@@ -328,6 +343,19 @@ jobs:
           # which would break the cart empty-state specs.
           PREVIEW_SEED_STOREFRONT: "1"
 
+      - name: Verify E2E test floor (P5 — 空回り検知)
+        # Same 0件成功 guard for the e2e suite. In CI several specs are
+        # intentionally ignored (external services), so the floor is set below
+        # the CI-run count with margin. Raise TEST_FLOOR_E2E over time.
+        # docs/ops/test-floor.md
+        #
+        # 移植元: main #58 (e1b778b)。JUnit の出力先は playwright.config.ts の
+        # reporter 定義 (test-results/e2e-junit.xml) を読む。
+        if: always()
+        env:
+          TEST_FLOOR_E2E: "15"
+        run: node scripts/ops/check-test-floor.mjs --file test-results/e2e-junit.xml --min "${TEST_FLOOR_E2E}" --label e2e
+
       - name: Report skipped tests (no-op green visibility)
         # Runs even when the suite fails. 33 runtime skip guards mean a large part
         # of this job can pass without asserting anything (CRON_SECRET,
@@ -359,10 +387,21 @@ jobs:
 
   visual-regression:
     name: visual-regression
-    # PR-only, unchanged. Chromatic bills per snapshot, so running it on every
-    # `feat/**` push would burn the quota on intermediate states nobody reviews.
-    # The gate that matters is on the PR, where changes are not auto-accepted.
-    if: github.event_name == 'pull_request'
+    # Runs on PRs AND on main pushes. Chromatic bills per snapshot, so it does
+    # NOT run on every `feat/**` push (that would burn the quota on intermediate
+    # states nobody reviews). But PR-only was also wrong: it made
+    # `autoAcceptChanges: main` below unreachable, so no main push ever produced
+    # a new baseline and every PR kept diffing against the last manually
+    # accepted build — a permanently red gate (main #51 / issue #50).
+    #
+    # `main` is the only branch that defines the baseline, so it is the only
+    # branch whose pushes need a Chromatic build.
+    #
+    # 移植元: main #51 (0e43663)。一本化 (2026-08-17) で c1-ds の PR-only 版に
+    # 上書きされないよう main 腕を戻した。
+    if: >-
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
     needs: static-checks
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -417,7 +456,8 @@ jobs:
     # 実際に出荷する側へ向け直すだけ。
     #
     # !! DEPLOY_BRANCH を変えるときは、この行も一緒に変える。!!
-    if: github.ref == 'refs/heads/feat/c1-ds-foundation' && github.event_name == 'push'
+    # 2026-08-17: 一本化で出荷ブランチが main になったため main に合わせた。
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     needs: [unit-tests, e2e-tests]
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -492,12 +532,14 @@ jobs:
     # ── DEPLOY_BRANCH ──────────────────────────────────────────────────────
     # The single line that decides which branch reaches production.
     #
-    # !! WHEN THE main/feat CONSOLIDATION LANDS, CHANGE THIS LINE. !!
-    # If it is left pinned to a branch that no longer receives pushes, auto-deploy
-    # dies SILENTLY: the ref stops matching, this job is skipped on every run, and
-    # nothing anywhere reports an error. A skipped job looks identical to a
-    # healthy one in the Actions list.
-    if: github.event_name == 'push' && github.ref == 'refs/heads/feat/c1-ds-foundation'
+    # 2026-08-17: main 一本化にあわせて `feat/c1-ds-foundation` から `main` に
+    # 変更した。ここが「もう push されないブランチ」に留まると auto-deploy は
+    # 無言で死ぬ (ref が一致しなくなり毎回この job が skip されるだけで、どこも
+    # エラーを出さない。skip された job は Actions 一覧で成功と見分けがつかない)。
+    #
+    # 本番の正本は main (docs/ops/production-source-of-truth.md)。この行と
+    # その宣言は必ず一致させる。
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: [static-checks, unit-tests, coverage, build, storybook-tests, e2e-tests]
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -512,6 +554,15 @@ jobs:
       # the environment, so no interactive `vercel link` is needed.
       VERCEL_ORG_ID: team_6ut7roUVtRU2EGbPVR9DNTy6
       VERCEL_PROJECT_ID: prj_sVwjaJwPAKxRcKu3wVejiqGPt5o6
+      # Pinned deliberately (移植元: main deploy.yml)。This used to be
+      # `vercel@latest`, which meant a third-party patch release could break
+      # production deploys with zero changes in this repo — and on 2026-07-30
+      # exactly that happened (57.0.0 deployed fine, 58.4.4 did not). Deploys
+      # must be reproducible, so the CLI is a pinned input like any other
+      # dependency. Bump intentionally, and check the run stays green after you do.
+      VERCEL_CLI_VERSION: "58.9.4"
+      # Public production URL, asserted by the smoke check after every deploy.
+      PRODUCTION_URL: "https://elxea.com"
       # Supplied ONCE, as an env var. The CLI picks VERCEL_TOKEN up automatically,
       # so no step passes it as a `--token=` flag: the value never lands on a
       # command line (which can surface in process listings and step logs).
@@ -574,7 +625,7 @@ jobs:
 
       - name: Install Vercel CLI
         if: steps.arm.outputs.armed == 'true'
-        run: npm install --global vercel@latest
+        run: npm install --global "vercel@${VERCEL_CLI_VERSION}"
 
       - name: Verify Vercel credentials
         # Cheap auth probe that creates nothing. Deliberately `vercel whoami`
@@ -610,4 +661,53 @@ jobs:
         # Nothing is lost by not building here — the `build` job above already
         # fails this workflow before the deploy on any build break.
         if: steps.arm.outputs.armed == 'true'
-        run: vercel deploy --prod
+        id: deploy
+        run: |
+          # --meta attaches the source git SHA + ref to the Vercel deployment
+          # (移植元: main #56 / 4c176dd)。A CLI deploy carries NO git metadata by
+          # default, so the prod↔main sync monitor
+          # (scripts/ops/check-prod-main-sync.mjs, P2) has no way to learn "which
+          # commit is live". These two meta keys are its ONLY input: the monitor
+          # reads meta.githubCommitSha from the Vercel REST API and compares it to
+          # origin/main HEAD. Drop them and prod-main-sync.yml goes red every day.
+          #
+          # `vercel deploy` writes the deployment URL to stdout and progress to
+          # stderr, so capturing stdout yields exactly this run's deployment.
+          deployment_url="$(vercel deploy --prod \
+            --meta githubCommitSha="${GITHUB_SHA}" \
+            --meta githubCommitRef="${GITHUB_REF_NAME}")"
+          echo "deployment_url=${deployment_url}" >> "$GITHUB_OUTPUT"
+          echo "Deployed: ${deployment_url}"
+
+      - name: Smoke check — production must actually serve traffic
+        # A green `vercel deploy` is not proof the site works: the same class of
+        # defect that made 2026-07-31 fail loudly (files missing from the
+        # deployment) can also produce a "successful" deploy that serves errors.
+        # So assert the production domain really returns 200 before calling this
+        # job successful.
+        #
+        # 移植元: main deploy.yml。c1-ds 側の配線にはデプロイ後の 200 確認が無く、
+        # 一本化でこれを落とすと「緑なのに本番が壊れている」を検知できなくなる。
+        #
+        # This does NOT roll back; it only reports. Rolling back unattended is a
+        # riskier action, and Vercel keeps the previous deployment available for
+        # an instant manual rollback.
+        if: steps.arm.outputs.armed == 'true'
+        env:
+          DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment_url }}
+        run: |
+          echo "Deployment: ${DEPLOYMENT_URL}"
+          code=000
+          # Retry: alias propagation is not instant, and a single transient
+          # network blip should not fail an otherwise good deploy.
+          for attempt in 1 2 3 4 5; do
+            code="$(curl -sS -o /dev/null -w '%{http_code}' -L --max-time 20 "${PRODUCTION_URL}" || echo 000)"
+            if [ "${code}" = "200" ]; then
+              echo "${PRODUCTION_URL} returned 200 on attempt ${attempt}."
+              exit 0
+            fi
+            echo "Attempt ${attempt}: ${PRODUCTION_URL} returned HTTP ${code}; retrying in 10s..."
+            sleep 10
+          done
+          echo "::error title=Production smoke check failed::${PRODUCTION_URL} did not return 200 after 5 attempts (last: HTTP ${code}). The deploy may have shipped a broken build — check ${DEPLOYMENT_URL} and consider rolling back in the Vercel dashboard."
+          exit 1
