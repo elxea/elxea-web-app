@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { getBaseUrl } from "@/lib/base-url";
 import { encryptToken } from "@/lib/shopify/customer";
 import {
+  clearFlowCookie,
   getCookieSpec,
   isSecure,
   resolveCookieDomain,
@@ -59,30 +60,32 @@ export async function GET(request: NextRequest) {
   }
 
   const baseUrl = getBaseUrl(request);
-
-  /* Clear the state cookie at the Domain it was issued at.
-   *
-   * The Domain now comes from the REQUEST, not from `getBaseUrl()`. The old code
-   * derived it from the env-configured base URL, which is a different input from
-   * the one the issuing route used at issue time — the mismatch is what made this
-   * delete a silent no-op and left stale state cookies alive until natural expiry.
-   *
-   * `cookieStore.delete({ name, domain })` is a single-scope delete, which is
-   * correct here: unlike session cookies, `line_oauth_state` is issued at exactly
-   * one scope per request and a stale one is a nuisance rather than an
-   * authorisation hole. */
   const stateDomain = resolveCookieDomain(request);
-  cookieStore.delete({
-    name: "line_oauth_state",
-    path: "/",
-    ...(stateDomain ? { domain: stateDomain } : {}),
-  });
+
+  /* Expire the one-shot state cookie at BOTH scopes, on whatever response we end
+   * up returning.
+   *
+   * It cannot be done through `cookieStore.delete()`: that store is keyed by
+   * cookie name and can hold only one directive per name, so it can express one
+   * scope, never two. And one scope is not enough here — `/api/line-login/init`
+   * issued this cookie Domain-scoped while the legacy `/api/line-login` issued it
+   * host-only, so after this deploys both shapes exist in real browsers. The old
+   * code additionally derived the Domain from `getBaseUrl()` (env) rather than
+   * from the request, which is a different input from the one used at issue time;
+   * that mismatch is what made the delete a silent no-op.
+   *
+   * Applied at every exit after the state check, so a failed exchange does not
+   * strand a state cookie that a later attempt would compare against. */
+  const clearState = <T extends NextResponse>(res: T): T => {
+    clearFlowCookie(res, "line_oauth_state");
+    return res;
+  };
 
   const channelId = process.env.AUTH_LINE_ID;
   const channelSecret = process.env.AUTH_LINE_SECRET;
 
   if (!channelId || !channelSecret) {
-    return NextResponse.redirect(new URL(`/${locale}/login?error=NotConfigured`, request.url));
+    return clearState(NextResponse.redirect(new URL(`/${locale}/login?error=NotConfigured`, request.url)));
   }
 
   try {
@@ -102,7 +105,7 @@ export async function GET(request: NextRequest) {
     if (!tokenRes.ok) {
       const err = await tokenRes.text();
       console.error("[line-callback] Token exchange failed:", err);
-      return NextResponse.redirect(new URL(`/${locale}/login?error=TokenFailed`, request.url));
+      return clearState(NextResponse.redirect(new URL(`/${locale}/login?error=TokenFailed`, request.url)));
     }
 
     const tokens = await tokenRes.json();
@@ -114,7 +117,7 @@ export async function GET(request: NextRequest) {
 
     if (!profileRes.ok) {
       console.error("[line-callback] Profile fetch failed");
-      return NextResponse.redirect(new URL(`/${locale}/login?error=ProfileFailed`, request.url));
+      return clearState(NextResponse.redirect(new URL(`/${locale}/login?error=ProfileFailed`, request.url)));
     }
 
     const profile = await profileRes.json();
@@ -242,9 +245,9 @@ export async function GET(request: NextRequest) {
     });
 
     // Redirect to login complete page
-    return response;
+    return clearState(response);
   } catch (err) {
     console.error("[line-callback] Unexpected error:", err);
-    return NextResponse.redirect(new URL(`/${locale}/login?error=Unexpected`, request.url));
+    return clearState(NextResponse.redirect(new URL(`/${locale}/login?error=Unexpected`, request.url)));
   }
 }

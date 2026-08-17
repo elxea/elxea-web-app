@@ -348,22 +348,78 @@ function namesToClear(scope: ClearScope): readonly string[] {
  * counts explicitly — checking merely that "a Domain-scoped line exists" cannot
  * tell these three implementations apart.
  */
-export function clearAuthCookies(response: NextResponse, scope: ClearScope): void {
-  const names = namesToClear(scope);
+/**
+ * Names awaiting a shared-domain expiry, per response.
+ *
+ * Needed because the ordering constraint is not just "appends last" — it is
+ * "appends after the LAST `set()` anywhere on this response". Two clearing calls
+ * on one response would otherwise silently truncate each other: measured
+ * 2026-08-18, `clearAuthCookies` followed by `clearFlowCookie` produced 12
+ * directives instead of 22, because the second call's `set()` wiped the first
+ * call's ten appends.
+ *
+ * Rather than leave that as a rule to remember, every clearing call re-flushes
+ * the full accumulated set. The result is order-independent and composable.
+ */
+const pendingSharedDomainExpiry = new WeakMap<NextResponse, Set<string>>();
+
+function expireAtBothScopes(response: NextResponse, names: readonly string[]): void {
+  const pending = pendingSharedDomainExpiry.get(response) ?? new Set<string>();
+  for (const name of names) pending.add(name);
+  pendingSharedDomainExpiry.set(response, pending);
 
   // PASS 1 — host-only expiry, through the cookie jar.
   for (const name of names) {
     response.cookies.set(name, "", { path: "/", maxAge: 0 });
   }
 
-  // PASS 2 — shared-domain expiry, as raw headers, strictly after every set().
-  for (const name of names) {
+  /* PASS 2 — shared-domain expiry as raw headers, strictly after every `set()`.
+   *
+   * The whole accumulated set is re-emitted, and any previously appended copies
+   * are dropped first, because `set()` above has just re-serialised the jar and
+   * discarded them. Without the drop, a second call would duplicate the first
+   * call's directives. */
+  const kept = response.headers
+    .getSetCookie()
+    .filter((raw) => !raw.includes(`Domain=${SHARED_COOKIE_DOMAIN}`));
+  response.headers.delete("set-cookie");
+  for (const raw of kept) response.headers.append("set-cookie", raw);
+  for (const name of pending) {
     response.headers.append(
       "set-cookie",
       `${name}=; Path=/; Max-Age=0; Domain=${SHARED_COOKIE_DOMAIN}`,
     );
   }
 }
+
+export function clearAuthCookies(response: NextResponse, scope: ClearScope): void {
+  expireAtBothScopes(response, namesToClear(scope));
+}
+
+/**
+ * Expire a single cookie at BOTH scopes, on a response.
+ *
+ * For one-shot flow cookies (`line_oauth_state`) rather than session cookies, so
+ * it takes a name instead of a group — but the two-scope rule is the same, and
+ * for the same reason: this codebase has issued `line_oauth_state` at BOTH
+ * scopes. `/api/line-login/init` scoped it to the apex while the legacy
+ * `/api/line-login` set it host-only. Issuance is unified now, but a cookie set
+ * by the old code is still in browsers after this deploys, and that is exactly
+ * the mixed case a single-scope delete cannot cover.
+ *
+ * ## Why this must be on a response, not the `next/headers` store
+ *
+ * The store is a Map keyed by cookie NAME, like the response jar, so it holds one
+ * directive per name and CANNOT emit two scopes. A dual-scope delete is therefore
+ * impossible through `cookies().delete()` — it has to go out as raw headers on a
+ * response. Same two-pass ordering as `clearAuthCookies`: the `set()` first, then
+ * the `append()`, because `set()` re-serialises the jar and wipes any raw header
+ * appended before it.
+ */
+export function clearFlowCookie(response: NextResponse, name: string): void {
+  expireAtBothScopes(response, [name]);
+}
+
 
 /**
  * The `(name, domain)` pairs `clearAuthCookies` is expected to expire for a

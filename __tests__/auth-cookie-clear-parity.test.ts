@@ -35,6 +35,7 @@ import {
   LINE_SESSION_COOKIES,
   SHOPIFY_SESSION_COOKIES,
   clearAuthCookies,
+  clearFlowCookie,
   cookieOptionsFor,
   expectedClearedPairs,
   getCookieSpec,
@@ -286,6 +287,52 @@ describe("issued cookies are reconciled against deleted cookies", () => {
     for (const pair of issued) {
       expect(cleared.has(pairKey(pair)), `${pairKey(pair)} is issued but never cleared`).toBe(true);
     }
+  });
+});
+
+describe("one-shot flow cookies are also expired at both scopes", () => {
+  /* `line_oauth_state` was issued at BOTH scopes historically: /api/line-login/init
+   * scoped it to the apex, the legacy /api/line-login set it host-only. Both
+   * shapes exist in real browsers when this deploys, so a single-scope delete
+   * cannot clear them all — the same trap as the session cookies, on a cookie
+   * that gates CSRF. */
+  it("clearFlowCookie emits exactly one host-only and one shared-domain expiry", () => {
+    const res = NextResponse.redirect("https://www.elxea.com/ja/login");
+    clearFlowCookie(res, "line_oauth_state");
+
+    const directives = directivesOf(res);
+    expect(directives).toHaveLength(2);
+    expect(directives.every((d) => d.expires && d.name === "line_oauth_state")).toBe(true);
+    expect(sortedKeys(directives)).toEqual(
+      sortedKeys([
+        { name: "line_oauth_state", domain: undefined },
+        { name: "line_oauth_state", domain: ".elxea.com" },
+      ]),
+    );
+  });
+
+  it("composes with clearAuthCookies in either order", () => {
+    /* Ordering trap: `cookies.set()` re-serialises the jar and drops raw appends,
+     * so a second clearing call used to truncate the first (measured: 12
+     * directives instead of 22). Both orders must now yield the same 22. */
+    const a = NextResponse.redirect("https://www.elxea.com/ja");
+    clearAuthCookies(a, "all");
+    clearFlowCookie(a, "line_oauth_state");
+
+    const b = NextResponse.redirect("https://www.elxea.com/ja");
+    clearFlowCookie(b, "line_oauth_state");
+    clearAuthCookies(b, "all");
+
+    expect(directivesOf(a)).toHaveLength(22);
+    expect(directivesOf(b)).toHaveLength(22);
+    expect(sortedKeys(directivesOf(a))).toEqual(sortedKeys(directivesOf(b)));
+  });
+
+  it("is idempotent — calling twice does not duplicate directives", () => {
+    const res = NextResponse.redirect("https://www.elxea.com/ja");
+    clearAuthCookies(res, "all");
+    clearAuthCookies(res, "all");
+    expect(directivesOf(res)).toHaveLength(20);
   });
 });
 

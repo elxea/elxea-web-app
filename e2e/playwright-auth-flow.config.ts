@@ -70,6 +70,13 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: 0,
   workers: 1,
+  /* The dev server compiles each route on first request, and a cold Turbopack
+   * cache can push a first `/ja/account` hit past the 30s default — which shows
+   * up as `ERR_ABORTED; maybe frame was detached?` rather than as a timeout, so
+   * it reads like a product fault when it is harness latency. Ring 2 must run
+   * against `next dev` (a production build would set Secure on the cookies and
+   * they would not be stored over http), so the compile cost is unavoidable. */
+  timeout: 120_000,
   outputDir: path.join(repoRoot, "test-results", "auth-flow-artifacts"),
   reporter: [
     ["list"],
