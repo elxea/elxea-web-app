@@ -1,3 +1,4 @@
+import * as React from "react";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { useTranslations } from "next-intl";
 
@@ -162,6 +163,63 @@ function OpenExpandedButton({ track }: { track: ArticleAudioTrack }) {
     >
       再生してプレイヤーを開く
     </button>
+  );
+}
+
+/**
+ * **退避** — 全画面の面 (本番ではモバイルの全画面チャット) が開いている間、バーは
+ * 画面外へ退く。`retreatBar()` を呼ぶだけで、`stop()` は呼ばない: **音は鳴り
+ * 続け再生位置も進む**。ボタンで往復させて確かめられる。
+ *
+ * 退避中のバーは `data-retreated="true"` + `inert` になり、指もキーボードの
+ * フォーカスも拾わない。本番ではこの間、音を止める手段をチャットヘッダーの
+ * 一時停止ボタンが引き継ぐ (`components/chat/chat-bar.tsx`)。
+ */
+export const Retreated: Story = {
+  render: () => (
+    <ArticleAudioProvider>
+      <div className="min-h-svh bg-background">
+        <div className="mx-auto flex w-full max-w-2xl flex-col items-start gap-4 px-6 py-16">
+          <RetreatControls track={TRACK_WITH_PEAKS} />
+        </div>
+      </div>
+      <AudioDock />
+    </ArticleAudioProvider>
+  ),
+};
+
+function RetreatControls({ track }: { track: ArticleAudioTrack }) {
+  const { toggle, retreatBar, isBarRetreated } = useArticleAudio();
+  // 解除関数を握っておく (要求と解除は対で、真偽値の setter ではない)。
+  const releaseRef = React.useRef<(() => void) | null>(null);
+
+  const buttonClass =
+    "rounded-md border border-border px-4 py-3 text-sm text-foreground hover:bg-muted";
+
+  return (
+    <>
+      <button type="button" onClick={() => toggle(track)} className={buttonClass}>
+        再生してバーを出す
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          if (releaseRef.current) {
+            releaseRef.current();
+            releaseRef.current = null;
+          } else {
+            releaseRef.current = retreatBar();
+          }
+        }}
+        className={buttonClass}
+      >
+        {isBarRetreated ? "バーを戻す" : "バーを退避させる"}
+      </button>
+      <p className="text-sm text-muted-foreground">
+        退避中も音は止まりません。`--audio-bar-h` は 0px に戻り、他の下端 UI が宙に
+        浮かないようになります。
+      </p>
+    </>
   );
 }
 

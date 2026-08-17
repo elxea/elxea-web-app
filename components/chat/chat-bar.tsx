@@ -1,11 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { SendHorizontal, X } from "lucide-react";
+import { Loader2, Pause, Play, SendHorizontal, X } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 // vaul Drawer removed — replaced with a plain fixed panel for iOS keyboard compatibility
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useArticleAudio } from "@/components/audio/article-audio-provider";
 import { useChatContext } from "./chat-provider";
 import type { ChatMessageMeta } from "./chat-provider";
 import { ChatMessage } from "./chat-message";
@@ -422,12 +424,60 @@ function DesktopChatBar() {
 }
 
 // ---------------------------------------------------------------------------
+// 退避中の音声を止める / 戻す (全画面チャットのヘッダー内)
+// ---------------------------------------------------------------------------
+
+/**
+ * 全画面チャットが開いている間、音声バーは画面外へ退避している
+ * (`components/audio/audio-dock.tsx`)。**音は鳴り続けている**ので、止める手段を
+ * ここで引き継ぐ。これが無いと「鳴っているのに止められない画面」になる
+ * (WCAG 2.2.2 — 自動で流れ続ける音は止められなければならない)。
+ *
+ * 出す条件は「音源が選ばれている」= 退避しているバーが実在すること。何も選ばれて
+ * いないときに出すと、鳴っていないのにボタンがあるノイズになる (Setaka 裁定
+ * 2026-08-17)。**一時停止した直後も出し続ける**: ここで止めたものはここで戻せ
+ * なければ行き止まりになる (`isPlaying` を条件にすると押した瞬間に消える)。
+ *
+ * 装飾は最小限。アイコンの向きが状態そのものを表す (一時停止マーク = 鳴っている /
+ * 再生マーク = 止まっている) ので、これ以上の飾りは足さない。時間や曲名も出さない
+ * — 数字はチャットの読み書きの邪魔になるし、詳細は展開したプレイヤーの役目。
+ */
+function RetreatedAudioToggle() {
+  const t = useTranslations("journal");
+  const { current, status, toggle } = useArticleAudio();
+
+  if (!current) return null;
+
+  const isPlaying = status === "playing";
+  const isLoading = status === "loading";
+  const StateIcon = isLoading ? Loader2 : isPlaying ? Pause : Play;
+
+  return (
+    <Button
+      variant="ghost"
+      size="icon-xs"
+      onClick={() => toggle(current)}
+      aria-label={`${isPlaying ? t("audioPause") : t("audioPlay")}: ${current.title}`}
+      aria-busy={isLoading}
+      // 鳴っているときだけ本文と同じ濃さにする。止まっている間は控えて、
+      // ヘッダーの「elxea assistant」より前に出ないようにする。
+      className={cn(isPlaying ? "text-foreground" : "text-muted-foreground")}
+    >
+      <StateIcon
+        className={cn("size-4", isLoading ? "animate-spin" : "fill-current")}
+      />
+    </Button>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Mobile: Drawer-based fullscreen chat
 // ---------------------------------------------------------------------------
 
 function MobileChatDrawer() {
   const { messages, status, isOpen, setIsOpen, pathname, sendMessage } =
     useChatContext();
+  const { retreatBar } = useArticleAudio();
 
   const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -469,6 +519,17 @@ function MobileChatDrawer() {
     }
   }, [isOpen]);
 
+  // 開いている間は音声バーを画面外へ退避させる (再生は止めない)。
+  //
+  // 限られた操作スペースにチャットと音声バーを 2 つ並べるとノイズになり操作の
+  // 邪魔になるため (Setaka 裁定 2026-08-17)。止める手段はヘッダーの
+  // `RetreatedAudioToggle` が引き継ぐ。cleanup が退避を解除するので、閉じても
+  // アンマウントされてもバーは必ず戻る。
+  useEffect(() => {
+    if (!isOpen) return;
+    return retreatBar();
+  }, [isOpen, retreatBar]);
+
   const onSubmit = useCallback(
     (e: React.FormEvent) => {
       e.preventDefault();
@@ -506,20 +567,17 @@ function MobileChatDrawer() {
           resize side-effects. Pure CSS positioning that iOS keyboards cannot
           displace. The panel slides up from the bottom via CSS transition.
 
-          下端は「全画面」ではなく音声バーの高さぶん手前で止める。素の
-          `inset-0` だと、パネル最下段の入力欄と音声バー (fixed / --z-sticky)
-          がちょうど同じ 64px を奪い合い、z の大きい音声バーが上に載って
-          入力欄が押せなくなる (2026-08-17 実測: 入力中心 (173,812) の
-          elementFromPoint が音声バー側の span を返した)。
-          変数は AudioDock が <html> に立て、非表示のときは 0px なので
-          音を鳴らしていないときの見た目は従来どおり全画面。 */}
+          下端は素の `inset-0` = 画面いっぱい。音声バーとは高さを分け合わない
+          (開いている間はバーが画面外へ退避するため。上の `retreatBar` 参照)。
+          2026-08-17 の一手前は `bottom: var(--audio-bar-h)` でバーのぶん手前で
+          止めて共存させていたが、狭い画面に主役を 2 つ並べる形になったので
+          退避方式へ変えた (Setaka 裁定)。 */}
       {isOpen && (
         <div
           data-slot="chat-panel-mobile"
-          style={{ bottom: "var(--audio-bar-h, 0px)", zIndex: "var(--z-chat)" }}
+          style={{ zIndex: "var(--z-chat)" }}
           className={cn(
             "fixed inset-0 bg-background flex flex-col",
-            "transition-[bottom] duration-fast ease-enter",
             "animate-in slide-in-from-bottom duration-300",
           )}
         >
@@ -528,14 +586,19 @@ function MobileChatDrawer() {
             <span className="text-sm font-medium text-muted-foreground tracking-wide">
               elxea assistant
             </span>
-            <Button
-              variant="ghost"
-              size="icon-xs"
-              onClick={() => setIsOpen(false)}
-              aria-label="Close chat"
-            >
-              <X className="size-4" />
-            </Button>
+            {/* 右端は「音声の一時停止 / 再開」と「閉じる」の 2 つだけ。音声側は
+                何も鳴っていなければ出ない (RetreatedAudioToggle)。 */}
+            <div className="flex items-center gap-1">
+              <RetreatedAudioToggle />
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                onClick={() => setIsOpen(false)}
+                aria-label="Close chat"
+              >
+                <X className="size-4" />
+              </Button>
+            </div>
           </div>
 
           {/* Messages area */}

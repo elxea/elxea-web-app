@@ -29,15 +29,37 @@ import { AudioWaveform } from "./audio-waveform";
  *
  * ## 画面下端の取り合い (ChatBar との共存)
  *
- * 下端には ChatBar が既に居る (`components/chat/chat-bar.tsx`)。重ねると
- * どちらかが埋まるので、**縦に積んで両立させる**:
+ * 下端には ChatBar が既に居る (`components/chat/chat-bar.tsx`)。取り合いの
+ * 解き方は**画面の広さで 2 通り**に分かれる (Setaka 裁定 2026-08-17)。
+ *
+ * ### 広い画面 — 縦に積んで両立させる
  *
  * - 音声バーが最下段。鳴っている音を止める手段は常に届く位置に要る (WCAG 2.2.2)。
  * - ChatBar はその上へ退く。`--audio-bar-h` を読んで自分の `bottom` を上げる。
- *   全画面のモバイルチャットも同じ変数で下端を手前に止める (`inset-0` のままだと
- *   最下段の入力欄がこのバーと同じ 64px を奪い合う)。
  *
- * 重ね順は名前付き z レイヤー (`app/globals.css` の `--z-*` が SoT) に従う。
+ * ### モバイルの全画面チャット — 音声バーを退避させる
+ *
+ * 全画面チャットが開いている間は、このバーを画面外へ退かせる (`motion-retreat`)。
+ * 限られた操作スペースに主役を 2 つ並べるとノイズになり操作の邪魔になる
+ * (Setaka「チャット操作時はチャットに集中すればいい。別に音声バーが上に下に
+ * 隠れてもいい」)。
+ *
+ * - **再生は止めない**。音も再生位置もそのまま続く。退避は見た目だけの話で、
+ *   `stop()` とは別物 (`isBarRetreated` / `retreatBar` は provider 側の SoT)。
+ * - 退避中の `--audio-bar-h` は `0px`。この変数は「バーが下端で占めている高さ」
+ *   を表すので、占めていない間は 0 でなければ他の下端 UI が宙に浮く。
+ * - 退避中は `inert` を付けて操作対象から外す。透明で画面外の面がフォーカスや
+ *   指を拾うと、見えないボタンを押せてしまう。
+ * - 代わりの停止手段はチャットヘッダーの一時停止ボタンが引き継ぐ
+ *   (`components/chat/chat-bar.tsx` の `RetreatedAudioToggle`)。**これが無いと
+ *   鳴っている音を止められない画面になる** ので、退避と対で必ず置く。
+ *
+ * 退避を始めるのは要求側 (チャット) で、バーは要求されたことだけを見る。逆向き
+ * (バーがチャットの開閉を見に行く) にすると音声側がチャットの実装に依存する。
+ *
+ * ### 重ね順
+ *
+ * 名前付き z レイヤー (`app/globals.css` の `--z-*` が SoT) に従う。
  * **チャットが音声バーより前**である (Setaka 裁定 2026-08-17):
  * - バー   `--z-sticky` (1020) … チャット `--z-chat` (1030) より後ろ
  * - 展開   `--z-modal`  (1050) … 自分で閉じられるモーダルなのでチャットより前
@@ -63,8 +85,18 @@ function isOwnAnimationEnd(event: React.AnimationEvent<HTMLElement>) {
 
 export function AudioDock() {
   const t = useTranslations("journal");
-  const { current, status, currentTime, duration, toggle, seek, stop, isExpanded, setExpanded } =
-    useArticleAudio();
+  const {
+    current,
+    status,
+    currentTime,
+    duration,
+    toggle,
+    seek,
+    stop,
+    isExpanded,
+    setExpanded,
+    isBarRetreated,
+  } = useArticleAudio();
 
   // 擦っている最中の見かけの位置。確定するまで実再生位置は動かさない。
   const [scrubRatio, setScrubRatio] = React.useState<number | null>(null);
@@ -100,15 +132,20 @@ export function AudioDock() {
   // --- ChatBar に自分の高さを知らせる ------------------------------------
   // 変数はルート要素に置く。ChatBar は DOM 上の兄弟なので、共通の祖先である
   // <html> 経由でしか渡せない。
-  // 閉じかけ (`barClosing`) の時点で 0px に落とすのは、上に載っている ChatBar
-  // や Cookie バーが、バーが降りていくのと同じタイミングで一緒に下りるため。
+  //
+  // 意味は「バーがいま下端で占めている高さ」。よって出ていないときだけでなく
+  // **退避中も 0px**。退避中に 64px を残すと、上に載っている ChatBar / ランチャ /
+  // Cookie バーが、実体の無いバーのぶんだけ宙に浮く。
+  // 閉じかけ (`barClosing`) の時点で 0px に落とすのは、上に載っている面が
+  // バーが降りていくのと同じタイミングで一緒に下りるため。
+  const occupiesBottom = isVisible && !isBarRetreated;
   React.useEffect(() => {
     const root = document.documentElement;
-    root.style.setProperty("--audio-bar-h", isVisible ? `${BAR_HEIGHT_PX}px` : "0px");
+    root.style.setProperty("--audio-bar-h", occupiesBottom ? `${BAR_HEIGHT_PX}px` : "0px");
     return () => {
       root.style.setProperty("--audio-bar-h", "0px");
     };
-  }, [isVisible]);
+  }, [occupiesBottom]);
 
   // --- 展開中は背後のページを固める --------------------------------------
   React.useEffect(() => {
@@ -156,6 +193,12 @@ export function AudioDock() {
       {/* ================= 下部固定バー ================= */}
       <div
         data-slot="audio-dock-bar"
+        // 退避中かどうかは DOM に出す。`motion-retreat` はこの属性を見て退く
+        // (状態を class 名に混ぜないので、退避中かどうかを外から実測できる)。
+        data-retreated={isBarRetreated}
+        // 退避中は操作対象から外す。画面外に居るボタンを指やキーボードの
+        // フォーカスが拾わないようにする (React 19 の `inert` 属性)。
+        inert={isBarRetreated}
         style={{ zIndex: "var(--z-sticky)", height: BAR_HEIGHT_PX }}
         onAnimationEnd={finishBarClose}
         className={cn(
@@ -165,7 +208,10 @@ export function AudioDock() {
           // 画面の端に出入りする面なので `sheet` 型。下から上がってきて、
           // 閉じるときは1段速い時間で下へ戻る。
           "motion-from-bottom",
-          barClosing ? "animate-sheet-out" : "animate-sheet-in"
+          barClosing ? "animate-sheet-out" : "animate-sheet-in",
+          // 全画面チャットが開いている間だけ下へ退く (再生は続く)。`sheet` 系は
+          // `transform`・こちらは `translate` プロパティを動かすので併用できる。
+          "motion-retreat"
         )}
       >
         {/* 進捗は細い線で出すだけにして、掴めるのは展開後の波形に寄せる。

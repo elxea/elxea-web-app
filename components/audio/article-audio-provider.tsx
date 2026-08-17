@@ -82,6 +82,30 @@ type ArticleAudioContextValue = {
   /** 全画面 (SP) / 大型パネル (PC) を開いているか。 */
   isExpanded: boolean;
   setExpanded: (next: boolean) => void;
+  /**
+   * 下部バーを画面外へ退避させているか。
+   *
+   * **停止ではない。** 音は鳴り続け再生位置も進む。見えるところから退くだけ。
+   * 退避中は音を止める手段をバー以外に置く責任が、退避を要求した側に生じる
+   * (WCAG 2.2.2 — 鳴っている音を止める手段は常に届く位置に要る)。
+   */
+  isBarRetreated: boolean;
+  /**
+   * バーの退避を要求する。**戻り値を呼ぶと解除される**ので、`useEffect` の
+   * cleanup にそのまま返せる:
+   *
+   * ```ts
+   * useEffect(() => {
+   *   if (!isOpen) return;
+   *   return retreatBar();
+   * }, [isOpen, retreatBar]);
+   * ```
+   *
+   * 真偽値の setter ではなく要求・解除の対にしているのは、退避を求める面が
+   * 2 つ以上開いたときに片方が閉じただけでバーが戻ってしまうのを防ぐため
+   * (中では要求数を数えていて、0 になったときだけ戻る)。
+   */
+  retreatBar: () => () => void;
 };
 
 const noop = () => {};
@@ -96,6 +120,8 @@ const ArticleAudioContext = React.createContext<ArticleAudioContextValue>({
   stop: noop,
   isExpanded: false,
   setExpanded: noop,
+  isBarRetreated: false,
+  retreatBar: () => noop,
 });
 
 export function ArticleAudioProvider({ children }: { children: React.ReactNode }) {
@@ -105,6 +131,23 @@ export function ArticleAudioProvider({ children }: { children: React.ReactNode }
   const [currentTime, setCurrentTime] = React.useState(0);
   const [duration, setDuration] = React.useState<number | null>(null);
   const [isExpanded, setExpanded] = React.useState(false);
+
+  // --- バーの退避 (再生は続ける) ------------------------------------------
+  // いま退避を求めている面の数。全画面チャットのように「開いている間だけ
+  // バーを退かせたい」面が要求し、閉じるときに解除する。0 になったら戻る。
+  // 数を持つのは、要求が重なったときに片方の解除で戻ってしまわないため。
+  const [retreatRequests, setRetreatRequests] = React.useState(0);
+
+  const retreatBar = React.useCallback(() => {
+    setRetreatRequests((n) => n + 1);
+    // 二重解除で数が負に落ちないよう、解除は 1 回だけ効かせる。
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      setRetreatRequests((n) => Math.max(0, n - 1));
+    };
+  }, []);
 
   // --- <audio> の生成とイベント配線 -------------------------------------
   React.useEffect(() => {
@@ -273,8 +316,21 @@ export function ArticleAudioProvider({ children }: { children: React.ReactNode }
       stop,
       isExpanded,
       setExpanded,
+      isBarRetreated: retreatRequests > 0,
+      retreatBar,
     }),
-    [current, status, currentTime, duration, toggle, seek, stop, isExpanded]
+    [
+      current,
+      status,
+      currentTime,
+      duration,
+      toggle,
+      seek,
+      stop,
+      isExpanded,
+      retreatRequests,
+      retreatBar,
+    ]
   );
 
   return (

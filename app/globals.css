@@ -585,10 +585,23 @@ dl[data-slot="spec-band"][data-emphasis="true"] > [data-slot="spec-item"] > dd {
    *   1050 --z-modal    モーダル面            … 音声プレイヤーの全画面展開
    *
    * チャットが音声バーより前に出る (Setaka 裁定 2026-08-17「チャット UI の
-   * レイヤーがオーディオプレイヤーより上であるべき」)。ただし両者は重ねずに
-   * **縦に積む** — 下端固定 UI は `--audio-bar-h` の分だけ自分の bottom を
-   * 上げる、という既存の 1 ルールを全員が守る。z はそのルールが崩れた一瞬
-   * (出入りのアニメーション中など) の保険。
+   * レイヤーがオーディオプレイヤーより上であるべき」)。
+   *
+   * ### 下端で「積む」のは広い画面だけ (Setaka 裁定 2026-08-17 その2)
+   *
+   * 下端固定 UI が `--audio-bar-h` の分だけ自分の bottom を上げて **縦に積む**
+   * のは、PC と、下端に細く居るチャットバーまで。画面が広いので 2 つ出ていても
+   * 互いの邪魔にならない。
+   *
+   * モバイルの**全画面チャットは積まない**。全画面を占める面の下端に別の操作面を
+   * 覗かせると、限られた操作スペースに主役が 2 つ並んでノイズになり操作の邪魔に
+   * なる (Setaka「チャット操作時はチャットに集中すればいい。別に音声バーが上に
+   * 下に隠れてもいい」)。全画面チャットが開いている間は音声バーを画面外へ
+   * **退避** させる (型は `motion-retreat` / **再生は止めない**)。音を止める手段は
+   * チャットヘッダーの一時停止ボタンが引き継ぐので WCAG 2.2.2 は保たれる。
+   *
+   * z はどちらの経路でも「積む・退くが崩れた一瞬 (出入りのアニメーション中など)」
+   * の保険として要る。生スケールには戻さない。
    *
    * 音声の全画面展開だけは --z-modal でチャットの上に出る。モーダルは自分で
    * 閉じられる面なので、覆われたままにはならない。 */
@@ -814,6 +827,47 @@ dl[data-slot="spec-band"][data-emphasis="true"] > [data-slot="spec-item"] > dd {
 @utility motion-from-bottom {
   --motion-sheet-x: 0%;
   --motion-sheet-y: 100%;
+}
+
+/* 型 `retreat` — 出したままの面を、**中身を生かしたまま**画面外へ退かせる。
+ *
+ * `sheet` (登場・退出) との違いは「戻ってくる前提で、退いた先に居続ける」こと。
+ * 音声バーは全画面チャットが開いている間だけ画面外へ退き、その間も音は鳴り続け
+ * 再生位置も進む (Setaka 裁定 2026-08-17: 全画面チャット中は音声バーを隠す)。
+ * 消えるのではないので unmount もアニメーションの再生も伴わない。
+ *
+ * そのため CSS animation ではなく **transition** で書く: animation は「1 回
+ * 流して終わる」ものなので、行き先で止まったまま何度も往復する状態表現には
+ * 向かない (`animate-sheet-out` を当て続けても、戻すときに再生し直すことになり
+ * 途中で切り替わったときに位置が飛ぶ)。
+ *
+ * 退く向きは `sheet` と同じ向きユーティリティから採る。使う側は
+ *   <div class="motion-from-bottom motion-retreat" data-retreated={…}>
+ * のように **向き + 型 + 状態** の 3 つで書く。下から出てきた面は下へ退く。
+ *
+ * 動かすのは `translate` プロパティで、`transform` を使う `sheet` 系の keyframes
+ * とは別プロパティなので **重ねて併用できる** (登場は animation・退避は
+ * transition が担当し、互いを打ち消さない)。
+ *
+ * 「動きを減らす」設定 (`--motion-travel: 0`) では移動距離が 0 になるので、
+ * 退避は `opacity` だけで表れる。**見えなくなる結果は同じ** — 位置で隠す型が
+ * 移動を失っても隠れなくならないよう、opacity を必ず併せている。
+ *
+ * 退避中は操作対象から外すため、使う側で `inert` を併せて付けること
+ * (透明なだけの面が指やキーボードのフォーカスを拾わないようにする)。 */
+@utility motion-retreat {
+  transition-property: translate, opacity;
+  transition-duration: var(--motion-enter-duration);
+  transition-timing-function: var(--motion-easing-ease-out);
+
+  &[data-retreated="true"] {
+    translate: calc(var(--motion-sheet-x) * var(--motion-travel))
+      calc(var(--motion-sheet-y) * var(--motion-travel));
+    opacity: 0;
+    /* 退くときは exit のカーブと時間 (戻るときは上の enter 側が効く)。 */
+    transition-duration: var(--motion-exit-duration);
+    transition-timing-function: var(--motion-easing-ease-in);
+  }
 }
 
 @utility motion-from-top {
