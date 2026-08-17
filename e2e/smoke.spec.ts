@@ -113,7 +113,10 @@ test.describe("Navigation", () => {
 test.describe("Footer", () => {
   test("footer contains shop links", async ({ page }) => {
     await page.goto("/ja");
-    const footer = page.locator("footer");
+    // getByRole, not locator("footer"): `next dev` renders its own <footer>
+    // inside the error-overlay markup, which makes a bare tag selector a
+    // strict-mode violation whenever the overlay is present.
+    const footer = page.getByRole("contentinfo");
 
     await expect(footer.getByText("ショップ")).toBeVisible();
     await expect(footer.getByText("商品一覧")).toBeVisible();
@@ -122,7 +125,10 @@ test.describe("Footer", () => {
 
   test("footer contains content links", async ({ page }) => {
     await page.goto("/ja");
-    const footer = page.locator("footer");
+    // getByRole, not locator("footer"): `next dev` renders its own <footer>
+    // inside the error-overlay markup, which makes a bare tag selector a
+    // strict-mode violation whenever the overlay is present.
+    const footer = page.getByRole("contentinfo");
 
     await expect(footer.getByText("コンテンツ")).toBeVisible();
     await expect(footer.getByText("ジャーナル")).toBeVisible();
@@ -132,7 +138,10 @@ test.describe("Footer", () => {
 
   test("footer contains support links", async ({ page }) => {
     await page.goto("/ja");
-    const footer = page.locator("footer");
+    // getByRole, not locator("footer"): `next dev` renders its own <footer>
+    // inside the error-overlay markup, which makes a bare tag selector a
+    // strict-mode violation whenever the overlay is present.
+    const footer = page.getByRole("contentinfo");
 
     await expect(footer.getByText("サポート")).toBeVisible();
     await expect(footer.getByText("elxeaについて")).toBeVisible();
@@ -143,7 +152,10 @@ test.describe("Footer", () => {
 
   test("footer contains legal links", async ({ page }) => {
     await page.goto("/ja");
-    const footer = page.locator("footer");
+    // getByRole, not locator("footer"): `next dev` renders its own <footer>
+    // inside the error-overlay markup, which makes a bare tag selector a
+    // strict-mode violation whenever the overlay is present.
+    const footer = page.getByRole("contentinfo");
     const legalNav = footer.locator('nav[aria-label="Legal"]');
 
     await expect(legalNav.getByText("特定商取引法に基づく表記")).toBeVisible();
@@ -154,7 +166,10 @@ test.describe("Footer", () => {
 
   test("footer shows copyright", async ({ page }) => {
     await page.goto("/ja");
-    const footer = page.locator("footer");
+    // getByRole, not locator("footer"): `next dev` renders its own <footer>
+    // inside the error-overlay markup, which makes a bare tag selector a
+    // strict-mode violation whenever the overlay is present.
+    const footer = page.getByRole("contentinfo");
     await expect(footer.getByText(/© \d{4} elxea/)).toBeVisible();
   });
 });

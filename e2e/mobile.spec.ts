@@ -108,7 +108,10 @@ test.describe("Mobile viewport", () => {
 
   test("footer is accessible on mobile", async ({ page }) => {
     await page.goto("/ja");
-    const footer = page.locator("footer");
+    // getByRole, not locator("footer"): `next dev` renders its own <footer>
+    // inside the error-overlay markup, which makes a bare tag selector a
+    // strict-mode violation whenever the overlay is present.
+    const footer = page.getByRole("contentinfo");
 
     // Scroll to footer
     await footer.scrollIntoViewIfNeeded();
