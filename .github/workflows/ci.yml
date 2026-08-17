@@ -1,5 +1,8 @@
 name: CI
 
+# Chromatic baseline verification probe — DO NOT MERGE (issue #50).
+# Touches no Storybook story, so a healthy baseline must report 0 visual changes.
+
 on:
   push:
     branches: [main, developer]
