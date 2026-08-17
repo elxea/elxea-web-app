@@ -200,6 +200,34 @@ const nextConfig: NextConfig = {
         destination: "/ja/people/:slug",
         permanent: true,
       },
+      /* 廃止したコレクション詳細の恒久転送 (2026-08-17 / main 一本化で追加)。
+       *
+       * `/collections/[handle]` は 2026-08-14 (ebc5b95) に廃止した面で、
+       * `app/sitemap.ts` からも既に外している。ただし廃止時にリダイレクトを
+       * 置いていなかったため、公開済みの URL が 404 になっていた。着地先は
+       * 廃止 commit 自身が宣言している商品一覧。
+       *
+       * 一覧 (`/collections`) は現存するので転送対象にしない。`:handle` は
+       * 1 セグメント下なので一覧の URL には一致しない。
+       *
+       * `/en/*` は middleware が先に 301 で `/ja/*` へ送るため ja だけで足りる。
+       *
+       * [保留] 農家一覧 `/farmers` (59e9cbe で廃止) の転送はここに入れていない。
+       * 後継の一覧ページが存在せず (app/[locale]/people は [slug] だけで一覧を
+       * 持たない)、着地先を機械的に決められない。誤った 308 は 404 より害が大きい
+       * (恒久転送は強くキャッシュされ、検索側にも誤った統合を伝える) ため、
+       * 着地先の判断が付くまで 404 のままにする。農家詳細 `/farmers/:slug` は
+       * 現存するので影響しない。 */
+      {
+        source: "/ja/collections/:handle",
+        destination: "/ja/products",
+        permanent: true,
+      },
+      {
+        source: "/collections/:handle",
+        destination: "/ja/products",
+        permanent: true,
+      },
       /* 旧 `/roji/*` → `/journal/*` の恒久転送。
        *
        * ジャーナルは旧サイトで `roji` (路地) という名前の面として公開されていて、
