@@ -184,7 +184,12 @@ export const TEA_MENUS_QUERY = groq`
     variety,
     origin,
     photo,
-    color
+    color,
+    supplier,
+    prefecture,
+    area,
+    location,
+    originPrecision
   }
 `;
 
@@ -207,7 +212,12 @@ export const TEA_MENU_BY_SLUG_QUERY = groq`
     relatedArticle->{title, slug},
     shopifyHandle,
     seo,
-    language
+    language,
+    supplier,
+    prefecture,
+    area,
+    location,
+    originPrecision
   }
 `;
 
