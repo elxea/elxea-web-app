@@ -9,6 +9,7 @@
 import { createClient } from "next-sanity";
 import { readFileSync } from "fs";
 import { join } from "path";
+import { resolveWriteDatasetOrExit } from "../lib/sanity/write-target";
 
 // Load env vars
 const envPath = join(process.cwd(), ".env");
@@ -34,7 +35,10 @@ try {
 }
 
 const projectId = env.NEXT_PUBLIC_SANITY_PROJECT_ID;
-const dataset = env.NEXT_PUBLIC_SANITY_DATASET || "production";
+const dataset = resolveWriteDatasetOrExit({
+  scriptName: "scripts/migrate-webflow-to-sanity.ts",
+  env: { ...process.env, ...env },
+});
 
 if (!projectId) {
   console.error("Missing NEXT_PUBLIC_SANITY_PROJECT_ID");

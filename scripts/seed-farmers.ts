@@ -11,6 +11,7 @@
 import { createClient } from "next-sanity";
 import { readFileSync } from "fs";
 import { join } from "path";
+import { resolveWriteDatasetOrExit } from "../lib/sanity/write-target";
 
 // Load env vars
 const envPath = join(process.cwd(), ".env");
@@ -39,9 +40,14 @@ try {
   process.exit(1);
 }
 
+const dataset = resolveWriteDatasetOrExit({
+  scriptName: "scripts/seed-farmers.ts",
+  env: { ...process.env, ...env },
+});
+
 const client = createClient({
   projectId: env.NEXT_PUBLIC_SANITY_PROJECT_ID || "5s8ahx87",
-  dataset: env.NEXT_PUBLIC_SANITY_DATASET || "production",
+  dataset,
   apiVersion: "2024-12-01",
   useCdn: false,
   token: authToken,

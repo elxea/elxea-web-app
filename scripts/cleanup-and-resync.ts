@@ -14,6 +14,7 @@
 import { createClient } from "next-sanity";
 import { readFileSync } from "fs";
 import { join } from "path";
+import { resolveWriteDatasetOrExit } from "../lib/sanity/write-target";
 
 const envPath = join(process.cwd(), ".env");
 const envContent = readFileSync(envPath, "utf-8");
@@ -24,7 +25,10 @@ for (const line of envContent.split("\n")) {
 }
 
 const SANITY_PROJECT_ID = env.NEXT_PUBLIC_SANITY_PROJECT_ID;
-const SANITY_DATASET = env.NEXT_PUBLIC_SANITY_DATASET || "production";
+const SANITY_DATASET = resolveWriteDatasetOrExit({
+  scriptName: "scripts/cleanup-and-resync.ts",
+  env: { ...process.env, ...env },
+});
 
 const sanityConfigPath = join(process.env.HOME || "", ".config/sanity/config.json");
 let sanityAuthToken = "";
