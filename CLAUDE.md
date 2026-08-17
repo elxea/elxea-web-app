@@ -4,11 +4,19 @@ elxea EC サイト（Next.js ヘッドレスコマース）のプロジェクト
 
 エージェント定義（責務・権限・Devlog・制約）は `elxea-developer/CLAUDE.md` を参照。
 
-## Git ルール（厳守）
-- 開発作業は developer ブランチで行う
-- main への直接 push は禁止
-- developer → main のマージは CI 全 PASS 後のみ
-- コミットメッセージは conventional commits に従う（feat:, fix:, ci:, test:, docs:, chore:）
+## Gitルール（厳守）
+- **本番の正本は `main`。Vercel productionは `main` から配信される**（`main` HEADに入ったコミットだけが本番になる）。詳細・監視・ロールバック時の注意は `docs/ops/production-source-of-truth.md` を正本とする
+- 開発作業はdeveloperブランチで行う
+- mainへの直接pushは禁止
+- developer → mainのマージはCI全PASS後のみ
+- コミットメッセージはconventional commitsに従う（feat:, fix:, ci:, test:, docs:, chore:）
+
+### Git運用の再発防止レジーム（docs/ops/）
+259コミット乖離・本番認識割れ・検証停止の再発防止策。各項目の正本は下記ドキュメント。
+- `docs/ops/production-source-of-truth.md` — 本番=mainの宣言 + 本番↔main一致監視（P2 / 追加a）
+- `docs/ops/branch-divergence.md` — ブランチ乖離監視・停止しきい値（P3）
+- `docs/ops/merge-governance.md` — mainへのマージ経路の限定・権限分離（P6 / 追加c）
+- `docs/ops/branch-protection.md` — GitHubブランチ保護の前提・費用・緊急バイパス手順（P1）
 
 ## アーキテクチャ
 

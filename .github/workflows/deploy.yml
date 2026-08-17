@@ -116,7 +116,15 @@ jobs:
         # to stderr, so capturing stdout yields exactly the deployment this run
         # created. We keep it for the smoke check and the run summary.
         run: |
-          deployment_url="$(vercel deploy --prebuilt --prod)"
+          # --meta attaches the source git SHA + ref to the Vercel deployment.
+          # A `--prebuilt` CLI deploy carries NO git metadata by default, so the
+          # prod↔main sync monitor (scripts/ops/check-prod-main-sync.mjs, P2)
+          # had no way to learn "which commit is live". These meta keys give it
+          # that: the monitor reads meta.githubCommitSha from the Vercel REST
+          # API and compares it to origin/main HEAD.
+          deployment_url="$(vercel deploy --prebuilt --prod \
+            --meta githubCommitSha="${GITHUB_SHA}" \
+            --meta githubCommitRef="${GITHUB_REF_NAME}")"
           echo "deployment_url=${deployment_url}" >> "$GITHUB_OUTPUT"
           echo "Deployed: ${deployment_url}"
 
