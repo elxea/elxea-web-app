@@ -8,7 +8,7 @@ import { PortableText } from "@/components/sanity/portable-text";
 import { ImageCard } from "@/components/media/image-card";
 import { FollowButton } from "@/components/farmers/follow-button";
 import { CommentSection } from "@/components/community/comment-section";
-import { isFictionalFarmerSlug } from "@/lib/fictional-farmers";
+import { isFictionalSlug } from "@/lib/fictional-content";
 
 export async function generateMetadata({
   params,
@@ -18,7 +18,7 @@ export async function generateMetadata({
   const { slug } = await params;
   const locale = await getLocale();
   // Fictional/seed farmers are hidden until real stories are approved.
-  if (isFictionalFarmerSlug(slug)) return {};
+  if (isFictionalSlug("farmer", slug)) return {};
   try {
     const client = getClient();
     const farmer = await client.fetch(FARMER_BY_SLUG_QUERY, { slug, language: locale });
@@ -51,7 +51,7 @@ export default async function FarmerPage({
 
   // Fictional/seed farmers are hidden until real stories are approved:
   // return 404 instead of rendering an invented profile. No Sanity mutation.
-  if (isFictionalFarmerSlug(slug)) notFound();
+  if (isFictionalSlug("farmer", slug)) notFound();
 
   let farmer;
   try {

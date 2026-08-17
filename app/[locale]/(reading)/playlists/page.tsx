@@ -5,6 +5,7 @@ import { getClient } from "@/sanity/lib/client";
 import { ImageCard } from "@/components/media/image-card";
 import { PLAYLISTS_QUERY } from "@/sanity/lib/queries";
 import { urlFor } from "@/sanity/lib/image";
+import { filterOutFictional } from "@/lib/fictional-content";
 
 export default function PlaylistsPage() {
   const t = useTranslations("playlist");
@@ -28,7 +29,11 @@ async function PlaylistGrid() {
 
   try {
     const client = getClient();
-    const playlists = await client.fetch(PLAYLISTS_QUERY);
+    const fetched = await client.fetch(PLAYLISTS_QUERY);
+
+    // Hide the fictional/seed playlists (placeholder bgm.mp3 tracks) still
+    // present in the production dataset. Code-only; no Sanity mutation.
+    const playlists: typeof fetched = filterOutFictional("playlist", fetched);
 
     if (!playlists || playlists.length === 0) {
       return <p className="text-muted-foreground text-sm">{t("empty")}</p>;

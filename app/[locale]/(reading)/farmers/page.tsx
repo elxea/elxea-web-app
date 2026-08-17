@@ -6,7 +6,7 @@ import { ImageCard } from "@/components/media/image-card";
 import { FARMERS_QUERY } from "@/sanity/lib/queries";
 import { urlFor } from "@/sanity/lib/image";
 import { withSeedFarmers, isSeedId } from "@/lib/preview-seed";
-import { filterOutFictionalFarmers } from "@/lib/fictional-farmers";
+import { filterOutFictional } from "@/lib/fictional-content";
 
 export default function FarmersPage() {
   const tf = useTranslations("farmer");
@@ -45,7 +45,7 @@ async function FarmersList() {
 
     // Hide fictional/seed farmer docs still present in the production dataset
     // until real producer stories are approved. Code-only; no Sanity mutation.
-    const real = filterOutFictionalFarmers(fetched);
+    const real = filterOutFictional("farmer", fetched);
 
     // Preview-only: real farmers lack photos and the list is thin. Attach
     // placeholder imagery and pad to a full grid. No effect when flag unset.

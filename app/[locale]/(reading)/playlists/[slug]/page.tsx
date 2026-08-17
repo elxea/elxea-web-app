@@ -6,6 +6,7 @@ import { PLAYLIST_BY_SLUG_QUERY } from "@/sanity/lib/queries";
 import { urlFor } from "@/sanity/lib/image";
 import { PortableText } from "@/components/sanity/portable-text";
 import { ImageCard } from "@/components/media/image-card";
+import { isFictionalSlug } from "@/lib/fictional-content";
 import type { PortableTextBlock } from "@portabletext/types";
 
 // Helper: extract plain text from PortableText blocks or return string as-is
@@ -31,6 +32,7 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
+  if (isFictionalSlug("playlist", slug)) return {};
   try {
     const client = getClient();
     const pl = await client.fetch(PLAYLIST_BY_SLUG_QUERY, { slug });
@@ -58,6 +60,9 @@ export default async function PlaylistDetailPage({
 }) {
   const { slug } = await params;
   const t = await getTranslations("playlist");
+
+  // Fictional/seed playlist -> behave as if the document does not exist.
+  if (isFictionalSlug("playlist", slug)) notFound();
 
   let pl;
   try {

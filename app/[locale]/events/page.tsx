@@ -6,6 +6,7 @@ import { ImageCard } from "@/components/media/image-card";
 import { EVENTS_QUERY } from "@/sanity/lib/queries";
 import { urlFor } from "@/sanity/lib/image";
 import { previewSeedEnabled, seedEvents, isSeedId } from "@/lib/preview-seed";
+import { filterOutFictional } from "@/lib/fictional-content";
 
 export default function EventsPage() {
   const t = useTranslations("common");
@@ -35,7 +36,11 @@ async function EventsList() {
 
   try {
     const client = getClient();
-    const fetched = await client.fetch(EVENTS_QUERY, { language: locale });
+    const published = await client.fetch(EVENTS_QUERY, { language: locale });
+
+    // Hide the fictional/seed events (bodies contain "ダミー") still present
+    // in the production dataset. Code-only; no Sanity mutation.
+    const fetched: typeof published = filterOutFictional("event", published);
 
     // Preview-only: the production dataset has no future events, so the list is
     // empty. Fall back to the shared seed events (same 3 as the top page) so the

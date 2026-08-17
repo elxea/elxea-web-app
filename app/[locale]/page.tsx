@@ -12,6 +12,7 @@ import { FEATURED_ARTICLES_QUERY, EVENTS_QUERY } from "@/sanity/lib/queries";
 import { ArticleCard } from "@/components/journal/article-card";
 import { urlFor } from "@/sanity/lib/image";
 import { previewSeedEnabled, isSeedId } from "@/lib/preview-seed";
+import { filterOutFictional } from "@/lib/fictional-content";
 
 /**
  * 変A section header for data-driven blocks (Products / Journal / Events):
@@ -295,7 +296,11 @@ async function UpcomingEvents() {
     const seedEnabled = previewSeedEnabled();
     const events = seedEnabled
       ? getSeedEvents()
-      : await getClient().fetch(EVENTS_QUERY, { language: locale });
+      // Hide the fictional/seed events still present in the production dataset.
+      : filterOutFictional(
+          "event",
+          await getClient().fetch(EVENTS_QUERY, { language: locale }),
+        );
 
     if (!events || events.length === 0) {
       return null;

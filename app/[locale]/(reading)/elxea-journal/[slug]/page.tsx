@@ -10,6 +10,7 @@ import { ImageWithFallback } from "@/components/media/image-with-fallback";
 import { TeaSpecCard } from "@/components/journal/tea-spec-card";
 import { JournalWashTheme } from "@/components/viz/wash/journal-wash-theme";
 import { Link } from "@/i18n/navigation";
+import { filterOutFictional, isFictionalSlug } from "@/lib/fictional-content";
 
 // 短縮ラベル (Figma Journal Theme Badge 6934:143 が正)
 const themeLabels: Record<string, string> = {
@@ -72,6 +73,20 @@ export default async function ElxeaJournalDetailPage({
 
   if (!journal) notFound();
 
+  // The journal issue itself is real content, but its referenced tea menus and
+  // playlist can still point at the fictional/seed docs left in the production
+  // dataset. Drop those references at the read layer (no Sanity mutation) so a
+  // real issue never links to invented tea or a placeholder audio track.
+  const journalTeaMenus: typeof journal.teaMenus = filterOutFictional(
+    "teaMenu",
+    journal.teaMenus,
+  );
+  const journalPlaylist =
+    journal.playlist &&
+    !isFictionalSlug("playlist", journal.playlist.slug?.current)
+      ? journal.playlist
+      : null;
+
   const themeLabel = themeLabels[journal.theme] || journal.theme;
   const themeColor = themeColors[journal.theme] || "var(--color-brand-ash)";
 
@@ -124,7 +139,7 @@ export default async function ElxeaJournalDetailPage({
       )}
 
       {/* ④ お届けのお茶について */}
-      {journal.teaMenus && journal.teaMenus.length > 0 && (
+      {journalTeaMenus.length > 0 && (
         <section className="section-wide py-16 border-t border-border">
           <div className="mb-12">
             <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-4">
@@ -133,7 +148,7 @@ export default async function ElxeaJournalDetailPage({
             <h2 className="text-2xl font-normal">{t("teaSection")}</h2>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-14">
-            {journal.teaMenus.map(
+            {journalTeaMenus.map(
               (tea: {
                 _id: string;
                 slug: { current: string };
@@ -154,20 +169,20 @@ export default async function ElxeaJournalDetailPage({
       )}
 
       {/* ⑤ Playlist */}
-      {journal.playlist && (
+      {journalPlaylist && (
         <section className="section-narrow py-16 border-t border-border">
           <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-4">
             Soundtrack
           </p>
           <h3 className="text-base font-medium mb-8">{t("relatedPlaylist")}</h3>
           <Link
-            href={`/playlists/${journal.playlist.slug.current}`}
+            href={`/playlists/${journalPlaylist.slug.current}`}
             className="flex items-center gap-5 group"
           >
-            {journal.playlist.albumImage?.asset && (
+            {journalPlaylist.albumImage?.asset && (
               <Image
-                src={urlFor(journal.playlist.albumImage).width(120).height(120).url()}
-                alt={journal.playlist.title}
+                src={urlFor(journalPlaylist.albumImage).width(120).height(120).url()}
+                alt={journalPlaylist.title}
                 width={120}
                 height={120}
                 className="size-20 object-cover flex-shrink-0"
@@ -175,9 +190,9 @@ export default async function ElxeaJournalDetailPage({
             )}
             <div>
               <p className="text-sm font-medium group-hover:underline underline-offset-4">
-                {journal.playlist.title}
+                {journalPlaylist.title}
               </p>
-              {journal.playlist.spotifyUrl && (
+              {journalPlaylist.spotifyUrl && (
                 <p className="text-xs text-muted-foreground mt-2">Spotify</p>
               )}
             </div>

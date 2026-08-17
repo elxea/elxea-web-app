@@ -12,6 +12,7 @@ import { ImageWithFallback } from "@/components/media/image-with-fallback";
 import { Button } from "@/components/ui/button";
 import { EventRegisterButton } from "@/components/events/event-register-button";
 import { Link } from "@/i18n/navigation";
+import { isFictionalSlug } from "@/lib/fictional-content";
 
 export async function generateMetadata({
   params,
@@ -20,6 +21,7 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   const locale = await getLocale();
+  if (isFictionalSlug("event", slug)) return {};
   try {
     const client = getClient();
     const event = await client.fetch(EVENT_BY_SLUG_QUERY, { slug, language: locale });
@@ -47,6 +49,9 @@ export default async function EventPage({
   const locale = await getLocale();
   const t = await getTranslations("event");
   const tCommon = await getTranslations("common");
+
+  // Fictional/seed event -> behave as if the document does not exist.
+  if (isFictionalSlug("event", slug)) notFound();
 
   let event;
   try {
