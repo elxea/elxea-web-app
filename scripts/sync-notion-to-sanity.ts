@@ -6,10 +6,22 @@
  * Fetches articles from Notion Content Hub (Channel=Roji, Status=Published)
  * and syncs them to Sanity as article documents.
  *
- * Requires:
- *   - NOTION_API_KEY (Notion Integration token with Content Hub access)
- *   - NOTION_CONTENT_HUB_DB_ID (Content Hub database ID)
- *   - Sanity CLI auth token (~/.config/sanity/config.json)
+ * Configuration comes from `process.env` only (see scripts/lib/sync-env.ts).
+ * Locally a `.env` file is loaded *into* process.env for convenience; on a
+ * runner the same names arrive as secrets. No value is ever read from a file
+ * and used directly, which is what made this script Mac-only.
+ *
+ * Required:
+ *   - NOTION_API_KEY              Notion integration token with Content Hub access
+ *   - NOTION_CONTENT_HUB_DB_ID    Content Hub database id
+ *   - NEXT_PUBLIC_SANITY_PROJECT_ID
+ *   - SANITY_API_WRITE_TOKEN      Sanity token with write access to the dataset
+ *
+ * Optional:
+ *   - NEXT_PUBLIC_SANITY_DATASET  defaults to "production"
+ *   - NOTION_PAGE_REGISTRY_DB_ID  required only for --pages / --all
+ *   - NOTION_PAGE_CONTENT_DB_ID   required only for --pages / --all
+ *   - SLACK_WEBHOOK_URL           failure notifications (scripts/lib/sync-notify.ts)
  */
 
 import { Client as NotionClient } from "@notionhq/client";
@@ -23,66 +35,91 @@ import {
   resolveArticleImages,
   type ArticleImageSource,
 } from "../lib/notion/article-image";
-import { readFileSync } from "fs";
-import { join } from "path";
 import { createHash } from "crypto";
+import {
+  MissingEnvError,
+  loadDotEnvIntoProcessEnv,
+  optionalEnv,
+  requireEnv,
+} from "./lib/sync-env";
+import {
+  EXIT_CODES,
+  errText,
+  reportSyncResult,
+  type SyncOutcome,
+} from "./lib/sync-notify";
 
 // ─── Config ──────────────────────────────────────────────────
 
-const envPath = join(process.cwd(), ".env");
-const envContent = readFileSync(envPath, "utf-8");
-const env: Record<string, string> = {};
-for (const line of envContent.split("\n")) {
-  const match = line.match(/^([^#=]+)=(.*)$/);
-  if (match) env[match[1].trim()] = match[2].trim();
-}
-
-const NOTION_API_KEY = env.NOTION_API_KEY;
-const CONTENT_HUB_DB_ID = env.NOTION_CONTENT_HUB_DB_ID;
-const SANITY_PROJECT_ID = env.NEXT_PUBLIC_SANITY_PROJECT_ID;
-const SANITY_DATASET = env.NEXT_PUBLIC_SANITY_DATASET || "production";
-const NOTION_PAGE_REGISTRY_DB_ID = env.NOTION_PAGE_REGISTRY_DB_ID || "";
-const NOTION_PAGE_CONTENT_DB_ID = env.NOTION_PAGE_CONTENT_DB_ID || "";
 const DRY_RUN = process.argv.includes("--dry-run");
 
-if (!NOTION_API_KEY) {
-  console.error("Missing NOTION_API_KEY in .env");
-  process.exit(1);
-}
-if (!CONTENT_HUB_DB_ID) {
-  console.error("Missing NOTION_CONTENT_HUB_DB_ID in .env");
-  process.exit(1);
-}
-if (!SANITY_PROJECT_ID) {
-  console.error("Missing NEXT_PUBLIC_SANITY_PROJECT_ID in .env");
-  process.exit(1);
+// Local convenience only: populates process.env, no-op on CI. Every read below
+// goes through process.env, so local and runner behaviour are identical.
+loadDotEnvIntoProcessEnv();
+
+/**
+ * A dry run never writes, so it must not require the Sanity write token. That
+ * is what lets CI exercise the whole pipeline — checkout, install, Notion read
+ * — before the write secret exists.
+ */
+const REQUIRED_ENV = DRY_RUN
+  ? (["NOTION_API_KEY", "NOTION_CONTENT_HUB_DB_ID", "NEXT_PUBLIC_SANITY_PROJECT_ID"] as const)
+  : ([
+      "NOTION_API_KEY",
+      "NOTION_CONTENT_HUB_DB_ID",
+      "NEXT_PUBLIC_SANITY_PROJECT_ID",
+      "SANITY_API_WRITE_TOKEN",
+    ] as const);
+
+const SANITY_DATASET = optionalEnv("NEXT_PUBLIC_SANITY_DATASET", "production");
+const SANITY_PROJECT_ID = optionalEnv("NEXT_PUBLIC_SANITY_PROJECT_ID");
+const CONTENT_HUB_DB_ID = optionalEnv("NOTION_CONTENT_HUB_DB_ID");
+const NOTION_PAGE_REGISTRY_DB_ID = optionalEnv("NOTION_PAGE_REGISTRY_DB_ID");
+const NOTION_PAGE_CONTENT_DB_ID = optionalEnv("NOTION_PAGE_CONTENT_DB_ID");
+
+/**
+ * Clients are created by `initClients()` rather than at module load.
+ *
+ * Constructing them eagerly would throw during module evaluation when a secret
+ * is absent — before any notifier exists — which is precisely the silent
+ * failure this change removes. Validating first means a missing secret is
+ * reported like any other outcome.
+ */
+let notion!: NotionClient;
+let sanity!: SanityClient;
+
+function initClients(): void {
+  const env = requireEnv(REQUIRED_ENV);
+
+  notion = new NotionClient({ auth: env.NOTION_API_KEY });
+
+  sanity = createClient({
+    projectId: env.NEXT_PUBLIC_SANITY_PROJECT_ID,
+    dataset: SANITY_DATASET,
+    apiVersion: "2024-01-01",
+    useCdn: false,
+    // Absent on a dry run by design; no write is attempted in that mode.
+    token: optionalEnv("SANITY_API_WRITE_TOKEN") || undefined,
+  });
 }
 
-// Sanity auth token
-const sanityConfigPath = join(
-  process.env.HOME || "",
-  ".config/sanity/config.json"
-);
-let sanityAuthToken = "";
-try {
-  const sanityConfig = JSON.parse(readFileSync(sanityConfigPath, "utf-8"));
-  sanityAuthToken = sanityConfig.authToken;
-} catch {
-  console.error(
-    "Could not read Sanity CLI config. Run `npx sanity login` first."
-  );
-  process.exit(1);
+/**
+ * Which phase the run is in, so that a thrown error can be classified.
+ *
+ * An error raised while reading Notion means "we do not know what should be
+ * published" and must never be reported as "0 articles were published"; an
+ * error after that point is a write failure. Reset per sub-sync.
+ */
+let currentPhase: "input" | "write" = "input";
+
+interface SyncCounts {
+  /** Items read from Notion. */
+  fetched: number;
+  synced: number;
+  errors: number;
+  /** Slugs that failed, so notifications name the broken articles. */
+  failures: string[];
 }
-
-const notion = new NotionClient({ auth: NOTION_API_KEY });
-
-const sanity = createClient({
-  projectId: SANITY_PROJECT_ID,
-  dataset: SANITY_DATASET,
-  apiVersion: "2024-01-01",
-  useCdn: false,
-  token: sanityAuthToken,
-});
 
 // ─── Types ───────────────────────────────────────────────────
 
@@ -839,7 +876,7 @@ async function syncNavigation(registry: PageRegistryEntry[]): Promise<void> {
 async function syncPageContent(
   registry: PageRegistryEntry[],
   content: PageContentEntry[]
-): Promise<{ synced: number; errors: number }> {
+): Promise<{ synced: number; errors: number; failures: string[] }> {
   let synced = 0;
   let errors = 0;
   const failures: string[] = [];
@@ -903,20 +940,20 @@ async function syncPageContent(
     console.log(`\n  Failed pages: ${failures.join(", ")}`);
   }
 
-  return { synced, errors };
+  return { synced, errors, failures };
 }
 
 // ─── Pages Sync Orchestrator ─────────────────────────────────
 
-async function syncPages(): Promise<void> {
-  if (!NOTION_PAGE_REGISTRY_DB_ID) {
-    console.error("Missing NOTION_PAGE_REGISTRY_DB_ID in .env");
-    process.exit(1);
-  }
-  if (!NOTION_PAGE_CONTENT_DB_ID) {
-    console.error("Missing NOTION_PAGE_CONTENT_DB_ID in .env");
-    process.exit(1);
-  }
+async function syncPages(): Promise<SyncCounts> {
+  currentPhase = "input";
+
+  // Throw rather than exit: the caller classifies this as a config error and
+  // reports it, instead of dying silently mid-run.
+  requireEnv([
+    "NOTION_PAGE_REGISTRY_DB_ID",
+    "NOTION_PAGE_CONTENT_DB_ID",
+  ] as const);
 
   if (DRY_RUN) {
     console.log("=== DRY RUN MODE (no writes to Sanity) ===\n");
@@ -930,23 +967,30 @@ async function syncPages(): Promise<void> {
   const content = await fetchPageContent();
   console.log(`  Found ${content.length} content entries\n`);
 
+  // Both inputs read successfully; subsequent errors are write failures.
+  currentPhase = "write";
+
   console.log("Syncing navigation...");
   await syncNavigation(registry);
   console.log();
 
   console.log("Syncing page documents...");
-  const { synced, errors } = await syncPageContent(registry, content);
+  const { synced, errors, failures } = await syncPageContent(registry, content);
   console.log();
 
   console.log("---");
   console.log(
     `Pages sync ${DRY_RUN ? "(dry run) " : ""}complete: ${synced} synced, ${errors} errors`
   );
+
+  return { fetched: registry.length, synced, errors, failures };
 }
 
 // ─── Main Sync ───────────────────────────────────────────────
 
-async function sync() {
+async function sync(): Promise<SyncCounts> {
+  currentPhase = "input";
+
   if (DRY_RUN) {
     console.log("=== DRY RUN MODE (no writes to Sanity) ===\n");
   }
@@ -1016,11 +1060,17 @@ async function sync() {
     startCursor = response.next_cursor ?? undefined;
   }
 
+  // The input was read successfully. From here on, a thrown error is a write
+  // failure, not an input failure — the distinction the notifier reports.
+  currentPhase = "write";
+
   console.log(`Found ${entries.length} published Roji articles\n`);
 
   if (entries.length === 0) {
-    console.log("No articles to sync. Done.");
-    return;
+    // An empty result is only reachable once the query above has succeeded, so
+    // this is a genuine "nothing published", never a swallowed fetch error.
+    console.log("No articles to sync (input read OK, 0 published). Done.");
+    return { fetched: 0, synced: 0, errors: 0, failures: [] };
   }
 
   // 2. Ensure Sanity reference documents exist (categories, tags, authors)
@@ -1060,6 +1110,7 @@ async function sync() {
   // 3. Process each entry
   let synced = 0;
   let errors = 0;
+  const failures: string[] = [];
 
   for (const entry of entries) {
     console.log(`Processing: ${entry.title} (${entry.slug})`);
@@ -1202,8 +1253,8 @@ async function sync() {
       synced++;
     } catch (err) {
       errors++;
-      const message = err instanceof Error ? err.message : String(err);
-      console.error(`  ERROR: ${message}`);
+      failures.push(entry.slug);
+      console.error(`  ERROR (${entry.slug}): ${errText(err)}`);
     }
 
     console.log();
@@ -1214,6 +1265,8 @@ async function sync() {
   console.log(
     `Sync ${DRY_RUN ? "(dry run) " : ""}complete: ${synced} synced, ${errors} errors`
   );
+
+  return { fetched: entries.length, synced, errors, failures };
 }
 
 const args = process.argv.slice(2);
@@ -1221,16 +1274,93 @@ const SYNC_PAGES = args.includes("--pages");
 const SYNC_ALL = args.includes("--all");
 const SYNC_ARTICLES = !SYNC_PAGES || SYNC_ALL;
 
+/**
+ * Run one sub-sync and turn its result — or its failure — into a report.
+ *
+ * Nothing here calls `process.exit` directly. Every path produces a report so
+ * that no outcome can leave the run without a record somewhere.
+ */
+async function runReported(
+  job: string,
+  fn: () => Promise<SyncCounts>
+): Promise<SyncOutcome> {
+  try {
+    const counts = await fn();
+    const outcome: SyncOutcome = counts.errors > 0 ? "partial" : "success";
+    await reportSyncResult({
+      job,
+      outcome,
+      dryRun: DRY_RUN,
+      dataset: SANITY_DATASET,
+      fetched: counts.fetched,
+      synced: counts.synced,
+      errors: counts.errors,
+      failures: counts.failures,
+    });
+    return outcome;
+  } catch (err) {
+    // MissingEnvError is a config problem, not a data problem. Otherwise use the
+    // phase to tell "could not read Notion" apart from "could not write Sanity".
+    const outcome: SyncOutcome =
+      err instanceof MissingEnvError
+        ? "config-error"
+        : currentPhase === "input"
+          ? "input-failure"
+          : "fatal";
+
+    console.error(`Sync failed (${job} / ${outcome}):`, err);
+
+    await reportSyncResult({
+      job,
+      outcome,
+      dryRun: DRY_RUN,
+      dataset: SANITY_DATASET,
+      // null (not 0) — we do not know how many items existed.
+      fetched: null,
+      synced: 0,
+      errors: 1,
+      message: errText(err),
+    });
+    return outcome;
+  }
+}
+
 (async () => {
+  const outcomes: SyncOutcome[] = [];
+
+  // Validate config and build clients first, so a missing secret is reported
+  // through the notifier instead of crashing at import time. Reported only on
+  // failure — a healthy config is not news.
+  try {
+    initClients();
+  } catch (err) {
+    console.error("Sync failed (config):", err);
+    await reportSyncResult({
+      job: "config",
+      outcome: "config-error",
+      dryRun: DRY_RUN,
+      dataset: SANITY_DATASET,
+      fetched: null,
+      synced: 0,
+      errors: 1,
+      message: errText(err),
+    });
+    process.exit(EXIT_CODES["config-error"]);
+  }
+
   if (SYNC_ARTICLES) {
     console.log("Syncing articles...");
-    await sync();
+    outcomes.push(await runReported("articles", sync));
   }
   if (SYNC_PAGES || SYNC_ALL) {
     console.log("Syncing pages...");
-    await syncPages();
+    outcomes.push(await runReported("pages", syncPages));
   }
-})().catch((err) => {
-  console.error("Sync failed:", err);
-  process.exit(1);
-});
+
+  // Exit on the worst outcome so the runner's status matches the cause.
+  const worst = outcomes.reduce<SyncOutcome>(
+    (acc, o) => (EXIT_CODES[o] > EXIT_CODES[acc] ? o : acc),
+    "success"
+  );
+  process.exit(EXIT_CODES[worst]);
+})();
