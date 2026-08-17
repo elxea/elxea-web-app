@@ -294,39 +294,72 @@ async function startAudioPlayback(page: Page): Promise<Rect> {
   return dock;
 }
 
-/** 重なった領域の中心で最前面に居る要素を調べる。 */
-async function topmostInOverlap(
+/**
+ * 重なった領域の中心で「どちらが手前に描かれているか」を描画順で調べる。
+ *
+ * ここで `document.elementFromPoint` (単数) を使ってはいけない。Radix の
+ * Dialog / Sheet は開いている間 `body` に `pointer-events: none` を敷き、
+ * 自分の面だけ `auto` に戻す。その結果、**z-index で音声バーが手前に描かれて
+ * いても単数版は必ずダイアログを返す** (2026-08-17 実測: dock z=1020 /
+ * sheet z=50 の状態でも `elementFromPoint` は sheet-content を返した)。
+ * つまり単数版では「見た目が覆われている」不具合を検出できない。
+ *
+ * 複数版 (`document.elementsFromPoint`) は **手前から奥の順**に返るが、これも
+ * `pointer-events: none` の要素を落とすため、そのままでは音声バーが一覧に
+ * 現れない (実測: 壊れた状態でも一覧は [sheet-content, sheet-overlay, HTML]
+ * だけで、音声バーが 1 度も出てこなかった)。
+ *
+ * そこで **計測の瞬間だけ `body` の `pointer-events` ロックを外し**、複数版で
+ * 順位を比べ、直後に元へ戻す。問うのが「操作の可否」ではなく「描画順」になる
+ * ので Radix のロックの有無に依存しない。ロックは同じ evaluate の中で必ず
+ * 復元するため、テストの続きに副作用は残らない。
+ */
+async function paintOrderInOverlap(
   page: Page,
-  aSelector: string,
-  bSelector: string,
-): Promise<{ point: [number, number]; inA: boolean; inB: boolean; tag: string }> {
+  frontSelector: string,
+  backSelector: string,
+): Promise<{
+  point: [number, number];
+  frontIndex: number;
+  backIndex: number;
+  order: string[];
+}> {
   const result = await page.evaluate(
-    ({ aSel, bSel }) => {
-      const a = document.querySelector(aSel);
-      const b = document.querySelector(bSel);
-      if (!a || !b) return null;
-      const ar = a.getBoundingClientRect();
-      const br = b.getBoundingClientRect();
-      const x1 = Math.max(ar.left, br.left);
-      const x2 = Math.min(ar.right, br.right);
-      const y1 = Math.max(ar.top, br.top);
-      const y2 = Math.min(ar.bottom, br.bottom);
+    ({ frontSel, backSel }) => {
+      const front = document.querySelector(frontSel);
+      const back = document.querySelector(backSel);
+      if (!front || !back) return null;
+      const fr = front.getBoundingClientRect();
+      const br = back.getBoundingClientRect();
+      const x1 = Math.max(fr.left, br.left);
+      const x2 = Math.min(fr.right, br.right);
+      const y1 = Math.max(fr.top, br.top);
+      const y2 = Math.min(fr.bottom, br.bottom);
       if (x2 <= x1 || y2 <= y1) return null;
       const cx = (x1 + x2) / 2;
       const cy = (y1 + y2) / 2;
-      const top = document.elementFromPoint(cx, cy);
+      // Radix が敷く pointer-events ロックを計測の間だけ外す (必ず戻す)。
+      const previousPointerEvents = document.body.style.pointerEvents;
+      document.body.style.pointerEvents = "";
+      let stack: Element[];
+      try {
+        stack = document.elementsFromPoint(cx, cy);
+      } finally {
+        document.body.style.pointerEvents = previousPointerEvents;
+      }
+      const indexOf = (sel: string) => stack.findIndex((el) => el.closest(sel));
       return {
         point: [Math.round(cx), Math.round(cy)] as [number, number],
-        inA: !!top?.closest(aSel),
-        inB: !!top?.closest(bSel),
-        tag: top?.tagName ?? "(none)",
+        frontIndex: indexOf(frontSel),
+        backIndex: indexOf(backSel),
+        order: stack.map((el) => el.getAttribute("data-slot") ?? el.tagName),
       };
     },
-    { aSel: aSelector, bSel: bSelector },
+    { frontSel: frontSelector, backSel: backSelector },
   );
   if (!result) {
     unmetPrecondition(
-      `${aSelector} と ${bSelector} が重なっていない — hit test の前提が崩れている`,
+      `${frontSelector} と ${backSelector} が重なっていない — 描画順の検査の前提が崩れている`,
     );
   }
   return result;
@@ -420,28 +453,21 @@ test.describe("Bottom-fixed occlusion (SP)", () => {
     await expect(panel).toBeVisible({ timeout: 10_000 });
 
     const bar = page.locator('[data-slot="audio-dock-bar"]');
-    const retreated = await stableBox(bar, "退避後の音声ドック");
-
-    // 退避の判定は矩形の位置で行う (属性だけを見ると、属性は正しいのに
-    // 実描画が動いていない事故を拾えない)。上端が画面下端以下 = 完全に画面外。
-    expect(
-      Math.round(retreated.y),
-      `音声ドックが画面外へ退避していない (${describeRect(retreated)})`,
-    ).toBeGreaterThanOrEqual(SP_VIEWPORT.height);
-
-    // 属性は補助的に併せて見る (退避の意図が DOM に出ているか)。
-    await expect(bar).toHaveAttribute("data-retreated", "true");
+    const dock = await stableBox(bar, "退避後の音声ドック");
 
     const input = page.locator('[data-slot="chat-input-bar-mobile"] input');
     await expect(input).toBeVisible();
     const inputBox = await stableBox(input, "全画面チャットの入力欄");
 
+    // --- 実害を先に見る -----------------------------------------------------
+    // 2026-08-17 に報告された症状そのもの:「入力欄が音声バーに覆われて押せない」。
+    // 直し方 (退避 / 共存) より前にこれを assert しておかないと、直し方を
+    // 取り替えたときに症状の検査が消えてしまう。
     expect(
-      overlapArea(retreated, inputBox),
-      `チャット入力欄が音声ドックと重なっている (input ${describeRect(inputBox)} / dock ${describeRect(retreated)})`,
+      overlapArea(dock, inputBox),
+      `チャット入力欄が音声ドックと重なっている (input ${describeRect(inputBox)} / dock ${describeRect(dock)})`,
     ).toBe(0);
 
-    // 2026-08-17 の不具合そのもの: 入力欄の中心を押すと音声バーが受け取っていた。
     expect(
       await isHitTarget(input),
       "チャット入力欄が最前面に居ない (別の面が覆っている)",
@@ -451,6 +477,17 @@ test.describe("Bottom-fixed occlusion (SP)", () => {
     await input.click();
     await input.fill("テスト");
     await expect(input).toHaveValue("テスト");
+
+    // --- 直し方 (退避) が効いているか --------------------------------------
+    // 退避の判定は矩形の位置で行う (属性だけを見ると、属性は正しいのに
+    // 実描画が動いていない事故を拾えない)。上端が画面下端以下 = 完全に画面外。
+    expect(
+      Math.round(dock.y),
+      `音声ドックが画面外へ退避していない (${describeRect(dock)})`,
+    ).toBeGreaterThanOrEqual(SP_VIEWPORT.height);
+
+    // 属性は補助的に併せて見る (退避の意図が DOM に出ているか)。
+    await expect(bar).toHaveAttribute("data-retreated", "true");
   });
 
   test("音声ドック再生中でもモバイルメニュー (Sheet) が手前に出る", async ({ page }) => {
@@ -461,19 +498,24 @@ test.describe("Bottom-fixed occlusion (SP)", () => {
     await expect(dialog).toBeVisible({ timeout: 10_000 });
     await stableBox(dialog, "モバイルメニューの Sheet");
 
-    // 全画面を覆う面なので矩形は必ず重なる。重なった領域で最前面を見る。
-    const hit = await topmostInOverlap(
+    // 全画面を覆う面なので矩形は必ず重なる。重なった領域で描画順を見る。
+    const paint = await paintOrderInOverlap(
       page,
       '[role="dialog"]',
       '[data-slot="audio-dock-bar"]',
     );
+    // 両方が一覧に現れていること (どちらかが -1 なら計測自体が壊れている)。
     expect(
-      hit.inB,
-      `Sheet と音声ドックが重なった座標 (${hit.point.join(",")}) で音声ドックが手前に出ている ` +
-        `(最前面=${hit.tag})。shadcn の生 z-50 が名前付きレイヤー (--z-modal) に ` +
-        `接続されていないと必ずこうなる。`,
-    ).toBe(false);
-    expect(hit.inA, `Sheet が最前面に居ない (最前面=${hit.tag})`).toBe(true);
+      Math.min(paint.frontIndex, paint.backIndex),
+      `描画順の一覧に Sheet と音声ドックの両方が現れていない (一覧=[${paint.order.join(", ")}])`,
+    ).toBeGreaterThanOrEqual(0);
+    expect(
+      paint.frontIndex,
+      `Sheet と音声ドックが重なった座標 (${paint.point.join(",")}) で音声ドックが手前に描かれている。` +
+        `描画順 (手前→奥) = [${paint.order.join(", ")}]。` +
+        `shadcn の生 z-50 が名前付きレイヤー (--z-modal) に接続されていないと必ずこうなる ` +
+        `(50 < --z-sticky 1020)。`,
+    ).toBeLessThan(paint.backIndex);
   });
 });
 
@@ -488,13 +530,12 @@ test.describe("Bottom-fixed coexistence (PC)", () => {
 
     const bar = page.locator('[data-slot="audio-dock-bar"]');
     const dock = await stableBox(bar, "音声ドックのバー");
-    // PC では退避しない。
-    await expect(bar).toHaveAttribute("data-retreated", "false");
 
     const chatBar = page.locator('[data-slot="chat-input-bar"]');
     await requireVisibleWithin(chatBar, "PC でチャット入力バーが出ている");
     const chatBox = await stableBox(chatBar, "PC のチャット入力バー");
 
+    // 実害を先に: 重なっていないこと・入力欄が押せること。
     expect(
       overlapArea(dock, chatBox),
       `PC のチャット入力バーが音声ドックと重なっている (chat ${describeRect(chatBox)} / dock ${describeRect(dock)})`,
@@ -507,6 +548,9 @@ test.describe("Bottom-fixed coexistence (PC)", () => {
       await isHitTarget(chatBar.locator("input").first()),
       "PC のチャット入力欄が最前面に居ない",
     ).toBe(true);
+
+    // PC は退避させず共存させる (SP の退避を直すときにここを壊さないための対)。
+    await expect(bar).toHaveAttribute("data-retreated", "false");
   });
 });
 
