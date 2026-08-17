@@ -87,6 +87,16 @@ jobs:
       - name: Run unit tests
         run: pnpm test --project unit --reporter=junit --outputFile=test-results/junit.xml
 
+      - name: Verify unit test floor (P5 — 空回り検知)
+        # A green run with ~0 tests is the "検証停止" failure mode from the
+        # 2026-08 incident. Assert a minimum executed count so a silently empty
+        # or over-filtered run FAILS instead of passing vacuously.
+        # Raise TEST_FLOOR_UNIT toward the real count over time.
+        # docs/ops/test-floor.md
+        env:
+          TEST_FLOOR_UNIT: "150"
+        run: node scripts/ops/check-test-floor.mjs --file test-results/junit.xml --min "${TEST_FLOOR_UNIT}" --label unit
+
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
@@ -151,11 +161,27 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium
 
       - name: Run E2E tests (with retries for flaky tests)
-        run: pnpm test:e2e --retries=2 --reporter=junit --output=test-results/e2e-junit.xml
+        # PLAYWRIGHT_JUNIT_OUTPUT_NAME makes the junit reporter write to a FILE.
+        # Playwright's --reporter=junit prints to stdout unless this env is set,
+        # so the previous `--output=test-results/e2e-junit.xml` (which is the
+        # ARTIFACTS dir, not the report path) never produced a junit file. We
+        # now write the junit to a known path and keep artifacts in a separate
+        # dir so the P5 floor check below can read the real executed count.
+        run: pnpm test:e2e --retries=2 --reporter=junit --output=test-results/e2e-artifacts
         env:
           CI: true
+          PLAYWRIGHT_JUNIT_OUTPUT_NAME: test-results/e2e-junit.xml
           NEXT_PUBLIC_SANITY_PROJECT_ID: 5s8ahx87
           NEXT_PUBLIC_SANITY_DATASET: production
+
+      - name: Verify E2E test floor (P5 — 空回り検知)
+        # Same 0件成功 guard for the e2e suite. In CI several specs are
+        # intentionally ignored (external services), so the floor is set below
+        # the CI-run count with margin. Raise TEST_FLOOR_E2E over time.
+        # docs/ops/test-floor.md
+        env:
+          TEST_FLOOR_E2E: "15"
+        run: node scripts/ops/check-test-floor.mjs --file test-results/e2e-junit.xml --min "${TEST_FLOOR_E2E}" --label e2e
 
       - name: Upload E2E results
         if: always()
