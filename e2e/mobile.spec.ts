@@ -188,6 +188,27 @@ test.describe("Mobile viewport", () => {
  *
  * **CMS にイベントが 1 件でも入ったら、この describe に
  * 「申込バー × 同意バー / 申込バー × ランチャ = 0」を足すこと。**
+ *
+ * ## 「下端の面は重ねない」が適用されない面 (2026-08-18 追記)
+ *
+ * この規則の対象は **下端に細く居座る面**だけで、画面を丸ごと取る面 (SP の
+ * 全画面チャット `chat-panel-mobile`) は対象外。全画面チャットが開いている間、
+ * Cookie 同意バーは完全に覆われる (実測 47190px^2 / 3 コントロールとも
+ * hitIsSelf=false) が、これは**不透明な面が画面を占有している**状態であって
+ * 積み木の破れではない。閉じれば同意バーは元どおり操作できる。
+ * ここを「重なり 0」で縛ると全画面チャット自体が成立しなくなるので縛らない。
+ *
+ * ## 検証環境の罠 (次にここを触る人へ)
+ *
+ * 1. **`.next` の退避先はリポジトリの外にすること。** リポジトリ内に
+ *    `.next.bak` 等で置くと Tailwind v4 のソーススキャンがビルド成果物
+ *    (バイナリを含む) を拾い、`app/globals.css` から生成される CSS が壊れて
+ *    全ページ 500 になる。
+ * 2. **`git checkout <old> -- app/globals.css` は Turbopack が追従しない。**
+ *    過去実装と現行を往復して赤/緑を確かめるときは、CSS を戻すたびに dev
+ *    サーバを止めて `.next` を捨ててから再起動する。さもないと古い CSS が
+ *    配られ続け、**偽の赤 / 偽の緑**が出る (実際に 1 度踏んで、Sheet の検査が
+ *    壊れた状態なのに緑になった)。
  */
 
 type Rect = { x: number; y: number; width: number; height: number };
@@ -359,7 +380,10 @@ async function paintOrderInOverlap(
       document.body.style.pointerEvents = "";
       let stack: Element[];
       try {
-        stack = document.elementsFromPoint(cx, cy);
+        // dev ツールの面 (nextjs-portal) は製品の重なりではないので外す。
+        stack = document
+          .elementsFromPoint(cx, cy)
+          .filter((el) => !el.closest("nextjs-portal"));
       } finally {
         document.body.style.pointerEvents = previousPointerEvents;
       }
@@ -443,16 +467,45 @@ async function expectAllControlsClickable(
   }
 }
 
-/** その座標を押したときに実際に受け取る要素が自分自身 (か自分の中) か。 */
+/**
+ * その座標を押したときに実際に受け取る要素が自分自身 (か自分の中) か。
+ *
+ * ## `top.contains(el)` を判定に含めない (2026-08-18 是正)
+ *
+ * 「最前面の要素が自分の**祖先**」を true にすると、透明なオーバーレイが祖先
+ * として自分を覆っている状態まで合格になる。それは押せない状態なので、自分自身
+ * か自分の**子孫**が受け取ったときだけ true にする。
+ *
+ * ## dev ツールの面は無視する (偽赤の防止)
+ *
+ * Next.js の開発インジケータ (`nextjs-portal` / 画面左下に固定) が左下の
+ * コントロールを奪う。`playwright.config.ts` の webServer は `pnpm dev` なので
+ * **CI でも起こり得る**。実測で Cookie 同意バーの「必要なもののみ」(x=16,y=796)
+ * と音声ドック左端のボタンが `topSlot=NEXTJS-PORTAL` で false になった。
+ * これは製品の重なりではないので判定から外して奥の要素を見る。
+ * (現行の検査は全ケース音声 ON で同意バーが上へ退いており未発火だが、
+ *  音声 OFF のケースを足した瞬間に踏む。踏む前に潰しておく)
+ */
 async function isHitTarget(locator: Locator): Promise<boolean> {
   return locator.evaluate((el) => {
     const r = el.getBoundingClientRect();
-    const top = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
-    return !!top && (top === el || el.contains(top) || top.contains(el));
+    const x = r.x + r.width / 2;
+    const y = r.y + r.height / 2;
+    const top = document
+      .elementsFromPoint(x, y)
+      .find((candidate) => !candidate.closest("nextjs-portal"));
+    return !!top && (top === el || el.contains(top));
   });
 }
 
 test.describe("Bottom-fixed occlusion (SP)", () => {
+  // 記事ページ (Sanity + 音声ブロック + viz) は dev サーバの初回コンパイルが重く、
+  // 冷えた状態で並列に叩くと既定の 30s を超えて落ちる (実測: 3 worker 同時で
+  // SP の 3 件が「音声ドックのバーの矩形が安定しない」で失敗 → 暖まった状態で
+  // 再実行すると 3.4s で緑)。CI の webServer も `pnpm dev` なので同じ条件になる。
+  // 検査の内容ではなくコンパイル待ちなので、時間だけを緩める。
+  test.describe.configure({ timeout: 90_000 });
+
   test.use({
     viewport: SP_VIEWPORT,
     isMobile: true,
@@ -600,6 +653,13 @@ test.describe("Bottom-fixed occlusion (SP)", () => {
 });
 
 test.describe("Bottom-fixed coexistence (PC)", () => {
+  // 記事ページ (Sanity + 音声ブロック + viz) は dev サーバの初回コンパイルが重く、
+  // 冷えた状態で並列に叩くと既定の 30s を超えて落ちる (実測: 3 worker 同時で
+  // SP の 3 件が「音声ドックのバーの矩形が安定しない」で失敗 → 暖まった状態で
+  // 再実行すると 3.4s で緑)。CI の webServer も `pnpm dev` なので同じ条件になる。
+  // 検査の内容ではなくコンパイル待ちなので、時間だけを緩める。
+  test.describe.configure({ timeout: 90_000 });
+
   // PC は退避させず **縦に積んで共存** させる (Setaka 裁定 2026-08-17)。
   // SP 側の退避を直すときに PC の共存を壊さないための対の検査。
   test.use({ viewport: { width: 1280, height: 800 }, reducedMotion: "no-preference" });
