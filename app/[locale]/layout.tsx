@@ -43,6 +43,17 @@ export const metadata: Metadata = {
   },
   other: {
     "theme-color": "#333333",
+    /* Build identity, so a check can tell WHICH build it is looking at.
+     *
+     * This is what makes "the deploy went live" verifiable instead of assumed:
+     * defect 4 was a preview login silently landing on production, and without a
+     * build marker there is no way to tell from the page which deployment
+     * answered. Ring 2 passes the expected SHA to the dev server and compares.
+     *
+     * `?? "local"` marks a build with no VCS metadata (a local dev server). CI
+     * treats that literal as a failure rather than a pass, so the check cannot go
+     * green by simply not knowing. */
+    "x-elxea-commit": process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? "local",
   },
 };
 

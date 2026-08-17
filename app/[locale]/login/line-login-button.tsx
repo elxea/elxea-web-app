@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { buildChatSessionCookie } from "@/lib/chat/session-cookie";
 
@@ -33,7 +34,12 @@ import { buildChatSessionCookie } from "@/lib/chat/session-cookie";
  *    networks, so users almost never see the disabled state.
  */
 export function LineLoginButton({ children }: { children: React.ReactNode }) {
+  const t = useTranslations("login");
   const [authUrl, setAuthUrl] = useState<string | null>(null);
+  /* Distinguishes "still loading" from "this deployment cannot do LINE login".
+   * Both used to render the same permanently-disabled button with a spinner
+   * that never resolved, which reads as a hang rather than as a state. */
+  const [unavailable, setUnavailable] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -58,8 +64,12 @@ export function LineLoginButton({ children }: { children: React.ReactNode }) {
       .then((data: { authUrl?: string }) => {
         if (!cancelled && data.authUrl) setAuthUrl(data.authUrl);
       })
-      .catch(() => {
-        // Silent fail — button stays disabled; user can refresh to retry.
+      .catch((status: unknown) => {
+        /* 503 is the server saying "not configured / host not registered here" —
+         * a settled state, not a transient failure, so stop showing a busy
+         * control the user can never complete. Anything else keeps the previous
+         * behaviour (stay busy; a refresh may succeed). */
+        if (!cancelled && status === 503) setUnavailable(true);
       });
 
     return () => {
@@ -80,6 +90,14 @@ export function LineLoginButton({ children }: { children: React.ReactNode }) {
       // noop
     }
   };
+
+  if (unavailable) {
+    return (
+      <Button disabled className="w-full shadow-xs">
+        {t("lineButtonUnavailable")}
+      </Button>
+    );
+  }
 
   if (!authUrl) {
     return (

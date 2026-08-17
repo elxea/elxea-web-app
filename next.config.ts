@@ -5,6 +5,28 @@ import createNextIntlPlugin from "next-intl/plugin";
 const withNextIntl = createNextIntlPlugin("./i18n/request.ts");
 
 const nextConfig: NextConfig = {
+  /* Ring 2 (auth-flow e2e) runs the dev server behind a *fake apex*
+   * `www.elxea.test` so that the production cookie-Domain branch
+   * (`resolveCookieDomain()` → `.elxea.test`) actually executes. Chromium maps
+   * `*.elxea.test` to 127.0.0.1 via `--host-resolver-rules`, so no DNS or
+   * /etc/hosts entry is involved.
+   *
+   * Without this allow-list Next 16 rejects the dev-only asset requests that
+   * arrive with a non-localhost Origin:
+   *   "Blocked cross-origin request to Next.js dev resource /_next/webpack-hmr
+   *    from \"www.elxea.test\""
+   * which kills HMR and emits console errors — and the Ring 2 check "console
+   * errors === 0" is one of the gates, so the suite cannot pass without it.
+   *
+   * `next start` is NOT an alternative: NODE_ENV=production flips the cookie
+   * `secure` flag on, and a Secure cookie is not stored over plain http, so the
+   * Domain-scoped deletion under test would never be observable.
+   *
+   * Scope: dev server only. `allowedDevOrigins` is not consulted by
+   * `next build` / `next start`, so production behaviour is unchanged.
+   * https://nextjs.org/docs/app/api-reference/config/next-config-js/allowedDevOrigins
+   */
+  allowedDevOrigins: ["www.elxea.test"],
   images: {
     minimumCacheTTL: 31536000,
     remotePatterns: [

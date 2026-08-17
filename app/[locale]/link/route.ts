@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/firebase/auth-guard";
 import { enforceRateLimit, limiters } from "@/lib/ratelimit";
 import { CX_AGENT_BASE_URL } from "@/lib/chat/proxy";
+import { getRequestOrigin } from "@/lib/base-url";
+import { getCookieSpec, isSecure } from "@/lib/auth/cookies";
 import {
   ACCOUNT_LINK_TOKEN_COOKIE,
   ACCOUNT_LINK_TOKEN_COOKIE_MAX_AGE,
@@ -61,7 +63,7 @@ export async function GET(
   { params }: { params: Promise<{ locale: string }> },
 ) {
   const { locale } = await params;
-  const origin = process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin;
+  const origin = getRequestOrigin(request);
 
   // 1. linkToken: クエリ優先、無ければログイン往復のために退避したクッキーから。
   const fromQuery = request.nextUrl.searchParams.get("linkToken");
@@ -85,7 +87,7 @@ export async function GET(
     const res = withSecurityHeaders(NextResponse.redirect(loginUrl));
     res.cookies.set(ACCOUNT_LINK_TOKEN_COOKIE, linkToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: isSecure(getCookieSpec(ACCOUNT_LINK_TOKEN_COOKIE)!),
       sameSite: "lax",
       path: "/",
       maxAge: ACCOUNT_LINK_TOKEN_COOKIE_MAX_AGE,
@@ -142,7 +144,8 @@ export async function GET(
   }
 
   const res = withSecurityHeaders(NextResponse.redirect(redirectUrl));
-  // 役目を終えた退避クッキーは必ず落とす（linkToken を残さない）。
+  /* 役目を終えた退避クッキーは必ず落とす（linkToken を残さない）。
+   * host-only 発行なので host-only の失効だけで足りる（registry の scope と一致）。 */
   res.cookies.set(ACCOUNT_LINK_TOKEN_COOKIE, "", { path: "/", maxAge: 0 });
   return res;
 }

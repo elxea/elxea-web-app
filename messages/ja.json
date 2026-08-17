@@ -562,6 +562,7 @@
     "heading": "elxea にログイン",
     "description": "LINE でログインすると、Web でも LINE でも会話を引き継げます。",
     "lineButton": "LINE でログイン",
+    "lineButtonUnavailable": "現在ご利用いただけません",
     "or": "または",
     "shopifyButton": "メールアドレスでログイン",
     "terms": "ログインすることで、<terms>利用規約</terms>と<privacy>プライバシーポリシー</privacy>に同意したものとみなされます。",

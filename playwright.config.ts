@@ -49,7 +49,18 @@ export default defineConfig({
   /* CI / 非CIで同じ2 specを外す。以前は三項演算子で書かれていたが両辺が同じ配列で、
    * 「CIだけ違う」と読めてしまう死んだ条件分岐だった。除外理由はどちらの環境でも
    * 同じ (仕様が消えた / ステージング前提) なので、条件を持たない1つの配列にする。 */
-  testIgnore: ["**/membership.spec.ts", "**/staging-smoke.spec.ts"],
+  /* The auth-flow specs are driven by `e2e/playwright-auth-flow.config.ts`,
+   * which runs them behind the fake apex `www.elxea.test:3310`. Running them
+   * from here would point them at this config's `baseURL` (localhost:3000),
+   * where `resolveCookieDomain()` returns undefined — so the Domain-scoped
+   * deletion they exist to check is never exercised and they would either fail
+   * or, worse, pass while asserting nothing. Excluded here rather than
+   * repointing `E2E_BASE_URL`, which is global to all specs in this config. */
+  testIgnore: [
+    "**/membership.spec.ts",
+    "**/staging-smoke.spec.ts",
+    "**/auth-session-flow.spec.ts",
+  ],
   use: {
     baseURL,
     trace: "on-first-retry",

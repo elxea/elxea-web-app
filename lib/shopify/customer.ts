@@ -108,6 +108,18 @@ export function buildAuthorizeUrl({
  * out of our site alone leaves Shopify's session cookie intact and the next
  * login silently re-authenticates the previous user.
  *
+ * `idTokenHint` is REQUIRED, not optional. Shopify rejects an RP-initiated
+ * logout that omits `id_token_hint` with `400 invalid_request` — measured
+ * 2026-08-18 against the real endpoint (see
+ * docs/release-gates/gate0-e7121ae.md). The parameter used to be optional and
+ * silently omitted when absent, which meant a LINE-only user — who never holds a
+ * Shopify `id_token` — hit that 400 on their very first logout. Requiring it
+ * turns that class of regression into a type error at the call site instead of a
+ * runtime 400 for the user.
+ *
+ * Callers that have no token must NOT pass a placeholder; they must skip the
+ * Shopify round trip entirely and complete logout locally.
+ *
  * Ref: OpenID Connect RP-Initiated Logout 1.0
  * https://openid.net/specs/openid-connect-rpinitiated-1_0.html
  */
@@ -115,15 +127,13 @@ export function buildLogoutUrl({
   idTokenHint,
   postLogoutRedirectUri,
 }: {
-  idTokenHint?: string;
+  idTokenHint: string;
   postLogoutRedirectUri: string;
 }): string {
   const params = new URLSearchParams({
     post_logout_redirect_uri: postLogoutRedirectUri,
+    id_token_hint: idTokenHint,
   });
-  if (idTokenHint) {
-    params.set("id_token_hint", idTokenHint);
-  }
   return `${LOGOUT_URL}?${params.toString()}`;
 }
 

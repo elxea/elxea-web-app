@@ -562,6 +562,7 @@
     "heading": "Sign in to elxea",
     "description": "Sign in with LINE to continue your conversation across Web and LINE.",
     "lineButton": "Sign in with LINE",
+    "lineButtonUnavailable": "Unavailable right now",
     "or": "or",
     "shopifyButton": "Sign in with Email",
     "terms": "By signing in, you agree to our <terms>Terms of Service</terms> and <privacy>Privacy Policy</privacy>.",

@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import crypto from "crypto";
-import { getBaseUrl } from "@/lib/base-url";
+import { getBaseUrl, getRequestHostname, isTrustedAuthHost } from "@/lib/base-url";
+import { getCookieSpec, isSecure, resolveCookieDomain } from "@/lib/auth/cookies";
 
 /**
  * Direct LINE Login OAuth 2.0 redirect endpoint.
@@ -17,29 +18,58 @@ import { getBaseUrl } from "@/lib/base-url";
  *
  * After LINE auth, callback goes to /api/line-callback
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
+
+  /* Fail closed on a host that is not ours.
+   *
+   * This is the fix for "login from a preview lands on the production top page".
+   * `NEXTAUTH_URL` is not set in the preview environment (verified 2026-08-18 by
+   * listing variable names only), while Vercel injects
+   * `VERCEL_PROJECT_PRODUCTION_URL` into every environment — so `getBaseUrl()`
+   * resolved to the PRODUCTION origin on previews, and the LINE round trip
+   * quietly delivered the user to production instead of the deployment they were
+   * testing. Silently sending someone to a different deployment is worse than
+   * refusing, so an untrusted host now gets a legible 503 instead.
+   *
+   * `isTrustedAuthHost` is satisfied by any host at or under our apex, so
+   * production and www are unaffected without any configuration. */
+  const hostname = getRequestHostname(request);
+  if (!isTrustedAuthHost(hostname)) {
+    return NextResponse.json(
+      { error: "auth_host_not_registered", host: hostname },
+      { status: 503 },
+    );
+  }
   const channelId = process.env.AUTH_LINE_ID;
   if (!channelId) {
-    return NextResponse.json(
-      { error: "LINE Login not configured" },
-      { status: 500 }
-    );
+    // Same rationale as /api/line-login/init: unconfigured, not broken.
+    return NextResponse.json({ error: "auth_not_configured" }, { status: 503 });
   }
 
   // Generate state for CSRF protection
   const state = crypto.randomBytes(32).toString("hex");
 
-  // Store state in cookie for verification in callback
+  /* Store state in a cookie for verification in the callback.
+   *
+   * This route previously set the state cookie with NO Domain while
+   * /api/line-login/init set the same cookie Domain-scoped to the apex. Two
+   * routes issuing one cookie at two different scopes means the callback's
+   * single-scope delete can only ever match one of them, and a state cookie
+   * issued here was invisible to a callback arriving on the sibling host.
+   * Both routes now go through the same registry-driven scope. */
   const cookieStore = await cookies();
+  const stateSpec = getCookieSpec("line_oauth_state")!;
+  const cookieDomain = resolveCookieDomain(request);
   cookieStore.set("line_oauth_state", state, {
     httpOnly: true,
-    secure: true,
+    secure: isSecure(stateSpec),
     sameSite: "lax",
     maxAge: 600, // 10 minutes
     path: "/",
+    ...(cookieDomain ? { domain: cookieDomain } : {}),
   });
 
-  const baseUrl = getBaseUrl();
+  const baseUrl = getBaseUrl(request);
 
   const redirectUri = `${baseUrl}/api/line-callback`;
 
@@ -57,7 +87,6 @@ export async function GET() {
     redirect_uri: redirectUri,
     state: state,
     scope: "profile openid email",
-    prompt: "consent", // Always show consent screen to ensure fresh token exchange
   });
 
   const authUrl = `https://access.line.me/oauth2/v2.1/authorize?${params.toString()}`;
