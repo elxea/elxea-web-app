@@ -182,6 +182,15 @@ export const COOKIE_REGISTRY: readonly CookieSpec[] = [
   { name: "site_auth", group: "not-auth", scope: "host-only", secure: "prod-only" },
   { name: "shopify_cart_id", group: "not-auth", scope: "host-only", secure: "prod-only" },
   { name: "sidebar_state", group: "not-auth", scope: "host-only", secure: "prod-only" },
+  /* Written from the browser by `buildConsentCookie` (`lib/consent.ts`), not
+   * through this module's helpers. It is listed because the registry is a map of
+   * every cookie we set, not only the ones set here — the scanner in
+   * `__tests__/auth-cookie-registry.test.ts` now follows cookie-builder calls and
+   * would otherwise report it as an unknown name.
+   *
+   * `shared-domain`: `consentCookieDomain` sets a `domain=` attribute.
+   * `prod-only`: `Secure` is added only when the page is served over https. */
+  { name: "cookie_consent", group: "not-auth", scope: "shared-domain", secure: "prod-only" },
 ] as const;
 
 /**

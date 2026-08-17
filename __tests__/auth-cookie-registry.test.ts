@@ -211,6 +211,91 @@ function resolveName(node: ts.Node, sf: ts.SourceFile): string | null {
   return null;
 }
 
+/**
+ * Resolve `document.cookie = buildSomething(...)` by looking inside the builder.
+ *
+ * Some cookies are not written as a literal at the assignment site: the browser
+ * half of the app hands the whole `name=value; attrs` string to a builder
+ * (`buildChatSessionCookie`, `buildConsentCookie`) so that the attributes live in
+ * one place. Without following the call, every such site is "unresolved" and the
+ * name it sets never reaches the registry check — which then also reports the
+ * registry entry as orphaned. Both failures are the scanner missing a hop, not a
+ * rogue cookie.
+ *
+ * The hop is deliberately narrow: inside the builder, find the first
+ * `` `${NAME}=...` `` shape (a template whose head is empty and whose first
+ * literal chunk starts with `=`) or a `"name=..."` literal, and resolve that
+ * expression with the same resolver used everywhere else. A builder that
+ * computes its name some other way is still reported as unresolved, so the check
+ * keeps its teeth.
+ */
+function resolveBuilderCall(call: ts.CallExpression): string | null {
+  const callee = ts.isIdentifier(call.expression)
+    ? call.expression.text
+    : ts.isPropertyAccessExpression(call.expression)
+      ? call.expression.name.text
+      : null;
+  if (!callee) return null;
+
+  for (const other of sourceFiles()) {
+    const otherSf = parseFile(other);
+
+    // A holder rather than a `let`: assigning from inside the visitor closure
+    // leaves TypeScript's control-flow analysis thinking the variable is still
+    // its initial `null` afterwards.
+    const decl: { node: ts.Node | null } = { node: null };
+    const findDecl = (n: ts.Node) => {
+      if (decl.node) return;
+      if (ts.isFunctionDeclaration(n) && n.name?.text === callee) {
+        decl.node = n;
+        return;
+      }
+      if (
+        ts.isVariableDeclaration(n) &&
+        ts.isIdentifier(n.name) &&
+        n.name.text === callee &&
+        n.initializer &&
+        (ts.isArrowFunction(n.initializer) || ts.isFunctionExpression(n.initializer))
+      ) {
+        decl.node = n.initializer;
+        return;
+      }
+      ts.forEachChild(n, findDecl);
+    };
+    findDecl(otherSf);
+    if (!decl.node) continue;
+
+    const name: { value: string | null } = { value: null };
+    const findName = (n: ts.Node) => {
+      if (name.value !== null) return;
+      if (
+        ts.isTemplateExpression(n) &&
+        n.head.text === "" &&
+        n.templateSpans.length > 0 &&
+        n.templateSpans[0].literal.text.startsWith("=")
+      ) {
+        const resolved = resolveName(n.templateSpans[0].expression, otherSf);
+        if (resolved !== null) {
+          name.value = resolved;
+          return;
+        }
+      }
+      if (ts.isStringLiteralLike(n)) {
+        const m = n.text.match(/^([A-Za-z0-9_-]+)=/);
+        if (m) {
+          name.value = m[1];
+          return;
+        }
+      }
+      ts.forEachChild(n, findName);
+    };
+    findName(decl.node);
+    if (name.value !== null) return name.value;
+  }
+
+  return null;
+}
+
 type ScanResult = {
   cookieNames: Finding[];
   unresolved: Finding[];
@@ -285,6 +370,14 @@ function scan(files: string[]): ScanResult {
               ) ?? candidate)
             : candidate;
           result.cookieNames.push({ file: rel, line: lineOf(node), detail: resolved });
+        } else if (ts.isCallExpression(node.right)) {
+          // `document.cookie = buildSomething(...)` — follow the builder.
+          const built = resolveBuilderCall(node.right);
+          if (built !== null) {
+            result.cookieNames.push({ file: rel, line: lineOf(node), detail: built });
+          } else {
+            result.unresolved.push({ file: rel, line: lineOf(node), detail: raw.slice(0, 60) });
+          }
         } else {
           result.unresolved.push({ file: rel, line: lineOf(node), detail: raw.slice(0, 60) });
         }
