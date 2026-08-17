@@ -28,9 +28,10 @@ const IMPLICIT_DEFAULT_PATTERNS = [
  * Each entry MUST be removed once that PR lands — this suite fails if an entry
  * is stale, so the exemption cannot outlive its reason.
  */
-const KNOWN_UNFIXED: Record<string, string> = {
-  "scripts/sync-notion-to-sanity.ts": "owned by PR #67 (do not touch)",
-};
+// 空でよい。scripts/sync-notion-to-sanity.ts は #64 のマージで
+// 暗黙の本番既定を持たなくなったため、この検査の免除を外した
+// (下の "keeps the exemption list honest" が古い免除を赤で知らせる設計)。
+const KNOWN_UNFIXED: Record<string, string> = {};
 
 /** Directories that are local scratch space, not shipped code. */
 const IGNORED_DIRS = new Set(["scratch", "node_modules"]);
