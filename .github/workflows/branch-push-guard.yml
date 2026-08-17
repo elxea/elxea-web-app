@@ -15,17 +15,10 @@ on:
       - main
       # backup/* は監査対象外 (docs/ops/branch-divergence.md)
       - "backup/**"
-      # TEMPORARY (2026-08-17, Setaka 承認済 / G1): main 一本化の統合ブランチ。
-      # このガードは「乖離したブランチに積み増すな = まず main を取り込め」を強制
-      # するもので、feat/main-consolidation はまさにその取り込みを行うブランチ。
-      # main を取り込んでも既存 commit の committer date は変わらないので齢
-      # (c1-ds 固有の最古 commit cd5cf34 = 2026-08-07 / しきい値 7 日超) は縮まず、
-      # push が決定論的に赤になる。除外は**この 1 本だけ**で、他の全ブランチの
-      # 保護は効いたまま。
-      #
-      # !! main へ合流させる直前に、この 1 行を削除する commit を積むこと。!!
-      # 合流後の main に本行が残っていないことを検証チェックリストで確認する。
-      - "feat/main-consolidation"
+      # G1 の TEMPORARY 除外 ("feat/main-consolidation") は 2026-08-18 に削除した。
+      # 段階 A で main を統合ブランチへ取り込み終えたため、除外を残す理由が消えた
+      # (残したまま main へ合流させると、以後どの統合ブランチも無保護になる)。
+      # 以後は統合ブランチも他の全ブランチと同じくこのガードの対象になる。
 
 concurrency:
   group: push-guard-${{ github.ref }}
