@@ -31,6 +31,30 @@ const nextConfig: NextConfig = {
   // MS10.4: Webflow → Next.js redirects (old site URL structure → new)
   async redirects() {
     return [
+      /* 会員制度 (階層プラン) の廃止に伴う URL 統合。
+       *
+       * elxea は会員制度を持たない — 会員かどうかは「roji 契約の有無」の二値であり、
+       * ランク・ティア・特典階層は作らない (Setaka 確定 2026-08-17 / roji マスター
+       * スペックが階層会員を明示禁止)。旧 `/membership` は フリー / スタンダード /
+       * プレミアム の 3 階層比較表を出しており、この決定と正面から矛盾する。
+       * プラン選択の導線は定期便 LP (`/ja/subscription`) に一本化する。
+       *
+       * ページ側の `permanentRedirect()` ではなく本ブロックで転送するのは、
+       * App Router がシェルを流し始めたあとの redirect を 200 + クライアント遷移に
+       * 畳んでしまい 308 にならないため。URL 統合は検索側にも伝える必要があるので、
+       * Webflow 移行と同じ `redirects()` (308) に載せる。
+       *
+       * `/en/*` は middleware が先に 301 で `/ja/*` へ送るため ja だけで足りる。 */
+      {
+        source: "/ja/membership",
+        destination: "/ja/subscription",
+        permanent: true,
+      },
+      {
+        source: "/membership",
+        destination: "/ja/subscription",
+        permanent: true,
+      },
       // Webflow blog posts → journal
       {
         source: "/blog/:slug",

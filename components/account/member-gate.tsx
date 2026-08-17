@@ -29,7 +29,10 @@ export async function MemberGate({
       </p>
       {loggedIn ? (
         <Button variant="outline" asChild>
-          <Link href="/membership">{t("viewPlans")}</Link>
+          {/* 会員制度 (階層プラン) は廃止し、プラン選択は定期便 LP に一本化した
+              (Setaka 確定 2026-08-17)。転送を 1 回挟まずに済むよう、導線は直接
+              LP を指す。 */}
+          <Link href="/subscription">{t("viewPlans")}</Link>
         </Button>
       ) : (
         <Button variant="outline" asChild>
