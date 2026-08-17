@@ -6,6 +6,7 @@ elxea EC サイト（Next.js ヘッドレスコマース）のプロジェクト
 
 ## Gitルール（厳守）
 
+- **本番の正本は `main`。Vercel productionは `main` から配信される**（`main` HEADに入ったコミットだけが本番になる）。詳細・監視・ロールバック時の注意は `docs/ops/production-source-of-truth.md` を正本とする
 - **作業はmainから切った短命トピックブランチで行う**（`feat/*` / `fix/*` / `chore/*` / `design/*` / `docs/*`）。作業前に必ず `git checkout main && git pull` してから切る
 - **長命ブランチに居座らない**。1タスク = 1ブランチで、マージされたら捨てる。`developer` ブランチは歴史的遺物であり現行の作業先ではない（2026-08-07時点でmainの履歴に含まれていない）
 - mainへの直接pushは禁止。マージはPR経由でCI全PASS後のみ
@@ -34,6 +35,14 @@ pre-commit install --hook-type pre-commit --hook-type pre-push
 ### 使い捨てスクリプトの置き場
 
 計測・スクショ採取などの一回きりの `.mjs` / `.ts` は**リポジトリ直下に置かない**。`scripts/scratch/`（gitignore対象・ESLint対象外）に置く。直下に散らかすと、次のブランチ切替時に「消していいのか分からない未追跡ファイル」として残り、作業ツリーが動かせなくなる（2026-08-07に実際に13本が滞留した）。
+
+### Git運用の再発防止レジーム（docs/ops/）
+259コミット乖離・本番認識割れ・検証停止の再発防止策。各項目の正本は下記ドキュメント。
+- `docs/ops/production-source-of-truth.md` — 本番=mainの宣言 + 本番↔main一致監視（P2 / 追加a）
+- `docs/ops/branch-divergence.md` — ブランチ乖離監視・停止しきい値（P3）
+- `docs/ops/merge-governance.md` — mainへのマージ経路の限定・権限分離（P6 / 追加c）
+- `docs/ops/branch-protection.md` — GitHubブランチ保護の前提・費用・緊急バイパス手順（P1）
+
 
 ## アーキテクチャ
 

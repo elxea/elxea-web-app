@@ -892,7 +892,8 @@
     "message": "このサイトではCookieを使用して、お客様の閲覧体験の向上とサイトの分析を行っています。",
     "accept": "同意する",
     "decline": "必要なもののみ",
-    "learnMore": "詳しく見る"
+    "learnMore": "詳しく見る",
+    "settings": "Cookie 設定"
   },
   "subscriptionLp": {
     "title": "シングルオリジンティーの定期便",
@@ -972,6 +973,11 @@
     "copyright": "© {year} elxea. All rights reserved."
   },
   "chat": {
+    "launcher": {
+      "label": "お茶のご相談",
+      "aria": "チャットを開く",
+      "close": "チャットを閉じる"
+    },
     "lineCta": {
       "unauthenticated": "ログインすると、LINE でもこの会話を続けられます",
       "authenticated": "LINE でも会話を続けられます。",

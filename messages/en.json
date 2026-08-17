@@ -892,7 +892,8 @@
     "message": "We use cookies to improve your browsing experience and analyze site traffic.",
     "accept": "Accept All",
     "decline": "Essential Only",
-    "learnMore": "Learn More"
+    "learnMore": "Learn More",
+    "settings": "Cookie Settings"
   },
   "subscriptionLp": {
     "title": "Single Origin Tea Subscription",
@@ -972,6 +973,11 @@
     "copyright": "© {year} elxea. All rights reserved."
   },
   "chat": {
+    "launcher": {
+      "label": "Ask about tea",
+      "aria": "Open chat",
+      "close": "Close chat"
+    },
     "lineCta": {
       "unauthenticated": "Sign in to continue this conversation on LINE",
       "authenticated": "Continue the conversation on LINE.",

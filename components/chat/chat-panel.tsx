@@ -62,7 +62,9 @@ export function ChatPanel({
       {...props}
     >
       {/* Panel header — Figma 6859:317 (h=32 = py-2 + 16 + py-2) */}
-      <div className="flex items-center justify-between border-b border-border/40 px-4 py-2">
+      {/* `shrink-0`: 呼び出し側が高さ上限 (max-h) を掛けた flex-column で使うため、
+          ヘッダーが潰れないよう固定する。見た目は変わらない (#55 統合 2026-08-17)。 */}
+      <div className="flex shrink-0 items-center justify-between border-b border-border/40 px-4 py-2">
         <span className="text-xs font-medium tracking-wide text-muted-foreground">
           {title}
         </span>

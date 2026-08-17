@@ -1,4 +1,5 @@
 import { Resend } from "resend";
+import { getSiteUrl } from "@/lib/env";
 
 import { formatPrice } from "@/lib/format-price";
 import { siteUrl } from "@/lib/site-url";

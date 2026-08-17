@@ -62,6 +62,15 @@ export default defineConfig({
     // The site-password gate (SITE_PASSWORD in .env.local) 307-redirects every
     // route to /site-password, which would make the whole suite unrunnable
     // locally. E2E always runs against an ungated app.
-    env: { SITE_PASSWORD: "" },
+    env: {
+      SITE_PASSWORD: "",
+      // Deterministic container id for e2e/cookie-consent.spec.ts, which has to
+      // assert both that GTM stays absent (no consent / declined) and that it
+      // appears (accepted). Without a fixed id the component renders nothing
+      // and the "accepted" case would pass vacuously. Requests to
+      // googletagmanager.com are aborted inside that spec, so nothing leaves
+      // the runner.
+      NEXT_PUBLIC_GTM_ID: "GTM-E2ETEST",
+    },
   },
 });
