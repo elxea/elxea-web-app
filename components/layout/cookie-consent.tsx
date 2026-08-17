@@ -52,13 +52,23 @@ export function CookieConsent() {
 
   return (
     // 音声プレイヤーのバー (components/audio/audio-dock.tsx) が出ている間は
-    // その分だけ上へ退く。z では音声バーが前 (1020 > 50) なので、重ねると
-    // 同意ボタンが隠れて押せなくなる。非表示時は 0px で従来の位置。
+    // その分だけ上へ退く。重ねると同意ボタンが隠れて押せなくなる。非表示時は
+    // 0px で従来の位置。
+    //
+    // z は名前付きレイヤー (`app/globals.css` の `--z-*` が唯一の SoT)。音声バー
+    // と同じ「画面端に貼り付く常設面」= `--z-sticky` (1020)。互いに重ならない
+    // (上の bottom で縦に積む) ので同じ段でよく、出入りの一瞬だけ重なったときは
+    // DOM 順で後ろに居るこちらが前に出る (レイアウトの並びが AudioDock →
+    // CookieConsent)。生の `z-50` は 1020 に必ず負けていたので使わない。
     <div
+      // 下端に居座る面は e2e で矩形を実測して重なりを検査する
+      // (`e2e/mobile.spec.ts` の Bottom-fixed occlusion)。class 名は Tailwind の
+      // 都合で変わるので、掴む先は data-slot に固定する。
+      data-slot="cookie-consent"
       style={{ bottom: "var(--audio-bar-h, 0px)" }}
       onAnimationEnd={handleAnimationEnd}
       className={cn(
-        "fixed left-0 right-0 z-50 w-full max-w-full border-t border-border bg-background",
+        "fixed left-0 right-0 z-(--z-sticky) w-full max-w-full border-t border-border bg-background",
         // 音声バーが出入りするときの退避はスライドではなく滑らかに。ChatBar に
         // だけ入っていた指定をここにも広げて、3つの下端要素の挙動を揃える。
         "transition-[bottom] duration-fast ease-enter",

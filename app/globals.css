@@ -562,30 +562,60 @@ dl[data-slot="spec-band"][data-emphasis="true"] > [data-slot="spec-item"] > dd {
    * なので brand-* には入れない。 */
   --graphite-pressed: oklch(0.333 0.007 274.8);
 
-  /* 名前付き z レイヤー。**ここが SoT**。`tokens/base.json` の `depth.zIndex`
-   * は 0-50 の raw scale で別物なので混同しないこと (名前付きレイヤーは
-   * base.json 側に存在しない)。Style Dictionary の source は base.json と
-   * overrides/cjk.json だけなので、このグループは dist/tokens.css には出ず
-   * この宣言だけが実効値になる。値を変えるならここを直す。
+  /* 名前付き z レイヤー。**ここが唯一の z の SoT** (2026-08-17 1系統へ統合)。
+   *
+   * Style Dictionary の source は base.json と overrides/cjk.json だけなので、
+   * このグループは dist/tokens.css には出ず **この宣言だけが実効値**になる。
+   * 値を変えるならここを直す。
+   *
+   * ## 併存していた 3 系統をここに畳んだ (2026-08-17)
+   *
+   * 1. この `--z-*` (名前付きレイヤー)                        → **残す = SoT**
+   * 2. `tokens/base.json` の `elevation.level` / `elevation.zIndex`
+   *    (どちらも 0/10/20/30/40/50 の raw scale。値が完全に同一の重複)
+   *                                                           → **削除**
+   *    参照は実測ゼロ (`--elevation-level-*` / `--elevation-zIndex-*` を
+   *    app/components/lib/hooks/stories/scripts/e2e 全域で grep して 0 件。
+   *    dist/tokens.css に出るだけで誰も読んでいなかった)。設計意図の未決は
+   *    design-kit の conflict `c-06` に記録されており、その解決がこれ。
+   * 3. `components/ui/**` の生 `z-50` (shadcn 上流のまま 13 ファイル 21 箇所)
+   *                                → **13 ファイルは編集せず、CSS 側で
+   *                                  `z-50` ユーティリティ自体をこの表へ接続**
+   *                                  (ファイル末尾の `@utility z-50` 参照)。
+   *                                  fork しないので `shadcn add` の更新経路は
+   *                                  そのまま残る。
    * (旧 SoT と書かれていた `tokens/elxea-custom.json` は参照ゼロの死にファイル
    *  だったため 2026-08-14 に削除。旧値は git 履歴 c54335a を参照)
    *
-   * ## 画面下端に居座る面の順序 (2026-08-17 是正)
+   * ## 段は 4 つ。どの面がどこに載るか
    *
-   * 下端には音声ドック (`components/audio/audio-dock.tsx`) とチャット
-   * (`components/chat/chat-bar.tsx`) が同居する。両者は DOM 上の兄弟で同じ
-   * stacking context に載るため、**必ずこの表の変数だけで順序を決める**。
-   * Tailwind の生スケール (`z-40` / `z-50`) を混ぜると 1020 > 50 で常に
-   * 名前付き側が勝ち、意図と逆の重なりになる (実際にそれが起きて、チャットの
-   * 入力欄が音声バーに覆われ押せなくなった)。生スケールは下端固定 UI に使わない。
-   *
-   *   1020 --z-sticky   下端ドック            … 音声バー
-   *   1030 --z-chat     常設 UI の最前面      … チャット (ランチャ / 入力バー / 全画面)
+   *   1020 --z-sticky   画面端に貼り付く常設面
+   *                     … ヘッダー (`components/layout/header.tsx`)
+   *                     … 音声バー (`components/audio/audio-dock.tsx`)
+   *                     … Cookie 同意 (`components/layout/cookie-consent.tsx`)
+   *                     … イベント申込バー (`components/events/event-register-button.tsx`)
+   *   1030 --z-chat     常設 UI の最前面
+   *                     … チャット (ランチャ / 入力バー / 全画面)
    *   1040 --z-overlay  スクリム
-   *   1050 --z-modal    モーダル面            … 音声プレイヤーの全画面展開
+   *   1050 --z-modal    モーダル面・浮遊面
+   *                     … 音声プレイヤーの全画面展開
+   *                     … shadcn の Dialog / Sheet / Popover / Dropdown 等
+   *                       (生 `z-50` からの接続先)
+   *
+   * 1020 の 4 つは互いに重ならない (上端 1 つ + 下端 3 つが `--audio-bar-h` の
+   * 分だけ順に上へ退く) ので同じ段でよい。出入りの一瞬だけ重なったときは DOM
+   * 順で後ろの面が前に出る (レイアウトの並びが ChatBar → AudioDock →
+   * CookieConsent なので、同意ボタンは常に押せる側に残る)。
    *
    * チャットが音声バーより前に出る (Setaka 裁定 2026-08-17「チャット UI の
    * レイヤーがオーディオプレイヤーより上であるべき」)。
+   *
+   * ### 生スケールを下端固定 UI に直接書かない
+   *
+   * Tailwind の生スケール (`z-40` / `z-50`) を素で混ぜると 1020 > 50 で常に
+   * 名前付き側が勝ち、意図と逆の重なりになる (実際にそれが起きて、チャットの
+   * 入力欄が音声バーに覆われ押せなくなった)。新しい固定 UI の z は
+   * `z-(--z-sticky)` のようにこの表から採る。
    *
    * ### 下端で「積む」のは広い画面だけ (Setaka 裁定 2026-08-17 その2)
    *
@@ -1244,3 +1274,49 @@ dl[data-slot="spec-band"][data-emphasis="true"] > [data-slot="spec-item"] > dd {
  * 値の正本は viz 査定 verdicts.md (roji コピー路線候補 — 実組み込み査定)。 */
 .roji-viz-caption { letter-spacing: 0.2em; }
 .roji-viz-caption-wide { letter-spacing: 0.28em; }
+
+/* ─── shadcn 上流の生 `z-50` を名前付きレイヤーへ接続する ───────────────────
+ *
+ * `components/ui/**` の 13 ファイル・21 箇所が `z-50` を素で持っている
+ * (Dialog / Sheet / AlertDialog / Drawer / Popover / Tooltip / HoverCard /
+ *  DropdownMenu / ContextMenu / Menubar / NavigationMenu / Select / Combobox)。
+ * これは shadcn 上流の既定値そのままで、**触らないことに価値がある**:
+ * 13 ファイルを書き換えると `shadcn add` / upstream diff の更新経路が
+ * fork になり、以後ずっと手で追従することになる。
+ *
+ * かわりに `z-50` ユーティリティの中身を差し替えて、この 1 箇所だけで
+ * `--z-modal` に接続する。13 ファイルは無編集のまま名前付きレイヤーに乗る。
+ *
+ * ## なぜこれが必要か (実害)
+ *
+ * 生の 50 は音声バー (`--z-sticky` = 1020) とチャット (`--z-chat` = 1030) に
+ * 必ず負ける。つまり **モーダルを開いても下端の常設 UI がその上に描かれる**。
+ * SP でモバイルメニュー (Sheet) を開くと、音声再生中はシート下部が音声バーに
+ * 覆われて押せない。部品単体の Storybook では常設 UI が居ないので永久に出ない
+ * 種類の不具合で、実ページを見る e2e (`e2e/mobile.spec.ts` の
+ * 「Bottom-fixed occlusion」) が唯一の検出手段。
+ *
+ * ## 素の (レイヤー無しの) クラスで書く理由 — 2026-08-17 実測で 2 案を却下
+ *
+ * - `@layer utilities { .z-50 { … } }` は v4 の Lightning CSS 段階で丸ごと落ちて
+ *   コンパイル後の CSS に 1 バイトも出ない (同ファイル `scrollbar-none` の注記と
+ *   同じ現象)。
+ * - `@utility z-50 { … }` は出力されるが、Tailwind 組込みの `z-<number>` と
+ *   **同じ規則にマージされ、組込みの `z-index: 50` が後に来て勝つ**
+ *   (実測値: `.z-50 { z-index: var(--z-modal); z-index: 50; }`)。
+ *
+ * 残るのがこれ。cascade layer に属さない宣言はどの `@layer` の中身よりも強い
+ * (CSS Cascade 5 の layer order — 無所属が最優先)。Tailwind のユーティリティは
+ * 全て `@layer utilities` の中なので、詳細度が同じ (0,1,0) でも必ずこちらが
+ * 実効値になる。同ファイル末尾の `.roji-viz-caption` と同じ書き方。
+ *
+ * ## 影響範囲
+ *
+ * `z-50` は移行後 `components/ui/**` と Storybook の story だけが使う
+ * (アプリ側の 3 箇所 — ヘッダー / Cookie 同意 / イベント申込バー — は
+ *  `z-(--z-sticky)` へ移行済み)。50 のまま下に居てほしい面は 1 つも無い。
+ * 生スケールで「下に居てほしい」面 (例: `reading-progress` の `z-40`) は
+ * ここを通らないので従来どおり。 */
+.z-50 {
+  z-index: var(--z-modal);
+}

@@ -275,7 +275,16 @@ export function EventStickyRegisterBar({
   return (
     <div
       data-slot="event-sticky-register-bar"
-      className="fixed inset-x-0 bottom-0 z-40 flex border-t border-border bg-card px-4 py-2.5 md:hidden"
+      // 音声プレイヤーのバー (components/audio/audio-dock.tsx) が出ている間は
+      // その分だけ上へ退く。ここが下端に貼り付いたままだと、音声再生中は
+      // 申込ボタンがバーの裏に完全に隠れて押せない (生の `z-40` は音声バーの
+      // 1020 に必ず負ける)。他の下端固定 UI (チャット / Cookie 同意) と同じ
+      // 積み方に揃える。
+      style={{ bottom: "var(--audio-bar-h, 0px)" }}
+      // z は名前付きレイヤー (`app/globals.css` の `--z-*` が唯一の SoT)。
+      // 「画面端に貼り付く常設面」= `--z-sticky` (1020)。チャットのランチャ
+      // (`--z-chat` = 1030) はこの上に出したいので同じ段に上げない。
+      className="fixed inset-x-0 z-(--z-sticky) flex border-t border-border bg-card px-4 py-2.5 transition-[bottom] duration-fast ease-enter md:hidden"
     >
       <EventRegisterButton />
     </div>

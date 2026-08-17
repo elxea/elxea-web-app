@@ -1,4 +1,6 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Locator, type Page } from "@playwright/test";
+
+import { unmetPrecondition } from "./support/preconditions";
 
 test.describe("Mobile viewport", () => {
   test.use({ viewport: { width: 390, height: 844 }, isMobile: true });
@@ -140,6 +142,371 @@ test.describe("Mobile viewport", () => {
     await searchInput.fill("tea");
     await searchInput.press("Enter");
     await page.waitForURL(/\/ja\/search\?q=tea/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 画面端に居座る面の重なり (occlusion) — 実ページで矩形を実測する
+// ---------------------------------------------------------------------------
+/**
+ * なぜ e2e にしか置けないのか (2026-08-17 新設)
+ *
+ * 音声ドック / チャット / Cookie 同意 は **ルートレイアウトに常駐する固定要素**
+ * (`app/[locale]/layout.tsx`) で、互いに同じ stacking context に載る。既存の
+ * 品質ゲート (unit / Storybook / Chromatic / design-kit) はすべて**部品を単体で**
+ * 見るため、「この 3 つが同時に載った実ページ」を見る目が 1 つも無かった。
+ * 2026-08-17 に見つかった 3 件の不具合 (チャット入力欄が音声バーに覆われて
+ * 押せない / モーダルの下部が音声バーに覆われる / 下端 UI が宙に浮く) は
+ * どれも部品単体では**原理的に再現しない**種類で、抜けた原因がこれ。
+ *
+ * 検査の作り方は 2 種類を使い分ける:
+ *
+ * 1. **矩形の非交差** — 縦に積んで共存させる面 (音声バー / Cookie 同意 /
+ *    チャットランチャ / PC のチャット入力バー)。重なったら即不具合なので、
+ *    boundingBox の交差面積が 0 であることを assert する。
+ * 2. **最前面の同一性 (hit test)** — 全画面を覆う面 (全画面チャット / Sheet や
+ *    Dialog)。これらは矩形が必ず重なるので、非交差では検査できない。重なった
+ *    領域の中心で `document.elementFromPoint` を引き、**そこに居るのが手前に
+ *    出るべき面であって音声バーではない**ことを assert する。
+ *
+ * 退避 (`data-retreated`) の検査は **属性ではなく矩形の位置**で行う。属性は
+ * 正しいのに実描画がずれている事故 (CSS 側の translate が効いていない等) は
+ * 属性を見ているだけでは拾えない。
+ */
+
+type Rect = { x: number; y: number; width: number; height: number };
+
+const SP_VIEWPORT = { width: 390, height: 844 };
+
+/** 音声ドックが出ている記事。CMS 上で `audioUrl` を持つ記事が前提。 */
+const KNOWN_AUDIO_ARTICLE = "/ja/journal/tsushima-oishi-farm-interview";
+
+/**
+ * 無音の WAV を組み立てる。
+ *
+ * 実在の音源 (Sanity 経由の外部 URL) に依存すると、CI からの外部到達性・帯域・
+ * 音源の差し替えでテストが揺れる。`resourceType() === "media"` の要求を全部
+ * これで差し替えることで、**本物の再生 (`playing` イベントまで到達)** を
+ * ネットワークに依存せず再現する。無音なので CI の音声デバイス有無も問わない。
+ */
+function silentWav(seconds = 30, sampleRate = 8000): Buffer {
+  const samples = seconds * sampleRate;
+  const buf = Buffer.alloc(44 + samples);
+  buf.write("RIFF", 0);
+  buf.writeUInt32LE(36 + samples, 4);
+  buf.write("WAVE", 8);
+  buf.write("fmt ", 12);
+  buf.writeUInt32LE(16, 16);
+  buf.writeUInt16LE(1, 20); // PCM
+  buf.writeUInt16LE(1, 22); // mono
+  buf.writeUInt32LE(sampleRate, 24);
+  buf.writeUInt32LE(sampleRate, 28);
+  buf.writeUInt16LE(1, 32);
+  buf.writeUInt16LE(8, 34); // 8bit
+  buf.write("data", 36);
+  buf.writeUInt32LE(samples, 40);
+  buf.fill(128, 44); // 8bit PCM の無音は 0x80
+  return buf;
+}
+
+async function mockAudioRequests(page: Page): Promise<void> {
+  const wav = silentWav();
+  await page.route("**/*", async (route) => {
+    if (route.request().resourceType() === "media") {
+      await route.fulfill({ status: 200, contentType: "audio/wav", body: wav });
+      return;
+    }
+    await route.fallback();
+  });
+}
+
+/** アニメーションが終わって矩形が動かなくなるまで待ってから返す。 */
+async function stableBox(locator: Locator, what: string): Promise<Rect> {
+  let last: Rect | null = null;
+  let previousKey = "";
+  await expect
+    .poll(
+      async () => {
+        const box = await locator.boundingBox();
+        last = box;
+        if (!box) {
+          previousKey = "";
+          return false;
+        }
+        const key = [box.x, box.y, box.width, box.height]
+          .map((n) => Math.round(n))
+          .join(",");
+        const stable = key === previousKey;
+        previousKey = key;
+        return stable;
+      },
+      { message: `${what} の矩形が安定しない`, timeout: 10_000 },
+    )
+    .toBe(true);
+  if (!last) unmetPrecondition(`${what} に矩形が無い`);
+  return last;
+}
+
+/** 2 つの矩形が重なっている面積 (px^2)。0 なら接していても重なっていない。 */
+function overlapArea(a: Rect, b: Rect): number {
+  const w = Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x);
+  const h = Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y);
+  return w > 0 && h > 0 ? Math.round(w * h) : 0;
+}
+
+function describeRect(r: Rect): string {
+  return `x=${Math.round(r.x)} y=${Math.round(r.y)} w=${Math.round(r.width)} h=${Math.round(r.height)}`;
+}
+
+/**
+ * 音声ドックを **実際に再生している状態** にして、その矩形を返す。
+ *
+ * 「音源が選ばれてバーが出た」だけでは足りないので `data-state="playing"` まで
+ * 待つ (`components/audio/audio-player.tsx` が provider の status を DOM に出す)。
+ */
+async function startAudioPlayback(page: Page): Promise<Rect> {
+  await page.goto(KNOWN_AUDIO_ARTICLE, { waitUntil: "domcontentloaded" });
+
+  const player = page.locator('[data-slot="audio-player"]').first();
+  await requireVisibleWithin(
+    player,
+    `${KNOWN_AUDIO_ARTICLE} に記事音声 (AudioBlock) がある — CMS の audioUrl が前提`,
+  );
+
+  const play = player.locator('button[aria-label="再生"]');
+  const bar = page.locator('[data-slot="audio-dock-bar"]');
+
+  // hydration 前のクリックは握られて消えるので、バーが出るまで押し直す。
+  await expect(async () => {
+    await play.click();
+    await expect(bar).toBeVisible({ timeout: 2_000 });
+  }).toPass({ timeout: 30_000 });
+
+  await expect(player).toHaveAttribute("data-state", "playing", { timeout: 20_000 });
+
+  const dock = await stableBox(bar, "音声ドックのバー");
+  // 出きった状態は画面内の最下段に居る。ここがズレていると以降の検査の前提が崩れる。
+  const viewportHeight = page.viewportSize()?.height ?? SP_VIEWPORT.height;
+  expect(
+    Math.round(dock.y + dock.height),
+    `音声ドックが画面下端に着いていない (${describeRect(dock)})`,
+  ).toBe(viewportHeight);
+  return dock;
+}
+
+/** 重なった領域の中心で最前面に居る要素を調べる。 */
+async function topmostInOverlap(
+  page: Page,
+  aSelector: string,
+  bSelector: string,
+): Promise<{ point: [number, number]; inA: boolean; inB: boolean; tag: string }> {
+  const result = await page.evaluate(
+    ({ aSel, bSel }) => {
+      const a = document.querySelector(aSel);
+      const b = document.querySelector(bSel);
+      if (!a || !b) return null;
+      const ar = a.getBoundingClientRect();
+      const br = b.getBoundingClientRect();
+      const x1 = Math.max(ar.left, br.left);
+      const x2 = Math.min(ar.right, br.right);
+      const y1 = Math.max(ar.top, br.top);
+      const y2 = Math.min(ar.bottom, br.bottom);
+      if (x2 <= x1 || y2 <= y1) return null;
+      const cx = (x1 + x2) / 2;
+      const cy = (y1 + y2) / 2;
+      const top = document.elementFromPoint(cx, cy);
+      return {
+        point: [Math.round(cx), Math.round(cy)] as [number, number],
+        inA: !!top?.closest(aSel),
+        inB: !!top?.closest(bSel),
+        tag: top?.tagName ?? "(none)",
+      };
+    },
+    { aSel: aSelector, bSel: bSelector },
+  );
+  if (!result) {
+    unmetPrecondition(
+      `${aSelector} と ${bSelector} が重なっていない — hit test の前提が崩れている`,
+    );
+  }
+  return result;
+}
+
+/**
+ * 「出るまで待つ」版の前提確認。
+ *
+ * `requireVisible` は待たずに 1 回見るだけなので、SSR 直後の hydration や
+ * 下端 UI の出現アニメーションと競合して偽陰性 (存在するのに precondition 失敗)
+ * になる。ここでは待ってから、それでも出ないときだけ前提失敗にする。
+ */
+async function requireVisibleWithin(
+  locator: Locator,
+  what: string,
+  timeout = 30_000,
+): Promise<void> {
+  const appeared = await locator
+    .first()
+    .waitFor({ state: "visible", timeout })
+    .then(() => true)
+    .catch(() => false);
+  if (!appeared) unmetPrecondition(what);
+}
+
+/** その座標を押したときに実際に受け取る要素が自分自身 (か自分の中) か。 */
+async function isHitTarget(locator: Locator): Promise<boolean> {
+  return locator.evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    const top = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+    return !!top && (top === el || el.contains(top) || top.contains(el));
+  });
+}
+
+test.describe("Bottom-fixed occlusion (SP)", () => {
+  test.use({
+    viewport: SP_VIEWPORT,
+    isMobile: true,
+    hasTouch: true,
+    // 退避を **矩形の位置**で判定するので、移動距離を 0 にする設定を明示的に外す。
+    // `prefers-reduced-motion: reduce` では `--motion-travel: 0` になり
+    // (app/globals.css)、退避は opacity + inert だけで表れて位置は動かない。
+    reducedMotion: "no-preference",
+  });
+
+  test.beforeEach(async ({ page }) => {
+    await mockAudioRequests(page);
+  });
+
+  test("音声ドック再生中でも Cookie 同意バーが覆われない", async ({ page }) => {
+    const dock = await startAudioPlayback(page);
+
+    const consent = page.locator('[data-slot="cookie-consent"]');
+    await requireVisibleWithin(consent, "初回訪問なので Cookie 同意バーが出ている");
+    const consentBox = await stableBox(consent, "Cookie 同意バー");
+
+    expect(
+      overlapArea(dock, consentBox),
+      `Cookie 同意バーが音声ドックと重なっている (consent ${describeRect(consentBox)} / dock ${describeRect(dock)})`,
+    ).toBe(0);
+
+    // 同意バーは音声ドックの真上に積まれる (下端は音声ドックの上端と一致)。
+    expect(Math.round(consentBox.y + consentBox.height)).toBe(Math.round(dock.y));
+
+    // 幾何が合っていても最前面が奪われていれば押せない。実際の当たりも見る。
+    const accept = consent.getByRole("button").last();
+    expect(await isHitTarget(accept), "同意ボタンが最前面に居ない").toBe(true);
+  });
+
+  test("音声ドック再生中でもチャットランチャが覆われない", async ({ page }) => {
+    const dock = await startAudioPlayback(page);
+
+    const launcher = page.locator('[data-slot="chat-launcher"]');
+    await requireVisibleWithin(launcher, "SP でチャットランチャが出ている");
+    const launcherBox = await stableBox(launcher, "チャットランチャ");
+
+    expect(
+      overlapArea(dock, launcherBox),
+      `チャットランチャが音声ドックと重なっている (launcher ${describeRect(launcherBox)} / dock ${describeRect(dock)})`,
+    ).toBe(0);
+    expect(await isHitTarget(launcher), "チャットランチャが最前面に居ない").toBe(true);
+  });
+
+  test("全画面チャットを開くと音声ドックは画面外へ退避し、入力欄が操作できる", async ({
+    page,
+  }) => {
+    await startAudioPlayback(page);
+
+    await page.locator('[data-slot="chat-launcher"]').click();
+    const panel = page.locator('[data-slot="chat-panel-mobile"]');
+    await expect(panel).toBeVisible({ timeout: 10_000 });
+
+    const bar = page.locator('[data-slot="audio-dock-bar"]');
+    const retreated = await stableBox(bar, "退避後の音声ドック");
+
+    // 退避の判定は矩形の位置で行う (属性だけを見ると、属性は正しいのに
+    // 実描画が動いていない事故を拾えない)。上端が画面下端以下 = 完全に画面外。
+    expect(
+      Math.round(retreated.y),
+      `音声ドックが画面外へ退避していない (${describeRect(retreated)})`,
+    ).toBeGreaterThanOrEqual(SP_VIEWPORT.height);
+
+    // 属性は補助的に併せて見る (退避の意図が DOM に出ているか)。
+    await expect(bar).toHaveAttribute("data-retreated", "true");
+
+    const input = page.locator('[data-slot="chat-input-bar-mobile"] input');
+    await expect(input).toBeVisible();
+    const inputBox = await stableBox(input, "全画面チャットの入力欄");
+
+    expect(
+      overlapArea(retreated, inputBox),
+      `チャット入力欄が音声ドックと重なっている (input ${describeRect(inputBox)} / dock ${describeRect(retreated)})`,
+    ).toBe(0);
+
+    // 2026-08-17 の不具合そのもの: 入力欄の中心を押すと音声バーが受け取っていた。
+    expect(
+      await isHitTarget(input),
+      "チャット入力欄が最前面に居ない (別の面が覆っている)",
+    ).toBe(true);
+
+    // 覆われていないだけでなく、実際に文字が入ること。
+    await input.click();
+    await input.fill("テスト");
+    await expect(input).toHaveValue("テスト");
+  });
+
+  test("音声ドック再生中でもモバイルメニュー (Sheet) が手前に出る", async ({ page }) => {
+    await startAudioPlayback(page);
+
+    await page.getByRole("button", { name: "Menu" }).click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible({ timeout: 10_000 });
+    await stableBox(dialog, "モバイルメニューの Sheet");
+
+    // 全画面を覆う面なので矩形は必ず重なる。重なった領域で最前面を見る。
+    const hit = await topmostInOverlap(
+      page,
+      '[role="dialog"]',
+      '[data-slot="audio-dock-bar"]',
+    );
+    expect(
+      hit.inB,
+      `Sheet と音声ドックが重なった座標 (${hit.point.join(",")}) で音声ドックが手前に出ている ` +
+        `(最前面=${hit.tag})。shadcn の生 z-50 が名前付きレイヤー (--z-modal) に ` +
+        `接続されていないと必ずこうなる。`,
+    ).toBe(false);
+    expect(hit.inA, `Sheet が最前面に居ない (最前面=${hit.tag})`).toBe(true);
+  });
+});
+
+test.describe("Bottom-fixed coexistence (PC)", () => {
+  // PC は退避させず **縦に積んで共存** させる (Setaka 裁定 2026-08-17)。
+  // SP 側の退避を直すときに PC の共存を壊さないための対の検査。
+  test.use({ viewport: { width: 1280, height: 800 }, reducedMotion: "no-preference" });
+
+  test("音声ドックとチャット入力バーが縦に積まれて共存する", async ({ page }) => {
+    await mockAudioRequests(page);
+    await startAudioPlayback(page);
+
+    const bar = page.locator('[data-slot="audio-dock-bar"]');
+    const dock = await stableBox(bar, "音声ドックのバー");
+    // PC では退避しない。
+    await expect(bar).toHaveAttribute("data-retreated", "false");
+
+    const chatBar = page.locator('[data-slot="chat-input-bar"]');
+    await requireVisibleWithin(chatBar, "PC でチャット入力バーが出ている");
+    const chatBox = await stableBox(chatBar, "PC のチャット入力バー");
+
+    expect(
+      overlapArea(dock, chatBox),
+      `PC のチャット入力バーが音声ドックと重なっている (chat ${describeRect(chatBox)} / dock ${describeRect(dock)})`,
+    ).toBe(0);
+    expect(
+      Math.round(chatBox.y + chatBox.height),
+      "チャット入力バーが音声ドックより下に居る",
+    ).toBeLessThanOrEqual(Math.round(dock.y));
+    expect(
+      await isHitTarget(chatBar.locator("input").first()),
+      "PC のチャット入力欄が最前面に居ない",
+    ).toBe(true);
   });
 });
 

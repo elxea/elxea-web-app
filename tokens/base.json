@@ -980,56 +980,6 @@
         }
       }
     },
-    "level": {
-      "0": {
-        "$value": "0",
-        "$description": "Flat — base content"
-      },
-      "1": {
-        "$value": "10",
-        "$description": "Raised — card, sticky header"
-      },
-      "2": {
-        "$value": "20",
-        "$description": "Floating — dropdown, popover"
-      },
-      "3": {
-        "$value": "30",
-        "$description": "Overlay — modal backdrop"
-      },
-      "4": {
-        "$value": "40",
-        "$description": "Modal — dialog, sheet"
-      },
-      "5": {
-        "$value": "50",
-        "$description": "Top — toast, notification"
-      },
-      "$type": "number",
-      "$description": "z-index elevation levels"
-    },
-    "zIndex": {
-      "0": {
-        "$value": "0"
-      },
-      "10": {
-        "$value": "10"
-      },
-      "20": {
-        "$value": "20"
-      },
-      "30": {
-        "$value": "30"
-      },
-      "40": {
-        "$value": "40"
-      },
-      "50": {
-        "$value": "50"
-      },
-      "$type": "number",
-      "$description": "Raw z-index values"
-    },
     "opacity": {
       "0": {
         "$value": "0"
