@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { buildChatSessionCookie } from "@/lib/chat/session-cookie";
 
 /**
  * LINE Login button — Direct OAuth 2.0 via <a href> to access.line.me.
@@ -42,7 +43,9 @@ export function LineLoginButton({
     try {
       const sessionId = localStorage.getItem("elxea-chat-session-id");
       if (sessionId) {
-        document.cookie = `chat_session_id=${sessionId};path=/;max-age=300;SameSite=Lax;Secure`;
+        // `Secure` は secure context のときだけ付ける。非 secure origin では
+        // ブラウザが `Secure` 付きクッキーを黙って捨てるため (lib/chat/session-cookie.ts)。
+        document.cookie = buildChatSessionCookie(sessionId, window.isSecureContext);
       }
     } catch {
       // localStorage not available
@@ -70,7 +73,9 @@ export function LineLoginButton({
     try {
       const sessionId = localStorage.getItem("elxea-chat-session-id");
       if (sessionId) {
-        document.cookie = `chat_session_id=${sessionId};path=/;max-age=300;SameSite=Lax;Secure`;
+        // `Secure` は secure context のときだけ付ける。非 secure origin では
+        // ブラウザが `Secure` 付きクッキーを黙って捨てるため (lib/chat/session-cookie.ts)。
+        document.cookie = buildChatSessionCookie(sessionId, window.isSecureContext);
       }
     } catch {
       // noop
