@@ -56,7 +56,7 @@
   },
   "components/journal/journal-list.tsx": {
     "elxea-tokens/section-spacing-utility": {
-      "count": 3
+      "count": 2
     }
   },
   "components/layout/header.tsx": {
