@@ -1,10 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import { SendHorizontal, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 // vaul Drawer removed — replaced with a plain fixed panel for iOS keyboard compatibility
 import { cn } from "@/lib/utils";
+import { trackEvent } from "@/lib/analytics";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useChatContext } from "./chat-provider";
 import type { ChatMessageMeta } from "./chat-provider";
@@ -267,17 +269,64 @@ function MessagesList({
 }
 
 // ---------------------------------------------------------------------------
-// Desktop: Chat panel + inline input bar
+// Shared: chat-open instrumentation
+// ---------------------------------------------------------------------------
+
+/**
+ * Records that the visitor opened the chat, split by surface.
+ *
+ * Desktop gave up its always-visible 672px input bar in favour of a launcher,
+ * which is a real trade of discoverability for a usable footer. The open rate
+ * per surface is the number that says whether the labelled pill bought it back,
+ * so it has to exist before the change ships — not after someone asks.
+ *
+ * Two sinks on purpose: `trackEvent` feeds the GTM dataLayer (and is itself
+ * gated on cookie consent inside `lib/analytics`), while `/api/chat/event`
+ * attributes the action to the chat session server-side, where the rest of the
+ * CX-agent funnel already lives.
+ */
+function useTrackChatOpen() {
+  const { sessionId } = useChatContext();
+
+  return useCallback(
+    (surface: "desktop" | "mobile") => {
+      trackEvent("chat_open", { surface });
+
+      if (!sessionId) return;
+      void fetch("/api/chat/event", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          session_id: sessionId,
+          action: "chat_open",
+          metadata: { surface },
+        }),
+        keepalive: true,
+      }).catch(() => {
+        // Instrumentation must never be able to stop the chat from opening.
+      });
+    },
+    [sessionId],
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Desktop: launcher + bottom-right anchored chat panel
 // ---------------------------------------------------------------------------
 
 function DesktopChatBar() {
   const { messages, status, isOpen, setIsOpen, pathname, sendMessage } =
     useChatContext();
+  const t = useTranslations("chat");
 
   const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
+  // Wraps both the panel and the launcher. If the launcher sat outside this
+  // ref, the same mousedown that opens the chat would immediately be judged an
+  // "outside click" and close it again.
+  const rootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const trackChatOpen = useTrackChatOpen();
 
   const isStreaming = status === "streaming" || status === "submitted";
 
@@ -303,7 +352,7 @@ function DesktopChatBar() {
     if (typeof window !== "undefined" && window.innerWidth < 768) return;
 
     function handleClick(e: MouseEvent) {
-      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
         setIsOpen(false);
       }
     }
@@ -351,21 +400,25 @@ function DesktopChatBar() {
   const placeholder = getPlaceholder(pathname);
 
   return (
-    <div
-      ref={panelRef}
-      data-slot="chat-bar-desktop"
-      className="fixed bottom-0 left-0 right-0 z-40 hidden md:block"
-    >
-      {/* Expanded chat panel */}
-      {isOpen && messages.length > 0 && (
+    // Zero-height, unpositioned wrapper: it exists only to give the outside-
+    // click handler one subtree covering both children. Its children position
+    // themselves. The previous full-width `fixed bottom-0 left-0 right-0` bar
+    // is gone on purpose — with no `pointer-events-none` it swallowed clicks
+    // across the whole 108px strip and made the footer's legal links
+    // unreachable.
+    <div ref={rootRef} data-slot="chat-bar-desktop" className="hidden md:block">
+      {isOpen ? (
         <div
           data-slot="chat-panel"
           className={cn(
-            "mx-auto w-full max-w-2xl",
-            "border border-border/40 rounded-t-2xl",
-            "bg-background/80 backdrop-blur-xl",
-            "shadow-lg",
-            "transition-all duration-300",
+            "fixed z-50 right-6",
+            "bottom-[calc(var(--bottom-obstruction,0px)+1.5rem)]",
+            "w-[min(400px,calc(100vw-3rem))]",
+            "max-h-[min(640px,calc(100dvh-8rem-var(--bottom-obstruction,0px)))]",
+            "flex flex-col overflow-hidden",
+            "border border-border/40 rounded-2xl",
+            "bg-background/95 backdrop-blur-xl shadow-lg",
+            "animate-in slide-in-from-bottom-2 fade-in duration-200",
           )}
           onWheel={(e) => {
             // Prevent scroll from propagating to the page body when
@@ -375,7 +428,7 @@ function DesktopChatBar() {
           }}
         >
           {/* Panel header */}
-          <div className="flex items-center justify-between border-b border-border/40 px-4 py-2">
+          <div className="flex shrink-0 items-center justify-between border-b border-border/40 px-4 py-2">
             <span className="text-xs font-medium text-muted-foreground tracking-wide">
               elxea assistant
             </span>
@@ -383,7 +436,7 @@ function DesktopChatBar() {
               variant="ghost"
               size="icon-xs"
               onClick={() => setIsOpen(false)}
-              aria-label="Close chat panel"
+              aria-label={t("launcher.close")}
             >
               <X className="size-3.5" />
             </Button>
@@ -394,29 +447,36 @@ function DesktopChatBar() {
             messages={messages}
             isStreaming={isStreaming}
             messagesEndRef={messagesEndRef}
-            className="max-h-[60vh]"
+            className="flex-1 min-h-0"
           />
-        </div>
-      )}
 
-      {/* Input bar (always visible on desktop) */}
-      <div
-        data-slot="chat-input-bar"
-        className="mx-auto w-full max-w-2xl px-4 pb-14 pt-3"
-      >
-        <ChatInputForm
-          input={input}
-          setInput={setInput}
-          onSubmit={onSubmit}
-          onKeyDown={onKeyDown}
-          onFocus={() => {
-            if (messages.length > 0) setIsOpen(true);
+          {/* Input bar. Renamed from `chat-input-bar` to mirror
+              `chat-input-bar-mobile`: the old name belonged to the always-on
+              full-width strip, and e2e asserts that name is gone for good. */}
+          <div
+            data-slot="chat-input-bar-desktop"
+            className="shrink-0 border-t border-border/40 px-4 py-3"
+          >
+            <ChatInputForm
+              input={input}
+              setInput={setInput}
+              onSubmit={onSubmit}
+              onKeyDown={onKeyDown}
+              placeholder={placeholder}
+              isStreaming={isStreaming}
+              inputRef={inputRef}
+            />
+          </div>
+        </div>
+      ) : (
+        <ChatLauncher
+          onClick={() => {
+            setIsOpen(true);
+            trackChatOpen("desktop");
           }}
-          placeholder={placeholder}
-          isStreaming={isStreaming}
-          inputRef={inputRef}
+          hasMessages={messages.length > 0}
         />
-      </div>
+      )}
     </div>
   );
 }
@@ -428,10 +488,12 @@ function DesktopChatBar() {
 function MobileChatDrawer() {
   const { messages, status, isOpen, setIsOpen, pathname, sendMessage } =
     useChatContext();
+  const t = useTranslations("chat");
 
   const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const trackChatOpen = useTrackChatOpen();
 
   const isStreaming = status === "streaming" || status === "submitted";
 
@@ -495,10 +557,15 @@ function MobileChatDrawer() {
   return (
     <div data-slot="chat-bar-mobile" className="md:hidden">
       {/* Launcher button */}
-      <ChatLauncher
-        onClick={() => setIsOpen(true)}
-        hasMessages={messages.length > 0}
-      />
+      {!isOpen && (
+        <ChatLauncher
+          onClick={() => {
+            setIsOpen(true);
+            trackChatOpen("mobile");
+          }}
+          hasMessages={messages.length > 0}
+        />
+      )}
 
       {/* Fullscreen fixed panel — no vaul, no gesture detection, no viewport
           resize side-effects. Pure CSS positioning that iOS keyboards cannot
@@ -520,7 +587,7 @@ function MobileChatDrawer() {
               variant="ghost"
               size="icon-xs"
               onClick={() => setIsOpen(false)}
-              aria-label="Close chat"
+              aria-label={t("launcher.close")}
             >
               <X className="size-4" />
             </Button>
