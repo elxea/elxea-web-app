@@ -2,7 +2,7 @@
   "$schema_note": "Figma node ⇄ code path 対応表。経済化施策① (Decision Log 39c70c9d064c81079145f69744e7b8f5)。自動化が Figma コンポーネントに対して正しいソースファイルを編集できるようにする lookup index。値の二重管理はしない (SoT=Code, Figma=参照 / CLAUDE.md 案 B)。検証は scripts/design-system/validate-design-map.ts (schema + code_path 実在 + --figma で node 実在)。",
   "figma_file_key": "AWLnI0XF07e8rScuxPYPc7",
   "figma_components_page": "5246:3",
-  "updated_at": "2026-07-13",
+  "updated_at": "2026-08-17",
   "conventions": {
     "entry": "{ figma_node_id, figma_name, code_path, kind, notes }。code_path はリポジトリルート相対。inline 定義部品は「定義/描画を含むファイル」を code_path とする (編集対象がそのファイルのため)。",
     "kind": "ds-component = elxea 固有の DS 部品 / module = Header/Footer 等の大型合成モジュール / shadcn = shadcn/ui プリミティブ。",
@@ -30,7 +30,6 @@
     { "figma_node_id": "5723:49", "figma_name": "ContactSuccessCard", "code_path": "app/[locale]/contact/contact-form.tsx", "kind": "ds-component", "notes": "success state の inline 表示 (従来 L50 付近)。専用 component 無し。Contact S3。" },
     { "figma_node_id": "6598:155", "figma_name": "EventCard", "code_path": "app/[locale]/events/page.tsx", "kind": "ds-component", "notes": "不整合注記: Figma は専用 EventCard symbol だが、コードは ImageCard を再利用して inline 描画 (専用 component 無し)。方針統一は要判断 (HANDOFF Step2-E)。編集対象は本ページ。" },
     { "figma_node_id": "6950:124", "figma_name": "MenuTrigger", "code_path": "components/layout/header.tsx", "kind": "ds-component", "notes": "inline (Header 内 SheetTrigger ハンバーガー, aria-label=Menu)。code_path は Header と同一ファイル。" },
-    { "figma_node_id": "6951:126", "figma_name": "MembershipPlanCard", "code_path": "app/[locale]/membership/page.tsx", "kind": "ds-component", "notes": "inline (TIERS.map, tier ごとに構成)。専用 component 無し。" },
     { "figma_node_id": "6956:18179", "figma_name": "Tag", "code_path": "app/[locale]/(reading)/journal/[slug]/page.tsx", "kind": "ds-component", "notes": "inline chip (border+rounded のタグリンク)。専用 Tag component 無し。" },
     { "figma_node_id": "6904:331", "figma_name": "CollectionCard", "code_path": "app/[locale]/collections/page.tsx", "kind": "ds-component", "notes": "inline (CollectionsContent, ImageCard を利用)。" },
     { "figma_node_id": "6904:337", "figma_name": "FarmerCard", "code_path": "app/[locale]/(reading)/farmers/page.tsx", "kind": "ds-component", "notes": "inline (FarmersList, ImageCard を利用)。lib/fictional-farmers.ts がデータ源。" },
