@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { AspectRatio } from "./aspect-ratio";
 
 const meta = {
-  title: "UI/AspectRatio",
+  title: "02 Elements/AspectRatio",
   component: AspectRatio,
   tags: ["autodocs"],
 } satisfies Meta<typeof AspectRatio>;

@@ -19,7 +19,7 @@ import {
 } from "./command";
 
 const meta = {
-  title: "UI/Command",
+  title: "02 Elements/Command",
   component: Command,
   tags: ["autodocs"],
   parameters: {

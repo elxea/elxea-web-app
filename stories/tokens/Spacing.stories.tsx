@@ -130,7 +130,7 @@ function SpacingScale() {
 }
 
 const meta = {
-  title: "Tokens/Spacing",
+  title: "01 Foundations/Spacing",
   component: SpacingScale,
   parameters: {
     layout: "padded",

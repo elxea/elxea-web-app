@@ -13,7 +13,7 @@ import {
  * お茶メニュー 8063:2144 / 8063:2372) の骨格部品。
  */
 const meta = {
-  title: "Catalog/List Pattern",
+  title: "03 Patterns/CatalogList",
   component: ListPageHead,
   parameters: { layout: "padded" },
 } satisfies Meta<typeof ListPageHead>;

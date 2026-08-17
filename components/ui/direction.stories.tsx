@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { DirectionProvider } from "./direction";
 
 const meta = {
-  title: "UI/DirectionProvider",
+  title: "02 Elements/DirectionProvider",
   component: DirectionProvider,
   tags: ["autodocs"],
 } satisfies Meta<typeof DirectionProvider>;

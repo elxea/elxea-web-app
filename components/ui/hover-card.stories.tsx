@@ -5,7 +5,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "./avatar";
 import { Button } from "./button";
 
 const meta = {
-  title: "UI/HoverCard",
+  title: "02 Elements/HoverCard",
   component: HoverCard,
   tags: ["autodocs"],
 } satisfies Meta<typeof HoverCard>;

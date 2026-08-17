@@ -37,7 +37,28 @@ stories/
     Typography.stories.tsx     ← タイポグラフィ一覧
 ```
 
-### Storybook 起動
+### カタログの階層 (story titleの規約)
+
+サイドバーは **抽象度順** に並べる。番号は並び順の制御用で、`.storybook/preview.ts`
+の `options.storySort` がtitleの昇順で並べる (同一title内 = 1ファイル内の
+storyの順番は書いた順のまま保つ)。
+
+```
+01 Foundations/   色・字・余白・角丸・レイアウト骨格 (トークンの見本)
+02 Elements/      単独で意味を持つ基礎部品 (shadcn/ui の 56 個 + Overview)
+03 Patterns/      複数部品を組み合わせた複合部品 (Cart / ChatPanel / HeroSection 等)
+04 Visualizations/
+     Flavor/      味と香りの図 (FlavorMatrix / AromaField / TasteMap)
+     Terroir/     土地の地図 (LensMap / OverviewMap)
+05 Media/         音の部品 (AudioDock / AudioWaveform)
+06 Pages/         画面単位 (現時点で該当 story なし)
+99 Preview/       未確定・差し替え前提のモックアップ (Me)
+```
+
+新しいstoryを足すときは **既存の番号グループのどれかに入れる**。
+新しいトップレベルグループを勝手に作らない (階層はSetaka承認事項)。
+
+### Storybook起動
 ```bash
 pnpm design-catalog     # elxea Design System カタログ dev server (port 6006)
 pnpm build:design-catalog    # static build
@@ -65,7 +86,7 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { ComponentName } from "./component-name";
 
 const meta = {
-  title: "UI/ComponentName",
+  title: "02 Elements/ComponentName",
   component: ComponentName,
   tags: ["autodocs"],
   parameters: {

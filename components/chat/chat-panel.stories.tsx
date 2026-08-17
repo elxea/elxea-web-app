@@ -8,7 +8,7 @@ import { ChatPanel } from "./chat-panel";
  * ヘッダーと本文の関係だけを見る。
  */
 const meta = {
-  title: "Chat/Panel",
+  title: "03 Patterns/ChatPanel",
   component: ChatPanel,
   parameters: { layout: "padded" },
   args: { title: "elxea assistant", onClose: () => {} },

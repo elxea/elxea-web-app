@@ -15,7 +15,7 @@ import { Avatar, AvatarFallback } from "./avatar";
 import { Button } from "./button";
 
 const meta = {
-  title: "UI/Item",
+  title: "02 Elements/Item",
   component: Item,
   tags: ["autodocs"],
 } satisfies Meta<typeof Item>;

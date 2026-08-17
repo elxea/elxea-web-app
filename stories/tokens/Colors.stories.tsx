@@ -200,7 +200,7 @@ function ColorPalette() {
 }
 
 const meta = {
-  title: "Tokens/Colors",
+  title: "01 Foundations/Colors",
   component: ColorPalette,
   parameters: {
     layout: "padded",

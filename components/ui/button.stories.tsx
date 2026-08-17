@@ -4,7 +4,7 @@ import { ChevronRight, Loader2, Mail } from "lucide-react";
 import { Button } from "./button";
 
 const meta = {
-  title: "UI/Button",
+  title: "02 Elements/Button",
   component: Button,
   tags: ["autodocs"],
   args: {

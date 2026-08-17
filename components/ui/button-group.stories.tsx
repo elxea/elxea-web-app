@@ -3,7 +3,7 @@ import { ButtonGroup, ButtonGroupText, ButtonGroupSeparator } from "./button-gro
 import { Button } from "./button";
 
 const meta = {
-  title: "UI/ButtonGroup",
+  title: "02 Elements/ButtonGroup",
   component: ButtonGroup,
   tags: ["autodocs"],
 } satisfies Meta<typeof ButtonGroup>;

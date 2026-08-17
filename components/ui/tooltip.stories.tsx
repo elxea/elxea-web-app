@@ -9,7 +9,7 @@ import { Button } from "./button";
 import { Info } from "lucide-react";
 
 const meta = {
-  title: "UI/Tooltip",
+  title: "02 Elements/Tooltip",
   component: Tooltip,
   tags: ["autodocs"],
   decorators: [

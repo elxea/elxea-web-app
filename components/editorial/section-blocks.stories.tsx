@@ -17,7 +17,7 @@ import {
  * 定期便LP (8071:2 / 8073:2) が共有する行型のカタログ。
  */
 const meta = {
-  title: "Editorial/SectionBlocks",
+  title: "03 Patterns/SectionBlocks",
   component: SectionHead,
   parameters: { layout: "fullscreen" },
 } satisfies Meta<typeof SectionHead>;

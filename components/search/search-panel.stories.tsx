@@ -7,7 +7,7 @@ import { InputUnderline, SearchPanel } from "./search-panel";
  * PC 検索オーバーレイ側 (7967:42105 / パネル 7967:42151)。
  */
 const meta = {
-  title: "Search/Panel",
+  title: "03 Patterns/SearchPanel",
   component: SearchPanel,
   parameters: { layout: "fullscreen" },
 } satisfies Meta<typeof SearchPanel>;

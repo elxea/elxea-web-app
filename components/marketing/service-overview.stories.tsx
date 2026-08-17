@@ -12,7 +12,7 @@ import { ServiceOverview } from "./service-overview";
  * Storybook では NextIntlClientProvider で包む。
  */
 const meta = {
-  title: "Marketing/ServiceOverview",
+  title: "03 Patterns/ServiceOverview",
   component: ServiceOverview,
   parameters: { layout: "fullscreen" },
   decorators: [

@@ -9,7 +9,7 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { HeroSection } from "./hero-section";
 
 const meta = {
-  title: "elxea/Business/HeroSection",
+  title: "03 Patterns/HeroSection",
   component: HeroSection,
   parameters: {
     layout: "fullscreen",

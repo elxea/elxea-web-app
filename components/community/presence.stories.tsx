@@ -10,7 +10,7 @@ import { ScaleBar } from "./scale-bar";
  * NoteCard 7840:39598 / ReactionChip 7840:39256 / ScaleBar 7840:39260。
  */
 const meta = {
-  title: "Community/Presence",
+  title: "03 Patterns/CommunityPresence",
   component: NoteCard,
   parameters: { layout: "padded" },
 } satisfies Meta<typeof NoteCard>;

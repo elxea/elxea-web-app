@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { Skeleton } from "./skeleton";
 
 const meta = {
-  title: "UI/Skeleton",
+  title: "02 Elements/Skeleton",
   component: Skeleton,
   tags: ["autodocs"],
 } satisfies Meta<typeof Skeleton>;

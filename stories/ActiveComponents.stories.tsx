@@ -38,7 +38,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Toaster } from "@/components/ui/sonner";
 
 const meta = {
-  title: "elxea/Active Components",
+  title: "02 Elements/Overview",
   parameters: {
     layout: "padded",
     nextjs: { appDirectory: true },

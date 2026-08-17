@@ -3,7 +3,7 @@ import { Textarea } from "./textarea";
 import { Label } from "./label";
 
 const meta = {
-  title: "UI/Textarea",
+  title: "02 Elements/Textarea",
   component: Textarea,
   tags: ["autodocs"],
 } satisfies Meta<typeof Textarea>;

@@ -10,7 +10,7 @@ import {
 import { Button } from "./button";
 
 const meta = {
-  title: "UI/InputGroup",
+  title: "02 Elements/InputGroup",
   component: InputGroup,
   tags: ["autodocs"],
 } satisfies Meta<typeof InputGroup>;

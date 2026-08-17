@@ -23,7 +23,7 @@ import { TerroirLensBlock } from "./terroir-lens-block";
  * 別々の読まれ方をする。茶園の点に触れると土地の言葉が出る (数字は標高だけ)。
  */
 const meta = {
-  title: "Viz/TerroirLensMap",
+  title: "04 Visualizations/Terroir/LensMap",
   component: TerroirLensBlock,
   parameters: {
     layout: "fullscreen",

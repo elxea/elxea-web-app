@@ -10,7 +10,7 @@ import { Logo } from "./logo";
  * Logo / Wordmark 7964:242。
  */
 const meta = {
-  title: "Layout/Foundation",
+  title: "01 Foundations/Layout",
   component: Container,
   parameters: { layout: "fullscreen" },
 } satisfies Meta<typeof Container>;

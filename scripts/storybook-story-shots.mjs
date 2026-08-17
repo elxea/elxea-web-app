@@ -25,7 +25,14 @@ function arg(name, fallback) {
 
 const BASE = arg("base", "http://localhost:6006");
 const OUT = path.resolve(arg("out", "./.storybook-shots"));
-const FILTER = new RegExp(arg("filter", "^(viz|audio)-"));
+/**
+ * 既定の対象は「図」と「音」の group。story id は title から作られるので、
+ * カタログの階層 (`04 Visualizations` / `05 Media` / `99 Preview`) がそのまま
+ * id の頭に出る。
+ */
+const FILTER = new RegExp(
+  arg("filter", "^(04-visualizations|05-media|99-preview)-")
+);
 /** 図が落ち着くまでの待ち。Canvas の初期アニメと DEM タイルの到着を含む。 */
 const SETTLE_MS = Number(arg("settle", "6000"));
 
@@ -35,13 +42,13 @@ const SETTLE_MS = Number(arg("settle", "6000"));
  * 何も写らない (= 部品が動いている証拠にならない)。
  */
 const CLICK_BEFORE_SHOT = {
-  "audio-audiodock--playable": '[data-slot="track-row"] button',
-  "audio-audiodock--precomputed-waveform": '[data-slot="track-row"] button',
-  "audio-audiodock--synthesized-waveform": '[data-slot="track-row"] button',
-  "audio-audiodock--source-error": '[data-slot="track-row"] button',
+  "05-media-audiodock--playable": '[data-slot="track-row"] button',
+  "05-media-audiodock--precomputed-waveform": '[data-slot="track-row"] button',
+  "05-media-audiodock--synthesized-waveform": '[data-slot="track-row"] button',
+  "05-media-audiodock--source-error": '[data-slot="track-row"] button',
   // dock 側にも button が居る (音源未選択でも DOM には在る) ので、
   // 位置ではなく文言で指す。
-  "audio-audiodock--expanded-panel": "text=再生してプレイヤーを開く",
+  "05-media-audiodock--expanded-panel": "text=再生してプレイヤーを開く",
 };
 
 const index = await fetch(`${BASE}/index.json`).then((r) => r.json());

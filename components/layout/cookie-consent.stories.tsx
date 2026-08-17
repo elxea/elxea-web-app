@@ -31,7 +31,7 @@ function CookieConsentPreview() {
 }
 
 const meta = {
-  title: "UI/CookieConsent",
+  title: "03 Patterns/CookieConsent",
   component: CookieConsentPreview,
   tags: ["autodocs"],
   parameters: {

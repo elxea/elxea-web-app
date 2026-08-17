@@ -3,7 +3,7 @@ import { AlignCenter, AlignLeft, AlignRight, Bold, Italic, Underline } from "luc
 import { ToggleGroup, ToggleGroupItem } from "./toggle-group";
 
 const meta = {
-  title: "UI/ToggleGroup",
+  title: "02 Elements/ToggleGroup",
   component: ToggleGroup,
   tags: ["autodocs"],
 } satisfies Meta<typeof ToggleGroup>;

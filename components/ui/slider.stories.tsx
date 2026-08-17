@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { Slider } from "./slider";
 
 const meta = {
-  title: "UI/Slider",
+  title: "02 Elements/Slider",
   component: Slider,
   tags: ["autodocs"],
 } satisfies Meta<typeof Slider>;

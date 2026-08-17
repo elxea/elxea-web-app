@@ -9,7 +9,7 @@ import { TimeMarker } from "./time-marker";
  * AuthorByline 7552:238 / TimeMarker 7552:23574。
  */
 const meta = {
-  title: "Journal/Primitives",
+  title: "03 Patterns/JournalPrimitives",
   component: AuthorByline,
   parameters: { layout: "padded" },
 } satisfies Meta<typeof AuthorByline>;

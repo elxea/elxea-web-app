@@ -91,7 +91,7 @@ function RadiusScale() {
 }
 
 const meta = {
-  title: "Tokens/Radius",
+  title: "01 Foundations/Radius",
   component: RadiusScale,
   parameters: {
     layout: "padded",

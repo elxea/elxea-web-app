@@ -11,7 +11,7 @@ import {
 import { Button } from "./button";
 
 const meta = {
-  title: "UI/Empty",
+  title: "02 Elements/Empty",
   component: Empty,
   tags: ["autodocs"],
 } satisfies Meta<typeof Empty>;

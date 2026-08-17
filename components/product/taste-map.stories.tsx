@@ -4,7 +4,7 @@ import { TasteMap } from "./taste-map";
 
 /** 味×香りマトリクス — Figma PC 8056:1639 / SP 8058:1803。 */
 const meta = {
-  title: "Product/TasteMap",
+  title: "04 Visualizations/Flavor/TasteMap",
   component: TasteMap,
   parameters: { layout: "padded" },
 } satisfies Meta<typeof TasteMap>;

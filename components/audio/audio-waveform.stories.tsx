@@ -20,7 +20,7 @@ import { AudioWaveform } from "./audio-waveform";
  * 3. どちらも無い → src から決定的に合成する (再描画しても形が変わらない)
  */
 const meta = {
-  title: "Audio/AudioWaveform",
+  title: "05 Media/AudioWaveform",
   component: AudioWaveform,
   parameters: { layout: "padded" },
 } satisfies Meta<typeof AudioWaveform>;

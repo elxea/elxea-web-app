@@ -15,7 +15,7 @@ import { QuantityStepper } from "@/components/ui/quantity-stepper";
  * 数値・文言は Figma フレームの見本値をそのまま使う (実データではない)。
  */
 const meta = {
-  title: "Cart/Primitives",
+  title: "03 Patterns/Cart",
   component: CartLine,
   parameters: { layout: "padded" },
 } satisfies Meta<typeof CartLine>;

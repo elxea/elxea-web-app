@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { Kbd, KbdGroup } from "./kbd";
 
 const meta = {
-  title: "UI/Kbd",
+  title: "02 Elements/Kbd",
   component: Kbd,
   tags: ["autodocs"],
 } satisfies Meta<typeof Kbd>;

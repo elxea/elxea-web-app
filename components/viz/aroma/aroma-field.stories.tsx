@@ -17,7 +17,7 @@ import { AromaFieldBlock } from "./aroma-field-block";
  * `lib/roji/tea-aroma.ts` が決め、story からは銘柄番号とカテゴリーしか渡さない。
  */
 const meta = {
-  title: "Viz/AromaField",
+  title: "04 Visualizations/Flavor/AromaField",
   component: AromaFieldBlock,
   parameters: {
     layout: "fullscreen",

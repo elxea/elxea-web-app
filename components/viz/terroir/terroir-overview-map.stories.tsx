@@ -23,7 +23,7 @@ import { TerroirOverviewBlock } from "./terroir-overview-block";
  * WebGL が要る点は `TerroirLensMap` と同じ。
  */
 const meta = {
-  title: "Viz/TerroirOverviewMap",
+  title: "04 Visualizations/Terroir/OverviewMap",
   component: TerroirOverviewBlock,
   parameters: {
     layout: "fullscreen",

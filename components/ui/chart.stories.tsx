@@ -10,7 +10,7 @@ import {
 } from "./chart";
 
 const meta = {
-  title: "UI/Chart",
+  title: "02 Elements/Chart",
   component: ChartContainer,
   tags: ["autodocs"],
 } satisfies Meta<typeof ChartContainer>;

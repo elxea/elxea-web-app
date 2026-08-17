@@ -210,7 +210,7 @@ function TypographyScale() {
 }
 
 const meta = {
-  title: "Tokens/Typography",
+  title: "01 Foundations/Typography",
   component: TypographyScale,
   parameters: {
     layout: "padded",

@@ -9,7 +9,7 @@ import {
 } from "./avatar";
 
 const meta = {
-  title: "UI/Avatar",
+  title: "02 Elements/Avatar",
   component: Avatar,
   tags: ["autodocs"],
 } satisfies Meta<typeof Avatar>;

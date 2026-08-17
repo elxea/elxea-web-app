@@ -35,7 +35,7 @@ import { TrackRow } from "./track-row";
  * 行か再生ボタンを 1 度押す必要がある (本番と同じ挙動)。
  */
 const meta = {
-  title: "Audio/AudioDock",
+  title: "05 Media/AudioDock",
   component: AudioDock,
   parameters: {
     layout: "fullscreen",

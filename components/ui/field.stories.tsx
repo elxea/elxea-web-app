@@ -13,7 +13,7 @@ import { Input } from "./input";
 import { Checkbox } from "./checkbox";
 
 const meta = {
-  title: "UI/Field",
+  title: "02 Elements/Field",
   component: Field,
   tags: ["autodocs"],
 } satisfies Meta<typeof Field>;

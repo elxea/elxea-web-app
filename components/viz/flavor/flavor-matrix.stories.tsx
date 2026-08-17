@@ -26,7 +26,7 @@ import { FlavorMatrixBlock } from "./flavor-matrix-block";
  *   静止画では分からない。ここで初めて動いて見える
  */
 const meta = {
-  title: "Viz/FlavorMatrix",
+  title: "04 Visualizations/Flavor/FlavorMatrix",
   component: FlavorMatrixBlock,
   parameters: {
     layout: "fullscreen",

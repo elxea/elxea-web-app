@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { NativeSelect, NativeSelectOptGroup, NativeSelectOption } from "./native-select";
 
 const meta = {
-  title: "UI/NativeSelect",
+  title: "02 Elements/NativeSelect",
   component: NativeSelect,
   tags: ["autodocs"],
 } satisfies Meta<typeof NativeSelect>;

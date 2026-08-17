@@ -13,7 +13,7 @@ import { Input } from "./input";
 import { Label } from "./label";
 
 const meta = {
-  title: "UI/Sheet",
+  title: "02 Elements/Sheet",
   component: Sheet,
   tags: ["autodocs"],
 } satisfies Meta<typeof Sheet>;

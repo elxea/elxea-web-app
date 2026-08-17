@@ -18,7 +18,7 @@ import { WordGardenBlock } from "./garden/word-garden-block";
  * 気配がゆらぐ — は静止画では分からない。ここで初めて動いて見える。
  */
 const meta = {
-  title: "Viz/Me",
+  title: "99 Preview/Me",
   component: FootprintsBlock,
   parameters: {
     layout: "fullscreen",

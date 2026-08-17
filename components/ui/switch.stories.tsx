@@ -3,7 +3,7 @@ import { Switch } from "./switch";
 import { Label } from "./label";
 
 const meta = {
-  title: "UI/Switch",
+  title: "02 Elements/Switch",
   component: Switch,
   tags: ["autodocs"],
   // Standalone switch stories (Checked/Disabled) render without a visible

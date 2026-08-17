@@ -3,7 +3,7 @@ import { Checkbox } from "./checkbox";
 import { Label } from "./label";
 
 const meta = {
-  title: "UI/Checkbox",
+  title: "02 Elements/Checkbox",
   component: Checkbox,
   tags: ["autodocs"],
   // Standalone checkbox stories (Checked/Disabled/...) render without a visible

@@ -3,7 +3,7 @@ import { Label } from "./label";
 import { Input } from "./input";
 
 const meta = {
-  title: "UI/Label",
+  title: "02 Elements/Label",
   component: Label,
   tags: ["autodocs"],
 } satisfies Meta<typeof Label>;

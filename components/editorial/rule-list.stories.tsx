@@ -20,7 +20,7 @@ import {
  * 罫線 1 本で区切る読み物系レイアウトの共通部品。
  */
 const meta = {
-  title: "Editorial/RuleList",
+  title: "03 Patterns/RuleList",
   component: DisclosureRow,
   parameters: { layout: "padded" },
 } satisfies Meta<typeof DisclosureRow>;

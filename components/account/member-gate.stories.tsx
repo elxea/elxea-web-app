@@ -26,7 +26,7 @@ function MemberGatePreview() {
 }
 
 const meta = {
-  title: "UI/MemberGate",
+  title: "03 Patterns/MemberGate",
   component: MemberGatePreview,
   tags: ["autodocs"],
   parameters: {
