@@ -41,6 +41,7 @@ const baseURL = `http://${FAKE_APEX_HOST}:${PORT}`;
  * never match and the check would be permanently, invisibly green-by-accident. */
 const commitSha = execSync("git rev-parse --short HEAD", { encoding: "utf8" }).trim();
 
+
 /* Paths resolve relative to this config file (i.e. `e2e/`), so artefact paths are
  * pinned to the repo root explicitly. `.gitignore` ignores `/test-results/` at
  * the root only; an `e2e/test-results/` directory would be untracked-but-not-
@@ -53,9 +54,18 @@ const STUB_PORT = 3311;
  * webServer comment below. */
 const STUB_LOG = path.join(repoRoot, "test-results", "shopify-logout-stub-hits.jsonl");
 
+/* The spec compares the page's build marker against this value, so the TEST
+ * process needs it too — `webServer.env` only reaches the dev server. Setting it
+ * here keeps a single evaluation feeding both sides; computing it independently
+ * inside the spec would let the two drift and still agree by accident. */
+process.env.VERCEL_GIT_COMMIT_SHA = commitSha;
+/* Same reason: the spec reads the stub's hit log directly. */
+process.env.SHOPIFY_LOGOUT_STUB_LOG = STUB_LOG;
+
+
 export default defineConfig({
   testDir: ".",
-  testMatch: ["**/auth-session-flow.spec.ts", "**/gate0-auth-probe.spec.ts"],
+  testMatch: ["**/auth-session-flow.spec.ts"],
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: 0,
@@ -125,8 +135,16 @@ export default defineConfig({
         /* Parity with the existing e2e job (ci.yml:313-329). Without these the
          * product / journal surfaces render differently than in the main suite. */
         PREVIEW_SEED_STOREFRONT: "1",
-        NEXT_PUBLIC_SANITY_PROJECT_ID: process.env.NEXT_PUBLIC_SANITY_PROJECT_ID ?? "",
-        NEXT_PUBLIC_SANITY_DATASET: process.env.NEXT_PUBLIC_SANITY_DATASET ?? "production",
+        /* Spread conditionally: assigning "" would OVERRIDE the value the dev
+         * server would otherwise load from .env.local, and an empty projectId
+         * makes the Sanity client throw on render. Only pass these through when
+         * the surrounding environment (CI) actually supplies them. */
+        ...(process.env.NEXT_PUBLIC_SANITY_PROJECT_ID
+          ? { NEXT_PUBLIC_SANITY_PROJECT_ID: process.env.NEXT_PUBLIC_SANITY_PROJECT_ID }
+          : {}),
+        ...(process.env.NEXT_PUBLIC_SANITY_DATASET
+          ? { NEXT_PUBLIC_SANITY_DATASET: process.env.NEXT_PUBLIC_SANITY_DATASET }
+          : {}),
         /* Feeds the <meta name="x-elxea-commit"> build-identity check. */
         VERCEL_GIT_COMMIT_SHA: commitSha,
         /* Existing convention: the site-password gate would 307 every route. */

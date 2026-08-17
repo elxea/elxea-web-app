@@ -7,10 +7,32 @@ import {
   buildAuthorizeUrl,
 } from "@/lib/shopify/customer";
 import { sanitizeReturnTo } from "@/lib/auth/return-to";
+import { getRequestHostname, getRequestOrigin, isRegisteredAuthHost } from "@/lib/base-url";
 
 export async function GET(request: NextRequest) {
-  // NEXT_PUBLIC_APP_URL allows overriding the redirect URI base (e.g. for tunnels in local dev)
-  const origin = process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin;
+  /* Refuse to start an OAuth round trip we know cannot come back.
+   *
+   * `redirect_uri` is matched by Shopify against a registered allow-list by exact
+   * string, so on an unregistered host the user is sent to Shopify only to be
+   * rejected there — an opaque third-party error instead of a legible one from
+   * us. This gate turns that into a local, explainable response.
+   *
+   * 503 rather than a 4xx: the host is not wrong, it is not configured yet, and
+   * that is a server-side condition an operator fixes by registering it.
+   *
+   * `isRegisteredAuthHost` is fail-open while `LINE_ALLOWED_CALLBACK_HOSTS` is
+   * unset — which it currently is in production (verified 2026-08-18 by listing
+   * variable names only). So this is inert until somebody deliberately turns it
+   * on, and turning it off again is a single env deletion with no deploy. */
+  const hostname = getRequestHostname(request);
+  if (!isRegisteredAuthHost(hostname)) {
+    return NextResponse.json(
+      { error: "auth_host_not_registered", host: hostname },
+      { status: 503 },
+    );
+  }
+
+  const origin = getRequestOrigin(request);
   const redirectUri = `${origin}/api/auth/callback`;
 
   const codeVerifier = generateCodeVerifier();

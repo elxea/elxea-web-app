@@ -1,7 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { getBaseUrl, getRequestHostname, isRegisteredAuthHost } from "@/lib/base-url";
+import {
+  getBaseUrl,
+  getRequestHostname,
+  getRequestOrigin,
+  isRegisteredAuthHost,
+} from "@/lib/base-url";
 import { normalizeHost } from "@/lib/auth/normalize-host";
+import { NextRequest } from "next/server";
 
 /**
  * T4 — origin resolution and host handling.
@@ -255,6 +261,32 @@ describe("isRegisteredAuthHost", () => {
     setEnv({ LINE_ALLOWED_CALLBACK_HOSTS: " WWW.ELXEA.COM. , ELXEA.COM:443 ", NODE_ENV: "test" });
     expect(isRegisteredAuthHost("www.elxea.com")).toBe(true);
     expect(isRegisteredAuthHost("elxea.com")).toBe(true);
+  });
+});
+
+describe("getRequestOrigin — the Shopify-family routes keep their previous origin", () => {
+  /* These four routes previously computed
+   * `process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin`, and that
+   * variable is not set in production (verified 2026-08-18 by listing variable
+   * names only, no values read). So the behaviour to preserve is exactly
+   * `request.nextUrl.origin`, independent of every env var. */
+  it.each([
+    ["https://www.elxea.com/api/auth/login", "https://www.elxea.com"],
+    ["http://www.elxea.test:3310/api/auth/logout", "http://www.elxea.test:3310"],
+    ["https://preview-abc.vercel.app/api/auth/callback", "https://preview-abc.vercel.app"],
+  ])("%s -> %s", (url, expected) => {
+    const req = new NextRequest(url);
+    expect(getRequestOrigin(req)).toBe(expected);
+  });
+
+  it("is unaffected by NEXTAUTH_URL and by the allow-list", () => {
+    setEnv({
+      NEXTAUTH_URL: "https://www.elxea.com",
+      LINE_ALLOWED_CALLBACK_HOSTS: "www.elxea.com",
+      NODE_ENV: "test",
+    });
+    const req = new NextRequest("https://preview-abc.vercel.app/api/auth/login");
+    expect(getRequestOrigin(req)).toBe("https://preview-abc.vercel.app");
   });
 });
 

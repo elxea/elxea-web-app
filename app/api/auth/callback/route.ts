@@ -10,6 +10,8 @@ import {
 import { sendWelcomeEmail } from "@/lib/email/welcome";
 import { getAdminFirestore } from "@/lib/firebase/admin";
 import { sanitizeReturnTo } from "@/lib/auth/return-to";
+import { clearAuthCookies } from "@/lib/auth/cookies";
+import { getRequestOrigin } from "@/lib/base-url";
 import {
   favoritesCol,
   followsCol,
@@ -128,8 +130,12 @@ async function mergeLineIdentityIntoShopify(
 
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
-  // NEXT_PUBLIC_APP_URL allows overriding the app base URL (e.g. for tunnels in local dev)
-  const origin = process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin;
+  /* Was `process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin`. Measured
+   * 2026-08-18: that variable is not set in production, so the expression always
+   * evaluated to the request origin there — the dead branch is dropped without
+   * changing behaviour. See `getRequestOrigin` for why these routes keep the
+   * request origin rather than moving to the env chain. */
+  const origin = getRequestOrigin(request);
   const code = searchParams.get("code");
   const state = searchParams.get("state");
 
@@ -237,23 +243,17 @@ export async function GET(request: NextRequest) {
       // Drop the LINE pointer cookies now that this browser is attached to
       // the Shopify session. The client-visible `line_auth` flag is cleared
       // too so the header flips to the Shopify-logged-in state cleanly.
-      // LINE cookies were set with `domain=.elxea.com` in production, so we
-      // must clear them against the same scope (and a host-only delete for
-      // dev / preview). Setting maxAge:0 is the portable way to do this.
-      const hostname = new URL(origin).hostname;
-      const sharedCookieDomain =
-        hostname === "elxea.com" || hostname.endsWith(".elxea.com")
-          ? ".elxea.com"
-          : undefined;
-      const clearLineOpts = {
-        path: "/",
-        maxAge: 0,
-        ...(sharedCookieDomain ? { domain: sharedCookieDomain } : {}),
-      } as const;
-      response.cookies.set("line_uid", "", clearLineOpts);
-      response.cookies.set("line_auth", "", clearLineOpts);
-      response.cookies.set("line_session", "", clearLineOpts);
-      response.cookies.set("line_user", "", clearLineOpts);
+      /* Clear the LINE session at BOTH scopes.
+       *
+       * This block used to compute the shared Domain itself, from
+       * `new URL(origin).hostname` — and only emitted the Domain-scoped delete
+       * when that host happened to look like the apex, emitting exactly ONE of
+       * the two scopes in either case. Under Next 16 `origin` derives from
+       * `nextUrl.origin`, which reports the server's own origin and ignores the
+       * request Host, so on any non-apex origin the Domain-scoped LINE cookies
+       * were never cleared here at all. Delegated to the single source of truth,
+       * which always emits both. */
+      clearAuthCookies(response, "line");
     }
 
     // Send welcome email for new members (no order history = first registration)

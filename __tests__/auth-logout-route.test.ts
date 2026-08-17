@@ -100,6 +100,7 @@ describe("GET /api/auth/logout", () => {
     expect(url.pathname).toMatch(/\/authentication\/(\d+\/)?logout$/);
     expect(url.searchParams.get("id_token_hint")).toBe("decrypted-id-token");
     expect(url.searchParams.get("post_logout_redirect_uri")).toBe("https://www.elxea.com/ja");
+    // Origin comes from the request, exactly as before this change.
   });
 
   it("stays on-site when there is no shop_it (the LINE-only user case)", async () => {
@@ -136,12 +137,18 @@ describe("GET /api/auth/logout", () => {
 
   it("stays on-site when the request host is not registered", async () => {
     decryptTokenMock.mockReturnValue("decrypted-id-token");
-    const res = await GET(
-      makeRequest({ host: "preview-abc.vercel.app", cookie: "shop_it=ciphertext" }),
-    );
+    const req = new NextRequest("https://preview-abc.vercel.app/api/auth/logout?locale=ja", {
+      headers: {
+        host: "preview-abc.vercel.app",
+        "x-forwarded-proto": "https",
+        cookie: "shop_it=ciphertext",
+      },
+    });
+    const res = await GET(req);
 
-    // Falls back to the env origin rather than handing Shopify an unknown host.
-    expect(location(res)).toBe("https://www.elxea.com/ja");
+    /* Completes locally on the origin the user is actually on, rather than
+     * handing Shopify a host it has not been told about. */
+    expect(location(res)).toBe("https://preview-abc.vercel.app/ja");
     expect(location(res)).not.toContain("authentication");
   });
 
@@ -166,7 +173,7 @@ describe("GET /api/auth/logout", () => {
     expect(location(await GET(noLocale))).toBe("https://www.elxea.com/ja");
   });
 
-  it("keeps the scheme the request actually arrived on (local http stays http)", async () => {
+  it("uses the origin the request arrived on (local http stays http)", async () => {
     process.env.LINE_ALLOWED_CALLBACK_HOSTS = "www.elxea.test";
     const req = new NextRequest("http://www.elxea.test:3310/api/auth/logout?locale=ja", {
       headers: { host: "www.elxea.test:3310" },

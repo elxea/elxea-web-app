@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { getBaseUrl } from "@/lib/base-url";
 import { encryptToken } from "@/lib/shopify/customer";
+import {
+  getCookieSpec,
+  isSecure,
+  resolveCookieDomain,
+} from "@/lib/auth/cookies";
 
 /**
  * LINE Login OAuth 2.0 callback endpoint.
@@ -53,19 +58,24 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL(`/${locale}/login?error=StateMismatch`, request.url));
   }
 
-  // Clear state cookie. Must match the domain used when the cookie was set
-  // in /api/line-login/init — otherwise the delete silently no-ops and the
-  // stale state cookie lingers until natural expiry.
-  const baseUrl = getBaseUrl();
-  const hostname = new URL(baseUrl).hostname;
-  const sharedCookieDomain =
-    hostname === "elxea.com" || hostname.endsWith(".elxea.com")
-      ? ".elxea.com"
-      : undefined;
+  const baseUrl = getBaseUrl(request);
+
+  /* Clear the state cookie at the Domain it was issued at.
+   *
+   * The Domain now comes from the REQUEST, not from `getBaseUrl()`. The old code
+   * derived it from the env-configured base URL, which is a different input from
+   * the one the issuing route used at issue time — the mismatch is what made this
+   * delete a silent no-op and left stale state cookies alive until natural expiry.
+   *
+   * `cookieStore.delete({ name, domain })` is a single-scope delete, which is
+   * correct here: unlike session cookies, `line_oauth_state` is issued at exactly
+   * one scope per request and a stale one is a nuisance rather than an
+   * authorisation hole. */
+  const stateDomain = resolveCookieDomain(request);
   cookieStore.delete({
     name: "line_oauth_state",
     path: "/",
-    ...(sharedCookieDomain ? { domain: sharedCookieDomain } : {}),
+    ...(stateDomain ? { domain: stateDomain } : {}),
   });
 
   const channelId = process.env.AUTH_LINE_ID;
@@ -182,11 +192,19 @@ export async function GET(request: NextRequest) {
 
     const response = NextResponse.redirect(new URL(`/${locale}/login/complete?linked=true`, request.url));
 
-    // Scope session cookies to the apex so the user stays logged in whether
-    // they browse `elxea.com` or `www.elxea.com`. See init route for context.
+    /* Scope session cookies to the apex so the user stays logged in whether they
+     * browse `elxea.com` or `www.elxea.com`. See the init route for context.
+     *
+     * `secure` now follows the registry's prod-only rule instead of being pinned
+     * to `true`. In production the value is identical (`NODE_ENV === "production"`),
+     * so behaviour there is unchanged; the difference is that the flow becomes
+     * observable over plain http locally and in Ring 2, where a Secure cookie is
+     * simply not stored and the Domain-scoped deletion under test could never be
+     * verified. */
+    const lineSessionSecure = isSecure(getCookieSpec("line_session")!);
     const sharedCookieOpts = {
-      ...(sharedCookieDomain ? { domain: sharedCookieDomain } : {}),
-      secure: true,
+      ...(stateDomain ? { domain: stateDomain } : {}),
+      secure: lineSessionSecure,
       sameSite: "lax" as const,
       maxAge: 60 * 60 * 24 * 30, // 30 days
       path: "/",

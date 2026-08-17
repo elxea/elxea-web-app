@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import { buildLogoutUrl, decryptToken } from "@/lib/shopify/customer";
-import { getBaseUrl, getRequestHostname, isRegisteredAuthHost } from "@/lib/base-url";
+import { getRequestHostname, getRequestOrigin, isRegisteredAuthHost } from "@/lib/base-url";
+import { clearAuthCookies } from "@/lib/auth/cookies";
 
 /**
  * Logout endpoint.
@@ -37,7 +38,7 @@ import { getBaseUrl, getRequestHostname, isRegisteredAuthHost } from "@/lib/base
  */
 export async function GET(request: NextRequest) {
   const locale = request.nextUrl.searchParams.get("locale") || "ja";
-  const origin = getBaseUrl(request);
+  const origin = getRequestOrigin(request);
   const localeHome = `${origin}/${locale}`;
 
   /* Three distinct states, deliberately not collapsed into two.
@@ -82,20 +83,9 @@ export async function GET(request: NextRequest) {
         )
       : NextResponse.redirect(localeHome);
 
-  // Clear ALL auth-related cookies (Shopify + LINE) with explicit path.
-  const deleteOptions = { path: "/", maxAge: 0 } as const;
-  // Shopify cookies
-  response.cookies.set("shop_at", "", deleteOptions);
-  response.cookies.set("shop_rt", "", deleteOptions);
-  response.cookies.set("shop_exp", "", deleteOptions);
-  response.cookies.set("shop_auth", "", deleteOptions);
-  response.cookies.set("shop_cid", "", deleteOptions);
-  response.cookies.set("shop_it", "", deleteOptions);
-  // LINE cookies
-  response.cookies.set("line_user", "", deleteOptions);
-  response.cookies.set("line_session", "", deleteOptions);
-  response.cookies.set("line_auth", "", deleteOptions);
-  response.cookies.set("line_uid", "", deleteOptions);
+  /* Clears every auth cookie at BOTH scopes. Takes no request on purpose — a
+   * request-dependent delete is what left Domain-scoped LINE cookies alive. */
+  clearAuthCookies(response, "all");
 
   return response;
 }

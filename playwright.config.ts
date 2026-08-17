@@ -60,7 +60,6 @@ export default defineConfig({
     "**/membership.spec.ts",
     "**/staging-smoke.spec.ts",
     "**/auth-session-flow.spec.ts",
-    "**/gate0-auth-probe.spec.ts",
   ],
   use: {
     baseURL,

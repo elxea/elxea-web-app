@@ -22,6 +22,7 @@ import {
   type QuickReplyItem,
 } from "./elxea-chat-transport";
 import { usePathname } from "next/navigation";
+import { randomId } from "@/lib/random-id";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -73,7 +74,7 @@ function getOrCreateSessionId(): string {
   if (existing && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(existing)) {
     return existing;
   }
-  const id = crypto.randomUUID();
+  const id = randomId();
   localStorage.setItem(SESSION_KEY, id);
   return id;
 }
@@ -95,7 +96,7 @@ function delay(ms: number) {
  */
 class MockChatTransport implements ChatTransport<UIMessage> {
   async sendMessages(): Promise<ReadableStream<UIMessageChunk>> {
-    const partId = crypto.randomUUID();
+    const partId = randomId();
 
     return new ReadableStream<UIMessageChunk>({
       async start(controller) {
@@ -187,7 +188,7 @@ async function fetchChatHistory(
  */
 function historyToUIMessages(msgs: HistoryApiMessage[]): UIMessage[] {
   return msgs.map((m) => ({
-    id: crypto.randomUUID(),
+    id: randomId(),
     role: m.role,
     parts: [{ type: "text" as const, text: m.content }],
     metadata: {
