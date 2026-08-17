@@ -27,6 +27,7 @@
     "design-catalog": "storybook dev -p 6006",
     "build:design-catalog": "storybook build",
     "build-storybook": "storybook build",
+    "shots:design-catalog": "node scripts/storybook-story-shots.mjs --headed --out .storybook-shots",
     "chromatic": "chromatic --exit-zero-on-changes",
     "sync:figma-read": "npx tsx scripts/design-system/sync-figma-read.ts",
     "snapshot:figma": "npx tsx scripts/design-system/figma-snapshot.ts",

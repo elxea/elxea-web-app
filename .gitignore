@@ -109,3 +109,7 @@ c16-*.mjs
 # 正本は scripts/design-system/design-kit.generated.json (pnpm generate:design-kit で機械生成)。
 # 追跡すると design-kit の第3のコピーとして stale 化するため追跡しない。
 .designkit-out.json
+
+# scripts/storybook-story-shots.mjs の出力 (story の実描画スクショ + report.json)。
+# 目視確認のための使い捨てで、視覚回帰の正本は Chromatic 側にある。
+.storybook-shots/
