@@ -55,6 +55,25 @@ const eslintConfig = [
     },
     rules: {
       "elxea-tokens/no-raw-colors": ["error", { checkArbitraryValues: true }],
+
+      // design-system-audit C3 (CRITICAL): section max-width/padding must come
+      // from the shared `.section-*` utility, and the vertical spacing between
+      // stacked blocks must be owned by the arranging container rather than
+      // delegated to each child.
+      //
+      // Why error-level rather than an audit note: C3 previously lived only as
+      // prose in the `design-system-audit` skill, which qa-pipeline runs as
+      // Gate 3 — a SOFT gate that records a warning and continues. It therefore
+      // could not stop anything, and the /ja/playlists 0px-gap defect shipped
+      // even though C3 describes it exactly. Promoting the CRITICAL half of C3
+      // to a blocking check means CI (`static-checks` -> `pnpm lint`, which runs
+      // with --max-warnings 0) fails instead of merely warning.
+      //
+      // Pre-existing violations are grandfathered in eslint-suppressions.json,
+      // so only NEW code fails while the debt stays counted and visible.
+      // Per-site escape hatch: a `DS-exception: <reason>` comment.
+      // Kill switch: change this line to "off".
+      "elxea-tokens/section-spacing-utility": "error",
     },
   },
 ];
