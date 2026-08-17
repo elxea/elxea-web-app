@@ -422,7 +422,8 @@
     "message": "We use cookies to improve your browsing experience and analyze site traffic.",
     "accept": "Accept All",
     "decline": "Essential Only",
-    "learnMore": "Learn More"
+    "learnMore": "Learn More",
+    "settings": "Cookie Settings"
   },
   "subscriptionLp": {
     "title": "Single Origin Tea Subscription",

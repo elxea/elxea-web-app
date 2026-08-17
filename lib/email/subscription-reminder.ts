@@ -1,4 +1,5 @@
 import { Resend } from "resend";
+import { getSiteUrl } from "@/lib/env";
 
 let _resend: Resend | null = null;
 
@@ -14,7 +15,7 @@ function getResend(): Resend {
 }
 
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "info@elxea.com";
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://elxea.com";
+const SITE_URL = getSiteUrl();
 
 type SubscriptionReminderData = {
   customerEmail: string;

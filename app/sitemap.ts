@@ -1,7 +1,8 @@
 import type { MetadataRoute } from "next";
 import { isFictionalFarmerSlug } from "@/lib/fictional-farmers";
+import { getSiteUrl } from "@/lib/env";
 
-const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://elxea.com";
+const BASE_URL = getSiteUrl();
 const locales = ["ja", "en"];
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {

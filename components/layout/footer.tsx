@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { LanguageSwitcher } from "./language-switcher";
+import { CookieSettingsButton } from "./cookie-settings-button";
 import { Separator } from "@/components/ui/separator";
 
 type FooterNavItem = { href: string; label: string };
@@ -226,6 +227,9 @@ export function Footer({ groups: externalGroups }: FooterProps) {
                 </Link>
               </>
             )}
+            {/* Rendered for both branches: the cookie choice must stay
+                changeable even when the Legal group comes from Sanity. */}
+            <CookieSettingsButton />
           </nav>
           <p className="text-xs text-muted-foreground">
             {t("footer.copyright", { year: new Date().getFullYear() })}
