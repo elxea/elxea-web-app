@@ -31,6 +31,77 @@ import { normalizeHost } from "@/lib/auth/normalize-host";
  * pins across every env combination, including the production throw.
  */
 
+/**
+ * ## Preview deployments (added 2026-08-18)
+ *
+ * `resolveFromEnv` returns `VERCEL_PROJECT_PRODUCTION_URL` on a preview, because
+ * Vercel injects that variable into *every* environment while `NEXTAUTH_URL` is
+ * set in none. So a LINE round trip started on a preview was handed a
+ * `redirect_uri` pointing at PRODUCTION: the user came back to the production
+ * deployment (old build, `line_oauth_state` cookie missing → StateMismatch →
+ * bounced to `/password` by the site-password gate). That single mis-resolution
+ * is the root cause behind all three reported symptoms.
+ *
+ * The fix does not go in the environment. A preview's URL changes on every
+ * deploy, so pinning one value would freeze every preview onto one deployment —
+ * a different breakage. It is resolved from the values the *platform* hands the
+ * running deployment instead.
+ *
+ * Two properties make this safe to put in front of a `redirect_uri`:
+ *
+ * 1. **Nothing untrusted enters.** The accepted origins are exactly
+ *    `VERCEL_URL` and `VERCEL_BRANCH_URL`, both injected by Vercel into the
+ *    server process. The request's `Host` is only ever used to *choose between*
+ *    those two — it can never introduce a third value. `Host: evil.example`
+ *    matches neither and is discarded.
+ * 2. **Production cannot be touched.** Every branch here is gated on
+ *    `VERCEL_ENV === "preview"`, a value only Vercel sets. In production and in
+ *    local dev the whole mechanism is inert and resolution is byte-identical to
+ *    before — pinned by the exhaustive parity test in
+ *    `__tests__/base-url-resolution.test.ts`.
+ *
+ * Fail-closed: if `VERCEL_ENV` says preview but the platform supplied no
+ * deployment host, this contributes nothing and the env chain runs as before.
+ */
+function isPreviewDeployment(): boolean {
+  return process.env.VERCEL_ENV === "preview";
+}
+
+/**
+ * Hostnames the platform itself assigned to THIS deployment, in preference
+ * order (`VERCEL_URL` is the immutable per-deployment host; `VERCEL_BRANCH_URL`
+ * is the stable per-branch alias). Both are set by Vercel, never by a client.
+ */
+function platformDeploymentHosts(): string[] {
+  return [process.env.VERCEL_URL, process.env.VERCEL_BRANCH_URL]
+    .map((h) => normalizeHost(h ?? ""))
+    .filter(Boolean);
+}
+
+/**
+ * The origin a preview deployment should hand an IdP, or `null` when this is
+ * not a preview / the platform gave us nothing to work with.
+ *
+ * When a request is available and its host is one the platform assigned, that
+ * one wins — a preview is reachable on both the deployment URL and the branch
+ * URL, and the user has to come back to the host their cookies were set on.
+ * Otherwise the deployment's own URL is used, which involves no request input
+ * at all.
+ */
+function resolvePreviewOrigin(request?: NextRequest): string | null {
+  if (!isPreviewDeployment()) return null;
+
+  const hosts = platformDeploymentHosts();
+  if (hosts.length === 0) return null;
+
+  if (request) {
+    const authority = normalizeHost(readRequestAuthority(request));
+    if (authority && hosts.includes(authority)) return `https://${authority}`;
+  }
+
+  return `https://${hosts[0]}`;
+}
+
 /** Priority is unchanged from the original implementation. */
 function resolveFromEnv(): string {
   if (process.env.NEXTAUTH_URL) {
@@ -117,6 +188,10 @@ export function isTrustedAuthHost(hostname: string): boolean {
   if (!hostname) return false;
   if (hostname === AUTH_COOKIE_APEX) return true;
   if (hostname.endsWith(`.${AUTH_COOKIE_APEX}`)) return true;
+  /* A preview is reached on a `*.vercel.app` host, which is not under our apex.
+   * The platform told this process which hosts those are, so they are ours by
+   * the same standard the apex test applies — and only on a preview. */
+  if (isPreviewDeployment() && platformDeploymentHosts().includes(hostname)) return true;
   return Boolean(process.env.LINE_ALLOWED_CALLBACK_HOSTS) && isRegisteredAuthHost(hostname);
 }
 
@@ -144,6 +219,11 @@ export function getBaseUrl(request?: NextRequest): string {
       return `${protocol}://${authority}`;
     }
   }
+
+  /* Preview only, and only from platform-supplied hosts. Inert in production
+   * and in local dev — see `resolvePreviewOrigin`. */
+  const previewOrigin = resolvePreviewOrigin(request);
+  if (previewOrigin) return previewOrigin;
 
   return resolveFromEnv();
 }

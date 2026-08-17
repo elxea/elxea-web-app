@@ -5,6 +5,7 @@ import {
   getRequestHostname,
   getRequestOrigin,
   isRegisteredAuthHost,
+  isTrustedAuthHost,
 } from "@/lib/base-url";
 import { normalizeHost } from "@/lib/auth/normalize-host";
 import { NextRequest } from "next/server";
@@ -27,6 +28,8 @@ const ENV_KEYS = [
   "NEXTAUTH_URL",
   "VERCEL_PROJECT_PRODUCTION_URL",
   "VERCEL_URL",
+  "VERCEL_BRANCH_URL",
+  "VERCEL_ENV",
   "LINE_ALLOWED_CALLBACK_HOSTS",
   "NODE_ENV",
 ] as const;
@@ -107,25 +110,32 @@ describe("getBaseUrl() — no request: exhaustive parity with the previous imple
     VERCEL_PROJECT_PRODUCTION_URL: [undefined, "prod.example.com"],
     VERCEL_URL: [undefined, "preview-abc.vercel.app"],
     NODE_ENV: ["test", "development", "production"],
+    /* Added 2026-08-18 with the preview-origin fix. `VERCEL_ENV` is the switch
+     * the new code reads, so it is swept here too — with the two values that
+     * are NOT "preview". Parity across both is the machine-checked form of "the
+     * production result does not change by a single character". */
+    VERCEL_ENV: [undefined, "production"],
   };
 
-  // 2 * 2 * 2 * 3 = 24 combinations. Every one is compared, not sampled: this is
-  // the "no unnoticed behaviour change" claim, so a gap in coverage is a gap in
-  // the claim.
+  // 2 * 2 * 2 * 3 * 2 = 48 combinations. Every one is compared, not sampled:
+  // this is the "no unnoticed behaviour change" claim, so a gap in coverage is
+  // a gap in the claim.
   const combos: Array<Record<string, string | undefined>> = [];
   for (const a of values.NEXTAUTH_URL)
     for (const b of values.VERCEL_PROJECT_PRODUCTION_URL)
       for (const c of values.VERCEL_URL)
         for (const d of values.NODE_ENV)
-          combos.push({
-            NEXTAUTH_URL: a,
-            VERCEL_PROJECT_PRODUCTION_URL: b,
-            VERCEL_URL: c,
-            NODE_ENV: d,
-          });
+          for (const e of values.VERCEL_ENV)
+            combos.push({
+              NEXTAUTH_URL: a,
+              VERCEL_PROJECT_PRODUCTION_URL: b,
+              VERCEL_URL: c,
+              NODE_ENV: d,
+              VERCEL_ENV: e,
+            });
 
-  it("covers 24 env combinations", () => {
-    expect(combos).toHaveLength(24);
+  it("covers 48 env combinations", () => {
+    expect(combos).toHaveLength(48);
   });
 
   for (const combo of combos) {
@@ -355,5 +365,133 @@ describe("normalizeHost", () => {
     [".", ""],
   ])("%s -> %s", (raw, expected) => {
     expect(normalizeHost(raw)).toBe(expected);
+  });
+});
+
+/**
+ * Preview deployments must land on themselves.
+ *
+ * The defect: with `VERCEL_ENV=preview`, `NEXTAUTH_URL` unset (it is set in no
+ * environment on this project) and `VERCEL_PROJECT_PRODUCTION_URL` injected by
+ * Vercel everywhere, `getBaseUrl()` returned the PRODUCTION origin. The LINE
+ * `redirect_uri` built from it delivered the user to the production deployment:
+ * old build, no `line_oauth_state` cookie → StateMismatch → `/password`.
+ *
+ * `PREVIEW_HOST` below is what the previous implementation returned in each of
+ * these cases; every `expect` in this block fails against it.
+ */
+describe("getBaseUrl() — preview deployments resolve to their own origin", () => {
+  const DEPLOY_HOST = "elxea-web-app-abc123.vercel.app";
+  const BRANCH_HOST = "elxea-web-app-git-fix-auth.vercel.app";
+  const PROD_HOST = "www.elxea.com";
+
+  function previewEnv(extra: Record<string, string | undefined> = {}) {
+    setEnv({
+      VERCEL_ENV: "preview",
+      VERCEL_PROJECT_PRODUCTION_URL: PROD_HOST,
+      VERCEL_URL: DEPLOY_HOST,
+      VERCEL_BRANCH_URL: BRANCH_HOST,
+      NODE_ENV: "production",
+      ...extra,
+    });
+  }
+
+  it("no longer resolves to the production origin with no request", () => {
+    previewEnv();
+    expect(getBaseUrl()).toBe(`https://${DEPLOY_HOST}`);
+    expect(getBaseUrl()).not.toContain(PROD_HOST);
+  });
+
+  it("stays on the deployment host the request arrived on", () => {
+    previewEnv();
+    expect(getBaseUrl(fakeRequest({ host: DEPLOY_HOST }))).toBe(`https://${DEPLOY_HOST}`);
+  });
+
+  it("stays on the branch host when that is the one being browsed", () => {
+    previewEnv();
+    expect(getBaseUrl(fakeRequest({ host: BRANCH_HOST }))).toBe(`https://${BRANCH_HOST}`);
+  });
+
+  it("works with LINE_ALLOWED_CALLBACK_HOSTS unset — that is the shipped state", () => {
+    previewEnv();
+    expect(process.env.LINE_ALLOWED_CALLBACK_HOSTS).toBeUndefined();
+    expect(getBaseUrl(fakeRequest({ host: DEPLOY_HOST }))).toBe(`https://${DEPLOY_HOST}`);
+  });
+
+  it("treats the platform-assigned preview hosts as trusted auth hosts", () => {
+    previewEnv();
+    // Without this the init route 503s every preview login (`isTrustedAuthHost`
+    // only knew the apex, and *.vercel.app is not under it).
+    expect(isTrustedAuthHost(DEPLOY_HOST)).toBe(true);
+    expect(isTrustedAuthHost(BRANCH_HOST)).toBe(true);
+  });
+
+  describe("untrusted input cannot become a redirect_uri", () => {
+    it("ignores a Host header naming a host the platform did not assign", () => {
+      previewEnv();
+      expect(getBaseUrl(fakeRequest({ host: "attacker.example.com" }))).toBe(
+        `https://${DEPLOY_HOST}`,
+      );
+    });
+
+    it("ignores a spoofed X-Forwarded-Host", () => {
+      previewEnv();
+      const req = fakeRequest({
+        host: DEPLOY_HOST,
+        "x-forwarded-host": "attacker.example.com",
+      });
+      expect(getBaseUrl(req)).toBe(`https://${DEPLOY_HOST}`);
+    });
+
+    it("does not trust an arbitrary host even on a preview", () => {
+      previewEnv();
+      expect(isTrustedAuthHost("attacker.example.com")).toBe(false);
+      expect(isTrustedAuthHost("elxea-web-app-abc123.vercel.app.evil.example")).toBe(false);
+    });
+
+    it("never forges https for a host it merely echoes back", () => {
+      previewEnv();
+      // Even asked over http, the answer is one of the two platform origins.
+      const req = fakeRequest({ host: "attacker.example.com" }, "http:");
+      expect(getBaseUrl(req)).toBe(`https://${DEPLOY_HOST}`);
+    });
+  });
+
+  describe("fail-closed", () => {
+    it("falls back to the env chain when the platform supplied no host", () => {
+      setEnv({
+        VERCEL_ENV: "preview",
+        VERCEL_PROJECT_PRODUCTION_URL: PROD_HOST,
+        NODE_ENV: "production",
+      });
+      expect(getBaseUrl(fakeRequest({ host: DEPLOY_HOST }))).toBe(`https://${PROD_HOST}`);
+    });
+
+    it("is inert when VERCEL_ENV is not 'preview', even with the hosts present", () => {
+      setEnv({
+        VERCEL_ENV: "production",
+        VERCEL_PROJECT_PRODUCTION_URL: PROD_HOST,
+        VERCEL_URL: DEPLOY_HOST,
+        VERCEL_BRANCH_URL: BRANCH_HOST,
+        NODE_ENV: "production",
+      });
+      expect(getBaseUrl(fakeRequest({ host: DEPLOY_HOST }))).toBe(`https://${PROD_HOST}`);
+      expect(isTrustedAuthHost(DEPLOY_HOST)).toBe(false);
+    });
+
+    it("is inert in local development", () => {
+      setEnv({ NODE_ENV: "development" });
+      expect(getBaseUrl(fakeRequest({ host: "www.elxea.test:3310" }))).toBe(
+        "http://localhost:3000",
+      );
+    });
+  });
+
+  it("leaves apex and www resolution untouched on a preview build", () => {
+    previewEnv();
+    // A production host arriving at a preview deployment is still ours, and is
+    // still not allowed to steer the redirect_uri away from this deployment.
+    expect(isTrustedAuthHost("www.elxea.com")).toBe(true);
+    expect(getBaseUrl(fakeRequest({ host: "www.elxea.com" }))).toBe(`https://${DEPLOY_HOST}`);
   });
 });
