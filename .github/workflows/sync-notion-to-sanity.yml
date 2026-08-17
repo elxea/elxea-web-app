@@ -20,6 +20,14 @@ name: sync-notion-to-sanity
 # (GitHub の job 上限 6 時間 / 非公開リポの無料枠 月 2000 分に対して十分小さい)。
 
 on:
+  # TEMPORARY (マージ前検証専用・検証後に削除する):
+  # workflow_dispatch は GitHub の仕様で「ワークフローが default branch に存在する」
+  # ことが前提のため、マージ前は発火できない (実測: HTTP 404 workflow not found on
+  # the default branch)。ワークフローが実際に走ることをマージ前に確かめるため、この
+  # ブランチへの push でだけ 1 回実行する。下の run step で push 起動時は強制的に
+  # --dry-run にしており、Sanity へは書き込まない。
+  push:
+    branches: [feat/sync-notion-github-actions]
   schedule:
     # 毎時 5 分 (UTC)。Spec の完了基準「1 時間以内に出る」に合わせる。
     # cron の起動は数十分遅れることがある (GitHub の仕様) が、1 時間粒度の
@@ -102,6 +110,11 @@ jobs:
           # workflow_dispatch は入力に従う。
           ARGS=""
           if [ "${{ inputs.dry_run }}" = "true" ]; then
+            ARGS="$ARGS --dry-run"
+          fi
+          # TEMPORARY (上の push トリガーと対で削除する): マージ前検証の push 起動は
+          # 必ず dry-run にする。本番データを書き換えないための保険。
+          if [ "${{ github.event_name }}" = "push" ]; then
             ARGS="$ARGS --dry-run"
           fi
           case "${{ inputs.target || 'articles' }}" in
