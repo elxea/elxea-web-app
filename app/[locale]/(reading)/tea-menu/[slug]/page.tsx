@@ -11,7 +11,11 @@ import { PortableText } from "@/components/sanity/portable-text";
 import { ImageCard } from "@/components/media/image-card";
 import { Breadcrumb } from "@/components/seo/breadcrumb";
 import { TeaOriginBlock } from "@/components/viz/map/tea-origin-block";
-import { resolveTeaOriginPlace } from "@/lib/roji/tea-origins";
+import { FlavorMatrixBlock } from "@/components/viz/flavor/flavor-matrix-block";
+import { AromaFieldBlock } from "@/components/viz/aroma/aroma-field-block";
+import { TerroirLensBlock } from "@/components/viz/terroir/terroir-lens-block";
+import { teaCategoryLabel, teaCategoryOf } from "@/lib/roji/tea-category";
+import { resolveTeaOrigin, resolveTeaOriginPlace } from "@/lib/roji/tea-origins";
 import { isFictionalSlug } from "@/lib/fictional-content";
 import { Button } from "@/components/ui/button";
 import {
@@ -196,6 +200,39 @@ export default async function TeaMenuDetailPage({
     ? t("originMapAlt", { place: originPlace })
     : t("originMapAltUnknown");
 
+  /**
+   * R1-B: 味の四象限 / 香りの場 / 土地を読む の 3 枚。
+   *
+   * 3 枚とも **データ層 (`lib/roji/tea-*.ts`) だけがダミーを持ち**、描画側は
+   * データを知らない。Tea Menu List 218 件が正本になったら差し替えるのは
+   * データ層だけで、この画面と `components/viz/**` には手を入れない。
+   *
+   * 図の代替テキストは i18n 側で組む — 図の中に文字を置かない設計なので、
+   * 図が何を語っているかはここでしか伝わらない (産地の地図と同じ方針)。
+   * `terroirElevation` だけ `t.raw` を使うのは、`{value}` を**クライアント側で
+   * 差し替える**ため (標高は DEM の実測値で、サーバー側では確定しない)。
+   */
+  const teaOrigin = resolveTeaOrigin(
+    tea.productNumber === null || tea.productNumber === undefined
+      ? ""
+      : String(tea.productNumber)
+  );
+  /**
+   * 図に載る比較対象のカテゴリー名 (「緑茶」/「紅茶」…)。
+   *
+   * 図そのものは色でカテゴリーを示すが、色だけでは何のカテゴリーか伝わらない。
+   * 図の外の一文で必ず名指しする — 「同じ緑茶だけを並べています」。
+   * 判定は `teaCategoryOf` が一手に握る (`lib/roji/tea-category.ts`)。
+   */
+  const categoryText = teaCategoryLabel(
+    teaCategoryOf(tea.productNumber, tea.category),
+    locale
+  );
+  const flavorMapLabel = t("flavorMapAlt", { place: tea.displayName });
+  const terroirMapLabel = originPlace
+    ? t("terroirMapAlt", { place: originPlace })
+    : t("terroirMapAltUnknown");
+
   return (
     <>
       <div className="page-container pt-6">
@@ -264,6 +301,45 @@ export default async function TeaMenuDetailPage({
         </PageSection>
       ) : null}
 
+      {/* R1-B-1: 味の四象限。詳細表 (品種・産地・収穫時期) が「何であるか」を
+          語った直後に、「どんな味か」を図で置く。文字 → 図 の順で読ませるのは
+          産地の地図と同じ作法。
+          載るのは **同じカテゴリーの銘柄だけ** (`docs/roji-dataviz-rules.md`)。
+          絞り込みはデータ層が行うので、ここは判定材料 (銘柄番号とカテゴリー) を
+          渡すだけでよい。 */}
+      <PageSection>
+        <SectionHead overline={t("flavorMapOverline")} title={t("flavorMap")} />
+        <SectionBody>
+          <FlavorMatrixBlock
+            menuNumber={tea.productNumber}
+            category={tea.category}
+            label={flavorMapLabel}
+          />
+          <p className={cn(captionClass, "mt-5 text-muted-foreground lg:mt-8")}>
+            {t("flavorMapScope", { category: categoryText })}{" "}
+            {t("flavorMapNote")}
+          </p>
+        </SectionBody>
+      </PageSection>
+
+      {/* R1-B-2: 香りの場。味の次に香り。点ではなく領域で置くので、四象限の
+          作法は共有しつつ「比べる図」には見せない。比較対象は味と同じく
+          同一カテゴリーに限る。 */}
+      <PageSection>
+        <SectionHead overline={t("aromaMapOverline")} title={t("aromaMap")} />
+        <SectionBody>
+          <AromaFieldBlock
+            menuNumber={tea.productNumber}
+            category={tea.category}
+            label={t("aromaMapAlt")}
+          />
+          <p className={cn(captionClass, "mt-5 text-muted-foreground lg:mt-8")}>
+            {t("aromaMapScope", { category: categoryText })}{" "}
+            {t("aromaMapNote")}
+          </p>
+        </SectionBody>
+      </PageSection>
+
       {/* R1-A: 産地の地図。銘柄番号から座標が引けないときは自分で null を返す
           (ブロックごと描かない)。詳細表の「産地」(Sanity の自由記述) の直後に
           置き、同じ話題を文字 → 図の順で読ませる。
@@ -275,6 +351,27 @@ export default async function TeaMenuDetailPage({
         heading={t("origin")}
         mapLabel={originMapLabel}
       />
+
+      {/* R1-B-3: 土地を読む。産地の地図が「どこか」を示した直後に、その土地が
+          「どういう土地か」を五つのレンズで語る。産地が引けない銘柄でも、
+          既定の主産地 (川根本町・大井川流域) に落として節ごとは残す —
+          この節は銘柄固有の事実ではなく roji の土地の語り方そのものだから。 */}
+      <PageSection>
+        <SectionHead overline={t("terroirMapOverline")} title={t("terroirMap")} />
+        <SectionBody>
+          <TerroirLensBlock
+            origin={{ lat: teaOrigin.lat, lng: teaOrigin.lng }}
+            placeLabel={originPlace}
+            label={terroirMapLabel}
+            copy={{
+              elevationUnit: t.raw("terroirElevation"),
+              teaLabel: t("terroirTeaLabel"),
+              close: t("terroirClose"),
+              hint: t("terroirHint"),
+            }}
+          />
+        </SectionBody>
+      </PageSection>
 
       {/* 淹れ方ガイド — 変A 6654:13257 / 6656:7967 */}
       {brewItems.length > 0 ? (

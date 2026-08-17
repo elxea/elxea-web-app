@@ -347,8 +347,9 @@ async function MakersSection() {
     <PageSection id={ANCHOR.makers} className={cn("pt-12 lg:pt-16", SCROLL_OFFSET)}>
       <AboutSectionHead no={t("makers.no")} title={t("makers.title")} />
       {/* SP は Figma どおり横スクロール (カード幅 = 内容カラム幅 343 / ピッチ 359)。
-          PC は共通の 3 列グリッドに戻す。 */}
-      <CatalogGrid className="-mx-4 mt-9 flex gap-x-4 overflow-x-auto px-4 lg:mx-0 lg:mt-13 lg:grid lg:overflow-visible lg:px-0">
+          PC は共通の 3 列グリッドに戻す。`scrollbar-none` は横スクロール列の
+          共通指定 (app/globals.css) — スワイプは効いたままバーだけ出さない。 */}
+      <CatalogGrid className="-mx-4 mt-9 flex gap-x-4 overflow-x-auto scrollbar-none px-4 lg:mx-0 lg:mt-13 lg:grid lg:overflow-visible lg:px-0">
         {farmers.map((farmer) => {
           const seeded = isSeedId(farmer._id);
           const image =

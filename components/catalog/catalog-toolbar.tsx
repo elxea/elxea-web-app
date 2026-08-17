@@ -166,7 +166,10 @@ export function CatalogToolbar({
         onScroll={measure}
         data-slot="catalog-chips"
         role="group"
-        className="-mx-4 flex gap-2 overflow-x-auto px-4 lg:mx-0 lg:overflow-visible lg:px-0"
+        // `scrollbar-none` = 横スクロール列の共通指定 (app/globals.css)。
+        // この列は下に自前のインジケータ (catalog-chips-scrollbar) を持って
+        // いるので、ブラウザ標準のバーが出ると位置表示が二重になる。
+        className="-mx-4 flex gap-2 overflow-x-auto scrollbar-none px-4 lg:mx-0 lg:overflow-visible lg:px-0"
       >
         {chips.map((chip) => {
           const selected = chip.value === current;
@@ -184,7 +187,7 @@ export function CatalogToolbar({
           const chipClass = cn(
             bodySmClass,
             "flex h-11 shrink-0 items-center rounded-full px-3 py-3 whitespace-nowrap lg:px-4 lg:py-2",
-            "transition-colors duration-200",
+            "transition-colors duration-fast",
             "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none",
             selected
               ? "bg-primary text-primary-foreground hover:bg-brand-charcoal"

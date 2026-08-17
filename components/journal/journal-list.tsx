@@ -115,14 +115,35 @@ export function HeroFeature({
  * Figma の PC は `記事グリッド 936 + サイドバー 344`、MoreRow は 1312 幅の中央。
  * SP は グリッド → MoreRow → サイドバー の順に積む。SP は flex + `order`、
  * PC は grid の行列指定で並べ替える (DOM 順は 1 つで済ませる)。
+ *
+ * ## 縦の間隔はこの枠が持つ (2026-08-17 是正)
+ *
+ * `gap-y-8 lg:gap-y-12` = 一覧共通のブロック間隔 (SP 32 / PC 48)。
+ *
+ * 元は `gap-x` しか無く、縦の間隔は「子が各自 `mt-8 lg:mt-12` を付ける」運用
+ * だった。これは子が 1 つでも付け忘れると密着する作りで、実際 ArticleRail が
+ * 持っておらず、SP で記事カードの直下にサイドバーが **間隔 0px** で貼り付いて
+ * いた (2026-08-17 実測: /ja/playlists の rail は marginTop 0px / 前要素との
+ * 間隔 0px)。「もっと見る」が出るページでは MoreRow の `mt-8` が偶然そこを
+ * 埋めていたため、件数の少ないページでだけ露見していた。
+ *
+ * 間隔は各子ではなく **並べる側** が一括で持つ。これで子は自分の上下余白を
+ * 知らなくてよくなり、付け忘れが構造的に起こらない。ArticleRail を使う 5 ページ
+ * (playlists / journal / journal:category / journal:tag / elxea-journal) が
+ * この 1 箇所で揃う。
+ *
+ * PC の行構成は 1 行目 = グリッド + サイドバー、2 行目 = MoreRow なので、
+ * `lg:gap-y-12` は MoreRow の上にだけ効く (従来の `lg:mt-12` と同値)。
+ * よって MoreRow 側の `mt-8 lg:mt-12` は呼び出し側から外してある — 残すと
+ * gap と足し算になって 64px / 96px に広がる。
  */
 export function JournalLayout({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="journal-layout"
       className={cn(
-        "flex flex-col",
-        "lg:grid lg:grid-cols-[minmax(0,1fr)_21.5rem] lg:gap-x-8",
+        "flex flex-col gap-y-8",
+        "lg:grid lg:grid-cols-[minmax(0,1fr)_21.5rem] lg:gap-x-8 lg:gap-y-12",
         className
       )}
       {...props}
@@ -168,12 +189,31 @@ export type ArticleRailProps = {
  * 触れない。読み終わりの場所に一覧を置く。
  *
  * Figma 実測 (px) → 実装 (SP):
- * - 面            card / 前ブロック (MoreRow) との間隔 0 — 面の変化が区切りになる
+ * - 面            card / 前ブロックとの間隔 32 (`mt-8`) — 下の「区切りの取り方」参照
  * - 内側 padding  上下 24 (`py-6`) / 左右 16 (`px-4`)
  * - 節見出し      12 / 見出しと行の間 0 (行側の 44 が余白を持つ)
  * - 節と節の間    24 (`mt-6`)
  * - 行            44 (タップ域。`RailRowLink` が既に `h-11`)
  * PC は従来どおり面を敷かない (サイドバーとして本文の横に立つため)。
+ *
+ * ## 区切りの取り方 (2026-08-17 是正)
+ *
+ * 縦の間隔は **自分では持たない**。親の JournalLayout が row gap で全ての子に
+ * まとめて与える。理由は下の JournalLayout 側の注記を参照。
+ *
+ * 元は「間隔 0 / 面 (card) の変化そのものが区切り」という指定だった
+ * (Figma 8205:5548)。実測するとこれは 2 つの理由で成立していない:
+ *
+ * 1. card (#f4f3ed) と background (#ebe9e0) の明度差は Lab で 3.5、コントラスト
+ *    比にして約 1.09:1 しかない。スマホ実寸では面が変わったことが見えず、
+ *    区切りとして機能しない。
+ * 2. Figma の指定は「直前に MoreRow が居る」前提だった。MoreRow は呼び出し側
+ *    から `mt-8` を受け取るので、そこで 32px が入っていた。件数が少なく
+ *    「もっと見る」が出ないページ (例: /ja/playlists) では MoreRow ごと消え、
+ *    記事カードの直下にサイドバーが **間隔 0px** で密着する。
+ *
+ * 間隔は面の色ではなくブロック間隔で持たせる (色トークンを動かすと全ページの
+ * 面が変わるため、ここでは触らない)。
  */
 export function ArticleRail({
   popularTitle,
@@ -190,6 +230,8 @@ export function ArticleRail({
       className={cn(
         // SP は画面幅いっぱいの面にする (Figma の card は x0 w375)。`sp-full-bleed`
         // が lg で margin を戻すので、PC は従来どおり 344 幅のサイドバー。
+        // 前ブロックとの間隔は自分では持たない — 親 (JournalLayout) の row gap
+        // が全ての子にまとめて与える (上の「区切りの取り方」参照)。
         "order-3 sp-full-bleed bg-card px-4 py-6",
         "lg:col-start-2 lg:row-start-1 lg:w-86 lg:bg-transparent lg:py-0",
         className

@@ -562,14 +562,105 @@ dl[data-slot="spec-band"][data-emphasis="true"] > [data-slot="spec-item"] > dd {
    * なので brand-* には入れない。 */
   --graphite-pressed: oklch(0.333 0.007 274.8);
 
-  /* 名前付き z レイヤー。**ここが SoT**。`tokens/base.json` の `depth.zIndex`
-   * は 0-50 の raw scale で別物なので混同しないこと (名前付きレイヤーは
-   * base.json 側に存在しない)。Style Dictionary の source は base.json と
-   * overrides/cjk.json だけなので、このグループは dist/tokens.css には出ず
-   * この宣言だけが実効値になる。値を変えるならここを直す。
+  /* 名前付き z レイヤー。**ここが唯一の z の SoT** (2026-08-17 1系統へ統合)。
+   *
+   * Style Dictionary の source は base.json と overrides/cjk.json だけなので、
+   * このグループは dist/tokens.css には出ず **この宣言だけが実効値**になる。
+   * 値を変えるならここを直す。
+   *
+   * ## 併存していた 3 系統をここに畳んだ (2026-08-17)
+   *
+   * 1. この `--z-*` (名前付きレイヤー)                        → **残す = SoT**
+   * 2. `tokens/base.json` の `elevation.level` / `elevation.zIndex`
+   *    (どちらも 0/10/20/30/40/50 の raw scale。値が完全に同一の重複)
+   *                                                           → **削除**
+   *    参照は実測ゼロ (`--elevation-level-*` / `--elevation-zIndex-*` を
+   *    app/components/lib/hooks/stories/scripts/e2e 全域で grep して 0 件。
+   *    dist/tokens.css に出るだけで誰も読んでいなかった)。設計意図の未決は
+   *    design-kit の conflict `c-06` に記録されており、その解決がこれ。
+   * 3. `components/ui/**` の生 `z-50` (shadcn 上流のまま 13 ファイル 21 箇所)
+   *                                → **13 ファイルは編集せず、CSS 側で
+   *                                  `z-50` ユーティリティ自体をこの表へ接続**
+   *                                  (ファイル末尾の `@utility z-50` 参照)。
+   *                                  fork しないので `shadcn add` の更新経路は
+   *                                  そのまま残る。
    * (旧 SoT と書かれていた `tokens/elxea-custom.json` は参照ゼロの死にファイル
-   *  だったため 2026-08-14 に削除。旧値は git 履歴 c54335a を参照) */
+   *  だったため 2026-08-14 に削除。旧値は git 履歴 c54335a を参照)
+   *
+   * ## 段は 4 つ。どの面がどこに載るか
+   *
+   *   1020 --z-sticky   画面端に貼り付く常設面
+   *                     … ヘッダー (`components/layout/header.tsx`)
+   *                     … 音声バー (`components/audio/audio-dock.tsx`)
+   *                     … Cookie 同意 (`components/layout/cookie-consent.tsx`)
+   *                     … イベント申込バー (`components/events/event-register-button.tsx`)
+   *   1030 --z-chat     常設 UI の最前面
+   *                     … チャット (ランチャ / 入力バー / 全画面)
+   *   1040 --z-overlay  スクリム
+   *   1050 --z-modal    モーダル面・浮遊面
+   *                     … 音声プレイヤーの全画面展開
+   *                     … shadcn の Dialog / Sheet / Popover / Dropdown 等
+   *                       (生 `z-50` からの接続先)
+   *
+   * ### 同じ段に載る面は「z では解けない」ので幾何で分ける (2026-08-18 是正)
+   *
+   * **同じ段の面は重ならない前提で置いてある。この前提はコードが守るのではなく
+   * `bottom` の式が守る。** 2026-08-18 の QA で、この段の説明を「4 つは互いに
+   * 重ならない」と書いたまま実際には 2 組が重なっていたことが実測された:
+   *
+   *   - チャットランチャ (1030) × Cookie 同意 (1020) … 2304px^2
+   *     → 同意バーの「詳しく見る」が SP で押せない
+   *   - Cookie 同意 (1020) × イベント申込バー (1020) … 25350px^2
+   *     → 両者が同じ `bottom: var(--audio-bar-h)` に居た。DOM 順で前に出る
+   *       同意バーが申込ボタンを覆う (CMS のイベントが 0 件で潜在化していた)
+   *
+   * **z の前後では解けない**。ランチャを前に出せば同意ボタンが埋まり、同意バーを
+   * 前に出せばランチャが埋まる。勝てる並びが存在しない。したがって下端の面は
+   * **重ねない**: それぞれが「自分より下の面の高さの和」を `bottom` に積む。
+   *
+   *   1. 音声バー         `--audio-bar-h`
+   *   2. Cookie 同意       + `--consent-bar-h`
+   *   3. イベント申込バー   + `--event-bar-h`
+   *   4. チャットランチャ   (一番上・何も公開しない)
+   *
+   * 高さの公開は `hooks/use-bottom-stack-slot.ts` が正本 (積み順の表もそこ)。
+   * z はここでは順位を決めておらず、**出入りのアニメーション中に一瞬重なった
+   * ときの保険**でしかない。新しい下端固定 UI を足すときは、z を足すのではなく
+   * この積み木に段を 1 つ足す。
+   *
+   * ヘッダー (上端) だけは下端の 3 つと交わらないので、同じ 1020 に同居させて
+   * 問題ない。
+   *
+   * チャットが音声バーより前に出る (Setaka 裁定 2026-08-17「チャット UI の
+   * レイヤーがオーディオプレイヤーより上であるべき」)。
+   *
+   * ### 生スケールを下端固定 UI に直接書かない
+   *
+   * Tailwind の生スケール (`z-40` / `z-50`) を素で混ぜると 1020 > 50 で常に
+   * 名前付き側が勝ち、意図と逆の重なりになる (実際にそれが起きて、チャットの
+   * 入力欄が音声バーに覆われ押せなくなった)。新しい固定 UI の z は
+   * `z-(--z-sticky)` のようにこの表から採る。
+   *
+   * ### 下端で「積む」のは広い画面だけ (Setaka 裁定 2026-08-17 その2)
+   *
+   * 下端固定 UI が `--audio-bar-h` の分だけ自分の bottom を上げて **縦に積む**
+   * のは、PC と、下端に細く居るチャットバーまで。画面が広いので 2 つ出ていても
+   * 互いの邪魔にならない。
+   *
+   * モバイルの**全画面チャットは積まない**。全画面を占める面の下端に別の操作面を
+   * 覗かせると、限られた操作スペースに主役が 2 つ並んでノイズになり操作の邪魔に
+   * なる (Setaka「チャット操作時はチャットに集中すればいい。別に音声バーが上に
+   * 下に隠れてもいい」)。全画面チャットが開いている間は音声バーを画面外へ
+   * **退避** させる (型は `motion-retreat` / **再生は止めない**)。音を止める手段は
+   * チャットヘッダーの一時停止ボタンが引き継ぐので WCAG 2.2.2 は保たれる。
+   *
+   * z はどちらの経路でも「積む・退くが崩れた一瞬 (出入りのアニメーション中など)」
+   * の保険として要る。生スケールには戻さない。
+   *
+   * 音声の全画面展開だけは --z-modal でチャットの上に出る。モーダルは自分で
+   * 閉じられる面なので、覆われたままにはならない。 */
   --z-sticky: 1020;
+  --z-chat: 1030;
   --z-overlay: 1040;
   --z-modal: 1050;
 
@@ -623,6 +714,424 @@ dl[data-slot="spec-band"][data-emphasis="true"] > [data-slot="spec-item"] > dd {
 @keyframes spin-slow {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+ * モーション — 配線 (層2) と動きの型 (層3)
+ *
+ * 値の正本 (層1) は `tokens/base.json` の `motion` で、Style Dictionary が
+ * `dist/tokens.css` に `--motion-*` として出す。ここは **値を持たない**:
+ * トークンを Tailwind の名前空間へ橋渡しする層と、型の定義だけを置く。
+ * 設計: [roji] モーションシステム Spec
+ *   https://www.notion.so/3be70c9d064c81ee82fac2f3b09f4a5f
+ * 見本: /dev/motion (実装確認用のプレビュー面・本番からはリンクしない)
+ *
+ * 採用は3段 (fast 150 / normal 300 / slow 500) と2カーブ (enter=ease-out /
+ * exit=ease-in)。「退出は登場の1段下」の規則は時間の値ではなく
+ * `--motion-exit-duration` の既定 (= fast) で表す。
+ *
+ * 確定事項 (Setaka 2026-08-16): 速さの目盛は 150/300/500 / 実際に使う標準は
+ * S = 150ms / 拡大ズームは不採用 / 実装は @theme の一括上書き。跳ね返り
+ * (spring) と拡大縮小は使わない。
+ * ─────────────────────────────────────────────────────────────────────────── */
+:root {
+  /* 実行時の速さ。標準は S = 150ms (Setaka 確定 2026-08-16。見本ページで
+   * 3段を実際に見比べた上での選択)。開閉・出入り・シート展開まで例外なく
+   * この1段に寄せている。
+   *
+   * 登場も退出も同じ 150ms。Spec B-1 の「退出は登場の1段下」を外したわけでは
+   * なく、S の下の段 (fastest 50ms) が凍結済みで下げようがないため。速さを
+   * 上げた型を個別に作るときは、その型の中で1段下の退出を指定する。
+   *
+   * この2つを差し替えるだけで、型を書き換えずに速さを切り替えられる
+   * (/dev/motion の速さトグルはこれを上書きしている)。 */
+  --motion-enter-duration: var(--motion-duration-fast);
+  --motion-exit-duration: var(--motion-duration-fast);
+
+  /* 移動距離。Spec B-3「距離の原則」= 移動は 8px 以内・退出はその半分。
+   * SP は 6px。spacing スケールに 6px の刻みが無いので、ここだけ実値で持つ
+   * (md 以上の 8px と退出の 4px は spacing トークンから引く)。 */
+  --motion-rise-distance: 0.375rem;
+  --motion-recede-distance: var(--spacing-1);
+
+  /* `sheet` は画面外からの移動なので距離は割合。既定は右端から。
+   * 下端から出す面 (モバイルメニュー等) は x=0% / y=100% に差し替える。 */
+  --motion-sheet-x: 100%;
+  --motion-sheet-y: 0%;
+
+  /* D-2 の比較専用。shadcn 既定の `zoom-in-95` 相当の倍率。案A (拡大なし) が
+   * 採用されたので本番の部品では使わず、/dev/motion の比較欄にだけ残す。 */
+  --motion-zoom-from: 0.95;
+
+  /* 移動量と拡大量にかかる係数。1 = そのまま / 0 = 動かさない。
+   * 「動きを減らす」設定はこの1つを 0 にするだけで全ての型に効く
+   * (型を増やしてもここを直す必要がない)。 */
+  --motion-travel: 1;
+}
+
+@media (min-width: 48rem) {
+  :root {
+    --motion-rise-distance: var(--spacing-2);
+  }
+}
+
+@theme {
+  /* 層2 / 配線 — Tailwind の既定そのものをトークンに差し替える。
+   * これが最も効率が高い: `transition-colors` とだけ書いてある約70ファイルが
+   * 一切の編集なしでトークン値に乗り換わる。既定カーブを対称の
+   * `ease-in-out` から `ease-out` (減速) に変えるのは、roji では「入りは減速」
+   * を全ての既定にするため。 */
+  --default-transition-duration: var(--motion-duration-fast);
+  --default-transition-timing-function: var(--motion-easing-ease-out);
+
+  /* 名前付きユーティリティも生やす。
+   * `duration-fast|normal|slow` と `ease-enter|ease-exit` が使えるようになる。 */
+  --transition-duration-fast: var(--motion-duration-fast);
+  --transition-duration-normal: var(--motion-duration-normal);
+  --transition-duration-slow: var(--motion-duration-slow);
+  --ease-enter: var(--motion-easing-ease-out);
+  --ease-exit: var(--motion-easing-ease-in);
+
+  /* 層3 / 型 — Spec B-3 の5種。登場と退出で別ユーティリティにするのは、
+   * 「退出は登場より速く・逆カーブで」を呼び出し側が書き忘れられないため。 */
+  --animate-fade: fade var(--motion-enter-duration) var(--motion-easing-ease-out) both;
+  --animate-fade-out: fade-out var(--motion-exit-duration) var(--motion-easing-ease-in) both;
+  --animate-rise: rise var(--motion-enter-duration) var(--motion-easing-ease-out) both;
+  --animate-recede: recede var(--motion-exit-duration) var(--motion-easing-ease-in) both;
+  --animate-expand: expand var(--motion-enter-duration) var(--motion-easing-ease-out) both;
+  --animate-collapse: collapse var(--motion-exit-duration) var(--motion-easing-ease-in) both;
+  --animate-sheet-in: sheet-in var(--motion-enter-duration) var(--motion-easing-ease-out) both;
+  --animate-sheet-out: sheet-out var(--motion-exit-duration) var(--motion-easing-ease-in) both;
+
+  /* 比較用 (D-2)。採用案が決まるまでの暫定で、本番の部品では使わない。 */
+  --animate-zoom: zoom var(--motion-enter-duration) var(--motion-easing-ease-out) both;
+}
+
+@keyframes fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(calc(var(--motion-rise-distance) * var(--motion-travel)));
+  }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes recede {
+  from { opacity: 1; transform: translateY(0); }
+  to {
+    opacity: 0;
+    transform: translateY(calc(var(--motion-recede-distance) * var(--motion-travel)));
+  }
+}
+
+/* `expand` / `collapse` だけは transform ではなく grid-template-rows を動かす。
+ * CLAUDE.md「transform/opacity のみ」の唯一の例外で、Spec B-4 原則5 のとおり
+ * 対象を短いテキストの開閉に限定する。使う側は
+ *   <div class="grid animate-expand"><div class="overflow-hidden">…</div></div>
+ * の2層で書く (内側の overflow-hidden が無いと中身がはみ出す)。 */
+@keyframes expand {
+  from { grid-template-rows: 0fr; opacity: 0; }
+  to { grid-template-rows: 1fr; opacity: 1; }
+}
+
+@keyframes collapse {
+  from { grid-template-rows: 1fr; opacity: 1; }
+  to { grid-template-rows: 0fr; opacity: 0; }
+}
+
+@keyframes sheet-in {
+  from {
+    transform: translate(
+      calc(var(--motion-sheet-x) * var(--motion-travel)),
+      calc(var(--motion-sheet-y) * var(--motion-travel))
+    );
+  }
+  to { transform: translate(0, 0); }
+}
+
+@keyframes sheet-out {
+  from { transform: translate(0, 0); }
+  to {
+    transform: translate(
+      calc(var(--motion-sheet-x) * var(--motion-travel)),
+      calc(var(--motion-sheet-y) * var(--motion-travel))
+    );
+  }
+}
+
+@keyframes zoom {
+  from {
+    opacity: 0;
+    transform: scale(calc(1 - (1 - var(--motion-zoom-from)) * var(--motion-travel)));
+  }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* `sheet` の向き。使う側は `animate-sheet-in motion-from-bottom` のように
+ * 型と向きを2つ並べて書く (向きだけ差し替えられるようにするため)。 */
+@utility motion-from-bottom {
+  --motion-sheet-x: 0%;
+  --motion-sheet-y: 100%;
+}
+
+/* 型 `retreat` — 出したままの面を、**中身を生かしたまま**画面外へ退かせる。
+ *
+ * `sheet` (登場・退出) との違いは「戻ってくる前提で、退いた先に居続ける」こと。
+ * 音声バーは全画面チャットが開いている間だけ画面外へ退き、その間も音は鳴り続け
+ * 再生位置も進む (Setaka 裁定 2026-08-17: 全画面チャット中は音声バーを隠す)。
+ * 消えるのではないので unmount もアニメーションの再生も伴わない。
+ *
+ * そのため CSS animation ではなく **transition** で書く: animation は「1 回
+ * 流して終わる」ものなので、行き先で止まったまま何度も往復する状態表現には
+ * 向かない (`animate-sheet-out` を当て続けても、戻すときに再生し直すことになり
+ * 途中で切り替わったときに位置が飛ぶ)。
+ *
+ * 退く向きは `sheet` と同じ向きユーティリティから採る。使う側は
+ *   <div class="motion-from-bottom motion-retreat" data-retreated={…}>
+ * のように **向き + 型 + 状態** の 3 つで書く。下から出てきた面は下へ退く。
+ *
+ * 動かすのは `translate` プロパティで、`transform` を使う `sheet` 系の keyframes
+ * とは別プロパティなので **重ねて併用できる** (登場は animation・退避は
+ * transition が担当し、互いを打ち消さない)。
+ *
+ * 「動きを減らす」設定 (`--motion-travel: 0`) では移動距離が 0 になるので、
+ * 退避は `opacity` だけで表れる。**見えなくなる結果は同じ** — 位置で隠す型が
+ * 移動を失っても隠れなくならないよう、opacity を必ず併せている。
+ *
+ * 退避中は操作対象から外すため、使う側で `inert` を併せて付けること
+ * (透明なだけの面が指やキーボードのフォーカスを拾わないようにする)。 */
+@utility motion-retreat {
+  transition-property: translate, opacity;
+  transition-duration: var(--motion-enter-duration);
+  transition-timing-function: var(--motion-easing-ease-out);
+
+  &[data-retreated="true"] {
+    translate: calc(var(--motion-sheet-x) * var(--motion-travel))
+      calc(var(--motion-sheet-y) * var(--motion-travel));
+    opacity: 0;
+    /* 退くときは exit のカーブと時間 (戻るときは上の enter 側が効く)。 */
+    transition-duration: var(--motion-exit-duration);
+    transition-timing-function: var(--motion-easing-ease-in);
+  }
+}
+
+@utility motion-from-top {
+  --motion-sheet-x: 0%;
+  --motion-sheet-y: -100%;
+}
+
+@utility motion-from-left {
+  --motion-sheet-x: -100%;
+  --motion-sheet-y: 0%;
+}
+
+@utility motion-from-right {
+  --motion-sheet-x: 100%;
+  --motion-sheet-y: 0%;
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+ * shadcn/ui 由来の開閉クラスの実体
+ *
+ * `animate-in` / `fade-in-0` / `slide-in-from-top-2` … は shadcn の部品が
+ * 17ファイル・184箇所で使っているが、提供元パッケージ (tw-animate-css) が
+ * 入っていないため CSS が1行も生成されておらず、全部が無効だった
+ * (クラスは DOM に付くのに何も起きない)。ここでその実体を **自前で** 与える。
+ *
+ * 外部パッケージを足さないのは、パッケージが roji と無関係な既定値
+ * (跳ね返り・拡大) を持ち込むため。ここに書けば時間もカーブも距離も
+ * `--motion-*` トークンからしか来ない。17ファイルは無編集のまま復活する。
+ *
+ * 意図的に用意しないもの:
+ *   - `zoom-in-*` / `zoom-out-*` … 拡大縮小は不採用 (Setaka 確定 2026-08-16)。
+ *     ユーティリティを定義しないので、これらのクラスは何も生成せず無効のまま
+ *     になり、ダイアログ類は fade (+ slide) だけで開く。
+ *   - `spin` / `bounce` 等の跳ねる動き … roji のトーンと衝突する。
+ *
+ * 時間は `--tw-duration` (= `duration-*` ユーティリティ) を **見ない**。
+ * 部品側に散らばった 500 / 300 の直書きを効かせるとトーンが再びばらけるので、
+ * 登場は M・退出は S にトークンで固定する。
+ * ─────────────────────────────────────────────────────────────────────────── */
+@utility animate-in {
+  animation: motion-enter var(--motion-enter-duration) var(--motion-easing-ease-out) both;
+}
+
+@utility animate-out {
+  animation: motion-exit var(--motion-exit-duration) var(--motion-easing-ease-in) both;
+}
+
+@utility fade-in-0 {
+  --motion-in-opacity: 0;
+}
+
+@utility fade-out-0 {
+  --motion-out-opacity: 0;
+}
+
+/* 数値付きの slide は Tailwind の spacing 目盛と同じ読み方 (2 = 0.5rem = 8px)。
+ * 数値なしは画面外から = 100%。Spec B-3「移動は8px以内」に収まるのは `-2` まで
+ * で、それ以外の大きい値を使っている箇所は要調整として洗い出す。 */
+@utility slide-in-from-top-* {
+  --motion-in-y: calc(--value(integer) * var(--spacing) * -1);
+}
+
+@utility slide-in-from-bottom-* {
+  --motion-in-y: calc(--value(integer) * var(--spacing));
+}
+
+@utility slide-in-from-left-* {
+  --motion-in-x: calc(--value(integer) * var(--spacing) * -1);
+}
+
+@utility slide-in-from-right-* {
+  --motion-in-x: calc(--value(integer) * var(--spacing));
+}
+
+@utility slide-out-to-top-* {
+  --motion-out-y: calc(--value(integer) * var(--spacing) * -1);
+}
+
+@utility slide-out-to-bottom-* {
+  --motion-out-y: calc(--value(integer) * var(--spacing));
+}
+
+@utility slide-out-to-left-* {
+  --motion-out-x: calc(--value(integer) * var(--spacing) * -1);
+}
+
+@utility slide-out-to-right-* {
+  --motion-out-x: calc(--value(integer) * var(--spacing));
+}
+
+@utility slide-in-from-top {
+  --motion-in-y: -100%;
+}
+
+@utility slide-in-from-bottom {
+  --motion-in-y: 100%;
+}
+
+/* 横スクロールする列 (サムネイル列・チップ列など) の共通指定。
+ *
+ * ブラウザ標準のスクロールバーを出さない。elxea の横スクロール列は
+ * 「掴んで流す」帯であって、スクロール位置を数える面ではない。overlay
+ * scrollbar は指を離すまで帯の上に黒い棒として重なり、写真やチップの下端を
+ * 汚す (Setaka 裁定 2026-08-17「いらない。見苦しいので、こういう実装の仕方を
+ * しないでください」)。
+ *
+ * **消すのは見た目だけ**。`overflow-x` は `auto` のまま残すので:
+ * - 指のスワイプ / トラックパッドの横フリックはそのまま効く
+ * - 中の要素は tab で辿れ、フォーカスが移ると当該要素まで自動でスクロールする
+ * - `hidden` にはしない (それをやるとキーボードでも到達できなくなる)
+ *
+ * 位置を示す必要がある列は、ブラウザ任せにせず自前のインジケータを置く
+ * (`components/catalog/catalog-toolbar.tsx` の `catalog-chips-scrollbar` —
+ *  幅が可視割合・位置がスクロール量)。二重に出さないため、そこでもこの
+ * utility を併用する。
+ *
+ * `@layer base` の素のクラスではなく `@utility` で定義する: v4 では前者は
+ * Lightning CSS の段階で丸ごと落ち、コンパイル後の CSS に 1 バイトも出ない
+ * (2026-08-17 実測 — DOM に class は載るのに `scrollbar-width` が `auto` の
+ * まま効かなかった)。同ファイルの他の自前 utility も全て `@utility`。
+ *
+ * 新しく横スクロール列を作るときは必ずこの class を当てる。生の
+ * `::-webkit-scrollbar` を各コンポーネントに書かない (単一正本)。 */
+@utility scrollbar-none {
+  scrollbar-width: none; /* 標準 (Firefox / Chrome 121+) */
+  &::-webkit-scrollbar {
+    display: none; /* WebKit / Blink */
+  }
+}
+
+@utility slide-in-from-left {
+  --motion-in-x: -100%;
+}
+
+@utility slide-in-from-right {
+  --motion-in-x: 100%;
+}
+
+@utility slide-out-to-top {
+  --motion-out-y: -100%;
+}
+
+@utility slide-out-to-bottom {
+  --motion-out-y: 100%;
+}
+
+@utility slide-out-to-left {
+  --motion-out-x: -100%;
+}
+
+@utility slide-out-to-right {
+  --motion-out-x: 100%;
+}
+
+/* 中央寄せは Tailwind v4 では `translate` プロパティで書かれる
+ * (`translate-x-[-50%]` → `translate: -50% …`)。ここが `transform` を使うのは
+ * その中央寄せと **合成させる** ため。同じ `translate` を動かすと、ダイアログが
+ * 開く瞬間に中央から左上へ飛ぶ。 */
+@keyframes motion-enter {
+  from {
+    opacity: var(--motion-in-opacity, 1);
+    transform: translate3d(
+      calc(var(--motion-in-x, 0px) * var(--motion-travel)),
+      calc(var(--motion-in-y, 0px) * var(--motion-travel)),
+      0
+    );
+  }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+@keyframes motion-exit {
+  from { opacity: 1; transform: translate3d(0, 0, 0); }
+  to {
+    opacity: var(--motion-out-opacity, 1);
+    transform: translate3d(
+      calc(var(--motion-out-x, 0px) * var(--motion-travel)),
+      calc(var(--motion-out-y, 0px) * var(--motion-travel)),
+      0
+    );
+  }
+}
+
+/* アコーディオンは高さが変わる動きなので `expand` と同じ扱い。高さは Radix が
+ * `--radix-accordion-content-height` に入れてくれる。 */
+@utility animate-accordion-down {
+  animation: motion-accordion-down var(--motion-enter-duration) var(--motion-easing-ease-out) both;
+}
+
+@utility animate-accordion-up {
+  animation: motion-accordion-up var(--motion-exit-duration) var(--motion-easing-ease-in) both;
+}
+
+@keyframes motion-accordion-down {
+  from { height: 0; opacity: 0; }
+  to { height: var(--radix-accordion-content-height); opacity: 1; }
+}
+
+@keyframes motion-accordion-up {
+  from { height: var(--radix-accordion-content-height); opacity: 1; }
+  to { height: 0; opacity: 0; }
+}
+
+/* Spec B-4 原則4 — 「動きを減らす」設定では移動と拡大を消し、不透明度の変化
+ * だけ残す。`animation: none` にはしない (完全に消すと出入りが読み取れず、
+ * 何が起きたのか分からなくなる)。
+ * 上の md クエリより **後** に置くこと (同じ :root の後勝ちで上書きする)。 */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-travel: 0;
+  }
 }
 
 @layer base {
@@ -775,4 +1284,63 @@ dl[data-slot="spec-band"][data-emphasis="true"] > [data-slot="spec-item"] > dd {
   [data-slot="button"]:disabled {
     @apply active:scale-100 active:brightness-100;
   }
+}
+
+/* ─── roji データ表現の「図の文字」 ─────────────────────────────────────────
+ *
+ * 味の四象限 / 香りの場 / 土地を読む の 3 枚は、本文とは別の文字組みを持つ。
+ * 小さな文字を 0.2〜0.28em 空けて置く組みで、これは **UI の文字ではなく図に
+ * 添える文字**。typography トークンの字間スケールは widest = 0.125em までで、
+ * ここまで空いた値を持たない。
+ *
+ * トークン側に足さないのは、UI の字間として使われると本文の組みが壊れるため
+ * (図の外で使う想定がない)。`components/viz/**` からだけ参照する。
+ * 値の正本は viz 査定 verdicts.md (roji コピー路線候補 — 実組み込み査定)。 */
+.roji-viz-caption { letter-spacing: 0.2em; }
+.roji-viz-caption-wide { letter-spacing: 0.28em; }
+
+/* ─── shadcn 上流の生 `z-50` を名前付きレイヤーへ接続する ───────────────────
+ *
+ * `components/ui/**` の 13 ファイル・21 箇所が `z-50` を素で持っている
+ * (Dialog / Sheet / AlertDialog / Drawer / Popover / Tooltip / HoverCard /
+ *  DropdownMenu / ContextMenu / Menubar / NavigationMenu / Select / Combobox)。
+ * これは shadcn 上流の既定値そのままで、**触らないことに価値がある**:
+ * 13 ファイルを書き換えると `shadcn add` / upstream diff の更新経路が
+ * fork になり、以後ずっと手で追従することになる。
+ *
+ * かわりに `z-50` ユーティリティの中身を差し替えて、この 1 箇所だけで
+ * `--z-modal` に接続する。13 ファイルは無編集のまま名前付きレイヤーに乗る。
+ *
+ * ## なぜこれが必要か (実害)
+ *
+ * 生の 50 は音声バー (`--z-sticky` = 1020) とチャット (`--z-chat` = 1030) に
+ * 必ず負ける。つまり **モーダルを開いても下端の常設 UI がその上に描かれる**。
+ * SP でモバイルメニュー (Sheet) を開くと、音声再生中はシート下部が音声バーに
+ * 覆われて押せない。部品単体の Storybook では常設 UI が居ないので永久に出ない
+ * 種類の不具合で、実ページを見る e2e (`e2e/mobile.spec.ts` の
+ * 「Bottom-fixed occlusion」) が唯一の検出手段。
+ *
+ * ## 素の (レイヤー無しの) クラスで書く理由 — 2026-08-17 実測で 2 案を却下
+ *
+ * - `@layer utilities { .z-50 { … } }` は v4 の Lightning CSS 段階で丸ごと落ちて
+ *   コンパイル後の CSS に 1 バイトも出ない (同ファイル `scrollbar-none` の注記と
+ *   同じ現象)。
+ * - `@utility z-50 { … }` は出力されるが、Tailwind 組込みの `z-<number>` と
+ *   **同じ規則にマージされ、組込みの `z-index: 50` が後に来て勝つ**
+ *   (実測値: `.z-50 { z-index: var(--z-modal); z-index: 50; }`)。
+ *
+ * 残るのがこれ。cascade layer に属さない宣言はどの `@layer` の中身よりも強い
+ * (CSS Cascade 5 の layer order — 無所属が最優先)。Tailwind のユーティリティは
+ * 全て `@layer utilities` の中なので、詳細度が同じ (0,1,0) でも必ずこちらが
+ * 実効値になる。同ファイル末尾の `.roji-viz-caption` と同じ書き方。
+ *
+ * ## 影響範囲
+ *
+ * `z-50` は移行後 `components/ui/**` と Storybook の story だけが使う
+ * (アプリ側の 3 箇所 — ヘッダー / Cookie 同意 / イベント申込バー — は
+ *  `z-(--z-sticky)` へ移行済み)。50 のまま下に居てほしい面は 1 つも無い。
+ * 生スケールで「下に居てほしい」面 (例: `reading-progress` の `z-40`) は
+ * ここを通らないので従来どおり。 */
+.z-50 {
+  z-index: var(--z-modal);
 }

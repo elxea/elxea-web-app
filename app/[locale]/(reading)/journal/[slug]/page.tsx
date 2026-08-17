@@ -175,7 +175,7 @@ export default async function ArticlePage({
       ).filter((p): p is NonNullable<typeof p> => Boolean(p))
     : [];
 
-  // AudioBlock / AudioPlayer / TrackRow / MiniPlayer が使う文言。client 側では
+  // AudioBlock / AudioPlayer / TrackRow / AudioDock が使う文言。client 側では
   // `getTranslations` を呼べないので、ここでまとめて解決して渡す。
   const audioLabels = {
     play: t("audioPlay"),
@@ -374,6 +374,7 @@ export default async function ArticlePage({
                   kicker={t("audioInterviewLabel")}
                   title={article.title}
                   meta={author ? t("writtenBy") + ": " + author.name : undefined}
+                  href={`/${locale}/journal/${slug}`}
                   labels={audioLabels}
                 />
               )}

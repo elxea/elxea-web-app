@@ -63,7 +63,7 @@ export function AudioToggle({ className }: AudioToggleProps) {
       aria-pressed={status === "playing"}
       aria-label={ariaLabel}
       className={cn(
-        "flex items-center gap-2 text-foreground transition-colors duration-200 cursor-pointer",
+        "flex items-center gap-2 text-foreground transition-colors duration-fast cursor-pointer",
         "disabled:cursor-wait disabled:opacity-70",
         className
       )}

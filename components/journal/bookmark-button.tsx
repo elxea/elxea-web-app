@@ -273,7 +273,7 @@ export function BookmarkButton({
         // Figma 実測: 高さ 44 (タップ最小域) / padding 16x12 / gap 8 /
         // 角丸 radius-md / 1px 罫線 / 文字 body-sm。
         "h-11 gap-2 rounded-md border px-4 py-3 text-sm font-normal",
-        "transition-colors duration-200",
+        "transition-colors duration-fast",
         // 4 状態 (+ unknown) の面と罫線。
         visual === "active"
           ? "border-foreground bg-secondary text-foreground hover:bg-secondary"
@@ -290,7 +290,7 @@ export function BookmarkButton({
       <Bookmark
         aria-hidden="true"
         className={cn(
-          "size-4 shrink-0 transition-colors duration-200",
+          "size-4 shrink-0 transition-colors duration-fast",
           visual === "active" ? "fill-current" : "fill-none",
           visual === "loading" && "animate-pulse"
         )}

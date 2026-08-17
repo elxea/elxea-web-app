@@ -78,7 +78,7 @@
  * 取引先の所在地詳細は roji の表示に使わないため (必要になったら Notion を引く)。
  */
 
-import { isPrefecture, type Prefecture } from "./prefectures";
+import { PREFECTURES, isPrefecture, type Prefecture } from "./prefectures";
 
 /**
  * 座標がどの粒度で取れているか。Mapbox の見せ方を分ける材料になる。
@@ -469,6 +469,67 @@ export function resolveTeaOriginPlace(menuNumber: string): string | null {
   const { prefecture, area } = resolveTeaOrigin(menuNumber);
   const place = [prefecture, area].filter(Boolean).join(" ");
   return place || null;
+}
+
+/**
+ * 自由記述の産地文字列から産地を引く (「静岡県牧之原市」→ 静岡県の代表点)。
+ *
+ * ## なぜ必要か
+ *
+ * 一覧ページの地図は Sanity の `teaMenu` を並べるが、Sanity 側の
+ * `productNumber` は 5 桁採番になっていない個体がある (`1` / `ELX-2026-04`)。
+ * その場合 `resolveTeaOrigin` は何も返せず、地図に 1 点も立たない。
+ * 一方で `teaMenu.origin` には「静岡県牧之原市」のような自由記述が入っている。
+ *
+ * ## 何をして、何をしないか
+ *
+ * 文字列に含まれる **都道府県の正式名称だけ**を拾い、その都道府県に属する
+ * 仕入先の座標 (Notion Supplier List 由来の実測値) を代表点として返す。
+ * 市町村までは降りない — 降りるには市町村の座標表が要り、それは
+ * 「座標は推測で作らない」に反する新しい二重管理になるため。
+ * よって `precision` は必ず `prefecture` になり、地図側はこの粒度を見て
+ * 点の出し方を変えられる。
+ *
+ * 該当する仕入先が 1 軒も無い都道府県 (例: 石川県) は **座標を返さない**。
+ * 適当な県庁所在地を埋めるより、地図に出さないほうが正しい。
+ */
+export function resolveTeaOriginByPlaceText(text: string | null | undefined): TeaOrigin {
+  if (!text) return UNKNOWN_ORIGIN;
+
+  const prefecture = PREFECTURES.find((name) => text.includes(name)) ?? null;
+  if (!prefecture) return UNKNOWN_ORIGIN;
+
+  const key = (Object.keys(ORIGIN_SOURCES) as OriginSourceKey[]).find(
+    (k) => ORIGIN_SOURCES[k].prefecture === prefecture
+  );
+  if (!key) {
+    // 都道府県は読めたが座標の当てが無い。県名だけ返し、地図には打たせない。
+    return {
+      prefecture,
+      area: null,
+      raw: text,
+      lat: null,
+      lng: null,
+      precision: "none",
+      geoTitle: null,
+      needsReview: true,
+    };
+  }
+
+  const source = ORIGIN_SOURCES[key];
+  const hasCoords =
+    source.lat !== null && source.lng !== null && isInJapan(source.lat, source.lng);
+  return {
+    prefecture,
+    area: null,
+    raw: text,
+    lat: hasCoords ? source.lat : null,
+    lng: hasCoords ? source.lng : null,
+    // 市町村までは降りていないので、元が `area` でも粒度は県止まりで申告する。
+    precision: hasCoords ? "prefecture" : "none",
+    geoTitle: hasCoords ? source.geoTitle : null,
+    needsReview: true,
+  };
 }
 
 /** 銘柄番号から仕入先名を引く (物語・農家紹介の導線用)。 */

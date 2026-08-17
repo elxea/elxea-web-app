@@ -94,6 +94,17 @@ export default async function middleware(request: NextRequest) {
   const passwordResponse = await checkSitePassword(request);
   if (passwordResponse) return passwordResponse;
 
+  // `/dev/*` はロケール接頭辞を持たない (下のブロックの理由)。人がプレビュー
+  // URL を手で打つときは他ページの癖で `/ja/dev/...` と書きがちで、そのままだと
+  // `app/[locale]/dev/` が無いので 404 になる。接頭辞を落として同じ面へ送る。
+  // 正規の URL はあくまで接頭辞なしの `/dev/*` なので、恒久扱いにならない 307。
+  const localizedDev = pathname.match(/^\/(?:ja|en)(\/dev(?:\/.*)?)$/);
+  if (localizedDev) {
+    const devUrl = new URL(localizedDev[1], request.url);
+    devUrl.search = request.nextUrl.search;
+    return NextResponse.redirect(devUrl, 307);
+  }
+
   // 実装確認用のプレビュー面 (`/dev/*`) は i18n の外に置く。
   // next-intl のミドルウェアを通すと `/dev/...` が `/ja/dev/...` へ飛ばされるが、
   // ルートは `app/dev/` (= `[locale]` の外) にあるので 404 になる。ここで手前に

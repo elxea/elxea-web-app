@@ -85,7 +85,11 @@ export function Header({ navItems: externalNavItems }: HeaderProps) {
         ];
 
   return (
-    <header className="border-b border-border bg-background sticky top-0 z-50">
+    /* z は名前付きレイヤー (`app/globals.css` の `--z-*` が唯一の SoT)。
+       ヘッダーは「画面端に貼り付く常設面」なので `--z-sticky` (1020)。
+       生の `z-50` は shadcn の Dialog / Sheet と同じ段 (= 1050 へ接続済み) に
+       なるため、ヘッダーがモーダルの上に出てしまう。 */
+    <header className="border-b border-border bg-background sticky top-0 z-(--z-sticky)">
       {/*
         Figma Header (Module) 5653:29 / Header SP (Module) 7970:42126 が正本。
 

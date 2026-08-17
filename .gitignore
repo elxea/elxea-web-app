@@ -59,7 +59,13 @@ next-env.d.ts
 # audio assets (35MB+): NOT part of the deploy. The site loads BGM from Vercel
 # Blob by absolute URL (see lib/audio/bgm-source.ts), so nothing here needs to
 # reach production. Anything under public/audio/ is a local working copy only.
-public/audio/
+#
+# 例外: public/audio/peaks/ (波形 JSON) は **配信する**。1 ファイル 1-2 KB の
+# 事前計算データで、プレイヤーが実行時に取りに来る (lib/audio/peaks.ts)。
+# 音源そのものと違って deploy に載せる必要があるため除外しない。
+# ディレクトリごと無視すると中身の否定 (!) が効かないので `*` で受ける。
+public/audio/*
+!public/audio/peaks/
 
 # maplibre worker (node_modules から dev / build の先頭で複製する生成物)
 public/maplibre/
@@ -103,3 +109,7 @@ c16-*.mjs
 # 正本は scripts/design-system/design-kit.generated.json (pnpm generate:design-kit で機械生成)。
 # 追跡すると design-kit の第3のコピーとして stale 化するため追跡しない。
 .designkit-out.json
+
+# scripts/storybook-story-shots.mjs の出力 (story の実描画スクショ + report.json)。
+# 目視確認のための使い捨てで、視覚回帰の正本は Chromatic 側にある。
+.storybook-shots/

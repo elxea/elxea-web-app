@@ -1,22 +1,17 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
+import { useBottomStackSlot } from "@/hooks/use-bottom-stack-slot";
 import type { ConsentChoice } from "@/lib/consent";
 import {
   setConsentChoice,
   useConsentBannerForcedOpen,
   useConsentChoice,
 } from "@/lib/consent-store";
-
-/**
- * Custom property published while this banner occupies the bottom of the
- * viewport. Other bottom-fixed UI adds it to its own offset so it clears the
- * banner instead of hiding behind it. Consumers default it to `0px`.
- */
-const BOTTOM_OBSTRUCTION_VAR = "--bottom-obstruction";
+import { cn } from "@/lib/utils";
 
 /**
  * Cookie consent banner.
@@ -30,36 +25,20 @@ export function CookieConsent() {
   const t = useTranslations("cookie");
   const choice = useConsentChoice();
   const forcedOpen = useConsentBannerForcedOpen();
-  const bannerRef = useRef<HTMLDivElement>(null);
 
   // "unknown" is the server / pre-hydration state. Rendering the banner then
   // would flash it on every page load for visitors who already chose.
   const visible = choice !== "unknown" && (choice === null || forcedOpen);
 
-  // Publish the banner's real height rather than a guessed constant: it wraps
-  // to a taller two-row layout below `sm`, so a hard-coded value would be wrong
-  // on exactly the viewport where space is tightest. Without this the chat
-  // launcher (z-40) is completely buried by this banner (z-50) on a first
-  // visit — and on desktop the launcher is now the only way into chat.
-  useEffect(() => {
-    const root = document.documentElement;
-    const el = bannerRef.current;
-    if (!visible || !el) {
-      root.style.removeProperty(BOTTOM_OBSTRUCTION_VAR);
-      return;
-    }
-
-    const publish = () =>
-      root.style.setProperty(BOTTOM_OBSTRUCTION_VAR, `${el.offsetHeight}px`);
-    publish();
-
-    const observer = new ResizeObserver(publish);
-    observer.observe(el);
-    return () => {
-      observer.disconnect();
-      root.style.removeProperty(BOTTOM_OBSTRUCTION_VAR);
-    };
-  }, [visible]);
+  // 自分が下端で占めている高さを公開する。上に載る面 (イベント申込バー /
+  // チャットランチャ / PC のチャット入力バー) がこの分だけ自分を持ち上げる。
+  // 公開しないと、それらが同意バーに重なって「詳しく見る」等が押せなくなる
+  // (2026-08-18 QA 実測の回帰。詳細は hooks/use-bottom-stack-slot.ts)。
+  //
+  // 高さは実測して公開する: `sm` 未満では 2 段組に折り返して背が高くなるため、
+  // 定数を置くと最も余白の無いビューポートでだけ値が狂う。
+  const barRef = useRef<HTMLDivElement>(null);
+  useBottomStackSlot(barRef, "--consent-bar-h", visible);
 
   if (!visible) return null;
 
@@ -75,10 +54,29 @@ export function CookieConsent() {
   };
 
   return (
+    // 音声プレイヤーのバー (components/audio/audio-dock.tsx) が出ている間は
+    // その分だけ上へ退く。重ねると同意ボタンが隠れて押せなくなる。非表示時は
+    // 0px で従来の位置。
+    //
+    // z は名前付きレイヤー (`app/globals.css` の `--z-*` が唯一の SoT)。音声バー
+    // と同じ「画面端に貼り付く常設面」= `--z-sticky` (1020)。互いに重ならない
+    // (上の bottom で縦に積む) ので同じ段でよく、出入りの一瞬だけ重なったときは
+    // DOM 順で後ろに居るこちらが前に出る (レイアウトの並びが AudioDock →
+    // CookieConsent)。生の `z-50` は 1020 に必ず負けていたので使わない。
     <div
-      ref={bannerRef}
+      ref={barRef}
+      // 下端に居座る面は e2e で矩形を実測して重なりを検査する
+      // (`e2e/mobile.spec.ts` の Bottom-fixed occlusion)。class 名は Tailwind の
+      // 都合で変わるので、掴む先は data-slot に固定する。
       data-slot="cookie-consent"
-      className="fixed bottom-0 left-0 right-0 z-50 w-full max-w-full border-t border-border bg-background"
+      style={{ bottom: "var(--audio-bar-h, 0px)" }}
+      className={cn(
+        "fixed left-0 right-0 z-(--z-sticky) w-full max-w-full border-t border-border bg-background",
+        // 音声バーが出入りするときの退避はスライドではなく滑らかに。ChatBar に
+        // だけ入っていた指定をここにも広げて、3つの下端要素の挙動を揃える。
+        "transition-[bottom] duration-fast ease-enter",
+        "animate-rise"
+      )}
     >
       {/* 統合 (2026-08-17): 同意の中身は main 版 (lib/consent + consent-store 経由で
           GTM に伝わる版) を採り、内側の幅取りだけ c1-ds のデザインシステムの

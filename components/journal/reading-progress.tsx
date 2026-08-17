@@ -10,12 +10,16 @@ import * as React from "react";
  * fill が現在地の割合を示す。
  *
  * 「ヘッダー直下」= ヘッダー高さぶんのオフセット。以前は `top-0` で貼っていた
- * ため、同じく `sticky top-0` かつ不透明・`z-50` のヘッダー
- * (components/layout/header.tsx:89) の真下に潜り込み、スクロールした瞬間から
+ * ため、同じく `sticky top-0` かつ不透明なヘッダー
+ * (components/layout/header.tsx) の真下に潜り込み、スクロールした瞬間から
  * 完全に隠れていた (実装済み機能が事実上死んでいた)。ヘッダーと同じ高さ
  * トークン (SP 60 / PC 68 = `component.header.height.*`) を `top` に使い、
  * ブレークポイントもヘッダー側 (`md:`) に揃えて重なりを解消する。
- * z はヘッダー (`z-50`) より後ろ・本文より前の `z-40` を維持する。
+ *
+ * z は生スケールの `z-40` を維持する。これは**意図的に名前付きレイヤーへ
+ * 移さない**唯一の追従要素で、役割が「本文より前・ヘッダーより後ろ」= 常設
+ * UI の段 (1020 以上) には載せたくない面だから (ヘッダーは `--z-sticky` =
+ * 1020)。40 < 1020 なので従来どおりヘッダーの後ろに収まる。
  */
 export function ReadingProgress() {
   const [progress, setProgress] = React.useState(0);

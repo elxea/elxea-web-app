@@ -12,6 +12,8 @@ import { LenisProvider } from "@/components/providers/lenis-provider";
 import { ChatProvider } from "@/components/chat/chat-provider";
 import { ChatBar } from "@/components/chat/chat-bar";
 import { AudioProvider } from "@/components/audio/audio-provider";
+import { ArticleAudioProvider } from "@/components/audio/article-audio-provider";
+import { AudioDock } from "@/components/audio/audio-dock";
 import { getClient } from "@/sanity/lib/client";
 import { SITE_SETTINGS_QUERY } from "@/sanity/lib/queries";
 
@@ -122,6 +124,10 @@ export default async function LocaleLayout({
       <body className="min-h-screen flex flex-col bg-background text-foreground">
         <NextIntlClientProvider messages={messages}>
           <AudioProvider>
+          {/* 記事音声はページ遷移で止めない (SoundCloud 方式)。provider を
+              ここに常駐させるのが前提条件で、記事ページ側に置くと遷移で
+              unmount され再生が必ず切れる。 */}
+          <ArticleAudioProvider>
           <CartProviderWrapper>
             <ChatProvider>
               <LenisProvider>
@@ -129,11 +135,13 @@ export default async function LocaleLayout({
                 <main className="flex-1">{children}</main>
                 <Footer groups={footerGroups} />
                 <ChatBar />
+                <AudioDock />
                 <CookieConsent />
                 <Toaster />
               </LenisProvider>
             </ChatProvider>
           </CartProviderWrapper>
+          </ArticleAudioProvider>
           </AudioProvider>
         </NextIntlClientProvider>
       </body>

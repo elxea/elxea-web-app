@@ -71,7 +71,7 @@ export function AudioPlayer({
           aria-busy={isLoading}
           className={cn(
             "flex size-10 shrink-0 items-center justify-center rounded-full text-background",
-            "transition-colors duration-200",
+            "transition-colors duration-fast",
             isLoading ? "bg-muted-foreground" : "bg-foreground hover:bg-brand-charcoal",
             "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card focus-visible:outline-none"
           )}

@@ -118,7 +118,7 @@ export function JournalModal({
               data-slot="journal-modal-close"
               className={cn(
                 "flex size-11 shrink-0 items-center justify-center rounded-full text-foreground",
-                "transition-colors duration-200 hover:bg-muted active:bg-secondary",
+                "transition-colors duration-fast hover:bg-muted active:bg-secondary",
                 "focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
               )}
             >
@@ -174,7 +174,7 @@ export function ModalDetailRow({
         data-slot="modal-detail-row"
         className={cn(
           "flex min-h-12 w-full items-center gap-4 py-3 text-left text-foreground",
-          "transition-colors duration-200 hover:text-muted-foreground",
+          "transition-colors duration-fast hover:text-muted-foreground",
           "focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
           className
         )}

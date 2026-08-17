@@ -57,9 +57,13 @@ pre-commit install --hook-type pre-commit --hook-type pre-push
 - i18n: next-intl（日本語 primary）
 - Package Manager: pnpm
 
+### rojiデータ表現の恒久ルール（非交渉）
+
+> 比較対象は同カテゴリーのみ・図の色はカテゴリーを表す（= 1枚に載る点は全て同色）。全文と実装上の固定点は `docs/roji-dataviz-rules.md`（Setaka指摘4回・2026-08-17確定）。rojiの図（フレーバーマップ / 香りの場 / テロワール地図 / 今後のマイページ系）を作る前に必ず読むこと。
+
 ## デザインシステム方針
 
-> **共通業務フロー**: デザイン提案・制作の共通フロー（2 モード / DS 準拠 / トークン束縛 / 二層チェック / 成果物台帳）は全プロジェクト共通の `design-workflow` skill を正本とする（詳細 = Design Ops Spec）。本節はプロジェクト固有の DS 差分を述べる。
+> **共通業務フロー**: デザイン提案・制作の共通フロー（2モード / DS準拠 / トークン束縛 / 二層チェック / 成果物台帳）は全プロジェクト共通の `design-workflow` skillを正本とする（詳細 = Design Ops Spec）。本節はプロジェクト固有のDS差分を述べる。
 
 ### 原則: SoTはFigma（全テンプレート共通）
 

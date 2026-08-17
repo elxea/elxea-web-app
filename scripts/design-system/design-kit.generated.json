@@ -113,7 +113,7 @@
         "dist/tokens-cjk.css"
       ],
       "name_transform": "sd.config.mjs の name/tailwind-compat が color.semantic.* から semantic を除去する (color.semantic.primary -> --color-primary)。他はパス連結。",
-      "token_count": 316
+      "token_count": 304
     },
     "color": {
       "semantic": {
@@ -796,22 +796,6 @@
       "_note": "ビルドされるのは base.json の値。elxea-custom.json の低不透明度版 (0.05-0.18 + xs / inner) はビルドされていない → conflicts[c-01]。"
     },
     "elevation": {
-      "level": {
-        "0": "0",
-        "1": "10",
-        "2": "20",
-        "3": "30",
-        "4": "40",
-        "5": "50"
-      },
-      "zIndex": {
-        "0": "0",
-        "10": "10",
-        "20": "20",
-        "30": "30",
-        "40": "40",
-        "50": "50"
-      },
       "opacity": {
         "0": "0",
         "5": "0.05",
@@ -1272,6 +1256,7 @@
         "--overlay-scrim": "color-mix(in oklab, var(--color-brand-graphite) 62%, transparent)",
         "--graphite-pressed": "oklch(0.333 0.007 274.8)",
         "--z-sticky": "1020",
+        "--z-chat": "1030",
         "--z-overlay": "1040",
         "--z-modal": "1050",
         "--elevation-shadow-modal": "0 12px 40px 0 color-mix(in oklab, var(--color-brand-graphite) 18%, transparent)",
@@ -1283,6 +1268,14 @@
         "--sidebar-accent-foreground": "hsl(240 5.9% 10%)",
         "--sidebar-border": "hsl(220 13% 91%)",
         "--sidebar-ring": "hsl(217.2 91.2% 59.8%)",
+        "--motion-enter-duration": "var(--motion-duration-fast)",
+        "--motion-exit-duration": "var(--motion-duration-fast)",
+        "--motion-rise-distance": "var(--spacing-2)",
+        "--motion-recede-distance": "var(--spacing-1)",
+        "--motion-sheet-x": "100%",
+        "--motion-sheet-y": "0%",
+        "--motion-zoom-from": "0.95",
+        "--motion-travel": "0",
         "--page-margin": "var(--layout-grid-margin-desktop)"
       },
       "dark": {
@@ -2175,13 +2168,13 @@
     {
       "id": "c-06",
       "severity": "MID",
-      "title": "z-index に 2 系統ある",
-      "code_value": "tokens/base.json elevation.level = 0/10/20/30/40/50 (semantic 名: flat/raised/floating/overlay/modal/top)",
-      "other_value": "tokens/elxea-custom.json z-index = hide -1 / base 0 / raised 10 / dropdown 1000 / sticky 1020 / fixed 1030 / overlay 1040 / modal 1050 / popover 1060 / toast 1070 / max 9999",
-      "impact": "同じ『overlay』が 30 と 1040 の 2 通り。custom 側はビルドされないので実効値は base だが、設計意図としてどちらかが未決。",
-      "resolution": "実装値は base.json の 0-50。",
-      "evidence": "git show origin/main:tokens/base.json / tokens/elxea-custom.json",
-      "verified_at": "2026-07-31"
+      "title": "z-index に 3 系統あった (解決済み — 1 系統へ統合)",
+      "code_value": "app/globals.css :root の名前付きレイヤー --z-sticky 1020 / --z-chat 1030 / --z-overlay 1040 / --z-modal 1050 が唯一の SoT",
+      "other_value": "廃止: (a) tokens/base.json elevation.level と elevation.zIndex (どちらも 0/10/20/30/40/50 の同値重複) を削除 (b) components/ui/** の生 z-50 (13 ファイル 21 箇所) は編集せず app/globals.css 末尾の素の .z-50 規則で --z-modal へ接続 (c) tokens/elxea-custom.json は 2026-08-14 に削除済み",
+      "impact": "統合前は同じ『overlay』が 30 と 1040 の 2 通りあり、shadcn の生 z-50 が下端固定 UI (1020/1030) に必ず負けるため、音声再生中にモーダルやシートの下部が音声バーに覆われて押せなかった。",
+      "resolution": "実装値は app/globals.css の --z-* (1020-1050) のみ。raw scale トークンは参照ゼロを実測 (--elevation-level-* / --elevation-zIndex-* を app/components/lib/hooks/stories/scripts/e2e で grep して 0 件) してから削除した。回帰検出は e2e/mobile.spec.ts の Bottom-fixed occlusion (SP) が担う。",
+      "evidence": "grep -rn '--elevation-level|--elevation-zIndex' app components lib hooks stories scripts e2e -> 0 hits / e2e/mobile.spec.ts",
+      "verified_at": "2026-08-17"
     },
     {
       "id": "c-07",
