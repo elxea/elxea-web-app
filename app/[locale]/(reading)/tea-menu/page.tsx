@@ -6,6 +6,7 @@ import { getClient } from "@/sanity/lib/client";
 import { ImageCard } from "@/components/media/image-card";
 import { TEA_MENUS_QUERY } from "@/sanity/lib/queries";
 import { urlFor } from "@/sanity/lib/image";
+import { filterOutFictional } from "@/lib/fictional-content";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("teaMenu");
@@ -43,7 +44,11 @@ async function TeaMenuList() {
 
   try {
     const client = getClient();
-    const items = await client.fetch(TEA_MENUS_QUERY, { language: locale });
+    const fetched = await client.fetch(TEA_MENUS_QUERY, { language: locale });
+
+    // Hide the fictional/seed tea menus still present in the production
+    // dataset until the real ones are published. Code-only; no Sanity mutation.
+    const items: typeof fetched = filterOutFictional("teaMenu", fetched);
 
     if (!items || items.length === 0) {
       return <p className="text-muted-foreground text-sm">{t("empty")}</p>;

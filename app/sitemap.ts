@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { isFictionalFarmerSlug } from "@/lib/fictional-farmers";
+import { isFictionalSlug } from "@/lib/fictional-content";
 import { getSiteUrl } from "@/lib/env";
 
 const BASE_URL = getSiteUrl();
@@ -77,6 +77,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       `*[_type == "event" && defined(slug.current)]{ "slug": slug.current, _updatedAt }`
     );
     for (const event of events) {
+      // Skip seed events whose bodies literally contain "ダミー".
+      if (isFictionalSlug("event", event.slug)) continue;
       for (const locale of locales) {
         entries.push({
           url: `${BASE_URL}/${locale}/events/${event.slug}`,
@@ -92,7 +94,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     );
     for (const farmer of farmers) {
       // Skip fictional/seed farmers hidden until real stories are approved.
-      if (isFictionalFarmerSlug(farmer.slug)) continue;
+      if (isFictionalSlug("farmer", farmer.slug)) continue;
       for (const locale of locales) {
         entries.push({
           url: `${BASE_URL}/${locale}/farmers/${farmer.slug}`,
@@ -108,6 +110,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       `*[_type == "teaMenu" && defined(slug.current)]{ "slug": slug.current, _updatedAt }`
     );
     for (const tea of teaMenus) {
+      // Skip the seed tea menus (no real tea is published yet).
+      if (isFictionalSlug("teaMenu", tea.slug)) continue;
       for (const locale of locales) {
         entries.push({
           url: `${BASE_URL}/${locale}/tea-menu/${tea.slug}`,
@@ -123,6 +127,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       `*[_type == "playlist" && defined(slug.current)]{ "slug": slug.current, _updatedAt }`
     );
     for (const pl of playlists) {
+      // Skip the seed playlists (tracks are a placeholder bgm.mp3).
+      if (isFictionalSlug("playlist", pl.slug)) continue;
       for (const locale of locales) {
         entries.push({
           url: `${BASE_URL}/${locale}/playlists/${pl.slug}`,

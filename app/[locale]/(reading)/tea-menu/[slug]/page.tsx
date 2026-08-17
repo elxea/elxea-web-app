@@ -10,6 +10,7 @@ import { ImageCard } from "@/components/media/image-card";
 import { Breadcrumb } from "@/components/seo/breadcrumb";
 import { TeaOriginBlock } from "@/components/viz/map/tea-origin-block";
 import { resolveTeaOriginPlace } from "@/lib/roji/tea-origins";
+import { isFictionalSlug } from "@/lib/fictional-content";
 import type { PortableTextBlock } from "@portabletext/types";
 
 export async function generateMetadata({
@@ -19,6 +20,7 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   const locale = await getLocale();
+  if (isFictionalSlug("teaMenu", slug)) return {};
   try {
     const client = getClient();
     const tea = await client.fetch(TEA_MENU_BY_SLUG_QUERY, { slug, language: locale });
@@ -46,6 +48,9 @@ export default async function TeaMenuDetailPage({
   const locale = await getLocale();
   const t = await getTranslations("teaMenu");
   const tCommon = await getTranslations("common");
+
+  // Fictional/seed tea menu -> behave as if the document does not exist.
+  if (isFictionalSlug("teaMenu", slug)) notFound();
 
   let tea;
   try {
