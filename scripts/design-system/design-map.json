@@ -69,9 +69,9 @@
     {
       "figma_node_id": "5904:77",
       "figma_name": "TeaSpecCard",
-      "code_path": "components/journal/tea-spec-card.tsx",
+      "code_path": "components/set-edition/tea-spec-card.tsx",
       "kind": "ds-component",
-      "notes": "elxea-journal S4。"
+      "notes": "elxea-journal S4。 実装は b4390f4 で Set Edition へ改称・移設 (components/set-edition/tea-spec-card.tsx)。"
     },
     {
       "figma_node_id": "5257:8",
@@ -296,13 +296,6 @@
       "code_path": "components/account/member-gate.tsx",
       "kind": "module",
       "notes": "会員ゲート (Server Component)。"
-    },
-    {
-      "figma_node_id": "6852:297",
-      "figma_name": "CategoryFilter (Module)",
-      "code_path": "components/journal/category-filter.tsx",
-      "kind": "module",
-      "notes": "Journal のカテゴリ絞り込み。"
     },
     {
       "figma_node_id": "6853:300",
@@ -1103,13 +1096,6 @@
       "notes": "SubscriptionEmptyCard。中央寄せ・上下 32 / 段間 16・本文 16 (jp/body)。「商品一覧」は DS Button 既定 (塗り)。SP は 6723:14874。C6-3 新規。"
     },
     {
-      "figma_node_id": "6639:7029",
-      "figma_name": "農家一覧 変A（部品ベース）— PC/SP @/ja/farmers",
-      "code_path": "app/[locale]/(reading)/farmers/page.tsx",
-      "kind": "module",
-      "notes": "農家一覧。この画面は R2 確定版フレームが存在しない (Structure List 行 33270c9d064c81e089dff5ab464cce55 の ステータス：Design=Not started。R2 セクションを 7567:2 / 7567:4 / 7567:6 全数走査して不在を確認)。よって構造の正本は共通リストパターン【R2: 確定版】お茶メニュー一覧 PC 8063:2144 / SP 8063:2372 (= 商品一覧 8061:1781 / 8062:2008) とし、部品は components/catalog/catalog-list.tsx をそのまま共有する。本ノードは内容モデル (FarmerCard = 写真 + 氏名 + 産地) とラベルの由来として登録。差分は英字キッカー FARMERS / 絞り込み軸が産地 (region) / meta 行なしの 3 点。C9-1 新規。"
-    },
-    {
       "figma_node_id": "6654:13189",
       "figma_name": "お茶メニュー詳細 変A（部品ベース）— PC/SP @/ja/tea-menu/[slug]",
       "code_path": "app/[locale]/(reading)/tea-menu/[slug]/page.tsx",
@@ -1346,13 +1332,6 @@
       "code_path": "components/people/person-detail.tsx",
       "kind": "ds-component",
       "notes": "People 層での命名を与える薄い再輸出 (PersonHead / PersonQuote / PersonSection* / PersonDataBand / PersonCardGrid / ProcessGrid / InterviewList / personBandClass)。実装は複製せず farmer-detail.tsx を指す。farmer-detail の注記どおり『People 詳細テンプレ共通骨格』への一本化は農家・プレイリストを同時に動かすため後続タスクに残す。"
-    },
-    {
-      "figma_node_id": "6647:7525",
-      "figma_name": "コレクション詳細 (roji 世代デザイン不在 → 共通リストパターンから導出)",
-      "code_path": "app/[locale]/collections/[handle]/page.tsx",
-      "kind": "module",
-      "notes": "全 14 ページ走査の結果 roji 世代の『コレクション詳細』は 0 件で、このノードは旧 elxea 変A (page 6054:15) = Structure DB の stale。C9-1 の先例に従い凍結済み兄弟 R2『共通リストパターン』(商品一覧 PC 8061:1781 / SP 8062:2008、お茶メニュー一覧 8063:2144/8063:2372) から導出。商品一覧との差分は 3 点: キッカー COLLECTION / チップ列なし (コレクション自体が絞り込み結果) / KindIndex なし。並び替えは ProductCollectionSortKeys (既定 BEST_SELLING = おすすめ順)。"
     }
   ],
   "unmapped_figma_nodes": [
