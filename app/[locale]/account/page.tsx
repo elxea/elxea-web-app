@@ -5,7 +5,6 @@ import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
 import { ImagePlaceholder } from "@/components/media/image-placeholder";
 import { Separator } from "@/components/ui/separator";
-import type { MembershipTier } from "@/lib/shopify/customer";
 import { DashboardSummary } from "@/components/account/dashboard-summary";
 import { FavoritesSection } from "@/components/account/favorites-section";
 import { FollowsSection } from "@/components/account/follows-section";
@@ -104,21 +103,10 @@ export default async function AccountPage() {
     // Subscription API may not be available
   }
 
-  // Compute membership tier from already-fetched data (avoid extra API calls)
-  let membershipTier: MembershipTier = "none";
-  if (customer.tags) {
-    if (customer.tags.includes("member-premium")) membershipTier = "premium";
-    else if (customer.tags.includes("member-standard") || customer.tags.includes("member")) membershipTier = "standard";
-  }
-  if (membershipTier === "none" && subscriptionCount > 0) {
-    membershipTier = "standard";
-  }
-
-  const tierLabels: Record<MembershipTier, string> = {
-    none: t("tierNone"),
-    standard: t("tierStandard").replace(/限定$/, "").replace(/ Only$/, ""),
-    premium: t("tierPremium").replace(/限定$/, "").replace(/ Only$/, ""),
-  };
+  /* 会員ランク (フリー / スタンダード / プレミアム) の表示は廃止した。
+   * elxea は会員制度を持たず、会員かどうかは「roji 契約の有無」の二値である
+   * (Setaka 確定 2026-08-17)。契約の有無は下の定期便セクション
+   * (`subscriptionCount`) がそのまま表しているので、ランク表示は不要。 */
 
     return (
       <div className="section-narrow py-20">
@@ -154,24 +142,6 @@ export default async function AccountPage() {
           subscriptions: "/account/subscriptions",
         }}
       />
-
-      {/* Membership status */}
-      <section className="mb-12">
-        <h2 className="text-lg mb-6 pb-3 border-b border-border">
-          {t("membershipStatus")}
-        </h2>
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs text-muted-foreground mb-1">{t("currentTier")}</p>
-            <p className="text-sm">{tierLabels[membershipTier]}</p>
-          </div>
-          {membershipTier !== "premium" && (
-            <Button variant="outline" size="sm" asChild>
-              <Link href="/membership">{t("viewPlans")}</Link>
-            </Button>
-          )}
-        </div>
-      </section>
 
       {/* LINE 連携エントリ（Web 側導線 / Phase 2）— NEXT_PUBLIC_LIFF_ID 未設定なら非表示 */}
       <LineLinkageEntry locale={locale} />
