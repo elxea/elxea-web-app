@@ -125,7 +125,14 @@ export const ByCategory: Story = {
             <p className="mb-4 text-sm" style={{ letterSpacing: "0.2em" }}>
               {TEA_CATEGORY_LABEL[category]}
             </p>
-            <TerroirOverviewBlock items={items} label={LABEL} />
+            {/* ラベルはカテゴリーごとに変える。地図の器は `role="region"` の
+                ランドマークになるため、同じ名前の地図を 3 つ並べると
+                landmark-unique (axe) に触れる。実ページは 1 ページ 1 地図なので
+                これはこの見本特有の条件。 */}
+            <TerroirOverviewBlock
+              items={items}
+              label={`${LABEL} — ${TEA_CATEGORY_LABEL[category]}`}
+            />
           </div>
         );
       })}

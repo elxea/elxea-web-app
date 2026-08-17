@@ -674,7 +674,15 @@ test.describe("Bottom-fixed coexistence (PC)", () => {
     const bar = page.locator('[data-slot="audio-dock-bar"]');
     const dock = await stableBox(bar, "音声ドックのバー");
 
-    const chatBar = page.locator('[data-slot="chat-input-bar"]');
+    /* 統合 (2026-08-18): PC の常設の全幅入力帯 (`chat-input-bar`) は #55 で
+       撤去された。`pointer-events-none` の無い 108px の帯が footer の法的リンクを
+       丸ごと飲み込んでいたため。対の検査が
+       `e2e/chat-launcher.spec.ts` の「the old full-width input strip is gone」で、
+       そちらは帯が**無い**ことを assert する。両方を同時に満たす構造は無いので、
+       新しい方 (#55) に合わせてここを更新した。
+       PC の入力欄はランチャから開くパネルの中に居るので、開いてから見る。 */
+    await page.locator('[data-slot="chat-launcher"]').click();
+    const chatBar = page.locator('[data-slot="chat-input-bar-desktop"]');
     await requireVisibleWithin(chatBar, "PC でチャット入力バーが出ている");
     const chatBox = await stableBox(chatBar, "PC のチャット入力バー");
 
