@@ -1332,62 +1332,6 @@
       "code_path": "components/people/person-detail.tsx",
       "kind": "ds-component",
       "notes": "People 層での命名を与える薄い再輸出 (PersonHead / PersonQuote / PersonSection* / PersonDataBand / PersonCardGrid / ProcessGrid / InterviewList / personBandClass)。実装は複製せず farmer-detail.tsx を指す。farmer-detail の注記どおり『People 詳細テンプレ共通骨格』への一本化は農家・プレイリストを同時に動かすため後続タスクに残す。"
-    },
-    {
-      "figma_node_id": "5904:77",
-      "figma_name": "TeaSpecCard",
-      "code_path": "components/journal/tea-spec-card.tsx",
-      "kind": "ds-component",
-      "notes": "elxea-journal S4。"
-    },
-    {
-      "figma_node_id": "5252:2",
-      "figma_name": "ValueCard",
-      "code_path": "app/[locale]/(reading)/about/page.tsx",
-      "kind": "ds-component",
-      "notes": "inline 定義 (function ValueCard, 従来 L113 付近)。elxea/About S5。"
-    },
-    {
-      "figma_node_id": "5447:7",
-      "figma_name": "SubscriptionCard",
-      "code_path": "app/[locale]/account/subscriptions/page.tsx",
-      "kind": "ds-component",
-      "notes": "inline 定義 (function SubscriptionCard, 従来 L98 付近)。EC account subscriptions。"
-    },
-    {
-      "figma_node_id": "5723:49",
-      "figma_name": "ContactSuccessCard",
-      "code_path": "app/[locale]/contact/contact-form.tsx",
-      "kind": "ds-component",
-      "notes": "success state の inline 表示 (従来 L50 付近)。専用 component 無し。Contact S3。"
-    },
-    {
-      "figma_node_id": "6904:337",
-      "figma_name": "FarmerCard",
-      "code_path": "app/[locale]/(reading)/farmers/page.tsx",
-      "kind": "ds-component",
-      "notes": "inline (FarmersList, ImageCard を利用)。lib/fictional-farmers.ts がデータ源。"
-    },
-    {
-      "figma_node_id": "6906:335",
-      "figma_name": "Stepper",
-      "code_path": "components/cart/cart-content.tsx",
-      "kind": "ds-component",
-      "notes": "inline 数量ステッパ (minus/value/plus, updateQuantity)。専用 component 無し。"
-    },
-    {
-      "figma_node_id": "6936:126",
-      "figma_name": "Input Underline",
-      "code_path": "components/search-form.tsx",
-      "kind": "ds-component",
-      "notes": "inline (shadcn Input を border-b の下線スタイルに)。SearchForm。"
-    },
-    {
-      "figma_node_id": "6936:17638",
-      "figma_name": "Status Badge (paused)",
-      "code_path": "app/[locale]/account/subscriptions/page.tsx",
-      "kind": "ds-component",
-      "notes": "inline status span (statusMap/statusColorMap, PAUSED 状態を含む)。SubscriptionCard 内。"
     }
   ],
   "unmapped_figma_nodes": [
