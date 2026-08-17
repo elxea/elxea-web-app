@@ -370,14 +370,21 @@ function DesktopChatBar() {
     <div
       ref={panelRef}
       data-slot="chat-bar-desktop"
-      // 音声プレイヤーのバー (components/audio/audio-dock.tsx) が下端に出て
-      // いる間は、その分だけ上へ退く。重ねると鳴っている音を止める手段か
-      // チャット入力のどちらかが埋まる。変数は AudioDock が <html> に立て、
-      // 非表示のときは 0px なので通常時の見た目は変わらない。
+      // 下端に出ている面 (音声バー / Cookie 同意) の高さぶん上へ退く。重ねると
+      // 鳴っている音を止める手段・同意ボタン・チャット入力のどれかが埋まる。
+      // 変数は各面が <html> に立て、出ていないときは 0px なので通常時の見た目は
+      // 変わらない。積み順の正本は hooks/use-bottom-stack-slot.ts。
+      //
+      // `--consent-bar-h` を足すのは 2026-08-18 の是正。PC でも同意バーは出るが
+      // 両者が同じ `bottom: var(--audio-bar-h)` に居たため重なっていた
+      // (z ではチャットが前 = 同意ボタンが埋まる側)。
       //
       // z は名前付きレイヤー (`app/globals.css` の `--z-*` が SoT)。生の
       // `z-40` は音声バーの `--z-sticky` (1020) に必ず負けるので使わない。
-      style={{ bottom: "var(--audio-bar-h, 0px)", zIndex: "var(--z-chat)" }}
+      style={{
+        bottom: "calc(var(--audio-bar-h, 0px) + var(--consent-bar-h, 0px))",
+        zIndex: "var(--z-chat)",
+      }}
       className="fixed left-0 right-0 hidden transition-[bottom] duration-fast ease-enter md:block"
     >
       {/* Expanded chat panel — Figma 6859:316 (components/chat/chat-panel.tsx) */}

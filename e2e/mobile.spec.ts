@@ -172,6 +172,22 @@ test.describe("Mobile viewport", () => {
  * 退避 (`data-retreated`) の検査は **属性ではなく矩形の位置**で行う。属性は
  * 正しいのに実描画がずれている事故 (CSS 側の translate が効いていない等) は
  * 属性を見ているだけでは拾えない。
+ *
+ * ## 既知の穴 — イベント申込バーが e2e に載っていない
+ *
+ * 下端に居る 4 つ目の面 `event-sticky-register-bar`
+ * (`components/events/event-register-button.tsx`) は **CMS のイベントが 0 件の間
+ * 実ページに出せない**ため、ここで検査できていない。2026-08-18 の QA で
+ * 「同意バーと同じスロットに居て 25350px^2 衝突する」ことが見つかったのも、
+ * 実ページに出ない = 誰も見ていなかったからである。
+ *
+ * 現状の担保は 2 つで、e2e ではない:
+ *   - `bottom` の式が `--consent-bar-h` を足していること (実装)
+ *   - スロット計算を実ページ上で数値検証した記録 (同意バー 659-780 の上、
+ *     594-659 に載り重なり 0。ランチャも 506 まで上がる)
+ *
+ * **CMS にイベントが 1 件でも入ったら、この describe に
+ * 「申込バー × 同意バー / 申込バー × ランチャ = 0」を足すこと。**
  */
 
 type Rect = { x: number; y: number; width: number; height: number };
@@ -385,6 +401,48 @@ async function requireVisibleWithin(
   if (!appeared) unmetPrecondition(what);
 }
 
+/**
+ * Cookie 同意バーを掴む。
+ *
+ * `data-slot="cookie-consent"` は 2026-08-17 に**この検査のために付けた**属性
+ * なので、それだけを頼りにすると、属性が無い過去の実装に対して検査を回したとき
+ * 「前提が満たせない」で落ちる。落ちてはいるが**重なりを検出したわけではない**
+ * ので、検査の検出力を確かめる用途には使えない (2026-08-18 QA 指摘)。
+ *
+ * そこで属性と、実装に依存しない特徴 (プライバシーポリシーへのリンクを含む
+ * 固定配置の面) の **どちらでも掴める**形にする。これで過去の実装に対しても
+ * 同じ検査が走り、赤の理由が「前提不足」ではなく「重なっている」になる。
+ */
+function cookieConsentBar(page: Page): Locator {
+  return page
+    .locator('[data-slot="cookie-consent"], div.fixed:has(a[href*="/legal/privacy"])')
+    .first();
+}
+
+/**
+ * 面の中の押せる要素 (button / a) を 1 つずつ hit test する。
+ *
+ * 代表 1 つだけを見ていると、その 1 つが無事で他が覆われている状態を通してしまう
+ * (2026-08-18: 承諾ボタンは押せるのに「詳しく見る」がランチャに覆われていた)。
+ */
+async function expectAllControlsClickable(
+  container: Locator,
+  what: string,
+): Promise<void> {
+  const controls = container.locator("button, a");
+  const count = await controls.count();
+  expect(count, `${what} に押せる要素が 1 つも無い`).toBeGreaterThan(0);
+  for (let index = 0; index < count; index += 1) {
+    const control = controls.nth(index);
+    const label = ((await control.textContent()) ?? "").trim() || `#${index}`;
+    const box = await control.boundingBox();
+    expect(
+      await isHitTarget(control),
+      `${what} の「${label}」が最前面に居ない (別の面が覆っている / ${box ? describeRect(box) : "矩形なし"})`,
+    ).toBe(true);
+  }
+}
+
 /** その座標を押したときに実際に受け取る要素が自分自身 (か自分の中) か。 */
 async function isHitTarget(locator: Locator): Promise<boolean> {
   return locator.evaluate((el) => {
@@ -412,7 +470,7 @@ test.describe("Bottom-fixed occlusion (SP)", () => {
   test("音声ドック再生中でも Cookie 同意バーが覆われない", async ({ page }) => {
     const dock = await startAudioPlayback(page);
 
-    const consent = page.locator('[data-slot="cookie-consent"]');
+    const consent = cookieConsentBar(page);
     await requireVisibleWithin(consent, "初回訪問なので Cookie 同意バーが出ている");
     const consentBox = await stableBox(consent, "Cookie 同意バー");
 
@@ -424,12 +482,16 @@ test.describe("Bottom-fixed occlusion (SP)", () => {
     // 同意バーは音声ドックの真上に積まれる (下端は音声ドックの上端と一致)。
     expect(Math.round(consentBox.y + consentBox.height)).toBe(Math.round(dock.y));
 
-    // 幾何が合っていても最前面が奪われていれば押せない。実際の当たりも見る。
-    const accept = consent.getByRole("button").last();
-    expect(await isHitTarget(accept), "同意ボタンが最前面に居ない").toBe(true);
+    // 幾何が合っていても最前面が奪われていれば押せない。同意バーの中の
+    // **全コントロール** (承諾 / 拒否 / 「詳しく見る」リンク) を 1 つずつ見る。
+    // 「承諾ボタンだけ」を見ていたために、リンクがランチャに覆われる回帰
+    // (2026-08-18) を検査が通してしまった。
+    await expectAllControlsClickable(consent, "Cookie 同意バー");
   });
 
-  test("音声ドック再生中でもチャットランチャが覆われない", async ({ page }) => {
+  test("音声ドック再生中でもチャットランチャと Cookie 同意バーが重ならない", async ({
+    page,
+  }) => {
     const dock = await startAudioPlayback(page);
 
     const launcher = page.locator('[data-slot="chat-launcher"]');
@@ -440,7 +502,25 @@ test.describe("Bottom-fixed occlusion (SP)", () => {
       overlapArea(dock, launcherBox),
       `チャットランチャが音声ドックと重なっている (launcher ${describeRect(launcherBox)} / dock ${describeRect(dock)})`,
     ).toBe(0);
+
+    // 2026-08-18 の回帰: ランチャ (--z-chat 1030) が Cookie 同意バー
+    // (--z-sticky 1020) の上に重なり、「詳しく見る」が押せなくなっていた。
+    // 「ランチャが最前面に居る」だけを見ていると、覆っている側を正解として
+    // 固定してしまう。**重なっていないこと**を先に assert する。
+    const consent = cookieConsentBar(page);
+    await requireVisibleWithin(consent, "初回訪問なので Cookie 同意バーが出ている");
+    const consentBox = await stableBox(consent, "Cookie 同意バー");
+    expect(
+      overlapArea(launcherBox, consentBox),
+      `チャットランチャが Cookie 同意バーと重なっている ` +
+        `(launcher ${describeRect(launcherBox)} / consent ${describeRect(consentBox)})。` +
+        `下端の面は z ではなく bottom の積み木で分けること ` +
+        `(hooks/use-bottom-stack-slot.ts)。`,
+    ).toBe(0);
+
+    // 重なっていない上で、両方が実際に押せること。
     expect(await isHitTarget(launcher), "チャットランチャが最前面に居ない").toBe(true);
+    await expectAllControlsClickable(consent, "Cookie 同意バー");
   });
 
   test("全画面チャットを開くと音声ドックは画面外へ退避し、入力欄が操作できる", async ({
@@ -548,6 +628,18 @@ test.describe("Bottom-fixed coexistence (PC)", () => {
       await isHitTarget(chatBar.locator("input").first()),
       "PC のチャット入力欄が最前面に居ない",
     ).toBe(true);
+
+    // Cookie 同意バーは PC でも出る。チャット入力バーと同じスロットに居ると
+    // 重なり、z ではチャットが前なので同意ボタンが埋まる (2026-08-18 是正)。
+    const consent = cookieConsentBar(page);
+    await requireVisibleWithin(consent, "初回訪問なので Cookie 同意バーが出ている");
+    const consentBox = await stableBox(consent, "PC の Cookie 同意バー");
+    expect(
+      overlapArea(chatBox, consentBox),
+      `PC のチャット入力バーが Cookie 同意バーと重なっている ` +
+        `(chat ${describeRect(chatBox)} / consent ${describeRect(consentBox)})`,
+    ).toBe(0);
+    await expectAllControlsClickable(consent, "PC の Cookie 同意バー");
 
     // PC は退避させず共存させる (SP の退避を直すときにここを壊さないための対)。
     await expect(bar).toHaveAttribute("data-retreated", "false");

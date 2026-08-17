@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useRef, useState, useSyncExternalStore } from "react";
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
+import { useBottomStackSlot } from "@/hooks/use-bottom-stack-slot";
 import { cn } from "@/lib/utils";
 
 function subscribeToConsent(callback: () => void) {
@@ -31,6 +32,13 @@ export function CookieConsent() {
   // 時点で保存し、DOM から外すのだけを `animationend` まで遅らせる。
   const [closing, setClosing] = useState(false);
   const visible = needsConsent && !dismissed;
+
+  // 自分が下端で占めている高さを公開する。上に載る面 (イベント申込バー /
+  // チャットランチャ / PC のチャット入力バー) がこの分だけ自分を持ち上げる。
+  // 公開しないと、それらが同意バーに重なって「詳しく見る」等が押せなくなる
+  // (2026-08-18 QA 実測の回帰。詳細は hooks/use-bottom-stack-slot.ts)。
+  const barRef = useRef<HTMLDivElement>(null);
+  useBottomStackSlot(barRef, "--consent-bar-h", visible && !closing);
 
   const handleAccept = () => {
     localStorage.setItem("cookie-consent", "all");
@@ -61,6 +69,7 @@ export function CookieConsent() {
     // DOM 順で後ろに居るこちらが前に出る (レイアウトの並びが AudioDock →
     // CookieConsent)。生の `z-50` は 1020 に必ず負けていたので使わない。
     <div
+      ref={barRef}
       // 下端に居座る面は e2e で矩形を実測して重なりを検査する
       // (`e2e/mobile.spec.ts` の Bottom-fixed occlusion)。class 名は Tailwind の
       // 都合で変わるので、掴む先は data-slot に固定する。

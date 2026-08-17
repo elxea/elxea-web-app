@@ -6,10 +6,12 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { useBottomStackSlot } from "@/hooks/use-bottom-stack-slot";
 import { cn } from "@/lib/utils";
 
 /**
@@ -270,17 +272,27 @@ export function EventStickyRegisterBar({
     return () => observer.disconnect();
   }, [selectorKey]);
 
+  // 自分が下端で占めている高さを公開する (チャットランチャがこの分だけ上がる)。
+  const barRef = useRef<HTMLDivElement>(null);
+  useBottomStackSlot(barRef, "--event-bar-h", visible);
+
   if (!visible) return null;
 
   return (
     <div
+      ref={barRef}
       data-slot="event-sticky-register-bar"
-      // 音声プレイヤーのバー (components/audio/audio-dock.tsx) が出ている間は
-      // その分だけ上へ退く。ここが下端に貼り付いたままだと、音声再生中は
-      // 申込ボタンがバーの裏に完全に隠れて押せない (生の `z-40` は音声バーの
-      // 1020 に必ず負ける)。他の下端固定 UI (チャット / Cookie 同意) と同じ
-      // 積み方に揃える。
-      style={{ bottom: "var(--audio-bar-h, 0px)" }}
+      // 下に居る面 (音声バー / Cookie 同意) の高さぶん上へ退く。下端に貼り付いた
+      // ままだと、音声再生中は申込ボタンがバーの裏に完全に隠れて押せない
+      // (生の `z-40` は音声バーの 1020 に必ず負ける)。
+      //
+      // `--consent-bar-h` を足すのは 2026-08-18 の是正。同意バーと同じ
+      // `bottom: var(--audio-bar-h)` に居たため両者が同スロットで重なり
+      // (QA 実測 25350px^2)、DOM 順で前に来る同意バーに申込ボタンが覆われていた。
+      // 積み順の正本は hooks/use-bottom-stack-slot.ts。
+      style={{
+        bottom: "calc(var(--audio-bar-h, 0px) + var(--consent-bar-h, 0px))",
+      }}
       // z は名前付きレイヤー (`app/globals.css` の `--z-*` が唯一の SoT)。
       // 「画面端に貼り付く常設面」= `--z-sticky` (1020)。チャットのランチャ
       // (`--z-chat` = 1030) はこの上に出したいので同じ段に上げない。
