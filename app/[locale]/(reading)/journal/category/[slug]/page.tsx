@@ -247,7 +247,7 @@ export default async function CategoryPage({
 
         {remaining > 0 ? (
           <MoreRow
-            className="order-2 mt-8 lg:col-span-2 lg:mt-12"
+            className="order-2 lg:col-span-2"
             href={hrefWith({ show: String(show + PAGE_SIZE) })}
             label={tl("showMore", { count: Math.min(remaining, PAGE_SIZE) })}
           />

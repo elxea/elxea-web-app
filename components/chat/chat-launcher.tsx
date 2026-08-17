@@ -23,9 +23,14 @@ export function ChatLauncher({ onClick, hasMessages }: ChatLauncherProps) {
       aria-label="Open chat"
       // 音声バーの高さぶん持ち上げる。素の bottom-10 (40px) はバー (64px) の
       // 内側に入ってしまい、ボタンがバーの裏に隠れる。
-      style={{ bottom: "calc(var(--audio-bar-h, 0px) + 2.5rem)" }}
+      // z は名前付きレイヤー (`app/globals.css` の `--z-*` が SoT)。生の
+      // `z-40` は音声バーの `--z-sticky` (1020) に必ず負けるので使わない。
+      style={{
+        bottom: "calc(var(--audio-bar-h, 0px) + 2.5rem)",
+        zIndex: "var(--z-chat)",
+      }}
       className={cn(
-        "fixed right-6 z-40 size-12 rounded-full shadow-lg",
+        "fixed right-6 size-12 rounded-full shadow-lg",
         "md:hidden",
         // 音声バーの出入りに合わせて滑らかに上下する。ChatBar / Cookie バーと
         // 同じ指定にして、3つの下端要素が同じ速さで動くようにする。

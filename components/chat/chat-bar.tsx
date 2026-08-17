@@ -372,8 +372,11 @@ function DesktopChatBar() {
       // いる間は、その分だけ上へ退く。重ねると鳴っている音を止める手段か
       // チャット入力のどちらかが埋まる。変数は AudioDock が <html> に立て、
       // 非表示のときは 0px なので通常時の見た目は変わらない。
-      style={{ bottom: "var(--audio-bar-h, 0px)" }}
-      className="fixed left-0 right-0 z-40 hidden transition-[bottom] duration-fast ease-enter md:block"
+      //
+      // z は名前付きレイヤー (`app/globals.css` の `--z-*` が SoT)。生の
+      // `z-40` は音声バーの `--z-sticky` (1020) に必ず負けるので使わない。
+      style={{ bottom: "var(--audio-bar-h, 0px)", zIndex: "var(--z-chat)" }}
+      className="fixed left-0 right-0 hidden transition-[bottom] duration-fast ease-enter md:block"
     >
       {/* Expanded chat panel — Figma 6859:316 (components/chat/chat-panel.tsx) */}
       {isOpen && messages.length > 0 && (
@@ -501,12 +504,22 @@ function MobileChatDrawer() {
 
       {/* Fullscreen fixed panel — no vaul, no gesture detection, no viewport
           resize side-effects. Pure CSS positioning that iOS keyboards cannot
-          displace. The panel slides up from the bottom via CSS transition. */}
+          displace. The panel slides up from the bottom via CSS transition.
+
+          下端は「全画面」ではなく音声バーの高さぶん手前で止める。素の
+          `inset-0` だと、パネル最下段の入力欄と音声バー (fixed / --z-sticky)
+          がちょうど同じ 64px を奪い合い、z の大きい音声バーが上に載って
+          入力欄が押せなくなる (2026-08-17 実測: 入力中心 (173,812) の
+          elementFromPoint が音声バー側の span を返した)。
+          変数は AudioDock が <html> に立て、非表示のときは 0px なので
+          音を鳴らしていないときの見た目は従来どおり全画面。 */}
       {isOpen && (
         <div
           data-slot="chat-panel-mobile"
+          style={{ bottom: "var(--audio-bar-h, 0px)", zIndex: "var(--z-chat)" }}
           className={cn(
-            "fixed inset-0 z-50 bg-background flex flex-col",
+            "fixed inset-0 bg-background flex flex-col",
+            "transition-[bottom] duration-fast ease-enter",
             "animate-in slide-in-from-bottom duration-300",
           )}
         >

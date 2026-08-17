@@ -568,8 +568,32 @@ dl[data-slot="spec-band"][data-emphasis="true"] > [data-slot="spec-item"] > dd {
    * overrides/cjk.json だけなので、このグループは dist/tokens.css には出ず
    * この宣言だけが実効値になる。値を変えるならここを直す。
    * (旧 SoT と書かれていた `tokens/elxea-custom.json` は参照ゼロの死にファイル
-   *  だったため 2026-08-14 に削除。旧値は git 履歴 c54335a を参照) */
+   *  だったため 2026-08-14 に削除。旧値は git 履歴 c54335a を参照)
+   *
+   * ## 画面下端に居座る面の順序 (2026-08-17 是正)
+   *
+   * 下端には音声ドック (`components/audio/audio-dock.tsx`) とチャット
+   * (`components/chat/chat-bar.tsx`) が同居する。両者は DOM 上の兄弟で同じ
+   * stacking context に載るため、**必ずこの表の変数だけで順序を決める**。
+   * Tailwind の生スケール (`z-40` / `z-50`) を混ぜると 1020 > 50 で常に
+   * 名前付き側が勝ち、意図と逆の重なりになる (実際にそれが起きて、チャットの
+   * 入力欄が音声バーに覆われ押せなくなった)。生スケールは下端固定 UI に使わない。
+   *
+   *   1020 --z-sticky   下端ドック            … 音声バー
+   *   1030 --z-chat     常設 UI の最前面      … チャット (ランチャ / 入力バー / 全画面)
+   *   1040 --z-overlay  スクリム
+   *   1050 --z-modal    モーダル面            … 音声プレイヤーの全画面展開
+   *
+   * チャットが音声バーより前に出る (Setaka 裁定 2026-08-17「チャット UI の
+   * レイヤーがオーディオプレイヤーより上であるべき」)。ただし両者は重ねずに
+   * **縦に積む** — 下端固定 UI は `--audio-bar-h` の分だけ自分の bottom を
+   * 上げる、という既存の 1 ルールを全員が守る。z はそのルールが崩れた一瞬
+   * (出入りのアニメーション中など) の保険。
+   *
+   * 音声の全画面展開だけは --z-modal でチャットの上に出る。モーダルは自分で
+   * 閉じられる面なので、覆われたままにはならない。 */
   --z-sticky: 1020;
+  --z-chat: 1030;
   --z-overlay: 1040;
   --z-modal: 1050;
 
@@ -886,6 +910,38 @@ dl[data-slot="spec-band"][data-emphasis="true"] > [data-slot="spec-item"] > dd {
 
 @utility slide-in-from-bottom {
   --motion-in-y: 100%;
+}
+
+/* 横スクロールする列 (サムネイル列・チップ列など) の共通指定。
+ *
+ * ブラウザ標準のスクロールバーを出さない。elxea の横スクロール列は
+ * 「掴んで流す」帯であって、スクロール位置を数える面ではない。overlay
+ * scrollbar は指を離すまで帯の上に黒い棒として重なり、写真やチップの下端を
+ * 汚す (Setaka 裁定 2026-08-17「いらない。見苦しいので、こういう実装の仕方を
+ * しないでください」)。
+ *
+ * **消すのは見た目だけ**。`overflow-x` は `auto` のまま残すので:
+ * - 指のスワイプ / トラックパッドの横フリックはそのまま効く
+ * - 中の要素は tab で辿れ、フォーカスが移ると当該要素まで自動でスクロールする
+ * - `hidden` にはしない (それをやるとキーボードでも到達できなくなる)
+ *
+ * 位置を示す必要がある列は、ブラウザ任せにせず自前のインジケータを置く
+ * (`components/catalog/catalog-toolbar.tsx` の `catalog-chips-scrollbar` —
+ *  幅が可視割合・位置がスクロール量)。二重に出さないため、そこでもこの
+ * utility を併用する。
+ *
+ * `@layer base` の素のクラスではなく `@utility` で定義する: v4 では前者は
+ * Lightning CSS の段階で丸ごと落ち、コンパイル後の CSS に 1 バイトも出ない
+ * (2026-08-17 実測 — DOM に class は載るのに `scrollbar-width` が `auto` の
+ * まま効かなかった)。同ファイルの他の自前 utility も全て `@utility`。
+ *
+ * 新しく横スクロール列を作るときは必ずこの class を当てる。生の
+ * `::-webkit-scrollbar` を各コンポーネントに書かない (単一正本)。 */
+@utility scrollbar-none {
+  scrollbar-width: none; /* 標準 (Firefox / Chrome 121+) */
+  &::-webkit-scrollbar {
+    display: none; /* WebKit / Blink */
+  }
 }
 
 @utility slide-in-from-left {
