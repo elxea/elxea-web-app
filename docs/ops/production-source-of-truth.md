@@ -46,6 +46,8 @@ Vercelはproductionをロールバック (Instant Rollback) すると **producti
 
 **これは検知 (warn) であって機械強制ではない。** 起票されても誰も動かなければ乖離は続く。ズレたら24h以内に是正する運用 + Bossエスカレで担保する。定期workflowは `drift` / `rollback_suspected` でCIを失敗させ、通知の起点にする。
 
+> **docs-only先行はdriftにしない**: `deploy.yml` はdocs / `*.md` / `LICENSE` だけのpushを `paths-ignore` でスキップする。そのためdocsのみのmerge後はmain HEADが進んでも本番はデプロイされずSHAがズレる。これは正常なので、監視は「mainがprodより進んでいて、その差分がdeploy-ignoreパス (docs/md/LICENSE) だけ」のときは `in_sync` とみなす (false drift防止)。判定にはprodコミットを解決できる完全なgit履歴が要るため、定期workflowは `fetch-depth: 0` でcheckoutする。
+
 > `unknown` は正常な過渡状態でありうる: この監視の初回導入直後、`deploy.yml` の `--meta` が付いた本番デプロイがまだ1回も出ていない間は `meta.githubCommitSha` が空で `unknown` になる。次回のmainへのpush由来デプロイ以降で解消する。
 
 ## 4. 追加(a): セッションをまたいだ本番認識の配布

@@ -138,6 +138,39 @@ async function getProductionState() {
 }
 
 // ---------------------------------------------------------------------------
+// docs-only-ahead: main が prod より進んでいるが、その差分が deploy.yml の
+// paths-ignore (**/*.md / docs/** / LICENSE) だけなら本番デプロイは意図的に
+// スキップされている。この場合ズレは正常で drift ではない。
+//
+// 戻り値: { ahead, ignoredOnly, changed } / git で判定不能なら null
+// ---------------------------------------------------------------------------
+function isIgnoredPath(p) {
+  return p.endsWith('.md') || p.startsWith('docs/') || p === 'LICENSE';
+}
+
+function mainAheadState(prodSha, mainSha) {
+  try {
+    // prod が main の祖先か (= main が prod より進んでいる)
+    execFileSync('git', ['merge-base', '--is-ancestor', prodSha, mainSha], {
+      stdio: ['ignore', 'ignore', 'ignore'],
+    });
+  } catch {
+    // 非0 = 祖先でない (diverged / rollback) か、commit を解決できない
+    return null;
+  }
+  try {
+    const out = execFileSync('git', ['diff', '--name-only', `${prodSha}..${mainSha}`], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+    const changed = out ? out.split('\n').filter(Boolean) : [];
+    return { ahead: true, ignoredOnly: changed.length > 0 && changed.every(isIgnoredPath), changed };
+  } catch {
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // 実行
 // ---------------------------------------------------------------------------
 async function run() {
@@ -175,8 +208,17 @@ async function run() {
     status = 'in_sync';
     reason = 'production SHA matches origin/main HEAD';
   } else {
-    status = 'drift';
-    reason = 'production SHA differs from origin/main HEAD';
+    // main が prod より進んでいて、その差分が deploy.yml の paths-ignore
+    // (docs/md/LICENSE) だけなら、本番デプロイは意図的にスキップされている =
+    // 正常。false drift を防ぐ。git で判定できないときのみ drift 扱い。
+    const ahead = mainAheadState(prodSha, mainSha);
+    if (ahead && ahead.ignoredOnly) {
+      status = 'in_sync';
+      reason = `main is ahead of production by deploy-ignored paths only (docs/md/LICENSE); no deploy expected. changed=${ahead.changed.length}`;
+    } else {
+      status = 'drift';
+      reason = 'production SHA differs from origin/main HEAD';
+    }
   }
 
   const report = {
