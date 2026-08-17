@@ -1,0 +1,65 @@
+name: branch-divergence
+
+# P3: ブランチ乖離の定期監査 (可視化)
+#
+# origin の全未マージブランチについて main からの behind コミット数 / バッチ齢を
+# 測り、warn(>20 or >3d) / stop(>50 or >7d) を集計して GitHub Actions のサマリに
+# 出す。これは "見える化" であり、この workflow 自体はブロックしない
+# (このリポには既に多数の legacy ブランチがあり、ここで fail させると常時赤に
+# なって signal を失うため)。実際の停止 (作業を止める) は push ガード
+# branch-push-guard.yml が担う。legacy ブランチ整理後に --fail-on-stop へ
+# 切替可能。しきい値・運用は docs/ops/branch-divergence.md 参照。
+
+on:
+  schedule:
+    # 毎日 00:20 UTC (JST 09:20)
+    - cron: "20 0 * * *"
+  workflow_dispatch: {}
+
+concurrency:
+  group: branch-divergence
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: audit-branch-divergence
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch all branches
+        run: git fetch origin '+refs/heads/*:refs/remotes/origin/*'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Audit branch divergence
+        run: |
+          node scripts/ops/check-branch-divergence.mjs | tee divergence.json
+
+      - name: Annotate and summarize
+        if: always()
+        run: |
+          node -e '
+            const fs = require("fs");
+            let j;
+            try { j = JSON.parse(fs.readFileSync("divergence.json","utf8")); }
+            catch { console.log("no report"); process.exit(0); }
+            const lines = ["## branch divergence audit",
+              `total unmerged: ${j.counts.total} / warn: ${j.counts.warn} / stop: ${j.counts.stop}`,
+              "", "| level | branch | behind | ahead | ageDays |", "|---|---|---|---|---|"];
+            for (const b of j.branches) {
+              lines.push(`| ${b.level} | ${b.branch} | ${b.behind} | ${b.ahead} | ${b.ageDays} |`);
+              if (b.level === "stop") console.log(`::warning title=STOP branch::${b.branch} behind=${b.behind} age=${b.ageDays}d`);
+            }
+            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join("\n") + "\n");
+          '

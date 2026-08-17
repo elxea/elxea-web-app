@@ -1,0 +1,48 @@
+name: branch-push-guard
+
+# P3: 乖離しすぎたブランチへの追加 push を CI で失敗させる (作業停止の機械強制)
+#
+# main から stop しきい値 (>50 commits behind または age >7 days) を超えたブランチに
+# push すると、この workflow が失敗する。これ以上そのブランチに積み増すな = まず
+# main を取り込む (merge/rebase) か、分割してマージせよ、という強制。259 コミット
+# 乖離の再発を「積み増しの時点で」止める。
+#
+# push トリガーで発火する (PR トリガーだと push 時に発火しないため。review 指摘)。
+
+on:
+  push:
+    branches-ignore:
+      - main
+      # backup/* は監査対象外 (docs/ops/branch-divergence.md)
+      - "backup/**"
+
+concurrency:
+  group: push-guard-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  guard:
+    name: branch-divergence-guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch main
+        run: git fetch origin main:refs/remotes/origin/main
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Guard — fail if pushed branch is too diverged
+        run: |
+          echo "Checking ${GITHUB_REF_NAME} against origin/main"
+          node scripts/ops/check-branch-divergence.mjs --branch HEAD
