@@ -503,6 +503,11 @@
     "copyright": "© {year} elxea. All rights reserved."
   },
   "chat": {
+    "launcher": {
+      "label": "Ask about tea",
+      "aria": "Open chat",
+      "close": "Close chat"
+    },
     "lineCta": {
       "unauthenticated": "Sign in to continue this conversation on LINE",
       "authenticated": "Continue the conversation on LINE.",

@@ -17,7 +17,13 @@ export function Footer({ groups: externalGroups }: FooterProps) {
   const useExternalGroups = externalGroups && externalGroups.length > 0;
 
   return (
-    <footer className="border-t border-border mt-auto bg-background">
+    // The bottom padding is structural, not decoration. Something is almost
+    // always fixed to the bottom of this viewport — the chat launcher, the
+    // cookie banner, a toast — and `.section-wide`'s 64px alone is less than
+    // any of them, so the last row (the legal links) ends up underneath.
+    // Reserving the space here solves it once for every bottom-fixed element
+    // instead of teaching each one to dodge the footer.
+    <footer className="border-t border-border mt-auto bg-background pb-[calc(2rem+env(safe-area-inset-bottom,0px))]">
       <div className="section-wide">
         <div className="grid grid-cols-1 md:grid-cols-5 gap-12">
           {/* Brand — always rendered */}

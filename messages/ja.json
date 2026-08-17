@@ -510,6 +510,11 @@
     "copyright": "© {year} elxea. All rights reserved."
   },
   "chat": {
+    "launcher": {
+      "label": "お茶のご相談",
+      "aria": "チャットを開く",
+      "close": "チャットを閉じる"
+    },
     "lineCta": {
       "unauthenticated": "ログインすると、LINE でもこの会話を続けられます",
       "authenticated": "LINE でも会話を続けられます。",
