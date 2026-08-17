@@ -1,12 +1,17 @@
 import { test, expect } from "@playwright/test";
 
 /**
- * メンバーシップは R2 でページごと廃止され、プラン選択は定期便LP に一本化された
- * (決定 2026-08-08 / Figma 7973:42298・実体は R2 確定版 LP の節 8071:514 / 8073:186)。
+ * elxea は会員制度 (階層プラン) を持たない。会員かどうかは「roji 契約の有無」の
+ * 二値であり、ランク・ティア・特典階層は作らない (Setaka 確定 2026-08-17 /
+ * roji マスタースペックが階層会員を明示禁止)。
  *
- * 旧仕様の 3 ティア (フリー / スタンダード / プレミアム) 比較表を確認していた 5 件は、
- * 仕様そのものが消えたので**恒久転送の確認**に置き換えた。転送は
- * `next.config.ts` の `redirects()` (permanent = 308) が担う。
+ * 旧 `/membership` は フリー / スタンダード / プレミアム の 3 階層比較表を出して
+ * おり、この決定と矛盾するためページごと廃止した。プラン選択の導線は定期便 LP
+ * (`/ja/subscription`) に一本化する。
+ *
+ * 3 階層比較表を確認していた旧テストは、仕様そのものが消えたので **恒久転送の
+ * 確認** に置き換えた。転送は `next.config.ts` の `redirects()` (permanent = 308)
+ * が担う。
  */
 test.describe("Membership URL consolidation", () => {
   test("/ja/membership は定期便LP へ恒久転送される", async ({ page }) => {
@@ -21,7 +26,7 @@ test.describe("Membership URL consolidation", () => {
     expect(page.url()).toContain("/ja/subscription");
   });
 
-  test("転送先に会員ランクの語が出ない (R2: 会員ランク制度は無し)", async ({ page }) => {
+  test("転送先に会員ランクの語が出ない (会員ランク制度は無し)", async ({ page }) => {
     await page.goto("/ja/subscription");
     const body = page.locator("body");
     await expect(body).not.toContainText("メンバーシッププラン");

@@ -9,6 +9,7 @@ import { ArticleProse } from "@/components/journal/article-blocks";
 import { getMembershipTier } from "@/lib/shopify/auth";
 import type { MembershipTier } from "@/lib/shopify/customer";
 import { MemberGate } from "@/components/account/member-gate";
+import { isFictionalSlug } from "@/lib/fictional-content";
 import { Breadcrumb } from "@/components/seo/breadcrumb";
 import {
   EventBody,
@@ -87,6 +88,7 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   const locale = await getLocale();
+  if (isFictionalSlug("event", slug)) return {};
   const { event } = await loadEvent(slug, locale);
   if (!event) return {};
 
@@ -110,6 +112,9 @@ export default async function EventPage({
   const locale = await getLocale();
   const t = await getTranslations("event");
   const tCommon = await getTranslations("common");
+
+  // Fictional/seed event -> behave as if the document does not exist.
+  if (isFictionalSlug("event", slug)) notFound();
 
   const { event, failed } = await loadEvent(slug, locale);
 

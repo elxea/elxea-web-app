@@ -26,6 +26,7 @@ import {
   type FeedItem,
 } from "@/components/marketing/top-blocks";
 import { getClient } from "@/sanity/lib/client";
+import { filterOutFictional } from "@/lib/fictional-content";
 import {
   ARTICLES_QUERY,
   EVENTS_QUERY,
@@ -430,7 +431,11 @@ async function EventsSection() {
   try {
     events = previewSeedEnabled()
       ? seedEvents()
-      : await getClient().fetch(EVENTS_QUERY, { language: locale });
+      // Hide the fictional/seed events still present in the production dataset.
+      : filterOutFictional(
+          "event",
+          await getClient().fetch(EVENTS_QUERY, { language: locale }),
+        );
   } catch {
     return null;
   }

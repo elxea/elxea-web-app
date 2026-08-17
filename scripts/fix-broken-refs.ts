@@ -1,15 +1,21 @@
 import { createClient } from "next-sanity";
 import { readFileSync } from "fs";
 import { join } from "path";
+import { resolveWriteDatasetOrExit } from "../lib/sanity/write-target";
 
 const home = process.env.HOME || "";
 const sanityConfig = JSON.parse(
   readFileSync(join(home, ".config/sanity/config.json"), "utf-8")
 );
 
+const dataset = resolveWriteDatasetOrExit({
+  scriptName: "scripts/fix-broken-refs.ts",
+  env: process.env,
+});
+
 const client = createClient({
   projectId: "5s8ahx87",
-  dataset: "production",
+  dataset,
   apiVersion: "2024-01-01",
   useCdn: false,
   token: sanityConfig.authToken,

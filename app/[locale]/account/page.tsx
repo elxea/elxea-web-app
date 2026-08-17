@@ -104,6 +104,10 @@ export default async function AccountPage() {
 
   const view: AccountView = customer ? await loadAccountView(customer) : (seeded as AccountView);
   const portalUrl = customerAccountPortalUrl();
+  /* 会員ランク (フリー / スタンダード / プレミアム) の表示は持たない。
+   * elxea は会員制度を持たず、会員かどうかは「roji 契約の有無」の二値である
+   * (Setaka 確定 2026-08-17 / main #62)。R2 確定版の account-parts + loadAccountView
+   * にはランク表示がそもそも無いため、ここは ours をそのまま採る。 */
 
   const recordDate = (record: AccountRecord) => formatRecordDate(record.date, locale);
 

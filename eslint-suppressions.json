@@ -1,11 +1,31 @@
 {
+  "app/[locale]/(reading)/about/page.tsx": {
+    "elxea-tokens/section-spacing-utility": {
+      "count": 1
+    }
+  },
+  "app/[locale]/(reading)/tasting-note/feedback/page.tsx": {
+    "elxea-tokens/no-raw-colors": {
+      "count": 1
+    }
+  },
+  "app/[locale]/(reading)/tea-menu/[slug]/page.tsx": {
+    "elxea-tokens/section-spacing-utility": {
+      "count": 1
+    }
+  },
   "app/[locale]/events/page.tsx": {
     "elxea-tokens/no-raw-colors": {
       "count": 2
     }
   },
-  "app/[locale]/(reading)/tasting-note/feedback/page.tsx": {
-    "elxea-tokens/no-raw-colors": {
+  "app/[locale]/liff/link/liff-link-client.tsx": {
+    "elxea-tokens/section-spacing-utility": {
+      "count": 1
+    }
+  },
+  "app/dev/origin-map/page.tsx": {
+    "elxea-tokens/section-spacing-utility": {
       "count": 1
     }
   },
@@ -19,8 +39,33 @@
       "count": 1
     }
   },
+  "components/editorial/rule-list.tsx": {
+    "elxea-tokens/section-spacing-utility": {
+      "count": 1
+    }
+  },
+  "components/editorial/section-blocks.tsx": {
+    "elxea-tokens/section-spacing-utility": {
+      "count": 1
+    }
+  },
+  "components/farmers/farmer-detail.tsx": {
+    "elxea-tokens/section-spacing-utility": {
+      "count": 1
+    }
+  },
+  "components/journal/journal-list.tsx": {
+    "elxea-tokens/section-spacing-utility": {
+      "count": 3
+    }
+  },
   "components/layout/header.tsx": {
     "elxea-tokens/no-raw-colors": {
+      "count": 1
+    }
+  },
+  "components/playlist/playlist-detail.tsx": {
+    "elxea-tokens/section-spacing-utility": {
       "count": 1
     }
   },

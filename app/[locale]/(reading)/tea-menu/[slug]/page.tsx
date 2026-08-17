@@ -12,6 +12,7 @@ import { ImageCard } from "@/components/media/image-card";
 import { Breadcrumb } from "@/components/seo/breadcrumb";
 import { TeaOriginBlock } from "@/components/viz/map/tea-origin-block";
 import { resolveTeaOriginPlace } from "@/lib/roji/tea-origins";
+import { isFictionalSlug } from "@/lib/fictional-content";
 import { Button } from "@/components/ui/button";
 import {
   bodySmClass,
@@ -111,6 +112,7 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   const locale = await getLocale();
+  if (isFictionalSlug("teaMenu", slug)) return {};
   try {
     const tea = await fetchTea(slug, locale);
     if (!tea) return {};
@@ -138,6 +140,9 @@ export default async function TeaMenuDetailPage({
   const locale = await getLocale();
   const t = await getTranslations("teaMenu");
   const bt = await getTranslations("breadcrumb");
+
+  // 架空・シードのお茶メニューは「文書が存在しない」扱いにする (#66)。
+  if (isFictionalSlug("teaMenu", slug)) notFound();
 
   let tea: TeaMenu | null;
   try {

@@ -27,6 +27,7 @@ import {
   articlePagePadding,
 } from "@/components/journal/article-blocks";
 import { Link } from "@/i18n/navigation";
+import { filterOutFictional, isFictionalSlug } from "@/lib/fictional-content";
 import {
   previewImageForKey,
   previewSeedEnabled,
@@ -187,6 +188,20 @@ export default async function ElxeaJournalDetailPage({
 
   if (!journal) notFound();
 
+  // The journal issue itself is real content, but its referenced tea menus and
+  // playlist can still point at the fictional/seed docs left in the production
+  // dataset. Drop those references at the read layer (no Sanity mutation) so a
+  // real issue never links to invented tea or a placeholder audio track.
+  const journalTeaMenus: typeof journal.teaMenus = filterOutFictional(
+    "teaMenu",
+    journal.teaMenus,
+  );
+  const journalPlaylist =
+    journal.playlist &&
+    !isFictionalSlug("playlist", journal.playlist.slug?.current)
+      ? journal.playlist
+      : null;
+
   // Preview-only: production dataset の journal は確定版のフィールドを持たない
   // ため、フラグが立っているときだけ未入力欄を見本で埋めて実寸を確認できる
   // ようにする。フラグ未設定時は byte-identical (何も足さない)。
@@ -199,7 +214,7 @@ export default async function ElxeaJournalDetailPage({
 
   /* --- 7. この号に入っているお茶 ------------------------------------------ */
 
-  const teaRows = (journal.teaMenus ?? []).map((tea, i) => ({
+  const teaRows = (journalTeaMenus ?? []).map((tea, i) => ({
     key: tea._id,
     href: `/tea-menu/${tea.slug.current}`,
     image: photoUrl(tea.photo, `${tea._id}-${i}`, 320, 320),
@@ -328,22 +343,22 @@ export default async function ElxeaJournalDetailPage({
 
           {/* 確定版に枠は無いが、既存のプレイリストデータを落とさないため
               同梱文脈の節として残す (意図的差分)。 */}
-          {journal.playlist ? (
+          {journalPlaylist ? (
             <ArticleBlock className="mt-6" label={t("relatedPlaylist")}>
               <ul className="space-y-6">
                 <ArticleProductRow
                   image={
-                    journal.playlist.albumImage?.asset
-                      ? urlFor(journal.playlist.albumImage)
+                    journalPlaylist.albumImage?.asset
+                      ? urlFor(journalPlaylist.albumImage)
                           .width(320)
                           .height(320)
                           .url()
                       : undefined
                   }
-                  imageAlt={journal.playlist.title}
-                  title={journal.playlist.title}
-                  meta={journal.playlist.spotifyUrl ? "Spotify" : undefined}
-                  href={`/playlists/${journal.playlist.slug.current}`}
+                  imageAlt={journalPlaylist.title}
+                  title={journalPlaylist.title}
+                  meta={journalPlaylist.spotifyUrl ? "Spotify" : undefined}
+                  href={`/playlists/${journalPlaylist.slug.current}`}
                   linkLabel={t("teaDetailLink")}
                 />
               </ul>

@@ -30,10 +30,7 @@ import {
   type FarmerCardItem,
   type ProcessItem,
 } from "@/components/farmers/farmer-detail";
-import {
-  filterOutFictionalFarmers,
-  isFictionalFarmerSlug,
-} from "@/lib/fictional-farmers";
+import { filterOutFictional, isFictionalSlug } from "@/lib/fictional-content";
 import {
   SEED_FARMER_TEAS,
   previewImageForKey,
@@ -129,7 +126,7 @@ export async function generateMetadata({
   const { slug } = await params;
   const locale = await getLocale();
   // Fictional/seed farmers are hidden until real stories are approved.
-  if (isFictionalFarmerSlug(slug)) return {};
+  if (isFictionalSlug("farmer", slug)) return {};
   try {
     const client = getClient();
     const farmer: Farmer | null = await client.fetch(FARMER_BY_SLUG_QUERY, {
@@ -194,7 +191,7 @@ export default async function FarmerPage({
 
   // Fictional/seed farmers are hidden until real stories are approved:
   // return 404 instead of rendering an invented profile. No Sanity mutation.
-  if (isFictionalFarmerSlug(slug)) notFound();
+  if (isFictionalSlug("farmer", slug)) notFound();
 
   let farmer: Farmer | null;
   let others: OtherFarmer[] = [];
@@ -205,7 +202,7 @@ export default async function FarmerPage({
       const fetched: OtherFarmer[] =
         (await client.fetch(OTHER_FARMERS_QUERY, { slug, language: locale })) ??
         [];
-      others = filterOutFictionalFarmers(fetched);
+      others = filterOutFictional("farmer", fetched);
     }
   } catch {
     return (

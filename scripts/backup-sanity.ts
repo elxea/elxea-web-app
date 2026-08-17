@@ -24,6 +24,7 @@
 import { execSync } from "child_process";
 import { mkdirSync, existsSync } from "fs";
 import { join } from "path";
+import { resolveWriteDatasetOrExit } from "../lib/sanity/write-target";
 
 // ─── Config ───────────────────────────────────────────────────────────
 
@@ -35,7 +36,12 @@ const getArg = (flag: string, fallback: string): string => {
 
 const PROJECT_ID =
   process.env.NEXT_PUBLIC_SANITY_PROJECT_ID || "5s8ahx87";
-const DATASET = getArg("--dataset", process.env.NEXT_PUBLIC_SANITY_DATASET || "production");
+// Read-only export: fail closed when no dataset is named, but do not
+// require the production confirmation flag (nothing is written to Sanity).
+const DATASET = resolveWriteDatasetOrExit({
+  scriptName: "scripts/backup-sanity.ts",
+  writes: false,
+});
 const OUTPUT_DIR = getArg("--output", join(process.cwd(), "backups"));
 
 // ─── Helpers ──────────────────────────────────────────────────────────

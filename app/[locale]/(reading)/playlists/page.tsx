@@ -22,6 +22,7 @@ import {
   JournalLayout,
 } from "@/components/journal/journal-list";
 import { urlFor } from "@/sanity/lib/image";
+import { filterOutFictional } from "@/lib/fictional-content";
 import { formatArticleDate } from "@/lib/format-date";
 import { previewSeedEnabled, previewImageForKey } from "@/lib/preview-seed";
 import { toPlainText } from "@/lib/sanity-text";
@@ -145,7 +146,9 @@ async function PlaylistContent({ params }: { params: SearchParams }) {
 
   let raw: PlaylistItem[];
   try {
-    raw = await getClient().fetch(PLAYLISTS_QUERY);
+    // Hide the fictional/seed playlists (placeholder bgm.mp3 tracks) still
+    // present in the production dataset. Code-only; no Sanity mutation.
+    raw = filterOutFictional("playlist", await getClient().fetch(PLAYLISTS_QUERY));
   } catch {
     return <p className="mt-8 text-sm text-muted-foreground lg:mt-12">{t("loadError")}</p>;
   }

@@ -21,7 +21,7 @@ import { Section } from "@/components/layout/container";
 import { Breadcrumb } from "@/components/seo/breadcrumb";
 import { ImageCard } from "@/components/media/image-card";
 import { Link } from "@/i18n/navigation";
-import { filterOutFictionalFarmers } from "@/lib/fictional-farmers";
+import { filterOutFictional } from "@/lib/fictional-content";
 import { placeholderValue } from "@/lib/placeholders";
 import { isSeedId, withSeedFarmers } from "@/lib/preview-seed";
 import { cn } from "@/lib/utils";
@@ -336,7 +336,7 @@ async function MakersSection() {
     return null;
   }
 
-  const farmers = (withSeedFarmers(filterOutFictionalFarmers(fetched), MAKERS_COUNT) as Farmer[]).slice(
+  const farmers = (withSeedFarmers(filterOutFictional("farmer", fetched), MAKERS_COUNT) as Farmer[]).slice(
     0,
     MAKERS_COUNT
   );

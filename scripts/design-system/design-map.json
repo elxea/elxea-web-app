@@ -2,7 +2,7 @@
   "$schema_note": "Figma node ⇄ code path 対応表。経済化施策① (Decision Log 39c70c9d064c81079145f69744e7b8f5)。自動化が Figma コンポーネントに対して正しいソースファイルを編集できるようにする lookup index。値の二重管理はしない。SoT=Figma (トークン・デザイン値の正本は Figma。コードは追従側で tokens/base.json が Figma の写し、dist/ は生成物 / Setaka 宣言 2026-08-08。旧「案 B = SoT=Code, Figma=参照」を置換)。本ファイルはどちらの向きにも値を持たない lookup index なので、この方針転換で役割は変わらない。検証は scripts/design-system/validate-design-map.ts (schema + code_path 実在 + --figma で node 実在)。",
   "figma_file_key": "AWLnI0XF07e8rScuxPYPc7",
   "figma_components_page": "5246:3",
-  "updated_at": "2026-08-09T10:16:48Z",
+  "updated_at": "2026-08-18T07:20:00Z",
   "conventions": {
     "entry": "{ figma_node_id, figma_name, code_path, kind, notes }。code_path はリポジトリルート相対。inline 定義部品は「定義/描画を含むファイル」を code_path とする (編集対象がそのファイルのため)。",
     "kind": "ds-component = elxea 固有の DS 部品 / module = Header/Footer 等の大型合成モジュール / shadcn = shadcn/ui プリミティブ。",
@@ -1332,6 +1332,62 @@
       "code_path": "components/people/person-detail.tsx",
       "kind": "ds-component",
       "notes": "People 層での命名を与える薄い再輸出 (PersonHead / PersonQuote / PersonSection* / PersonDataBand / PersonCardGrid / ProcessGrid / InterviewList / personBandClass)。実装は複製せず farmer-detail.tsx を指す。farmer-detail の注記どおり『People 詳細テンプレ共通骨格』への一本化は農家・プレイリストを同時に動かすため後続タスクに残す。"
+    },
+    {
+      "figma_node_id": "5904:77",
+      "figma_name": "TeaSpecCard",
+      "code_path": "components/journal/tea-spec-card.tsx",
+      "kind": "ds-component",
+      "notes": "elxea-journal S4。"
+    },
+    {
+      "figma_node_id": "5252:2",
+      "figma_name": "ValueCard",
+      "code_path": "app/[locale]/(reading)/about/page.tsx",
+      "kind": "ds-component",
+      "notes": "inline 定義 (function ValueCard, 従来 L113 付近)。elxea/About S5。"
+    },
+    {
+      "figma_node_id": "5447:7",
+      "figma_name": "SubscriptionCard",
+      "code_path": "app/[locale]/account/subscriptions/page.tsx",
+      "kind": "ds-component",
+      "notes": "inline 定義 (function SubscriptionCard, 従来 L98 付近)。EC account subscriptions。"
+    },
+    {
+      "figma_node_id": "5723:49",
+      "figma_name": "ContactSuccessCard",
+      "code_path": "app/[locale]/contact/contact-form.tsx",
+      "kind": "ds-component",
+      "notes": "success state の inline 表示 (従来 L50 付近)。専用 component 無し。Contact S3。"
+    },
+    {
+      "figma_node_id": "6904:337",
+      "figma_name": "FarmerCard",
+      "code_path": "app/[locale]/(reading)/farmers/page.tsx",
+      "kind": "ds-component",
+      "notes": "inline (FarmersList, ImageCard を利用)。lib/fictional-farmers.ts がデータ源。"
+    },
+    {
+      "figma_node_id": "6906:335",
+      "figma_name": "Stepper",
+      "code_path": "components/cart/cart-content.tsx",
+      "kind": "ds-component",
+      "notes": "inline 数量ステッパ (minus/value/plus, updateQuantity)。専用 component 無し。"
+    },
+    {
+      "figma_node_id": "6936:126",
+      "figma_name": "Input Underline",
+      "code_path": "components/search-form.tsx",
+      "kind": "ds-component",
+      "notes": "inline (shadcn Input を border-b の下線スタイルに)。SearchForm。"
+    },
+    {
+      "figma_node_id": "6936:17638",
+      "figma_name": "Status Badge (paused)",
+      "code_path": "app/[locale]/account/subscriptions/page.tsx",
+      "kind": "ds-component",
+      "notes": "inline status span (statusMap/statusColorMap, PAUSED 状態を含む)。SubscriptionCard 内。"
     }
   ],
   "unmapped_figma_nodes": [

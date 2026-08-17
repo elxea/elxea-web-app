@@ -7,6 +7,7 @@ import { getClient } from "@/sanity/lib/client";
 import { CATEGORY_LABELS_QUERY, TEA_MENUS_QUERY } from "@/sanity/lib/queries";
 import { urlFor } from "@/sanity/lib/image";
 import { Link } from "@/i18n/navigation";
+import { filterOutFictional } from "@/lib/fictional-content";
 import { EmptyState } from "@/components/ui/empty-state";
 import { pillClass } from "@/components/ui/pill-button";
 import { Breadcrumb } from "@/components/seo/breadcrumb";
@@ -95,7 +96,12 @@ async function TeaMenuList({ params }: { params: SearchParams }) {
   let categoryLabels: CategoryLabel[] = [];
   try {
     const client = getClient();
-    items = (await client.fetch(TEA_MENUS_QUERY, { language: locale })) ?? [];
+    // 本番データセットに残っている架空・シードのお茶メニューは読み取り層で落とす
+    // (#66 / Sanity は変更しない)。空になったときの出口は下の EmptyState が担う。
+    items = filterOutFictional(
+      "teaMenu",
+      (await client.fetch(TEA_MENUS_QUERY, { language: locale })) ?? []
+    );
     // 表示名は CMS 側の正本を引く。取得に失敗しても一覧は出す (生値で退避)。
     categoryLabels = (await client.fetch(CATEGORY_LABELS_QUERY).catch(() => [])) ?? [];
   } catch {
