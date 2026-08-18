@@ -81,6 +81,20 @@ export default defineConfig({
           exclude: ['e2e/**', 'node_modules/**'],
           environment: 'node',
           globals: true,
+          // Vitest's default is 5s. Several unit tests do a *cold* dynamic
+          // `import()` of a Next.js app module (`@/app/sitemap` pulls in the
+          // whole route module graph, which Vite has to transform on first
+          // touch). That single import measured 5.4s on this machine while the
+          // `storybook` browser project ran in parallel and competed for CPU —
+          // so `__tests__/site-url-consumers.test.ts` failed with "Test timed
+          // out in 5000ms" under load while passing in isolation.
+          //
+          // This is machine speed, not a defect the test exists to catch. The
+          // assertions are unchanged and a genuinely hung test still fails,
+          // just 20s later. Do NOT raise this again to silence a red test — if
+          // something needs more than 20s, that is itself the finding.
+          testTimeout: 20_000,
+          hookTimeout: 20_000,
           // Vitest 4 leaves NODE_ENV as 'development' here, so modules that
           // fail fast on missing production secrets unless NODE_ENV === 'test'
           // (e.g. lib/shopify/customer.ts guarding SESSION_SECRET) could not be
@@ -109,7 +123,30 @@ export default defineConfig({
           browser: {
             enabled: true,
             headless: true,
-            provider: playwright({}),
+            provider: playwright({
+              launchOptions: {
+                // Two stories (`components/viz/terroir/*-map.stories.tsx`)
+                // mount MapLibre GL, which needs a **WebGL2** context. Headless
+                // Chromium on a machine with no usable GPU stack has none, so
+                // MapLibre throws `GPUInitializationError` and those stories
+                // fail for a reason that has nothing to do with the component.
+                //
+                // These flags give Chromium SwiftShader — a software GL
+                // implementation — so WebGL2 exists everywhere: this Mac, the
+                // GitHub Actions runner, and any container. Since Chromium 128
+                // software WebGL must be opted into explicitly, hence
+                // `--enable-unsafe-swiftshader` ("unsafe" = no GPU sandbox
+                // acceleration, not a security relaxation of the page).
+                //
+                // This makes the map stories RUN. It does not skip or weaken
+                // them: interaction and axe assertions are unchanged.
+                args: [
+                  '--use-gl=angle',
+                  '--use-angle=swiftshader',
+                  '--enable-unsafe-swiftshader',
+                ],
+              },
+            }),
             instances: [{ browser: 'chromium' }],
           },
           setupFiles: ['.storybook/vitest.setup.ts'],

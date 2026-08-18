@@ -66,8 +66,29 @@ repos:
         always_run: true
 
       - id: unit-test
-        name: Unit test (vitest run)
-        entry: pnpm test
+        name: Unit test (vitest run --project unit)
+        # `--project unit`, NOT a bare `pnpm test`.
+        #
+        # A bare `pnpm test` also runs the `storybook` project, which is a
+        # **browser** suite: it launches headless Chromium via Playwright and
+        # renders every story. That makes the push gate depend on the local
+        # machine's graphics stack — on a host with no usable WebGL2 the two
+        # MapLibre stories die with `GPUInitializationError` and **every push
+        # from that machine is blocked**, including pushes that touch no UI at
+        # all. A gate whose verdict depends on the GPU is not a code gate.
+        #
+        # The storybook suite is NOT dropped — it is a required CI job
+        # (`storybook-tests` in .github/workflows/ci.yml) that runs on every
+        # push and every PR, on a runner where the browser environment is
+        # provisioned and reproducible. That is the right place for it.
+        # `vitest.config.ts` additionally hands Chromium SwiftShader so the
+        # suite works headless everywhere; run it locally any time with
+        # `pnpm test --project storybook`.
+        #
+        # What stays local (this hook) is the environment-independent part:
+        # lint, typecheck, and the Node-only unit tests. See docs/ci-gates.md
+        # 「ローカル pre-push とCIの分担」.
+        entry: pnpm test --project unit
         language: system
         stages: [pre-push]
         pass_filenames: false
