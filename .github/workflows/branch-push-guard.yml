@@ -15,18 +15,9 @@ on:
       - main
       # backup/* は監査対象外 (docs/ops/branch-divergence.md)
       - "backup/**"
-      # TEMPORARY (段階 B / 2026-08-18): 統合ブランチ本体だけを除外する。
-      # ブランチ齢 10.7 日 > しきい値 7 日で level=stop になるが、齢は既存 commit の
-      # committer date で決まり、history 書き換え (禁止) 以外に解消手段が無い。
-      #
-      # **段階 C で main へ合流させる直前に、この 1 行を削除する commit を積むこと。**
-      # 合流後の main に残っていないことを
-      #   grep -n "main-consolidation" .github/workflows/branch-push-guard.yml
-      # で検証する。残したまま合流させると以後どの統合ブランチも無保護になる。
-      - feat/main-consolidation-r2
-      # G1 の TEMPORARY 除外 ("feat/main-consolidation") は 2026-08-18 に削除した。
-      # 段階 A で main を統合ブランチへ取り込み終えたため、除外を残す理由が消えた
-      # (残したまま main へ合流させると、以後どの統合ブランチも無保護になる)。
+      # G1 の TEMPORARY 除外 (統合ブランチ本体の branches-ignore 追加) は 2026-08-18 の
+      # 段階 C (main への合流) で削除した。統合ブランチを main へ合流させ終えたため、
+      # 除外を残す理由が消えた (残したまま合流させると以後どの統合ブランチも無保護になる)。
       # 以後は統合ブランチも他の全ブランチと同じくこのガードの対象になる。
 
 concurrency:
