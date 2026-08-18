@@ -19,6 +19,28 @@ default_install_hook_types: [pre-commit, pre-push]
 default_stages: [pre-commit]
 
 repos:
+  # --- main 直接書き込みガード (HARD) ---
+  # GitHub 側の branch protection が free + private では課金ゲートされていて張れないため、
+  # 「PR を経由させる」強制を手元で作る。DEPLOY_ENABLED=true の今、main への push は
+  # 即 elxea.com への本番配信になるので、これを外さないこと。詳細は docs/ops/main-guard.md。
+  - repo: local
+    hooks:
+      - id: main-guard-commit
+        name: main への直接 commit を拒否
+        entry: scripts/git-guard/main-guard.sh commit
+        language: script
+        stages: [pre-commit]
+        pass_filenames: false
+        always_run: true
+
+      - id: main-guard-push
+        name: main への直接 push を拒否
+        entry: scripts/git-guard/main-guard.sh push
+        language: script
+        stages: [pre-push]
+        pass_filenames: false
+        always_run: true
+
   # --- Secret Scan (HARD - same as CI) ---
   - repo: https://github.com/gitleaks/gitleaks
     rev: v8.21.2
