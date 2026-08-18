@@ -52,19 +52,36 @@ Vercelはproductionをロールバック (Instant Rollback) すると **producti
 | `in_sync` | 本番SHA == main HEAD | なし (正常) |
 | `drift` | 本番SHA != main HEAD | 24h以内に是正 (再デプロイ)。Bossへエスカレ |
 | `rollback_suspected` | 配信中が最新READYでない (auto-assign OFFの疑い) | Undo / promoteで復帰。Bossへエスカレ |
-| `unknown` | SHA未確定 (token無し / meta未付与の旧デプロイ) | 情報不足。原因を除去して再照合 |
+| `unverifiable` | **照合そのものができなかった** (token無し / API不通 / meta未付与 / main HEAD不明) | 監視が武装できていない。`unverifiableCause` を見て原因を除去する |
 
-**これは検知 (warn) であって機械強制ではない。** 起票されても誰も動かなければ乖離は続く。ズレたら24h以内に是正する運用 + Bossエスカレで担保する。定期workflowは `drift` / `rollback_suspected` でCIを失敗させ、通知の起点にする。
+`in_sync` / `drift` / `rollback_suspected` は `verified: true` (実際に照合した結論)。`unverifiable` は `verified: false` で、**「異常なし」ではなく「不明」**を意味する。
+
+> **旧 `unknown` は廃止した (2026-08-18)。** v1では `unknown` を `in_sync` と同じ「緑」に丸めており、`--fail-on-drift` を付けてもexit 0を返していた。`VERCEL_TOKEN` が無いあいだ、この監視は1日2回「何も検証せずに緑」を返し続ける。259 commit分・約14時間のズレが誰にも気付かれなかった一因がこれ。**「検証していない」と「検証して問題なかった」を同じ色で表現しない**のがv2の主眼。
+
+### 終了コード (fail-closed)
+
+| exit | 意味 |
+|---|---|
+| 0 | `in_sync` (照合して一致)。`--fail-on-drift` を付けない情報取得実行も常に0 |
+| 1 | `drift` / `rollback_suspected` (照合して異常) |
+| 2 | スクリプト自体の例外 |
+| 3 | `unverifiable` (照合できなかった)。**ゲート実行では既定でこれ = 緑にしない** |
+
+恒久的に武装できない環境で赤を出し続けたくない場合だけ、呼び出し側が `--unverifiable-exit 0` を明示する。黙って緑になる経路は無く、その判断はコマンドラインに残って監査できる。
+
+**これは検知 (warn) であって機械強制ではない。** 起票されても誰も動かなければ乖離は続く。ズレたら24h以内に是正する運用 + Bossエスカレで担保する。定期workflowは `drift` / `rollback_suspected` / `unverifiable` でCIを失敗させ、通知の起点にする。
+
+判定ロジックは `scripts/ops/lib/prod-main-sync-verdict.mjs` に純関数として切り出してあり、`__tests__/ops/prod-main-sync-verdict.test.ts` が正常 / ずれあり / 検証不能の3パターンをfixtureで固定している (デグレしたらCIが赤くなる)。
 
 > **docs-only先行はdriftにしない**: `deploy.yml` はdocs / `*.md` / `LICENSE` だけのpushを `paths-ignore` でスキップする。そのためdocsのみのmerge後はmain HEADが進んでも本番はデプロイされずSHAがズレる。これは正常なので、監視は「mainがprodより進んでいて、その差分がdeploy-ignoreパス (docs/md/LICENSE) だけ」のときは `in_sync` とみなす (false drift防止)。判定にはprodコミットを解決できる完全なgit履歴が要るため、定期workflowは `fetch-depth: 0` でcheckoutする。
 
-> `unknown` は正常な過渡状態でありうる: この監視の初回導入直後、`deploy.yml` の `--meta` が付いた本番デプロイがまだ1回も出ていない間は `meta.githubCommitSha` が空で `unknown` になる。次回のmainへのpush由来デプロイ以降で解消する。
+> `unverifiable` は過渡状態でありうるが、緑ではない: この監視の初回導入直後、`--meta` が付いた本番デプロイがまだ1回も出ていない間は `meta.githubCommitSha` が空で `unverifiable` (`unverifiableCause: production_sha_missing`) になる。次回のmainへのpush由来デプロイ以降で解消する。**解消するまでのあいだ、この監視は本番のズレを検知できない**ことを忘れないこと (それを見えるようにするのがexit 3と `[SKIP] NOT VERIFIED` 表示)。
 
 ## 4. 追加(a): セッションをまたいだ本番認識の配布
 
 検知結果を「人向け起票」だけで終わらせると、各エージェントセッションは起動時に正しい本番認識を得られず、認識割れがセッション単位で再発する。そこで照合結果を **状態ファイル**に書き出し、全セッションが同じ本番認識を読めるようにする。
 
-- 書き出し (実装済み): 監視スクリプトに `--state-out <path>` を渡すと状態ファイル (`elxea-prod-main-sync/v1` スキーマ) を書き出す。ローカルの定期実行 (朝の点検ジョブ) から
+- 書き出し (実装済み): 監視スクリプトに `--state-out <path>` を渡すと状態ファイル (`elxea-prod-main-sync/v2` スキーマ) を書き出す。ローカルの定期実行 (朝の点検ジョブ) から
   ```
   node scripts/ops/check-prod-main-sync.mjs --state-out ~/.claude/progress/elxea-prod-main-sync.json
   ```
@@ -72,14 +89,16 @@ Vercelはproductionをロールバック (Instant Rollback) すると **producti
 - 読み取り (**設計案・未実装**): elxea系エージェントのSessionStart hookが上記状態ファイルを読み、`status != in_sync` のときadditionalContextに「本番とmainがズレている」警告を注入する。
   - **本タスクではhook実ファイルは作成しない** (hook新規作成はSetaka承認 + QAクロスチェックが必要な対象のため)。読み取りhookの実装は別途承認フローで行う。設計のみを本節に記す。
 
-## 5. 状態ファイル スキーマ (`elxea-prod-main-sync/v1`)
+## 5. 状態ファイル スキーマ (`elxea-prod-main-sync/v2`)
 
 ```json
 {
-  "schema": "elxea-prod-main-sync/v1",
+  "schema": "elxea-prod-main-sync/v2",
   "checkedAt": "<ISO8601>",
   "repo": "elxea/elxea-web-app",
-  "status": "in_sync | drift | rollback_suspected | unknown",
+  "status": "in_sync | drift | rollback_suspected | unverifiable",
+  "verified": "true = 実際に照合した / false = 照合できていない (status は unverifiable)",
+  "unverifiableCause": "missing_credentials | production_api_error | production_sha_missing | main_head_unresolved | null",
   "reason": "<人間可読の理由>",
   "mainHeadSha": "<40hex or null>",
   "productionSha": "<40hex or null>",
@@ -87,6 +106,8 @@ Vercelはproductionをロールバック (Instant Rollback) すると **producti
   "newestReadyDeploymentId": "<id or null>",
   "liveIsNewest": true,
   "sourceOfTruth": "main",
-  "remediation": "<is_sync/unknown 時は null>"
+  "remediation": "<in_sync 時のみ null。unverifiable にも必ず入る>"
 }
 ```
+
+**消費側 (SessionStart hook等) の注意**: `status === 'in_sync'` だけを正常として扱うこと。`verified === false` を正常側に寄せるとv1と同じ見逃しが再発する。v1の `unknown` は存在しないので、`schema` が `v1` のままの状態ファイルを読んだら古い実行結果と判断してよい。
