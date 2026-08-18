@@ -73,7 +73,9 @@ export function TastingNoteCta() {
       className="flex items-start"
     >
       <Link
-        href="/tasting-note"
+        /* アンケートは /tasting-note から子ルートへ退避した (=/tasting-note は
+           R2 の飲んだ記録一覧)。この CTA が指すのは従来どおりアンケート。 */
+        href="/tasting-note/feedback"
         className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground transition-colors"
       >
         {t("chatCta")}

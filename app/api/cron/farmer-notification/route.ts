@@ -6,7 +6,7 @@ import {
   sendFarmerNotification,
   type FarmerNotificationItem,
 } from "@/lib/email/farmer-notification";
-import { getSiteUrl } from "@/lib/env";
+import { siteUrl } from "@/lib/site-url";
 
 /**
  * Cron job: Notify followers of new articles/products from followed farmers.
@@ -29,7 +29,7 @@ import { getSiteUrl } from "@/lib/env";
 const CRON_SECRET = process.env.CRON_SECRET || "";
 /** How far back to look for new content (hours) */
 const LOOKBACK_HOURS = 25; // slightly over 24h to handle scheduling drift
-const SITE_URL = getSiteUrl();
+const SITE_URL = siteUrl();
 
 // ─── Sanity queries ───────────────────────────────────────────────────
 

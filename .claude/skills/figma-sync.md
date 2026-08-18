@@ -5,7 +5,7 @@ Figma と elxea-web-app コードベース間のデザイントークン同期�
 ## アーキテクチャ
 
 ```
-Code（正本）                    Figma（参照・調整用）
+Code（追従側 / 写し）           Figma（正本）
 tokens/base.json  ──────→  Figma Variables
                   Rebinder プラグイン
 
@@ -13,7 +13,8 @@ tokens/base.json  ←──────  Figma Variables
                   Exporter プラグイン
 ```
 
-**コードが正本**。Figma は視覚調整・プレゼン用。
+**Figmaが正本**（Setaka宣言2026-08-08）。`tokens/base.json` はFigma値の写しで、コードはFigmaに追従する。
+値が食い違ったら直す方向は常に「コードをFigmaに合わせる」。Rebinder（Code → Figma）は**写しを正本へ書き戻す用途では使わない** — Figmaで確定した値を機械的に反映する補助であり、実装都合でFigmaを書き換えないこと。
 
 ## ツール一覧
 

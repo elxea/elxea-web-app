@@ -4,102 +4,14 @@
       "count": 1
     }
   },
-  "app/[locale]/(reading)/elxea-journal/[slug]/page.tsx": {
-    "elxea-tokens/no-raw-colors": {
-      "count": 3
-    }
-  },
-  "app/[locale]/(reading)/elxea-journal/page.tsx": {
-    "elxea-tokens/no-raw-colors": {
-      "count": 1
-    }
-  },
-  "app/[locale]/(reading)/farmers/[slug]/page.tsx": {
-    "elxea-tokens/no-raw-colors": {
-      "count": 1
-    },
-    "elxea-tokens/section-spacing-utility": {
-      "count": 1
-    }
-  },
-  "app/[locale]/(reading)/farmers/page.tsx": {
-    "elxea-tokens/no-raw-colors": {
-      "count": 2
-    }
-  },
-  "app/[locale]/(reading)/journal/author/[slug]/page.tsx": {
-    "elxea-tokens/no-raw-colors": {
-      "count": 1
-    }
-  },
-  "app/[locale]/(reading)/journal/category/[slug]/page.tsx": {
-    "elxea-tokens/no-raw-colors": {
-      "count": 1
-    }
-  },
-  "app/[locale]/(reading)/journal/page.tsx": {
-    "elxea-tokens/no-raw-colors": {
-      "count": 1
-    }
-  },
-  "app/[locale]/(reading)/journal/tag/[slug]/page.tsx": {
-    "elxea-tokens/no-raw-colors": {
-      "count": 1
-    }
-  },
-  "app/[locale]/(reading)/playlists/[slug]/page.tsx": {
-    "elxea-tokens/no-raw-colors": {
-      "count": 2
-    }
-  },
-  "app/[locale]/(reading)/playlists/page.tsx": {
-    "elxea-tokens/no-raw-colors": {
-      "count": 2
-    }
-  },
-  "app/[locale]/(reading)/tasting-note/page.tsx": {
+  "app/[locale]/(reading)/tasting-note/feedback/page.tsx": {
     "elxea-tokens/no-raw-colors": {
       "count": 1
     }
   },
   "app/[locale]/(reading)/tea-menu/[slug]/page.tsx": {
-    "elxea-tokens/no-raw-colors": {
-      "count": 2
-    }
-  },
-  "app/[locale]/(reading)/tea-menu/page.tsx": {
-    "elxea-tokens/no-raw-colors": {
-      "count": 2
-    }
-  },
-  "app/[locale]/account/page.tsx": {
-    "elxea-tokens/no-raw-colors": {
-      "count": 2
-    }
-  },
-  "app/[locale]/account/subscriptions/page.tsx": {
-    "elxea-tokens/no-raw-colors": {
-      "count": 2
-    }
-  },
-  "app/[locale]/collections/page.tsx": {
-    "elxea-tokens/no-raw-colors": {
-      "count": 2
-    }
-  },
-  "app/[locale]/contact/business/page.tsx": {
     "elxea-tokens/section-spacing-utility": {
       "count": 1
-    }
-  },
-  "app/[locale]/contact/page.tsx": {
-    "elxea-tokens/section-spacing-utility": {
-      "count": 1
-    }
-  },
-  "app/[locale]/events/[slug]/page.tsx": {
-    "elxea-tokens/no-raw-colors": {
-      "count": 2
     }
   },
   "app/[locale]/events/page.tsx": {
@@ -107,86 +19,8 @@
       "count": 2
     }
   },
-  "app/[locale]/faq/page.tsx": {
-    "elxea-tokens/section-spacing-utility": {
-      "count": 1
-    }
-  },
-  "app/[locale]/legal/privacy/page.tsx": {
-    "elxea-tokens/section-spacing-utility": {
-      "count": 1
-    }
-  },
-  "app/[locale]/legal/returns/page.tsx": {
-    "elxea-tokens/section-spacing-utility": {
-      "count": 1
-    }
-  },
-  "app/[locale]/legal/terms/page.tsx": {
-    "elxea-tokens/section-spacing-utility": {
-      "count": 1
-    }
-  },
-  "app/[locale]/legal/tokushoho/page.tsx": {
-    "elxea-tokens/section-spacing-utility": {
-      "count": 1
-    }
-  },
   "app/[locale]/liff/link/liff-link-client.tsx": {
     "elxea-tokens/section-spacing-utility": {
-      "count": 1
-    }
-  },
-  "app/[locale]/login/line-login-button.tsx": {
-    "elxea-tokens/no-raw-colors": {
-      "count": 1
-    }
-  },
-  "app/[locale]/login/page.tsx": {
-    "elxea-tokens/no-raw-colors": {
-      "count": 1
-    }
-  },
-  "app/[locale]/page.tsx": {
-    "elxea-tokens/no-raw-colors": {
-      "count": 6
-    },
-    "elxea-tokens/section-spacing-utility": {
-      "count": 1
-    }
-  },
-  "app/[locale]/pages/[slug]/page.tsx": {
-    "elxea-tokens/section-spacing-utility": {
-      "count": 3
-    }
-  },
-  "app/[locale]/people/[slug]/page.tsx": {
-    "elxea-tokens/no-raw-colors": {
-      "count": 1
-    }
-  },
-  "app/[locale]/products/[handle]/page.tsx": {
-    "elxea-tokens/no-raw-colors": {
-      "count": 2
-    }
-  },
-  "app/[locale]/products/page.tsx": {
-    "elxea-tokens/no-raw-colors": {
-      "count": 1
-    }
-  },
-  "app/[locale]/search/page.tsx": {
-    "elxea-tokens/no-raw-colors": {
-      "count": 1
-    }
-  },
-  "app/[locale]/shipping/page.tsx": {
-    "elxea-tokens/section-spacing-utility": {
-      "count": 1
-    }
-  },
-  "app/[locale]/subscription/page.tsx": {
-    "elxea-tokens/no-raw-colors": {
       "count": 1
     }
   },
@@ -200,19 +34,29 @@
       "count": 3
     }
   },
-  "components/cart/cart-content.tsx": {
-    "elxea-tokens/no-raw-colors": {
-      "count": 1
-    }
-  },
   "components/chat/chat-message.tsx": {
     "elxea-tokens/no-raw-colors": {
       "count": 1
     }
   },
-  "components/layout/cookie-consent.tsx": {
+  "components/editorial/rule-list.tsx": {
     "elxea-tokens/section-spacing-utility": {
       "count": 1
+    }
+  },
+  "components/editorial/section-blocks.tsx": {
+    "elxea-tokens/section-spacing-utility": {
+      "count": 1
+    }
+  },
+  "components/farmers/farmer-detail.tsx": {
+    "elxea-tokens/section-spacing-utility": {
+      "count": 1
+    }
+  },
+  "components/journal/journal-list.tsx": {
+    "elxea-tokens/section-spacing-utility": {
+      "count": 2
     }
   },
   "components/layout/header.tsx": {
@@ -220,19 +64,14 @@
       "count": 1
     }
   },
+  "components/playlist/playlist-detail.tsx": {
+    "elxea-tokens/section-spacing-utility": {
+      "count": 1
+    }
+  },
   "components/product/add-to-cart-button.tsx": {
     "elxea-tokens/no-raw-colors": {
       "count": 2
-    }
-  },
-  "components/product/product-card.tsx": {
-    "elxea-tokens/no-raw-colors": {
-      "count": 2
-    }
-  },
-  "components/product/product-features.tsx": {
-    "elxea-tokens/no-raw-colors": {
-      "count": 14
     }
   },
   "components/ui/accordion.tsx": {

@@ -2,7 +2,7 @@
  * Server-side Firestore operations using Firebase Admin SDK.
  * These are called from API routes (not directly from client components).
  */
-import type { Query } from "firebase-admin/firestore";
+import { FieldValue, type Query } from "firebase-admin/firestore";
 import { getAdminFirestore } from "./admin";
 import { COLLECTIONS, favoritesCol, followsCol, eventRegistrationsCol, behaviorLogCol, userDoc } from "./collections";
 import type {
@@ -508,6 +508,49 @@ export async function linkLineUser(
   }
 
   return { success: true, action: "linked" };
+}
+
+/**
+ * Undo `linkLineUser`: remove the LINE user ID from the customer's Firestore
+ * user document so the customer can link a (different) LINE account again.
+ *
+ * 「解除 → 再連携」が成立するために、**フィールドを空文字や null で上書きせず
+ * `FieldValue.delete()` で消す**。`linkLineUser` は既存値との一致で
+ * `already_linked` を返す実装なので、消し残り (`lineUserId: null` 等) があると
+ * 再連携時の分岐が残った値に引っぱられる。フィールドごと消せば、再連携は必ず
+ * 「未連携からの新規連携」と同じ経路 (`action: "linked"`) を通る。
+ *
+ * 冪等: 連携が無い状態で呼ばれても失敗させず `not_linked` を返す (解除は
+ * 「その状態にする」操作であり、二重解除をエラーにする意味がない)。
+ *
+ * 削除範囲はこのドキュメントの連携情報のみ。カルテ・注文履歴等のサブコレクションは
+ * 触らない (解除 != データ削除。データ削除は GDPR `customers/redact` webhook /
+ * cx-agent `/api/erase` の担当)。
+ *
+ * @param customerId Shopify numeric customer ID (サーバ確定値のみを渡すこと)
+ */
+export async function unlinkLineUser(
+  customerId: string
+): Promise<{ success: boolean; action: "unlinked" | "not_linked" }> {
+  const db = getAdminFirestore();
+  const docRef = db.doc(userDoc(customerId));
+
+  const snapshot = await docRef.get();
+  if (!snapshot.exists) {
+    return { success: true, action: "not_linked" };
+  }
+
+  const existing = snapshot.data()?.lineUserId;
+  if (existing === undefined || existing === null) {
+    return { success: true, action: "not_linked" };
+  }
+
+  await docRef.update({
+    lineUserId: FieldValue.delete(),
+    lastActiveAt: new Date(),
+  });
+
+  return { success: true, action: "unlinked" };
 }
 
 /**

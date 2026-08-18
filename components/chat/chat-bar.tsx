@@ -1,16 +1,18 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Loader2, Pause, Play, SendHorizontal, X } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { SendHorizontal, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 // vaul Drawer removed — replaced with a plain fixed panel for iOS keyboard compatibility
 import { cn } from "@/lib/utils";
 import { trackEvent } from "@/lib/analytics";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useArticleAudio } from "@/components/audio/article-audio-provider";
 import { useChatContext } from "./chat-provider";
 import type { ChatMessageMeta } from "./chat-provider";
 import { ChatMessage } from "./chat-message";
+import { ChatPanel } from "./chat-panel";
 import { ChatLauncher } from "./chat-launcher";
 import { ProductCards } from "./product-card";
 import { QuickReplies } from "./quick-replies";
@@ -57,7 +59,15 @@ function TypingIndicator() {
 // Date separator
 // ---------------------------------------------------------------------------
 
-const DAY_NAMES = ["\u65E5", "\u6708", "\u706B", "\u6C34", "\u6728", "\u91D1", "\u571F"] as const;
+const DAY_NAMES = [
+  "\u65E5",
+  "\u6708",
+  "\u706B",
+  "\u6C34",
+  "\u6728",
+  "\u91D1",
+  "\u571F",
+] as const;
 
 /**
  * Build a human-readable date label:
@@ -85,10 +95,7 @@ function getDateLabel(date: Date): string {
 
 function DateSeparator({ label }: { label: string }) {
   return (
-    <div
-      data-slot="date-separator"
-      className="flex items-center gap-3 py-2"
-    >
+    <div data-slot="date-separator" className="flex items-center gap-3 py-2">
       <div className="flex-1 border-t border-border" />
       <span className="text-xs text-muted-foreground shrink-0">{label}</span>
       <div className="flex-1 border-t border-border" />
@@ -200,8 +207,13 @@ function MessagesList({
   messagesEndRef,
   className,
 }: MessagesListProps) {
-  const { productCards, quickReplies, sendMessage, clearQuickReplies, getMessageTimestamp } =
-    useChatContext();
+  const {
+    productCards,
+    quickReplies,
+    sendMessage,
+    clearQuickReplies,
+    getMessageTimestamp,
+  } = useChatContext();
 
   const handleQuickReply = useCallback(
     (text: string) => {
@@ -224,7 +236,10 @@ function MessagesList({
 
       if (dateStr !== prevDateStr) {
         elements.push(
-          <DateSeparator key={`sep-${dateStr}`} label={getDateLabel(msgDate)} />,
+          <DateSeparator
+            key={`sep-${dateStr}`}
+            label={getDateLabel(msgDate)}
+          />,
         );
         prevDateStr = dateStr;
       }
@@ -405,18 +420,34 @@ function DesktopChatBar() {
     // themselves. The previous full-width `fixed bottom-0 left-0 right-0` bar
     // is gone on purpose — with no `pointer-events-none` it swallowed clicks
     // across the whole 108px strip and made the footer's legal links
-    // unreachable.
+    // unreachable (#55).
+    //
+    // 統合 (2026-08-17): #55 の構造 (右下アンカー / 全幅帯なし / 下端の面に追従 /
+    // メッセージ 0 件でも開く) を維持したまま、パネルの見た目は c1-ds の DS 部品
+    // `ChatPanel` (Figma 6859:316) に載せ替えた。
+    // ヘッダーと閉じるボタンは ChatPanel が持つので、ここでは位置と寸法だけを渡す。
+    //
+    // 統合 (2026-08-18): 単一の `--bottom-obstruction` を、下端の各面が自分で立てる
+    // `--audio-bar-h` / `--consent-bar-h` / `--event-bar-h` の**和**に差し替えた。
+    // 重ねると鳴っている音を止める手段・同意ボタン・チャット入力のどれかが埋まる。
+    // 出ていない面は 0px なので通常時の見た目は変わらない。積み順の正本は
+    // hooks/use-bottom-stack-slot.ts。z も名前付きレイヤー (`--z-chat`) に載せる:
+    // 生の `z-50` は音声バーの `--z-sticky` (1020) に必ず負ける。
     <div ref={rootRef} data-slot="chat-bar-desktop" className="hidden md:block">
       {isOpen ? (
-        <div
-          data-slot="chat-panel"
+        <ChatPanel
+          title="elxea assistant"
+          onClose={() => setIsOpen(false)}
+          closeLabel={t("launcher.close")}
           className={cn(
-            "fixed z-50 right-6",
-            "bottom-[calc(var(--bottom-obstruction,0px)+1.5rem)]",
-            "w-[min(400px,calc(100vw-3rem))]",
-            "max-h-[min(640px,calc(100dvh-8rem-var(--bottom-obstruction,0px)))]",
+            // ChatPanel 既定の `mx-auto w-full max-w-2xl rounded-t-2xl` を打ち消す。
+            "fixed z-(--z-chat) right-6 mx-0",
+            "bottom-[calc(var(--audio-bar-h,0px)+var(--consent-bar-h,0px)+var(--event-bar-h,0px)+1.5rem)]",
+            "w-[min(400px,calc(100vw-3rem))] max-w-none",
+            "max-h-[min(640px,calc(100dvh-8rem-var(--audio-bar-h,0px)-var(--consent-bar-h,0px)-var(--event-bar-h,0px)))]",
+            "transition-[bottom] duration-fast ease-enter",
             "flex flex-col overflow-hidden",
-            "border border-border/40 rounded-2xl",
+            "rounded-2xl border border-border/40",
             "bg-background/95 backdrop-blur-xl shadow-lg",
             "animate-in slide-in-from-bottom-2 fade-in duration-200",
           )}
@@ -427,22 +458,7 @@ function DesktopChatBar() {
             e.stopPropagation();
           }}
         >
-          {/* Panel header */}
-          <div className="flex shrink-0 items-center justify-between border-b border-border/40 px-4 py-2">
-            <span className="text-xs font-medium text-muted-foreground tracking-wide">
-              elxea assistant
-            </span>
-            <Button
-              variant="ghost"
-              size="icon-xs"
-              onClick={() => setIsOpen(false)}
-              aria-label={t("launcher.close")}
-            >
-              <X className="size-3.5" />
-            </Button>
-          </div>
-
-          {/* Messages area */}
+          {/* ヘッダー (タイトル + 閉じる) は ChatPanel 側が描く。 */}
           <MessagesList
             messages={messages}
             isStreaming={isStreaming}
@@ -467,7 +483,7 @@ function DesktopChatBar() {
               inputRef={inputRef}
             />
           </div>
-        </div>
+        </ChatPanel>
       ) : (
         <ChatLauncher
           onClick={() => {
@@ -482,6 +498,53 @@ function DesktopChatBar() {
 }
 
 // ---------------------------------------------------------------------------
+// 退避中の音声を止める / 戻す (全画面チャットのヘッダー内)
+// ---------------------------------------------------------------------------
+
+/**
+ * 全画面チャットが開いている間、音声バーは画面外へ退避している
+ * (`components/audio/audio-dock.tsx`)。**音は鳴り続けている**ので、止める手段を
+ * ここで引き継ぐ。これが無いと「鳴っているのに止められない画面」になる
+ * (WCAG 2.2.2 — 自動で流れ続ける音は止められなければならない)。
+ *
+ * 出す条件は「音源が選ばれている」= 退避しているバーが実在すること。何も選ばれて
+ * いないときに出すと、鳴っていないのにボタンがあるノイズになる (Setaka 裁定
+ * 2026-08-17)。**一時停止した直後も出し続ける**: ここで止めたものはここで戻せ
+ * なければ行き止まりになる (`isPlaying` を条件にすると押した瞬間に消える)。
+ *
+ * 装飾は最小限。アイコンの向きが状態そのものを表す (一時停止マーク = 鳴っている /
+ * 再生マーク = 止まっている) ので、これ以上の飾りは足さない。時間や曲名も出さない
+ * — 数字はチャットの読み書きの邪魔になるし、詳細は展開したプレイヤーの役目。
+ */
+function RetreatedAudioToggle() {
+  const t = useTranslations("journal");
+  const { current, status, toggle } = useArticleAudio();
+
+  if (!current) return null;
+
+  const isPlaying = status === "playing";
+  const isLoading = status === "loading";
+  const StateIcon = isLoading ? Loader2 : isPlaying ? Pause : Play;
+
+  return (
+    <Button
+      variant="ghost"
+      size="icon-xs"
+      onClick={() => toggle(current)}
+      aria-label={`${isPlaying ? t("audioPause") : t("audioPlay")}: ${current.title}`}
+      aria-busy={isLoading}
+      // 鳴っているときだけ本文と同じ濃さにする。止まっている間は控えて、
+      // ヘッダーの「elxea assistant」より前に出ないようにする。
+      className={cn(isPlaying ? "text-foreground" : "text-muted-foreground")}
+    >
+      <StateIcon
+        className={cn("size-4", isLoading ? "animate-spin" : "fill-current")}
+      />
+    </Button>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Mobile: Drawer-based fullscreen chat
 // ---------------------------------------------------------------------------
 
@@ -489,6 +552,7 @@ function MobileChatDrawer() {
   const { messages, status, isOpen, setIsOpen, pathname, sendMessage } =
     useChatContext();
   const t = useTranslations("chat");
+  const { retreatBar } = useArticleAudio();
 
   const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -519,7 +583,9 @@ function MobileChatDrawer() {
 
       // Use the computed background color from the body (which uses bg-background)
       // to ensure the gap behind iOS keyboard matches the chat panel color.
-      html.style.backgroundColor = getComputedStyle(document.body).backgroundColor;
+      html.style.backgroundColor = getComputedStyle(
+        document.body,
+      ).backgroundColor;
       document.body.style.overflow = "hidden";
 
       return () => {
@@ -528,6 +594,17 @@ function MobileChatDrawer() {
       };
     }
   }, [isOpen]);
+
+  // 開いている間は音声バーを画面外へ退避させる (再生は止めない)。
+  //
+  // 限られた操作スペースにチャットと音声バーを 2 つ並べるとノイズになり操作の
+  // 邪魔になるため (Setaka 裁定 2026-08-17)。止める手段はヘッダーの
+  // `RetreatedAudioToggle` が引き継ぐ。cleanup が退避を解除するので、閉じても
+  // アンマウントされてもバーは必ず戻る。
+  useEffect(() => {
+    if (!isOpen) return;
+    return retreatBar();
+  }, [isOpen, retreatBar]);
 
   const onSubmit = useCallback(
     (e: React.FormEvent) => {
@@ -569,12 +646,19 @@ function MobileChatDrawer() {
 
       {/* Fullscreen fixed panel — no vaul, no gesture detection, no viewport
           resize side-effects. Pure CSS positioning that iOS keyboards cannot
-          displace. The panel slides up from the bottom via CSS transition. */}
+          displace. The panel slides up from the bottom via CSS transition.
+
+          下端は素の `inset-0` = 画面いっぱい。音声バーとは高さを分け合わない
+          (開いている間はバーが画面外へ退避するため。上の `retreatBar` 参照)。
+          2026-08-17 の一手前は `bottom: var(--audio-bar-h)` でバーのぶん手前で
+          止めて共存させていたが、狭い画面に主役を 2 つ並べる形になったので
+          退避方式へ変えた (Setaka 裁定)。 */}
       {isOpen && (
         <div
           data-slot="chat-panel-mobile"
+          style={{ zIndex: "var(--z-chat)" }}
           className={cn(
-            "fixed inset-0 z-50 bg-background flex flex-col",
+            "fixed inset-0 bg-background flex flex-col",
             "animate-in slide-in-from-bottom duration-300",
           )}
         >
@@ -583,14 +667,19 @@ function MobileChatDrawer() {
             <span className="text-sm font-medium text-muted-foreground tracking-wide">
               elxea assistant
             </span>
-            <Button
-              variant="ghost"
-              size="icon-xs"
-              onClick={() => setIsOpen(false)}
-              aria-label={t("launcher.close")}
-            >
-              <X className="size-4" />
-            </Button>
+            {/* 右端は「音声の一時停止 / 再開」と「閉じる」の 2 つだけ。音声側は
+                何も鳴っていなければ出ない (RetreatedAudioToggle)。 */}
+            <div className="flex items-center gap-1">
+              <RetreatedAudioToggle />
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                onClick={() => setIsOpen(false)}
+                aria-label={t("launcher.close")}
+              >
+                <X className="size-4" />
+              </Button>
+            </div>
           </div>
 
           {/* Messages area */}

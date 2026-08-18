@@ -24,6 +24,21 @@ export type SellingPlanPriceAdjustment = {
     | { price: Money };
 };
 
+/**
+ * 定期便プランの配送間隔。
+ *
+ * Storefront API が返すのは `interval` / `intervalCount` だけで、締日 (`cutoff`) と
+ * 起算日 (`anchors`) は Admin API 専用。よって「毎月のプランはどれか」は判定できるが
+ * 「次の発送日はいつか」は Storefront だけでは判定できない。
+ *
+ * 単発購入プラン (SellingPlanFixedDeliveryPolicy) には interval が無いため
+ * `null` になりうる。
+ */
+export type SellingPlanRecurringDeliveryPolicy = {
+  interval: "DAY" | "WEEK" | "MONTH" | "YEAR";
+  intervalCount: number;
+};
+
 export type SellingPlan = {
   id: string;
   name: string;
@@ -31,6 +46,7 @@ export type SellingPlan = {
   recurringDeliveries: boolean;
   options: { name: string; value: string }[];
   priceAdjustments: SellingPlanPriceAdjustment[];
+  deliveryPolicy?: SellingPlanRecurringDeliveryPolicy | null;
 };
 
 export type SellingPlanGroup = {

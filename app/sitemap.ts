@@ -1,16 +1,26 @@
 import type { MetadataRoute } from "next";
 import { isFictionalSlug } from "@/lib/fictional-content";
-import { getSiteUrl } from "@/lib/env";
+import { siteUrl } from "@/lib/site-url";
 
-const BASE_URL = getSiteUrl();
-const locales = ["ja", "en"];
+// 環境変数に混ざった改行・末尾スラッシュを落としてから使う。生の値をそのまま
+// 連結していたため、本番の <loc> が全件 "https://elxea.com\n/ja/..." になり、
+// sitemap のエントリ 172 件がまるごと不正な URL になっていた。
+const BASE_URL = siteUrl();
+
+// 出すのは ja だけ。`middleware.ts` が /en/* を /ja/* へ 301 で恒久リダイレクト
+// する (英語コンテンツが未完のため) ので、en の URL を載せるとリダイレクト先
+// でしか到達できない URL を sitemap に並べることになる。実体のある URL だけを
+// 載せる。英語を出す判断がついた時点でここに "en" を戻す。
+const locales = ["ja"];
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const entries: MetadataRoute.Sitemap = [];
 
   // Static pages
   const staticPages = [
-    "", "/products", "/collections", "/journal", "/farmers", "/events",
+    // 農家一覧 (/farmers) は廃止 (2026-08-14)。農家詳細 (/farmers/[slug]) は
+    // 下の Sanity ループで個別に載せる。
+    "", "/products", "/collections", "/journal", "/events",
     "/tea-menu", "/playlists", "/elxea-journal", "/about", "/faq", "/contact",
   ];
   for (const locale of locales) {
@@ -26,7 +36,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   // Dynamic pages from Shopify
   try {
-    const { getProducts, getCollections } = await import("@/lib/shopify");
+    const { getProducts } = await import("@/lib/shopify");
 
     const { products } = await getProducts({ first: 100 });
     for (const product of products) {
@@ -40,18 +50,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       }
     }
 
-    const collections = await getCollections();
-    for (const collection of collections) {
-      for (const locale of locales) {
-        entries.push({
-          url: `${BASE_URL}/${locale}/collections/${collection.handle}`,
-          changeFrequency: "weekly",
-          priority: 0.6,
-        });
-      }
-    }
+    // コレクション詳細 (/collections/[handle]) は 2026-08-14 に廃止したので
+    // 動的エントリは出さない。コレクション一覧 (/collections) は static 側にある。
   } catch {
-    // Shopify API not available — skip dynamic product/collection entries
+    // Shopify API not available — skip dynamic product entries
   }
 
   // Dynamic pages from Sanity

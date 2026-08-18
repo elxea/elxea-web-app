@@ -12,6 +12,8 @@ import { LenisProvider } from "@/components/providers/lenis-provider";
 import { ChatProvider } from "@/components/chat/chat-provider";
 import { ChatBar } from "@/components/chat/chat-bar";
 import { AudioProvider } from "@/components/audio/audio-provider";
+import { ArticleAudioProvider } from "@/components/audio/article-audio-provider";
+import { AudioDock } from "@/components/audio/audio-dock";
 import { getClient } from "@/sanity/lib/client";
 import { SITE_SETTINGS_QUERY } from "@/sanity/lib/queries";
 
@@ -41,6 +43,17 @@ export const metadata: Metadata = {
   },
   other: {
     "theme-color": "#333333",
+    /* Build identity, so a check can tell WHICH build it is looking at.
+     *
+     * This is what makes "the deploy went live" verifiable instead of assumed:
+     * defect 4 was a preview login silently landing on production, and without a
+     * build marker there is no way to tell from the page which deployment
+     * answered. Ring 2 passes the expected SHA to the dev server and compares.
+     *
+     * `?? "local"` marks a build with no VCS metadata (a local dev server). CI
+     * treats that literal as a failure rather than a pass, so the check cannot go
+     * green by simply not knowing. */
+    "x-elxea-commit": process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? "local",
   },
 };
 
@@ -89,7 +102,18 @@ export default async function LocaleLayout({
   }
 
   return (
-    <html lang={locale}>
+    /* suppressHydrationWarning は <html> の**属性だけ**に効く (子要素には及ばない)。
+     * 下の Typekit ローダーは hydration より前に
+     * `document.documentElement.className += " wf-loading"` を実行するので、
+     * サーバ HTML の `class` (無し) とクライアントの `class=" wf-loading"` が
+     * 必ず食い違う。React はこれを毎ページで hydration mismatch として報告し、
+     * dev では**エラーオーバーレイが常時開く**。オーバーレイは自前の
+     * <footer data-nextjs-error-overlay-footer> を持つため
+     * `page.locator("footer")` が 2 件に解決して e2e が strict mode 違反で落ちる
+     * (mobile.spec.ts「footer is accessible on mobile」で実測)。
+     * next-themes 等と同じ、外部スクリプトが <html> のクラスを書き換える定型
+     * ケースなのでここで抑制する。 */
+    <html lang={locale} suppressHydrationWarning>
       <head>
         {/* Adobe Fonts (Typekit kit fwg7gtf) — loaded via the official async JS
          * embed. The kit is configured as JS-only: the CSS endpoint
@@ -111,6 +135,10 @@ export default async function LocaleLayout({
       <body className="min-h-screen flex flex-col bg-background text-foreground">
         <NextIntlClientProvider messages={messages}>
           <AudioProvider>
+          {/* 記事音声はページ遷移で止めない (SoundCloud 方式)。provider を
+              ここに常駐させるのが前提条件で、記事ページ側に置くと遷移で
+              unmount され再生が必ず切れる。 */}
+          <ArticleAudioProvider>
           <CartProviderWrapper>
             <ChatProvider>
               <LenisProvider>
@@ -118,11 +146,13 @@ export default async function LocaleLayout({
                 <main className="flex-1">{children}</main>
                 <Footer groups={footerGroups} />
                 <ChatBar />
+                <AudioDock />
                 <CookieConsent />
                 <Toaster />
               </LenisProvider>
             </ChatProvider>
           </CartProviderWrapper>
+          </ArticleAudioProvider>
           </AudioProvider>
         </NextIntlClientProvider>
       </body>

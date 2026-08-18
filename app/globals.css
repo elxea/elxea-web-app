@@ -2,6 +2,27 @@
 @import "../dist/tokens.css";
 @import "../dist/tokens-cjk.css";
 
+/*
+ * Keep `docs/` out of Tailwind's source scanning.
+ *
+ * Tailwind v4 auto-detects sources across the whole project, markdown included,
+ * and does not care whether a class-shaped string is real code or prose. The
+ * fidelity tables in `docs/fidelity/*.md` quote utilities while explaining them,
+ * and on 2026-08-09 one of them wrote an abbreviated `[font:var(…)]` with a
+ * literal ellipsis. Tailwind extracted it as a candidate and emitted
+ * `.\[font\:var\(…\)\] { font: var(…) }`, which is not parseable CSS.
+ *
+ * The result was that `next dev` returned HTTP 500 on every route (dev compiles
+ * globals.css through PostCSS, which hard-errors: `Unexpected token Ident("…")`)
+ * and so the whole E2E job failed, while `next build` passed — a docs-only-looking
+ * commit taking down the test suite with no obvious connection to the change.
+ *
+ * Excluding `docs/` fixes the class of bug rather than the one occurrence: no
+ * document that merely *mentions* a utility can generate CSS. Nothing under
+ * `docs/` is ever rendered, so nothing real is lost by not scanning it.
+ */
+@source not "../docs";
+
 @custom-variant dark (&:is(.dark *));
 
 /* Prevent horizontal viewport overflow from off-screen children (e.g. wide
@@ -29,53 +50,63 @@ html.lenis, html.lenis body {
   html {
     scroll-behavior: auto;
   }
+
+  /* A9: BGM 再生中の回転 (`animate-spin-slow`) と読み込み中の点滅
+   * (`animate-pulse`) は「動きを減らす」設定の利用者には流さない。
+   * 状態は文言 (再生中 / 読み込み中 …) でも伝えているので、動きを止めても
+   * 情報は失われない。 */
+  .animate-spin-slow,
+  .animate-pulse {
+    animation: none;
+  }
 }
 
 /* Adobe Fonts (Typekit ID: fwg7gtf) — loaded via async JS embed in layout.tsx
  * (kit is JS-only; the .css endpoint returns HTTP 412, .js returns 200) */
-/* Headings: aktiv-grotesk-extended + dnp-shuei-gothic-gin-std */
-/* Body: aktiv-grotesk + kozuka-gothic-pro */
-/* Secondary: neue-haas-grotesk-text + ryo-gothic-plusn */
-/* Special: dnp-shuei-ymincho-std */
+/* Headings: aktiv-grotesk-extended + dnp-shuei-gothic-gin-std (秀英角ゴシック銀) */
+/* Body:     aktiv-grotesk + dnp-shuei-gothic-gin-std (秀英角ゴシック銀) */
+/* Mono:     SF Mono / Menlo */
+/* Special:  dnp-shuei-ymincho-std (定義のみ・style プリセット未参照 — conflicts[c-03]) */
+/* The `secondary` role (neue-haas-grotesk-text / ryo-gothic-plusn) was retired
+ * 2026-08-07; the kit itself (fwg7gtf) is unchanged. */
 /* Design tokens generated from tokens/ via Style Dictionary (pnpm build:tokens) */
 
+/* Weight / size / line-height / family / tracking all come from the `body`
+ * style preset. dist/tokens-cjk.css re-binds --typography-style-body and
+ * --typography-style-body-tracking under :lang(ja), so the Japanese cadence
+ * (lh 1.8 / tracking 0.04em) applies without a second rule here.
+ * Until 2026-08-07 this was two hand-written :lang() blocks (en 0.01em/1.65,
+ * ja 0.04em/1.8) whose English values disagreed with the Figma-authored token
+ * preset (0.05em/1.75). The tokens are the Figma copy, so they win. */
 body {
-  font-family: var(--typography-family-sans);
-  font-size: 1rem;
+  font: var(--typography-style-body);
+  letter-spacing: var(--typography-style-body-tracking);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-}
-
-/* Japanese: tighter letter-spacing, taller line-height for readability */
-:lang(ja) {
-  letter-spacing: 0.04em;
-  line-height: 1.8;
-}
-
-/* English: standard letter-spacing, slightly tighter line-height */
-:lang(en) {
-  letter-spacing: 0.01em;
-  line-height: 1.65;
 }
 
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--typography-family-heading);
 }
 
-:lang(ja) h1, :lang(ja) h2, :lang(ja) h3, :lang(ja) h4, :lang(ja) h5, :lang(ja) h6 {
-  letter-spacing: 0.02em;
-}
+/* Headings track per level — the old blanket -0.01em (en) / 0.02em (ja) rule
+ * flattened six distinct Figma values into one. */
+h1 { letter-spacing: var(--typography-style-h1-tracking); }
+h2 { letter-spacing: var(--typography-style-h2-tracking); }
+h3 { letter-spacing: var(--typography-style-h3-tracking); }
+h4 { letter-spacing: var(--typography-style-h4-tracking); }
+h5 { letter-spacing: var(--typography-style-h5-tracking); }
+h6 { letter-spacing: var(--typography-style-h6-tracking); }
 
-:lang(en) h1, :lang(en) h2, :lang(en) h3, :lang(en) h4, :lang(en) h5, :lang(en) h6 {
-  letter-spacing: -0.01em;
-}
-
-/* Headings keep their design line-height. The :lang() body line-height
- * (1.8 ja / 1.65 en) targets body copy only; without this override it also
- * inherits onto headings and stretches them (Figma heading line-height is
- * 1.2–1.3). Scope: h1–h3 (large, visible headings). h4–h6 intentionally keep
- * the body cadence. Specificity (0,1,1) beats both :lang() (0,1,0) and the
- * h{n} font shorthand's line-height (0,0,1). */
+/* Headings keep their own line-height, overriding the h{n} token presets.
+ * Scope: h1–h3 (large, visible headings); h4–h6 intentionally keep the preset
+ * cadence. Specificity (0,1,1) beats the h{n} font shorthand's line-height
+ * (0,0,1) below.
+ * NOTE: this block used to also guard against the hand-written :lang() body
+ * line-height inheriting onto headings. Those :lang() rules are gone as of
+ * 2026-08-07 (body now takes its leading from the token preset), but these
+ * heading values are kept deliberately — they are set from Figma, not from the
+ * presets, so do not fold them back in without a Figma change. */
 :lang(ja) h1, :lang(en) h1 { line-height: 1.2; }
 :lang(ja) h2, :lang(en) h2,
 :lang(ja) h3, :lang(en) h3 { line-height: 1.3; }
@@ -92,14 +123,40 @@ h6 { font: var(--typography-style-h6); }
  * therefore beat Tailwind utilities (which live in @layer utilities), so a
  * `md:[font:…]` utility on the element would never win. line-height is set
  * explicitly so the display token's own lh (1.3) does not override the 1.2. */
+/* KNOWN GAP (DS トークン整合タスク 3b670c9d-064c-8166 / 項目2 — 保留中):
+ * `.page-title` / `.hero-display` の字間が Figma と符号が逆 (Figma display は
+ * -0.01em = -0.44px、実際に効くのは +0.02em = +0.88px)。原因は 2 段:
+ *   1. `font:` ショートハンドは letter-spacing を含まないので、上の
+ *      `h1 { letter-spacing: var(--typography-style-h1-tracking) }` が残る
+ *   2. かつ `dist/tokens-cjk.css` が `:lang(ja)` で
+ *      `--typography-style-display-tracking` 自体を 0.02em に再束縛する
+ * よって `letter-spacing: var(--typography-style-display-tracking)` を足しても
+ * 日本語ページ (html lang="ja") では -0.44px にならない (実測で確認済)。
+ * 直すには「CJK オーバーライドと Figma のどちらを正とするか」の判断が要り、
+ * これは未解決の Setaka レビュー案件 (All Tasks「Review: CJK 文字組みトークン
+ * vs Figma の食い違いの正を決める (roji)」3b570c9d-064c-81b7) の対象。
+ * 判断が出るまで触らない (妥協値を作らない)。 */
 @media (min-width: 768px) {
   h1.hero-display { font: var(--typography-style-display); line-height: 1.2; }
 }
 
-/* Page-header title — content-index pages (collections / collection detail /
- * elxea-journal) use the Figma PC page-title size (44px = display token) at md+.
+/* Page-header title — every page whose main heading is a page title uses the
+ * Figma PC page-title size (44px = display token) at md+.
+ * Applied via the R2 shared list-pattern head (ListPageHead — products /
+ * tea-menu / collections / collection detail / journal / journal category /
+ * journal tag / elxea-journal / farmers / playlists / tasting-note) and, on
+ * detail / reading pages, by putting `.page-title` on the h1 directly
+ * (about / account / account subscriptions / cart / journal article /
+ * tea-menu detail / events / farmers detail / people detail / author /
+ * playlist detail).
+ * NOTE (2026-08-09): the list above used to name only 4 pages and had drifted;
+ * `.page-title` is the single lever for the "page main heading = PC 44 / SP 32"
+ * ruling, so the comment now matches the real call sites. Figma still carries
+ * older values (PC 52 / 32, SP 24) on several pages — that follow-up is tracked
+ * as All Tasks ID-7507 and is a designer-side change, not a code one.
  * Same unlayered-rule rationale as .hero-display above so it beats the h1{font}
  * shorthand and Tailwind utilities. Mobile keeps the base h1 (32px). */
+/* 字間は上の `.hero-display` の KNOWN GAP と同じ (項目2・保留中)。 */
 @media (min-width: 768px) {
   h1.page-title { font: var(--typography-style-display); line-height: 1.2; }
 }
@@ -116,16 +173,504 @@ h1.contact-title {
   font-weight: 500;
 }
 
+/* Auth card title — 認証画面のカード見出し (Figma【R2: 確定版】ログイン 6702:9012 /
+ * 6706:14452、ログイン完了 6750:10387 / 6750:15889)。SP 20px / PC(md+) 24px で、
+ * base h1 (32px/300) より小さい。44px の display プリセットは一覧・ヒーローの
+ * `.page-title` / `.hero-display` 用で、認証カードは `.contact-title` と同じ
+ * 「読み枠内の控えめな見出し」系統。Unlayered なのは上の 3 クラスと同じ理由
+ * (`h1 { font: … }` が unlayered なので Tailwind utilities からは当てられない)。
+ * 値は既存トークンを参照し生 px は書かない (1.25rem = h3 / 1.5rem = h2 の size)。
+ * line-height は `:lang(ja) h1 { line-height: 1.2 }` を維持する。
+ * data-emphasis="strong" はログイン完了の「連携完了」(Figma weight 700)。 */
+h1.auth-card-title {
+  font-size: var(--typography-size-xl);
+  font-weight: var(--typography-weight-medium);
+}
+h1.auth-card-title[data-emphasis="strong"] {
+  font-weight: var(--typography-weight-bold);
+}
+@media (min-width: 768px) {
+  h1.auth-card-title {
+    font-size: var(--typography-size-2xl);
+  }
+}
+
+/* Catalog card title — Figma【R2: 確定版】共通リストパターンの ProductCard
+ * (8061:1807 ほか) はカード見出しに h4 プリセット (16px / 500) を使う。
+ * 見出しレベルは文書構造上 h2 が正しいので、要素は h2 のまま体裁だけ h4 に
+ * 揃える。Unlayered なのは .hero-display / .page-title / .contact-title と同じ
+ * 理由 (上の `h2 { font: … }` は unlayered なので Tailwind utilities が勝てない)。
+ * `:lang()` を前置しているのは `:lang(ja) h2 { line-height: 1.3 }` (0,1,1) に
+ * 負けないようにするため。値はすべて h4 トークン経由で生 px は書かない。 */
+:lang(ja) h2[data-slot="catalog-card-title"],
+:lang(en) h2[data-slot="catalog-card-title"] {
+  font: var(--typography-style-h4);
+  letter-spacing: var(--typography-style-h4-tracking);
+}
+
+/* ページ内モーダルの見出し (Figma Modal 8172:280)。SP は h4 (16px / 500)、
+ * PC は h3 (20px / 400) と Figma でサイズが切り替わるので、単純縮小ではなく
+ * ブレークポイントで組み替える。Radix の DialogTitle は h2 を描画するため
+ * セレクタは h2。Unlayered な理由・`:lang()` 前置の理由は catalog-card-title と
+ * 同じ (globals.css の素の `h2 { font: … }` に Tailwind utilities が勝てない)。 */
+:lang(ja) h2[data-slot="modal-title"],
+:lang(en) h2[data-slot="modal-title"] {
+  font: var(--typography-style-h4);
+  letter-spacing: var(--typography-style-h4-tracking);
+}
+@media (min-width: 64rem) {
+  :lang(ja) h2[data-slot="modal-title"],
+  :lang(en) h2[data-slot="modal-title"] {
+    font: var(--typography-style-h3);
+    letter-spacing: var(--typography-style-h3-tracking);
+  }
+}
+
+/* R2 ジャーナル一覧の ArticleCard (8073:45001) は見出し行高 21 = body-sm
+ * (14px / 1.5) プリセット。体裁だけ body-sm に揃える。Unlayered な理由・
+ * `:lang()` 前置の理由は上の catalog-card-title と同じ。値は body-sm トークン
+ * 経由で生 px は書かない。
+ *
+ * 要素は h2 / h3 の両方を受ける。カードが**節見出しを持つ帯の中**に入る画面
+ * (People 詳細の「この人の記事」。旧・著者ページは C17-1 で People 詳細へ
+ *  308 統合され消えた) では節の下位なので h3、
+ * カード帯がページ直下の兄弟ブロックである画面 (elxea Journal 一覧 /
+ * ジャーナル一覧 / プレイリスト一覧 = Figma 8085:4299 で HeroFeature と Main が
+ * 同階層) では h2。どちらでも体裁は 1px も変わらない
+ * (`font:` ショートハンドが lh を body-sm トークンの 1.8 に束ねるため、
+ * `:lang(ja) h2 {1.3}` / `:lang(ja) h3 {1.3}` のどちらも上書きされて 25.2)。
+ * 出し分けは `ArticleCard` の `headingLevel` prop (既定 h2) が行う。 */
+:lang(ja) h2[data-slot="article-card-title"],
+:lang(en) h2[data-slot="article-card-title"],
+:lang(ja) h3[data-slot="article-card-title"],
+:lang(en) h3[data-slot="article-card-title"] {
+  font: var(--typography-style-body-sm);
+  letter-spacing: var(--typography-style-body-sm-tracking);
+}
+
+/* R2 セクション見出し (商品詳細 8056:1575 / 定期便LP 8071:134 ほか) は h3
+ * プリセット (20px / 400) を使う。見出しレベルは文書構造上 h2 が正しいので、
+ * 要素は h2 のまま体裁だけ h3 に揃える。Unlayered な理由・`:lang()` 前置の
+ * 理由は上の catalog-card-title と同じ。値は h3 トークン経由で生 px は書かない。 */
+:lang(ja) h2[data-slot="section-title"],
+:lang(en) h2[data-slot="section-title"],
+:lang(ja) h3[data-slot="section-title"],
+:lang(en) h3[data-slot="section-title"] {
+  font: var(--typography-style-h3);
+  letter-spacing: var(--typography-style-h3-tracking);
+}
+
+/* legal 系の条項見出し (利用規約 7849:39287 / 特商法・返品も同型・**実測 h24**)
+ * は h4 プリセット (16px / 500 / lh 1.5)。条項は節の下位だが、法的文書の
+ * 文書構造としては h2 が正しいので要素は h2 のまま体裁だけ h4 に揃える。
+ *
+ * ！`className` に `[font:var(--typography-style-h4)]` を書くだけでは効かない。
+ * 上の unlayered な `h2 { font: var(--typography-style-h2) }` (24px) が
+ * Tailwind の utilities レイヤーに勝つため、実測 31.19px (= 24 x 1.3) になる。
+ * だから同じ unlayered 面で data-slot 指定として当てる (詳細度 (0,2,1) > (0,0,1))。
+ * Unlayered な理由・`:lang()` 前置の理由は上の catalog-card-title と同じ。
+ * 値は h4 トークン経由で生 px は書かない。
+ *
+ * 申し送り: 利用規約 `app/[locale]/legal/terms/page.tsx` も同じ書き方
+ * (className だけ) で同じ 24px 化が起きている。別レーンの凍結済みページなので
+ * 本レーンでは触らず、確認事項として上げる。 */
+:lang(ja) h2[data-slot="legal-clause-title"],
+:lang(en) h2[data-slot="legal-clause-title"] {
+  font: var(--typography-style-h4);
+  letter-spacing: var(--typography-style-h4-tracking);
+}
+
+/* legal 系の**節**見出し (プライバシー S4 事業者情報 / 導出元 利用規約 7850:799・
+ * 実測 20px)。節は条 (legal-clause-title / 16px) の上位なので、見出しレベルが
+ * 条より下 (h3) になっていると「タグは下位なのに文字は大きい」逆転になる。
+ * 要素を h2 に上げ、**体裁は従来の素の `<h3>` と 1px も変えない**。
+ *
+ * ！`section-title` スロットは使えない。あれは `font:` ショートハンドで lh を
+ * h3 トークン自身の値 (実測 29 = 20 x 1.45) に戻すため、素の h3 (実測 26 =
+ * 20 x 1.3・`:lang(ja) h3 { line-height: 1.3 }` 由来) から 3px 動く。
+ * ここでは lh 1.3 を明示して素の h3 と同値に固定する。
+ * Unlayered な理由・`:lang()` 前置の理由は上の catalog-card-title と同じ。
+ * 値は h3 トークン経由で生 px は書かない (lh は既存 `:lang()` 規則と同じ 1.3)。
+ *
+ * 申し送り: 利用規約 `app/[locale]/legal/terms/page.tsx` の S4 も素の `<h3>` の
+ * ままだが、あちらは条見出しが 24px で描かれているため逆転にはなっていない
+ * (条 24 > 節 20)。別レーンの凍結済みページなので本レーンでは触らず、
+ * 条見出しの 24px 化と合わせて確認事項に上げる。 */
+:lang(ja) h2[data-slot="legal-section-title"],
+:lang(en) h2[data-slot="legal-section-title"] {
+  font: var(--typography-style-h3);
+  line-height: 1.3;
+  letter-spacing: var(--typography-style-h3-tracking);
+}
+
+/* トップ【R2: 確定版】の節見出し (Figma 8109:46599「茶葉」/ 8109:46571
+ * 「行為から、茶葉を探す」/ 8109:46594「正解を、押し付けない。」・実測 h38) は
+ * `elxea/typography/editorial/jp/h1` = 32px / Light / lh 1.2。ページ主見出し
+ * (44px display = `.page-title` / `.hero-display`) の 1 段下で、商品詳細 R2 の
+ * `section-title` (20px) より 1 段上。見出しレベルは文書構造上 h2 が正しいので
+ * 要素は h2 のまま体裁だけ h1 トークンに揃える。Unlayered な理由・`:lang()`
+ * 前置の理由は上の catalog-card-title と同じ。lh は Figma の 1.2 を明示する
+ * (`:lang(ja) h2 { line-height: 1.3 }` を上書き。詳細度 (0,2,1) > (0,1,1))。 */
+:lang(ja) h2[data-slot="top-section-title"],
+:lang(en) h2[data-slot="top-section-title"] {
+  font: var(--typography-style-h1);
+  letter-spacing: var(--typography-style-h1-tracking);
+  line-height: 1.2;
+}
+
+/* トップ【R2: 確定版】導線ブロックのタイル見出し (Figma 0:10「お茶」ほか・
+ * 実測 h36 = 24 x 1.5) は h2 プリセット (24px / 400)。タイルは節の下位なので
+ * 要素は h3 のまま体裁だけ h2 に揃える。Unlayered な理由・`:lang()` 前置の
+ * 理由は上の catalog-card-title と同じ。値は h2 トークン経由で生 px は書かない。 */
+:lang(ja) h3[data-slot="service-guide-tile-title"],
+:lang(en) h3[data-slot="service-guide-tile-title"] {
+  font: var(--typography-style-h2);
+  letter-spacing: var(--typography-style-h2-tracking);
+}
+
+/* elxea Journal 記事詳細【R2: 確定版】の本文内 節見出しは PC と SP でプリセットが
+ * 1 段変わる。Figma を `get_design_context` で再取得して確定した値 (2026-08-09):
+ *   PC 8110:46910 = `elxea/typography/editorial/jp/h1`
+ *                   32px / Light(300) / lh 1.2 (= 38.4) / tracking .02em (= 0.64px)
+ *   SP 8110:47060 = `elxea/typography/editorial/jp/h2`
+ *                   24px / Regular(400) / lh 1.3 (= 31.2) / tracking 0
+ * SP の text node 高 31 (frame 8110:47059 は 56 + 31 + 20 = 107) が 24 x 1.3 と
+ * 一致することが裏取り。以前はここで PC の h1 プリセットを無条件に当てていたため
+ * SP も 32 / 38.4 になっていた (C15-1 で是正。QA バッチ2 の実 Fail #1)。
+ *
+ * SP は base の `h2 { font: var(--typography-style-h2) }` (24 / 400) +
+ * `:lang(ja) h2 { line-height: 1.3 }` がそのまま Figma 値になるので、ここでは
+ * 何も当てない。PC 側だけ h1 プリセットに上書きする。
+ *
+ * 記事本文の H2 は Sanity の blockContent 由来で data-slot を持てないため、
+ * 本文枠 (`[data-slot="article-prose"]`) を前置してスコープする。
+ * Unlayered な理由は上の catalog-card-title と同じ (`h2 { font: … }` が
+ * Tailwind utilities に勝つため utility 側からは当てられない)。
+ * 詳細度 (0,2,1) は `:lang(ja) h2 { line-height: 1.3 }` (0,1,1) に勝つ。
+ * lh は h1 トークンの cjk 値 (1.4) ではなく Figma の 1.2 を明示する
+ * (`:lang(ja) h1 { line-height: 1.2 }` と同じ値・同じ出どころ)。
+ * 切替点 64rem は Tailwind の `lg:` と同じで、記事詳細ページ側の `lg:` 指定
+ * (`articlePagePadding` / `ArticleImageBleed` ほか) と揃う。 */
+@media (min-width: 64rem) {
+  :lang(ja) [data-slot="article-prose"] h2,
+  :lang(en) [data-slot="article-prose"] h2 {
+    font: var(--typography-style-h1);
+    letter-spacing: var(--typography-style-h1-tracking);
+    line-height: 1.2;
+  }
+}
+
+/* R2 ジャーナル:カテゴリ の棚見出し (8083:4087 / 8083:4230) は 16px / 行高 24 =
+ * h4 プリセット。棚は 1 カテゴリ = 1 セクションなので要素は文書構造上 h2 のまま
+ * 体裁だけ h4 に揃える。Unlayered な理由・`:lang()` 前置の理由は上の
+ * catalog-card-title と同じ。値は h4 トークン経由で生 px は書かない。 */
+:lang(ja) h2[data-slot="shelf-title"],
+:lang(en) h2[data-slot="shelf-title"] {
+  font: var(--typography-style-h4);
+  letter-spacing: var(--typography-style-h4-tracking);
+}
+
+/* R2 カート 確定版の注文サマリー見出し (Figma 6684:164 / 6686:14229) は
+ * 14px / 500 / lh 1.5 = h5 プリセット。パネル 1 枚 = 1 セクションなので要素は
+ * 文書構造上 h2 のまま体裁だけ h5 に揃える。Unlayered な理由・`:lang()` 前置の
+ * 理由は上の catalog-card-title と同じ。値は h5 トークン経由で生 px は書かない。 */
+:lang(ja) h2[data-slot="summary-title"],
+:lang(en) h2[data-slot="summary-title"] {
+  font: var(--typography-style-h5);
+  letter-spacing: var(--typography-style-h5-tracking);
+}
+
+/* 記事内プレイヤーのシーク帯 (Figma AudioPlayer 7047:6363)。
+ * 高さ 6 / 全丸め / 溝 mode/muted / 進捗 mode/foreground。
+ * ネイティブの range を土台にするのは、キーボードと支援技術から操作できる
+ * 状態を保つため (見た目だけ寄せて操作できない部品は作らない)。
+ * 進捗の塗りは背景のグラデーションで作る — つまみ前後を別々に塗る CSS は
+ * ブラウザごとに当たる疑似要素が違い、片方だけ塗れない事故が起きる。 */
+.audio-seek {
+  appearance: none;
+  -webkit-appearance: none;
+  height: 0.375rem;
+  border-radius: var(--shape-radius-full);
+  background:
+    linear-gradient(
+      to right,
+      var(--color-foreground) 0,
+      var(--color-foreground) var(--audio-progress, 0%),
+      var(--color-muted) var(--audio-progress, 0%),
+      var(--color-muted) 100%
+    );
+  cursor: pointer;
+}
+.audio-seek:disabled {
+  cursor: default;
+}
+/* つまみ。Figma は静止画なので描かれていないが、掴む対象が見えないと
+ * ドラッグでシークできないので置く。 */
+.audio-seek::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 0.875rem;
+  height: 0.875rem;
+  border-radius: var(--shape-radius-full);
+  background: var(--color-foreground);
+}
+.audio-seek::-moz-range-thumb {
+  width: 0.875rem;
+  height: 0.875rem;
+  border: 0;
+  border-radius: var(--shape-radius-full);
+  background: var(--color-foreground);
+}
+.audio-seek:disabled::-webkit-slider-thumb {
+  background: var(--color-muted-foreground);
+}
+.audio-seek:disabled::-moz-range-thumb {
+  background: var(--color-muted-foreground);
+}
+.audio-seek:focus-visible {
+  outline: 2px solid var(--color-ring);
+  outline-offset: 2px;
+}
+
+/* 空状態の見出し (Figma EmptyState 8173:298) は h4 プリセット (16px / 500)。
+ * 文書構造としては見出しではなく本文なので要素は p のままにし、体裁だけ揃える。 */
+:lang(ja) p[data-slot="empty-state-title"],
+:lang(en) p[data-slot="empty-state-title"] {
+  font: var(--typography-style-h4);
+  letter-spacing: var(--typography-style-h4-tracking);
+}
+
+/* マイページ【R2: 確定版】の挨拶 (Figma PC 8095:741 / SP 8095:800) は
+ * `elxea/typography/editorial/jp/h1` = 32px / Light / lh 1.2 / tracking .02em。
+ * 見出しではなく本文 (挨拶) なので要素は p のままにして体裁だけ h1 に揃える。
+ * Unlayered なのは utilities では `[font:…]` (shorthand) と `leading-*` の適用順を
+ * 制御できず、lh が h1 トークンの cjk 値 (1.4) に上書きされてしまうため
+ * (実測で確認済み)。ここでは 1 つの規則の中で font の後に line-height を書けるので
+ * Figma の 1.2 が確実に効く。値は h1 トークン経由で生 px は書かない。 */
+:lang(ja) p[data-slot="account-greeting"],
+:lang(en) p[data-slot="account-greeting"] {
+  font: var(--typography-style-h1);
+  letter-spacing: var(--typography-style-h1-tracking);
+  line-height: 1.2;
+}
+
+/* R2 イベント詳細の本文節見出し (Figma 6661:13491 = PC 24px / 6664:8169 = SP
+ * 20px、どちらも weight 500) は h2 / h3 プリセットのサイズに一致するが太さだけ
+ * medium。要素は文書構造上 h2 のまま体裁を当てる。Unlayered な理由・`:lang()`
+ * 前置の理由は上の catalog-card-title と同じ。`font:` ショートハンドは
+ * font-weight をリセットするので weight は必ずその後に置く。値はすべて
+ * typography トークン経由で生 px は書かない。 */
+:lang(ja) h2[data-slot="event-section-title"],
+:lang(en) h2[data-slot="event-section-title"] {
+  font: var(--typography-style-h3);
+  letter-spacing: var(--typography-style-h3-tracking);
+  font-weight: var(--typography-weight-medium);
+}
+@media (min-width: 768px) {
+  :lang(ja) h2[data-slot="event-section-title"],
+  :lang(en) h2[data-slot="event-section-title"] {
+    font: var(--typography-style-h2);
+    letter-spacing: var(--typography-style-h2-tracking);
+    font-weight: var(--typography-weight-medium);
+  }
+}
+
+/* 定期便管理【R2: 確定版】(Figma 6717:14526) の節見出し・パネル見出しは、SP と PC で
+ * プリセットが 1 段変わる (実測: 節見出し SP h24 = 16/1.5 → PC h27 = 20/1.35、
+ * パネル見出し SP h21 = 14/1.5 → PC h24 = 16/1.5)。要素は文書構造上 h2 / h3 が
+ * 正しいので、要素はそのままにして体裁だけ切り替える。Unlayered な理由・`:lang()`
+ * 前置の理由は上の catalog-card-title と同じ (`h2 { font: … }` / `h3 { font: … }` が
+ * unlayered なので Tailwind utilities では当てられず、`:lang(ja) h2 { line-height }`
+ * (0,1,1) にも勝つ必要がある)。値はすべて h3 / h4 / h5 トークン経由で生 px は書かない。
+ * 切替点 64rem は Tailwind の `lg:` と同じで、部品側の `lg:` 指定と揃う。 */
+:lang(ja) h2[data-slot="subscription-section-title"],
+:lang(en) h2[data-slot="subscription-section-title"] {
+  font: var(--typography-style-h4);
+  letter-spacing: var(--typography-style-h4-tracking);
+}
+:lang(ja) h3[data-slot="subscription-panel-title"],
+:lang(en) h3[data-slot="subscription-panel-title"] {
+  font: var(--typography-style-h5);
+  letter-spacing: var(--typography-style-h5-tracking);
+}
+@media (min-width: 64rem) {
+  :lang(ja) h2[data-slot="subscription-section-title"],
+  :lang(en) h2[data-slot="subscription-section-title"] {
+    font: var(--typography-style-h3);
+    letter-spacing: var(--typography-style-h3-tracking);
+  }
+  :lang(ja) h3[data-slot="subscription-panel-title"],
+  :lang(en) h3[data-slot="subscription-panel-title"] {
+    font: var(--typography-style-h4);
+    letter-spacing: var(--typography-style-h4-tracking);
+  }
+}
+
+/* スペック帯の emphasis variant (`SpecBand emphasis`) — お茶メニュー詳細の
+ * 淹れ方ガイド (変A 6654:13259 / SP 6656:7969) は「値を大きく見せる」造作で、
+ * 値の実測が 16〜18 相当 (text 高 24)。DS に 18px の style プリセットは無いので
+ * size トークン `--typography-size-lg` (1.125rem = 18) を参照する。
+ * Unlayered なのは値の要素が `bodySmClass`
+ * (= `[font:var(--typography-style-body-sm)]` utility) を持ち、`font:`
+ * ショートハンドが font-size を含むため utilities では上書き順を制御できないから
+ * (`.page-title` / `auth-card-title` と同じ理由)。詳細度 (0,3,3) は utilities
+ * (0,1,0) に十分勝つ。生 px は書かない。既定 (emphasis なし) には当たらないので
+ * 商品詳細・定期便 LP のスペック帯は不変。 */
+dl[data-slot="spec-band"][data-emphasis="true"] > [data-slot="spec-item"] > dd {
+  font-size: var(--typography-size-lg);
+}
+
+/* ページ内モーダルの見出し (Figma Modal 8172:280)。SP は h4 (16px / 500)、
+ * PC は h3 (20px / 400) と Figma でサイズが切り替わるので、単純縮小ではなく
+ * ブレークポイントで組み替える。Radix の DialogTitle は h2 を描画するため
+ * セレクタは h2。Unlayered な理由・`:lang()` 前置の理由は catalog-card-title と
+ * 同じ (globals.css の素の `h2 { font: … }` に Tailwind utilities が勝てない)。 */
+:lang(ja) h2[data-slot="modal-title"],
+:lang(en) h2[data-slot="modal-title"] {
+  font: var(--typography-style-h4);
+  letter-spacing: var(--typography-style-h4-tracking);
+}
+@media (min-width: 64rem) {
+  :lang(ja) h2[data-slot="modal-title"],
+  :lang(en) h2[data-slot="modal-title"] {
+    font: var(--typography-style-h3);
+    letter-spacing: var(--typography-style-h3-tracking);
+  }
+}
+
 :root {
   /* Third-party brand colors */
   --brand-line: #06C755;
-  
+
   /* Overlay colors for hero sections with background images */
   --overlay: oklch(0 0 0 / 0.15);
   --overlay-foreground: oklch(0.98 0.01 60);
   --overlay-foreground-muted: oklch(0.75 0.01 60);
   --overlay-border: oklch(1 0.02 60 / 0.4);
-  
+
+  /* ページ内モーダルのスクリム — Figma `mode/overlay-scrim` (Modal Module
+   * 8172:280 の注記「スクリムを全面に敷き、クリックで閉じる」)。
+   * 上の `--overlay` (ヒーロー写真に敷く黒 15%) とは用途が別なので混ぜない。
+   * 値は brand graphite の 62%。生の rgba を書かず既存トークンから混色するので、
+   * graphite が動けばスクリムも一緒に動く (単一正本)。 */
+  --overlay-scrim: color-mix(in oklab, var(--color-brand-graphite) 62%, transparent);
+
+  /* 押下 (active) 面 — Figma `color/state/graphite-pressed` (#35363a
+   * = oklch(0.333 0.007 274.8))。Pill solid の active だけに使う。
+   * graphite (#464748) より 1 段暗く、hover の charcoal (#5d5e61) と合わせて
+   * 「明るく浮く → 暗く沈む」の押し込み方向を作る。ブランドランプ外の状態専用色
+   * なので brand-* には入れない。 */
+  --graphite-pressed: oklch(0.333 0.007 274.8);
+
+  /* 名前付き z レイヤー。**ここが唯一の z の SoT** (2026-08-17 1系統へ統合)。
+   *
+   * Style Dictionary の source は base.json と overrides/cjk.json だけなので、
+   * このグループは dist/tokens.css には出ず **この宣言だけが実効値**になる。
+   * 値を変えるならここを直す。
+   *
+   * ## 併存していた 3 系統をここに畳んだ (2026-08-17)
+   *
+   * 1. この `--z-*` (名前付きレイヤー)                        → **残す = SoT**
+   * 2. `tokens/base.json` の `elevation.level` / `elevation.zIndex`
+   *    (どちらも 0/10/20/30/40/50 の raw scale。値が完全に同一の重複)
+   *                                                           → **削除**
+   *    参照は実測ゼロ (`--elevation-level-*` / `--elevation-zIndex-*` を
+   *    app/components/lib/hooks/stories/scripts/e2e 全域で grep して 0 件。
+   *    dist/tokens.css に出るだけで誰も読んでいなかった)。設計意図の未決は
+   *    design-kit の conflict `c-06` に記録されており、その解決がこれ。
+   * 3. `components/ui/**` の生 `z-50` (shadcn 上流のまま 13 ファイル 21 箇所)
+   *                                → **13 ファイルは編集せず、CSS 側で
+   *                                  `z-50` ユーティリティ自体をこの表へ接続**
+   *                                  (ファイル末尾の `@utility z-50` 参照)。
+   *                                  fork しないので `shadcn add` の更新経路は
+   *                                  そのまま残る。
+   * (旧 SoT と書かれていた `tokens/elxea-custom.json` は参照ゼロの死にファイル
+   *  だったため 2026-08-14 に削除。旧値は git 履歴 c54335a を参照)
+   *
+   * ## 段は 4 つ。どの面がどこに載るか
+   *
+   *   1020 --z-sticky   画面端に貼り付く常設面
+   *                     … ヘッダー (`components/layout/header.tsx`)
+   *                     … 音声バー (`components/audio/audio-dock.tsx`)
+   *                     … Cookie 同意 (`components/layout/cookie-consent.tsx`)
+   *                     … イベント申込バー (`components/events/event-register-button.tsx`)
+   *   1030 --z-chat     常設 UI の最前面
+   *                     … チャット (ランチャ / 入力バー / 全画面)
+   *   1040 --z-overlay  スクリム
+   *   1050 --z-modal    モーダル面・浮遊面
+   *                     … 音声プレイヤーの全画面展開
+   *                     … shadcn の Dialog / Sheet / Popover / Dropdown 等
+   *                       (生 `z-50` からの接続先)
+   *
+   * ### 同じ段に載る面は「z では解けない」ので幾何で分ける (2026-08-18 是正)
+   *
+   * **同じ段の面は重ならない前提で置いてある。この前提はコードが守るのではなく
+   * `bottom` の式が守る。** 2026-08-18 の QA で、この段の説明を「4 つは互いに
+   * 重ならない」と書いたまま実際には 2 組が重なっていたことが実測された:
+   *
+   *   - チャットランチャ (1030) × Cookie 同意 (1020) … 2304px^2
+   *     → 同意バーの「詳しく見る」が SP で押せない
+   *   - Cookie 同意 (1020) × イベント申込バー (1020) … 25350px^2
+   *     → 両者が同じ `bottom: var(--audio-bar-h)` に居た。DOM 順で前に出る
+   *       同意バーが申込ボタンを覆う (CMS のイベントが 0 件で潜在化していた)
+   *
+   * **z の前後では解けない**。ランチャを前に出せば同意ボタンが埋まり、同意バーを
+   * 前に出せばランチャが埋まる。勝てる並びが存在しない。したがって下端の面は
+   * **重ねない**: それぞれが「自分より下の面の高さの和」を `bottom` に積む。
+   *
+   *   1. 音声バー         `--audio-bar-h`
+   *   2. Cookie 同意       + `--consent-bar-h`
+   *   3. イベント申込バー   + `--event-bar-h`
+   *   4. チャットランチャ   (一番上・何も公開しない)
+   *
+   * 高さの公開は `hooks/use-bottom-stack-slot.ts` が正本 (積み順の表もそこ)。
+   * z はここでは順位を決めておらず、**出入りのアニメーション中に一瞬重なった
+   * ときの保険**でしかない。新しい下端固定 UI を足すときは、z を足すのではなく
+   * この積み木に段を 1 つ足す。
+   *
+   * ヘッダー (上端) だけは下端の 3 つと交わらないので、同じ 1020 に同居させて
+   * 問題ない。
+   *
+   * チャットが音声バーより前に出る (Setaka 裁定 2026-08-17「チャット UI の
+   * レイヤーがオーディオプレイヤーより上であるべき」)。
+   *
+   * ### 生スケールを下端固定 UI に直接書かない
+   *
+   * Tailwind の生スケール (`z-40` / `z-50`) を素で混ぜると 1020 > 50 で常に
+   * 名前付き側が勝ち、意図と逆の重なりになる (実際にそれが起きて、チャットの
+   * 入力欄が音声バーに覆われ押せなくなった)。新しい固定 UI の z は
+   * `z-(--z-sticky)` のようにこの表から採る。
+   *
+   * ### 下端で「積む」のは広い画面だけ (Setaka 裁定 2026-08-17 その2)
+   *
+   * 下端固定 UI が `--audio-bar-h` の分だけ自分の bottom を上げて **縦に積む**
+   * のは、PC と、下端に細く居るチャットバーまで。画面が広いので 2 つ出ていても
+   * 互いの邪魔にならない。
+   *
+   * モバイルの**全画面チャットは積まない**。全画面を占める面の下端に別の操作面を
+   * 覗かせると、限られた操作スペースに主役が 2 つ並んでノイズになり操作の邪魔に
+   * なる (Setaka「チャット操作時はチャットに集中すればいい。別に音声バーが上に
+   * 下に隠れてもいい」)。全画面チャットが開いている間は音声バーを画面外へ
+   * **退避** させる (型は `motion-retreat` / **再生は止めない**)。音を止める手段は
+   * チャットヘッダーの一時停止ボタンが引き継ぐので WCAG 2.2.2 は保たれる。
+   *
+   * z はどちらの経路でも「積む・退くが崩れた一瞬 (出入りのアニメーション中など)」
+   * の保険として要る。生スケールには戻さない。
+   *
+   * 音声の全画面展開だけは --z-modal でチャットの上に出る。モーダルは自分で
+   * 閉じられる面なので、覆われたままにはならない。 */
+  --z-sticky: 1020;
+  --z-chat: 1030;
+  --z-overlay: 1040;
+  --z-modal: 1050;
+
+  /* ページ内モーダルの影 — Figma Modal 8172:280 実測
+   * `0px 12px 40px 0px rgba(69,71,71,0.18)`。#454747 は graphite (#464748) の
+   * 実質同値なので、色はトークンから混色して作る (生 rgba を残さない)。
+   * dist/tokens.css の elevation.shadow.* は汎用 5 段で、モーダル専用のこの
+   * 深さを持たないため独立させる。 */
+  --elevation-shadow-modal: 0 12px 40px 0 color-mix(in oklab, var(--color-brand-graphite) 18%, transparent);
+
   --sidebar: hsl(0 0% 98%);
   --sidebar-foreground: hsl(240 5.3% 26.1%);
   --sidebar-primary: hsl(240 5.9% 10%);
@@ -150,6 +695,8 @@ h1.contact-title {
 @theme inline {
   --color-brand-line: var(--brand-line);
   --color-overlay: var(--overlay);
+  --color-overlay-scrim: var(--overlay-scrim);
+  --color-graphite-pressed: var(--graphite-pressed);
   --color-overlay-foreground: var(--overlay-foreground);
   --color-overlay-foreground-muted: var(--overlay-foreground-muted);
   --color-overlay-border: var(--overlay-border);
@@ -169,16 +716,547 @@ h1.contact-title {
   to { transform: rotate(360deg); }
 }
 
+/* ───────────────────────────────────────────────────────────────────────────
+ * モーション — 配線 (層2) と動きの型 (層3)
+ *
+ * 値の正本 (層1) は `tokens/base.json` の `motion` で、Style Dictionary が
+ * `dist/tokens.css` に `--motion-*` として出す。ここは **値を持たない**:
+ * トークンを Tailwind の名前空間へ橋渡しする層と、型の定義だけを置く。
+ * 設計: [roji] モーションシステム Spec
+ *   https://www.notion.so/3be70c9d064c81ee82fac2f3b09f4a5f
+ * 見本: /dev/motion (実装確認用のプレビュー面・本番からはリンクしない)
+ *
+ * 採用は3段 (fast 150 / normal 300 / slow 500) と2カーブ (enter=ease-out /
+ * exit=ease-in)。「退出は登場の1段下」の規則は時間の値ではなく
+ * `--motion-exit-duration` の既定 (= fast) で表す。
+ *
+ * 確定事項 (Setaka 2026-08-16): 速さの目盛は 150/300/500 / 実際に使う標準は
+ * S = 150ms / 拡大ズームは不採用 / 実装は @theme の一括上書き。跳ね返り
+ * (spring) と拡大縮小は使わない。
+ * ─────────────────────────────────────────────────────────────────────────── */
+:root {
+  /* 実行時の速さ。標準は S = 150ms (Setaka 確定 2026-08-16。見本ページで
+   * 3段を実際に見比べた上での選択)。開閉・出入り・シート展開まで例外なく
+   * この1段に寄せている。
+   *
+   * 登場も退出も同じ 150ms。Spec B-1 の「退出は登場の1段下」を外したわけでは
+   * なく、S の下の段 (fastest 50ms) が凍結済みで下げようがないため。速さを
+   * 上げた型を個別に作るときは、その型の中で1段下の退出を指定する。
+   *
+   * この2つを差し替えるだけで、型を書き換えずに速さを切り替えられる
+   * (/dev/motion の速さトグルはこれを上書きしている)。 */
+  --motion-enter-duration: var(--motion-duration-fast);
+  --motion-exit-duration: var(--motion-duration-fast);
+
+  /* 移動距離。Spec B-3「距離の原則」= 移動は 8px 以内・退出はその半分。
+   * SP は 6px。spacing スケールに 6px の刻みが無いので、ここだけ実値で持つ
+   * (md 以上の 8px と退出の 4px は spacing トークンから引く)。 */
+  --motion-rise-distance: 0.375rem;
+  --motion-recede-distance: var(--spacing-1);
+
+  /* `sheet` は画面外からの移動なので距離は割合。既定は右端から。
+   * 下端から出す面 (モバイルメニュー等) は x=0% / y=100% に差し替える。 */
+  --motion-sheet-x: 100%;
+  --motion-sheet-y: 0%;
+
+  /* D-2 の比較専用。shadcn 既定の `zoom-in-95` 相当の倍率。案A (拡大なし) が
+   * 採用されたので本番の部品では使わず、/dev/motion の比較欄にだけ残す。 */
+  --motion-zoom-from: 0.95;
+
+  /* 移動量と拡大量にかかる係数。1 = そのまま / 0 = 動かさない。
+   * 「動きを減らす」設定はこの1つを 0 にするだけで全ての型に効く
+   * (型を増やしてもここを直す必要がない)。 */
+  --motion-travel: 1;
+}
+
+@media (min-width: 48rem) {
+  :root {
+    --motion-rise-distance: var(--spacing-2);
+  }
+}
+
+@theme {
+  /* 層2 / 配線 — Tailwind の既定そのものをトークンに差し替える。
+   * これが最も効率が高い: `transition-colors` とだけ書いてある約70ファイルが
+   * 一切の編集なしでトークン値に乗り換わる。既定カーブを対称の
+   * `ease-in-out` から `ease-out` (減速) に変えるのは、roji では「入りは減速」
+   * を全ての既定にするため。 */
+  --default-transition-duration: var(--motion-duration-fast);
+  --default-transition-timing-function: var(--motion-easing-ease-out);
+
+  /* 名前付きユーティリティも生やす。
+   * `duration-fast|normal|slow` と `ease-enter|ease-exit` が使えるようになる。 */
+  --transition-duration-fast: var(--motion-duration-fast);
+  --transition-duration-normal: var(--motion-duration-normal);
+  --transition-duration-slow: var(--motion-duration-slow);
+  --ease-enter: var(--motion-easing-ease-out);
+  --ease-exit: var(--motion-easing-ease-in);
+
+  /* 層3 / 型 — Spec B-3 の5種。登場と退出で別ユーティリティにするのは、
+   * 「退出は登場より速く・逆カーブで」を呼び出し側が書き忘れられないため。 */
+  --animate-fade: fade var(--motion-enter-duration) var(--motion-easing-ease-out) both;
+  --animate-fade-out: fade-out var(--motion-exit-duration) var(--motion-easing-ease-in) both;
+  --animate-rise: rise var(--motion-enter-duration) var(--motion-easing-ease-out) both;
+  --animate-recede: recede var(--motion-exit-duration) var(--motion-easing-ease-in) both;
+  --animate-expand: expand var(--motion-enter-duration) var(--motion-easing-ease-out) both;
+  --animate-collapse: collapse var(--motion-exit-duration) var(--motion-easing-ease-in) both;
+  --animate-sheet-in: sheet-in var(--motion-enter-duration) var(--motion-easing-ease-out) both;
+  --animate-sheet-out: sheet-out var(--motion-exit-duration) var(--motion-easing-ease-in) both;
+
+  /* 比較用 (D-2)。採用案が決まるまでの暫定で、本番の部品では使わない。 */
+  --animate-zoom: zoom var(--motion-enter-duration) var(--motion-easing-ease-out) both;
+}
+
+@keyframes fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(calc(var(--motion-rise-distance) * var(--motion-travel)));
+  }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes recede {
+  from { opacity: 1; transform: translateY(0); }
+  to {
+    opacity: 0;
+    transform: translateY(calc(var(--motion-recede-distance) * var(--motion-travel)));
+  }
+}
+
+/* `expand` / `collapse` だけは transform ではなく grid-template-rows を動かす。
+ * CLAUDE.md「transform/opacity のみ」の唯一の例外で、Spec B-4 原則5 のとおり
+ * 対象を短いテキストの開閉に限定する。使う側は
+ *   <div class="grid animate-expand"><div class="overflow-hidden">…</div></div>
+ * の2層で書く (内側の overflow-hidden が無いと中身がはみ出す)。 */
+@keyframes expand {
+  from { grid-template-rows: 0fr; opacity: 0; }
+  to { grid-template-rows: 1fr; opacity: 1; }
+}
+
+@keyframes collapse {
+  from { grid-template-rows: 1fr; opacity: 1; }
+  to { grid-template-rows: 0fr; opacity: 0; }
+}
+
+@keyframes sheet-in {
+  from {
+    transform: translate(
+      calc(var(--motion-sheet-x) * var(--motion-travel)),
+      calc(var(--motion-sheet-y) * var(--motion-travel))
+    );
+  }
+  to { transform: translate(0, 0); }
+}
+
+@keyframes sheet-out {
+  from { transform: translate(0, 0); }
+  to {
+    transform: translate(
+      calc(var(--motion-sheet-x) * var(--motion-travel)),
+      calc(var(--motion-sheet-y) * var(--motion-travel))
+    );
+  }
+}
+
+@keyframes zoom {
+  from {
+    opacity: 0;
+    transform: scale(calc(1 - (1 - var(--motion-zoom-from)) * var(--motion-travel)));
+  }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* `sheet` の向き。使う側は `animate-sheet-in motion-from-bottom` のように
+ * 型と向きを2つ並べて書く (向きだけ差し替えられるようにするため)。 */
+@utility motion-from-bottom {
+  --motion-sheet-x: 0%;
+  --motion-sheet-y: 100%;
+}
+
+/* 型 `retreat` — 出したままの面を、**中身を生かしたまま**画面外へ退かせる。
+ *
+ * `sheet` (登場・退出) との違いは「戻ってくる前提で、退いた先に居続ける」こと。
+ * 音声バーは全画面チャットが開いている間だけ画面外へ退き、その間も音は鳴り続け
+ * 再生位置も進む (Setaka 裁定 2026-08-17: 全画面チャット中は音声バーを隠す)。
+ * 消えるのではないので unmount もアニメーションの再生も伴わない。
+ *
+ * そのため CSS animation ではなく **transition** で書く: animation は「1 回
+ * 流して終わる」ものなので、行き先で止まったまま何度も往復する状態表現には
+ * 向かない (`animate-sheet-out` を当て続けても、戻すときに再生し直すことになり
+ * 途中で切り替わったときに位置が飛ぶ)。
+ *
+ * 退く向きは `sheet` と同じ向きユーティリティから採る。使う側は
+ *   <div class="motion-from-bottom motion-retreat" data-retreated={…}>
+ * のように **向き + 型 + 状態** の 3 つで書く。下から出てきた面は下へ退く。
+ *
+ * 動かすのは `translate` プロパティで、`transform` を使う `sheet` 系の keyframes
+ * とは別プロパティなので **重ねて併用できる** (登場は animation・退避は
+ * transition が担当し、互いを打ち消さない)。
+ *
+ * 「動きを減らす」設定 (`--motion-travel: 0`) では移動距離が 0 になるので、
+ * 退避は `opacity` だけで表れる。**見えなくなる結果は同じ** — 位置で隠す型が
+ * 移動を失っても隠れなくならないよう、opacity を必ず併せている。
+ *
+ * 退避中は操作対象から外すため、使う側で `inert` を併せて付けること
+ * (透明なだけの面が指やキーボードのフォーカスを拾わないようにする)。 */
+@utility motion-retreat {
+  transition-property: translate, opacity;
+  transition-duration: var(--motion-enter-duration);
+  transition-timing-function: var(--motion-easing-ease-out);
+
+  &[data-retreated="true"] {
+    translate: calc(var(--motion-sheet-x) * var(--motion-travel))
+      calc(var(--motion-sheet-y) * var(--motion-travel));
+    opacity: 0;
+    /* 退くときは exit のカーブと時間 (戻るときは上の enter 側が効く)。 */
+    transition-duration: var(--motion-exit-duration);
+    transition-timing-function: var(--motion-easing-ease-in);
+  }
+}
+
+@utility motion-from-top {
+  --motion-sheet-x: 0%;
+  --motion-sheet-y: -100%;
+}
+
+@utility motion-from-left {
+  --motion-sheet-x: -100%;
+  --motion-sheet-y: 0%;
+}
+
+@utility motion-from-right {
+  --motion-sheet-x: 100%;
+  --motion-sheet-y: 0%;
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+ * shadcn/ui 由来の開閉クラスの実体
+ *
+ * `animate-in` / `fade-in-0` / `slide-in-from-top-2` … は shadcn の部品が
+ * 17ファイル・184箇所で使っているが、提供元パッケージ (tw-animate-css) が
+ * 入っていないため CSS が1行も生成されておらず、全部が無効だった
+ * (クラスは DOM に付くのに何も起きない)。ここでその実体を **自前で** 与える。
+ *
+ * 外部パッケージを足さないのは、パッケージが roji と無関係な既定値
+ * (跳ね返り・拡大) を持ち込むため。ここに書けば時間もカーブも距離も
+ * `--motion-*` トークンからしか来ない。17ファイルは無編集のまま復活する。
+ *
+ * 意図的に用意しないもの:
+ *   - `zoom-in-*` / `zoom-out-*` … 拡大縮小は不採用 (Setaka 確定 2026-08-16)。
+ *     ユーティリティを定義しないので、これらのクラスは何も生成せず無効のまま
+ *     になり、ダイアログ類は fade (+ slide) だけで開く。
+ *   - `spin` / `bounce` 等の跳ねる動き … roji のトーンと衝突する。
+ *
+ * 時間は `--tw-duration` (= `duration-*` ユーティリティ) を **見ない**。
+ * 部品側に散らばった 500 / 300 の直書きを効かせるとトーンが再びばらけるので、
+ * 登場は M・退出は S にトークンで固定する。
+ * ─────────────────────────────────────────────────────────────────────────── */
+@utility animate-in {
+  animation: motion-enter var(--motion-enter-duration) var(--motion-easing-ease-out) both;
+}
+
+@utility animate-out {
+  animation: motion-exit var(--motion-exit-duration) var(--motion-easing-ease-in) both;
+}
+
+@utility fade-in-0 {
+  --motion-in-opacity: 0;
+}
+
+@utility fade-out-0 {
+  --motion-out-opacity: 0;
+}
+
+/* 数値付きの slide は Tailwind の spacing 目盛と同じ読み方 (2 = 0.5rem = 8px)。
+ * 数値なしは画面外から = 100%。Spec B-3「移動は8px以内」に収まるのは `-2` まで
+ * で、それ以外の大きい値を使っている箇所は要調整として洗い出す。 */
+@utility slide-in-from-top-* {
+  --motion-in-y: calc(--value(integer) * var(--spacing) * -1);
+}
+
+@utility slide-in-from-bottom-* {
+  --motion-in-y: calc(--value(integer) * var(--spacing));
+}
+
+@utility slide-in-from-left-* {
+  --motion-in-x: calc(--value(integer) * var(--spacing) * -1);
+}
+
+@utility slide-in-from-right-* {
+  --motion-in-x: calc(--value(integer) * var(--spacing));
+}
+
+@utility slide-out-to-top-* {
+  --motion-out-y: calc(--value(integer) * var(--spacing) * -1);
+}
+
+@utility slide-out-to-bottom-* {
+  --motion-out-y: calc(--value(integer) * var(--spacing));
+}
+
+@utility slide-out-to-left-* {
+  --motion-out-x: calc(--value(integer) * var(--spacing) * -1);
+}
+
+@utility slide-out-to-right-* {
+  --motion-out-x: calc(--value(integer) * var(--spacing));
+}
+
+@utility slide-in-from-top {
+  --motion-in-y: -100%;
+}
+
+@utility slide-in-from-bottom {
+  --motion-in-y: 100%;
+}
+
+/* 横スクロールする列 (サムネイル列・チップ列など) の共通指定。
+ *
+ * ブラウザ標準のスクロールバーを出さない。elxea の横スクロール列は
+ * 「掴んで流す」帯であって、スクロール位置を数える面ではない。overlay
+ * scrollbar は指を離すまで帯の上に黒い棒として重なり、写真やチップの下端を
+ * 汚す (Setaka 裁定 2026-08-17「いらない。見苦しいので、こういう実装の仕方を
+ * しないでください」)。
+ *
+ * **消すのは見た目だけ**。`overflow-x` は `auto` のまま残すので:
+ * - 指のスワイプ / トラックパッドの横フリックはそのまま効く
+ * - 中の要素は tab で辿れ、フォーカスが移ると当該要素まで自動でスクロールする
+ * - `hidden` にはしない (それをやるとキーボードでも到達できなくなる)
+ *
+ * 位置を示す必要がある列は、ブラウザ任せにせず自前のインジケータを置く
+ * (`components/catalog/catalog-toolbar.tsx` の `catalog-chips-scrollbar` —
+ *  幅が可視割合・位置がスクロール量)。二重に出さないため、そこでもこの
+ * utility を併用する。
+ *
+ * `@layer base` の素のクラスではなく `@utility` で定義する: v4 では前者は
+ * Lightning CSS の段階で丸ごと落ち、コンパイル後の CSS に 1 バイトも出ない
+ * (2026-08-17 実測 — DOM に class は載るのに `scrollbar-width` が `auto` の
+ * まま効かなかった)。同ファイルの他の自前 utility も全て `@utility`。
+ *
+ * 新しく横スクロール列を作るときは必ずこの class を当てる。生の
+ * `::-webkit-scrollbar` を各コンポーネントに書かない (単一正本)。 */
+@utility scrollbar-none {
+  scrollbar-width: none; /* 標準 (Firefox / Chrome 121+) */
+  &::-webkit-scrollbar {
+    display: none; /* WebKit / Blink */
+  }
+}
+
+@utility slide-in-from-left {
+  --motion-in-x: -100%;
+}
+
+@utility slide-in-from-right {
+  --motion-in-x: 100%;
+}
+
+@utility slide-out-to-top {
+  --motion-out-y: -100%;
+}
+
+@utility slide-out-to-bottom {
+  --motion-out-y: 100%;
+}
+
+@utility slide-out-to-left {
+  --motion-out-x: -100%;
+}
+
+@utility slide-out-to-right {
+  --motion-out-x: 100%;
+}
+
+/* 中央寄せは Tailwind v4 では `translate` プロパティで書かれる
+ * (`translate-x-[-50%]` → `translate: -50% …`)。ここが `transform` を使うのは
+ * その中央寄せと **合成させる** ため。同じ `translate` を動かすと、ダイアログが
+ * 開く瞬間に中央から左上へ飛ぶ。 */
+@keyframes motion-enter {
+  from {
+    opacity: var(--motion-in-opacity, 1);
+    transform: translate3d(
+      calc(var(--motion-in-x, 0px) * var(--motion-travel)),
+      calc(var(--motion-in-y, 0px) * var(--motion-travel)),
+      0
+    );
+  }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+@keyframes motion-exit {
+  from { opacity: 1; transform: translate3d(0, 0, 0); }
+  to {
+    opacity: var(--motion-out-opacity, 1);
+    transform: translate3d(
+      calc(var(--motion-out-x, 0px) * var(--motion-travel)),
+      calc(var(--motion-out-y, 0px) * var(--motion-travel)),
+      0
+    );
+  }
+}
+
+/* アコーディオンは高さが変わる動きなので `expand` と同じ扱い。高さは Radix が
+ * `--radix-accordion-content-height` に入れてくれる。 */
+@utility animate-accordion-down {
+  animation: motion-accordion-down var(--motion-enter-duration) var(--motion-easing-ease-out) both;
+}
+
+@utility animate-accordion-up {
+  animation: motion-accordion-up var(--motion-exit-duration) var(--motion-easing-ease-in) both;
+}
+
+@keyframes motion-accordion-down {
+  from { height: 0; opacity: 0; }
+  to { height: var(--radix-accordion-content-height); opacity: 1; }
+}
+
+@keyframes motion-accordion-up {
+  from { height: var(--radix-accordion-content-height); opacity: 1; }
+  to { height: 0; opacity: 0; }
+}
+
+/* Spec B-4 原則4 — 「動きを減らす」設定では移動と拡大を消し、不透明度の変化
+ * だけ残す。`animation: none` にはしない (完全に消すと出入りが読み取れず、
+ * 何が起きたのか分からなくなる)。
+ * 上の md クエリより **後** に置くこと (同じ :root の後勝ちで上書きする)。 */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-travel: 0;
+  }
+}
+
 @layer base {
-  /* Heading color — Figma headings use graphite (#464748), not the charcoal
-   * body foreground (#5d5e61). Placed in @layer base so page-level color
-   * utilities (e.g. hero `text-overlay-foreground`) still override it. */
-  h1, h2, h3, h4, h5, h6 { color: var(--color-brand-graphite); }
+  /* Border color — no `* { border-color: … }` rule here on purpose.
+   *
+   * Stock shadcn/ui ships a preflight override
+   *   @layer base { * { @apply border-border outline-ring/50; } }
+   * so that a bare `border` utility (which in Tailwind v4 sets *width only*)
+   * picks up the `border` token instead of the CSS initial value
+   * `currentColor`. This project does not carry that rule, and that is the
+   * decision — not an oversight:
+   *
+   *   - Every screen under app/** already writes the color explicitly
+   *     (`border border-border`), so a global default would make the
+   *     established house style redundant and ambiguous to read.
+   *   - A `*` selector redefines what `currentColor` means for every element
+   *     on the page, including embedded/third-party markup we do not own.
+   *   - Being explicit is machine-checkable with zero debt, which the
+   *     `elxea-tokens/no-colorless-border` ESLint rule now enforces at
+   *     error level across app/**, components/** and stories/**.
+   *
+   * So: do NOT add the shadcn reset back. If a border needs a color, name the
+   * token on the element. If it genuinely wants the text color, write
+   * `border-current` so the intent is reviewable.
+   * Background: 罫線色の総点検 (TASK ID-7561). Before that task the missing
+   * reset was silently painting 罫線 in the body text color (#464748 graphite)
+   * instead of the `border` token (#888675) wherever a color class was absent
+   * — measured on /ja/cart (Button outline) and in 52 DS call sites. */
+
+  /* Heading color — no rule here on purpose.
+   *
+   * Until 2026-08-09 this block carried
+   *   h1, h2, h3, h4, h5, h6 { color: var(--color-brand-graphite); }
+   * because the `foreground` token had drifted to charcoal (#5d5e61) while
+   * Figma's `foreground` variable is graphite (#464748), so every heading had
+   * to opt out of the inherited body color to look right. That made the R2
+   * pages override the base rule instead of relying on it.
+   *
+   * `foreground` now IS graphite (tokens/base.json, DS トークン整合タスク), so
+   * headings inherit the correct color from `<body class="… text-foreground">`
+   * (app/[locale]/layout.tsx) and the override is redundant. Do not reintroduce
+   * it: a heading that needs a different color should say so with a utility. */
+
+  /* Outer page margin — bound to layout.grid.margin tokens (Figma Foundations
+   * 規約 64 / 32 / 16). Do NOT hardcode px here: the value must stay a copy of
+   * tokens/base.json layout.grid.margin.* (which mirrors Figma).
+   * mobile 1rem (16px) → tablet 2rem (32px) → desktop 4rem (64px). */
+  :root { --page-margin: var(--layout-grid-margin-mobile); }
+  @media (min-width: 48rem) {
+    :root { --page-margin: var(--layout-grid-margin-tablet); }
+  }
+  @media (min-width: 64rem) {
+    :root { --page-margin: var(--layout-grid-margin-desktop); }
+  }
+
+  /* Page container. Single source for every full-width chrome (Header / Footer /
+   * sections) so the logo's left edge and body content's left edge resolve to
+   * the same token.
+   *
+   * The max-width adds the margin on top of the content cap so the outer margin
+   * lives OUTSIDE the content column. With a plain `max-w-7xl` the cap would
+   * swallow the padding and the content would start 144px in at 1440
+   * (measured), i.e. the 64px margin would not bind at all. With the calc the
+   * content column stays exactly container.xl (1312px) and the 64px margin
+   * binds on every viewport up to 1440px — at exactly 1440 the page fills the
+   * viewport and the outer margin is 64px on both sides (Figma SoT).
+   * box-sizing is border-box (Tailwind preflight), so max-width covers padding. */
+  .page-container {
+    width: 100%;
+    max-width: calc(var(--layout-container-xl) + var(--page-margin) * 2);
+    margin-inline: auto;
+    padding-inline: var(--page-margin);
+  }
+
+  /* Padding-only variant for elements that bring their own width constraint. */
+  .page-inset { padding-inline: var(--page-margin); }
+
+  /* SP full-bleed. Cancels the page gutter so a child of `.page-container`
+   * spans the full container width below lg, then snaps back inside the column
+   * from lg up.
+   *
+   * Why it cannot produce a horizontal scrollbar: the negative margin is
+   * exactly `--page-margin`, the same token `.page-container` uses for its
+   * padding-inline, so the element's outer width resolves to the container's
+   * own width (never wider). `.page-container` itself is `width: 100%`, so on
+   * SP that is the viewport width. Hard-coding a viewport unit (`100vw`) would
+   * overshoot by the scrollbar width on desktop and is deliberately avoided.
+   *
+   * Figma SoT: プレイリスト詳細 SP 8089:4622 places every Photo frame at x0
+   * w375 (page 375) while the text stays at x16 w343 — photos are full-bleed,
+   * copy is not. Setaka 裁定 2026-08-08. */
+  .sp-full-bleed { margin-inline: calc(var(--page-margin) * -1); }
+  @media (min-width: 64rem) {
+    .sp-full-bleed { margin-inline: 0; }
+  }
+
+  /* Narrow content column (long-form text: legal / FAQ / about 本文).
+   * Width only — vertical rhythm lives in `.section-*` / <Section>, so a block
+   * can change its padding without inventing a new width. Same calc as
+   * .page-container so the outer margin stays OUTSIDE the content column. */
+  .page-container-narrow {
+    width: 100%;
+    max-width: calc(var(--layout-container-md) + var(--page-margin) * 2);
+    margin-inline: auto;
+    padding-inline: var(--page-margin);
+  }
 
   /* Section layout utilities */
-  .section-narrow { @apply max-w-3xl mx-auto px-6 py-16; }
-  .section-wide   { @apply max-w-7xl mx-auto px-6 py-16; }
-  .section-full   { @apply w-full py-16; }
+  .section-narrow {
+    @apply py-16;
+    width: 100%;
+    max-width: calc(var(--layout-container-md) + var(--page-margin) * 2);
+    margin-inline: auto;
+    padding-inline: var(--page-margin);
+  }
+  /* Not `@apply page-container` — in Tailwind v4 `@apply` only resolves
+   * utilities, not sibling custom classes, so the properties are spelled out. */
+  .section-wide {
+    @apply py-16;
+    width: 100%;
+    max-width: calc(var(--layout-container-xl) + var(--page-margin) * 2);
+    margin-inline: auto;
+    padding-inline: var(--page-margin);
+  }
+  .section-full { @apply w-full py-16; }
 
   /* Tap feedback for all interactive elements */
   button,
@@ -206,4 +1284,63 @@ h1.contact-title {
   [data-slot="button"]:disabled {
     @apply active:scale-100 active:brightness-100;
   }
+}
+
+/* ─── roji データ表現の「図の文字」 ─────────────────────────────────────────
+ *
+ * 味の四象限 / 香りの場 / 土地を読む の 3 枚は、本文とは別の文字組みを持つ。
+ * 小さな文字を 0.2〜0.28em 空けて置く組みで、これは **UI の文字ではなく図に
+ * 添える文字**。typography トークンの字間スケールは widest = 0.125em までで、
+ * ここまで空いた値を持たない。
+ *
+ * トークン側に足さないのは、UI の字間として使われると本文の組みが壊れるため
+ * (図の外で使う想定がない)。`components/viz/**` からだけ参照する。
+ * 値の正本は viz 査定 verdicts.md (roji コピー路線候補 — 実組み込み査定)。 */
+.roji-viz-caption { letter-spacing: 0.2em; }
+.roji-viz-caption-wide { letter-spacing: 0.28em; }
+
+/* ─── shadcn 上流の生 `z-50` を名前付きレイヤーへ接続する ───────────────────
+ *
+ * `components/ui/**` の 13 ファイル・21 箇所が `z-50` を素で持っている
+ * (Dialog / Sheet / AlertDialog / Drawer / Popover / Tooltip / HoverCard /
+ *  DropdownMenu / ContextMenu / Menubar / NavigationMenu / Select / Combobox)。
+ * これは shadcn 上流の既定値そのままで、**触らないことに価値がある**:
+ * 13 ファイルを書き換えると `shadcn add` / upstream diff の更新経路が
+ * fork になり、以後ずっと手で追従することになる。
+ *
+ * かわりに `z-50` ユーティリティの中身を差し替えて、この 1 箇所だけで
+ * `--z-modal` に接続する。13 ファイルは無編集のまま名前付きレイヤーに乗る。
+ *
+ * ## なぜこれが必要か (実害)
+ *
+ * 生の 50 は音声バー (`--z-sticky` = 1020) とチャット (`--z-chat` = 1030) に
+ * 必ず負ける。つまり **モーダルを開いても下端の常設 UI がその上に描かれる**。
+ * SP でモバイルメニュー (Sheet) を開くと、音声再生中はシート下部が音声バーに
+ * 覆われて押せない。部品単体の Storybook では常設 UI が居ないので永久に出ない
+ * 種類の不具合で、実ページを見る e2e (`e2e/mobile.spec.ts` の
+ * 「Bottom-fixed occlusion」) が唯一の検出手段。
+ *
+ * ## 素の (レイヤー無しの) クラスで書く理由 — 2026-08-17 実測で 2 案を却下
+ *
+ * - `@layer utilities { .z-50 { … } }` は v4 の Lightning CSS 段階で丸ごと落ちて
+ *   コンパイル後の CSS に 1 バイトも出ない (同ファイル `scrollbar-none` の注記と
+ *   同じ現象)。
+ * - `@utility z-50 { … }` は出力されるが、Tailwind 組込みの `z-<number>` と
+ *   **同じ規則にマージされ、組込みの `z-index: 50` が後に来て勝つ**
+ *   (実測値: `.z-50 { z-index: var(--z-modal); z-index: 50; }`)。
+ *
+ * 残るのがこれ。cascade layer に属さない宣言はどの `@layer` の中身よりも強い
+ * (CSS Cascade 5 の layer order — 無所属が最優先)。Tailwind のユーティリティは
+ * 全て `@layer utilities` の中なので、詳細度が同じ (0,1,0) でも必ずこちらが
+ * 実効値になる。同ファイル末尾の `.roji-viz-caption` と同じ書き方。
+ *
+ * ## 影響範囲
+ *
+ * `z-50` は移行後 `components/ui/**` と Storybook の story だけが使う
+ * (アプリ側の 3 箇所 — ヘッダー / Cookie 同意 / イベント申込バー — は
+ *  `z-(--z-sticky)` へ移行済み)。50 のまま下に居てほしい面は 1 つも無い。
+ * 生スケールで「下に居てほしい」面 (例: `reading-progress` の `z-40`) は
+ * ここを通らないので従来どおり。 */
+.z-50 {
+  z-index: var(--z-modal);
 }

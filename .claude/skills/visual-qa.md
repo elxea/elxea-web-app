@@ -6,7 +6,7 @@
 
 | ツール | 用途 | コマンド |
 |--------|------|---------|
-| Storybook | コンポーネントの視覚確認 | `pnpm storybook` |
+| elxea Design System カタログ（内部名 design-catalog / 実体は Storybook） | コンポーネントの視覚確認 | `pnpm design-catalog` |
 | Chromatic | スクリーンショット比較・リグレッション検出 | `pnpm chromatic` |
 | Active Components | 使用中コンポーネントの一括確認 | Storybook → elxea/Active Components |
 
@@ -14,7 +14,7 @@
 
 ### 起動
 ```bash
-pnpm storybook    # http://localhost:6006
+pnpm design-catalog    # elxea Design System カタログ / http://localhost:6006
 ```
 
 ### 確認ポイント
@@ -101,6 +101,6 @@ Storybook だけでは確認できない項目:
 # GitHub Actions（検討中）
 - pnpm validate:tokens    # トークンの整合性
 - pnpm build:tokens       # CSS 生成
-- pnpm build-storybook    # Storybook ビルド
+- pnpm build:design-catalog    # elxea Design System カタログの静的ビルド
 - pnpm chromatic          # ビジュアルリグレッション
 ```

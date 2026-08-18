@@ -1,9 +1,23 @@
+import { SHOPIFY_API_VERSION } from "./api-version";
+
 const SHOPIFY_STORE_DOMAIN = process.env.SHOPIFY_STORE_DOMAIN || "";
 const SHOPIFY_STOREFRONT_ACCESS_TOKEN =
   process.env.SHOPIFY_STOREFRONT_ACCESS_TOKEN || "";
-const API_VERSION = "2025-04";
 
-const endpoint = `https://${SHOPIFY_STORE_DOMAIN}/api/${API_VERSION}/graphql.json`;
+const endpoint = `https://${SHOPIFY_STORE_DOMAIN}/api/${SHOPIFY_API_VERSION}/graphql.json`;
+
+/**
+ * True when both Storefront credentials are present.
+ *
+ * Callers use this to distinguish "this environment has no Shopify at all"
+ * (CI, a clone without secrets) from "Shopify is configured but the request
+ * failed" (outage, rate limit). Only the first case may fall back to seeded
+ * catalogue data — masking a real outage with dummy products would hide a
+ * production incident. See `lib/preview-seed-storefront.ts`.
+ */
+export function storefrontConfigured(): boolean {
+  return Boolean(SHOPIFY_STORE_DOMAIN && SHOPIFY_STOREFRONT_ACCESS_TOKEN);
+}
 
 type ShopifyResponse<T> = {
   data: T;

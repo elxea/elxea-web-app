@@ -129,6 +129,43 @@ export type BillingAttempt = {
   errorCode: string | null;
 };
 
+/**
+ * `SubscriptionBillingCycleBillingCycleStatus`。**この 2 値しかない** —
+ * "PENDING" のような中間状態は無いので、「課金が確定したか」は
+ * `BILLED` / `UNBILLED` だけで読み取れる。
+ *
+ * Ref: https://shopify.dev/docs/api/admin-graphql/latest/enums/SubscriptionBillingCycleBillingCycleStatus
+ */
+export type SubscriptionBillingCycleStatus = "BILLED" | "UNBILLED";
+
+/**
+ * 契約の 1 周期。`nextBillingDate` の導出元 (`lib/shopify/next-billing-date.ts`)。
+ *
+ * `billingAttemptExpectedDate` は「この周期の課金が行われるべき日時」。
+ * 実測 (2026-08-12 / 本番 2 契約) では **`cycleEndAt` と同値**だった。
+ * 値そのものを計算し直さず Shopify の値をそのまま採用する。
+ *
+ * Ref: https://shopify.dev/docs/api/admin-graphql/latest/objects/SubscriptionBillingCycle
+ */
+export type SubscriptionBillingCycle = {
+  cycleIndex: number;
+  status: SubscriptionBillingCycleStatus;
+  /** 顧客/運営がこの周期をスキップした。スキップ分は課金対象にしない。 */
+  skipped: boolean;
+  billingAttemptExpectedDate: string;
+  cycleStartAt: string;
+  cycleEndAt: string;
+};
+
+/**
+ * `SubscriptionBillingCyclesIndexRangeSelector`。両フィールド必須。
+ * `startIndex` は 1 以上 (0 は "Billing cycle index out of range.")。
+ */
+export type SubscriptionBillingCyclesIndexRange = {
+  startIndex: number;
+  endIndex: number;
+};
+
 // Input types for mutations
 
 export type SellingPlanGroupInput = {
@@ -171,19 +208,6 @@ export type SellingPlanInput = {
       afterCycle?: number;
     };
   }[];
-};
-
-export type SubscriptionLineInput = {
-  /** The price of the product (required). */
-  currentPrice: string;
-  /** The ID of the product variant (required). */
-  productVariantId: string;
-  /** The quantity of the product (required). */
-  quantity: number;
-  /** The selling plan ID (optional). */
-  sellingPlanId?: string;
-  /** The selling plan name (optional). */
-  sellingPlanName?: string;
 };
 
 export type SubscriptionDraftInput = {

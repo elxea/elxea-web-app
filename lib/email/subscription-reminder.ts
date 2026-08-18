@@ -1,6 +1,10 @@
 import { Resend } from "resend";
 import { getSiteUrl } from "@/lib/env";
 
+import { formatPrice } from "@/lib/format-price";
+import { placeholderValue } from "@/lib/placeholders";
+import { siteUrl } from "@/lib/site-url";
+
 let _resend: Resend | null = null;
 
 function getResend(): Resend {
@@ -15,7 +19,13 @@ function getResend(): Resend {
 }
 
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "info@elxea.com";
-const SITE_URL = getSiteUrl();
+const SITE_URL = siteUrl();
+
+/**
+ * 変更・停止・解約の受付期限。特商法ページ IV-6 と同じ基準を使う。
+ * 直書きすると表示が割れるので、正本 (lib/placeholders.ts) からのみ読む。
+ */
+const CANCEL_CUTOFF = placeholderValue("tokushoho.subscriptionCancelCutoff");
 
 type SubscriptionReminderData = {
   customerEmail: string;
@@ -30,12 +40,8 @@ type SubscriptionReminderData = {
   deliveryInterval: string;
 };
 
-function formatPrice(amount: string, currencyCode: string): string {
-  return new Intl.NumberFormat("ja-JP", {
-    style: "currency",
-    currency: currencyCode,
-  }).format(parseFloat(amount));
-}
+/* 金額整形は `lib/format-price.ts` の共通実装を使う (旧: このファイルに複製が
+   あり、`Intl` 既定の全角 `￥` が出ていた。dunning.ts と同じ是正)。 */
 
 function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString("ja-JP", {
@@ -71,7 +77,7 @@ ${data.deliveryInterval}
 定期便の内容変更・一時停止・解約は、マイページから行えます。
 ${SITE_URL}/ja/account
 
-※ 次回お届け日の変更をご希望の場合は、お届け日の3日前までにマイページよりお手続きください。
+※ 次回お届け分の変更・スキップ・停止をご希望の場合は、${CANCEL_CUTOFF}までにマイページよりお手続きください。この期限を過ぎたお手続きは、その次の回から反映されます。
 
 ---
 roji by elxea
@@ -157,7 +163,7 @@ function buildHtmlEmail(data: SubscriptionReminderData): string {
       </div>
 
       <p style="font-size: 12px; color: #888; line-height: 1.8; margin: 0;">
-        ※ 次回お届け日の変更をご希望の場合は、お届け日の3日前までにマイページよりお手続きください。
+        ※ 次回お届け分の変更・スキップ・停止をご希望の場合は、${CANCEL_CUTOFF}までにマイページよりお手続きください。この期限を過ぎたお手続きは、その次の回から反映されます。
       </p>
     </div>
 

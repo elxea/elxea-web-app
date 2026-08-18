@@ -69,7 +69,7 @@ test.describe("Product detail page", () => {
     const hasProduct = await productLink.isVisible().catch(() => false);
 
     if (!hasProduct) {
-      test.skip();
+      test.skip(true, "商品一覧に商品カードが無い — Shopify に公開商品が必要です");
       return;
     }
 
@@ -101,7 +101,7 @@ test.describe("Product detail page", () => {
     const hasProduct = await productLink.isVisible().catch(() => false);
 
     if (!hasProduct) {
-      test.skip();
+      test.skip(true, "商品一覧に商品カードが無い — Shopify に公開商品が必要です");
       return;
     }
 
@@ -122,7 +122,7 @@ test.describe("Product detail page", () => {
     const hasProduct = await productLink.isVisible().catch(() => false);
 
     if (!hasProduct) {
-      test.skip();
+      test.skip(true, "商品一覧に商品カードが無い — Shopify に公開商品が必要です");
       return;
     }
 
@@ -143,15 +143,18 @@ test.describe("Product detail page", () => {
     const hasProduct = await productLink.isVisible().catch(() => false);
 
     if (!hasProduct) {
-      test.skip();
+      test.skip(true, "商品一覧に商品カードが無い — Shopify に公開商品が必要です");
       return;
     }
 
     await productLink.click();
     await page.waitForURL(/\/ja\/products\/.+/);
 
-    // Check if variant selector buttons exist (aria-pressed attribute)
-    const variantButtons = page.locator("button[aria-pressed]");
+    // Check if variant selector buttons exist.
+    // 旧 spec は `button[aria-pressed]` を素で拾っており、商品詳細に同居する
+    // お気に入りボタン (favorite-button.tsx も aria-pressed を持つ) に当たって
+    // いた。variant-selector.tsx の data-slot でスコープする。
+    const variantButtons = page.locator('[data-slot="variant-option"]');
     const hasVariants =
       (await variantButtons.count().catch(() => 0)) > 0;
 
@@ -172,7 +175,7 @@ test.describe("Product detail page", () => {
     const hasProduct = await productLink.isVisible().catch(() => false);
 
     if (!hasProduct) {
-      test.skip();
+      test.skip(true, "商品一覧に商品カードが無い — Shopify に公開商品が必要です");
       return;
     }
 

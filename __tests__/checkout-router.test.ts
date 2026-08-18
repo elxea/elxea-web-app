@@ -1,36 +1,13 @@
 /**
  * Tests for the Worker checkout-router routing logic.
  *
- * Replicates the isShopifyPath function from
- * workers/checkout-router/src/index.ts to verify which paths
- * route to Shopify vs Vercel.
+ * Imports the REAL implementation from workers/checkout-router/src/routing.ts.
+ * Do not re-declare the routing table here: a local copy makes this suite pass
+ * even after the worker's routing changes (the defect this file used to have).
  */
 import { describe, it, expect } from "vitest";
 
-// Replicate the routing table from the worker
-const SHOPIFY_PATH_PREFIXES = [
-  "/checkouts/",
-  "/checkouts",
-  "/cart/add",
-  "/cart/update",
-  "/cart/change",
-  "/cart/clear",
-  "/cart.js",
-  "/cart.json",
-  "/services/",
-  "/.well-known/shopify/",
-  "/payments/",
-  "/wallets/",
-  // After C3 fix: /admin/ removed, /cdn/ narrowed
-  "/cdn/shopifycloud/",
-  "/cdn/s/",
-];
-
-function isShopifyPath(pathname: string): boolean {
-  return SHOPIFY_PATH_PREFIXES.some(
-    (prefix) => pathname === prefix || pathname.startsWith(prefix),
-  );
-}
+import { SHOPIFY_PATH_PREFIXES, isShopifyPath } from "@/workers/checkout-router/src/routing";
 
 describe("checkout-router: isShopifyPath", () => {
   describe("Shopify paths (should proxy to Shopify)", () => {
@@ -101,5 +78,16 @@ describe("checkout-router: isShopifyPath", () => {
     it("/cart/ without action goes to Vercel", () => {
       expect(isShopifyPath("/cart/")).toBe(false);
     });
+  });
+});
+
+describe("checkout-router: routing table integrity", () => {
+  it("exposes the prefix table used by the worker (guards against a silent empty table)", () => {
+    expect(SHOPIFY_PATH_PREFIXES.length).toBeGreaterThan(0);
+    expect(SHOPIFY_PATH_PREFIXES).toContain("/checkouts");
+    // C3 fix: /admin/ must not be in the proxy table.
+    expect(SHOPIFY_PATH_PREFIXES).not.toContain("/admin/");
+    // C4 fix: the CDN entry must stay narrowed, never a bare /cdn/.
+    expect(SHOPIFY_PATH_PREFIXES).not.toContain("/cdn/");
   });
 });

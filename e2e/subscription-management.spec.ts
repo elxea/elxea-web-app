@@ -20,6 +20,8 @@
 
 import { test, expect, type APIRequestContext, type Page } from "@playwright/test";
 
+import { SELLING_PLAN_SKIP_REASON, STOREFRONT_CONFIGURED } from "./support/preconditions";
+
 // ─── ヘルパー: Admin API が利用可能かチェック ─────────────────────────────
 
 /**
@@ -50,14 +52,21 @@ test.describe("定期便管理ページ（未ログイン時）", () => {
     await expect(page.locator("body")).not.toContainText("500");
   });
 
+  /*
+   * 未ログインの /ja/account/* は middleware.ts の accountMatch ガードで
+   * /ja/login へ 307 リダイレクトする。よって「定期便」見出しには到達せず、
+   * ログインページの h1 (「elxea にログイン」) になる。
+   * 旧アサーション (h1 に「定期便」) は誘導がページ内にあった時代のもの。
+   */
   test("未ログイン時は定期便ページでログインが要求される", async ({ page }) => {
     await page.goto("/ja/account/subscriptions");
 
-    // 「定期便」という見出しが表示されること
-    await expect(page.locator("h1")).toContainText("定期便", { timeout: 10000 });
+    // ログインページへ送られること
+    await page.waitForURL(/\/ja\/login/);
+    await expect(page.locator("h1")).toContainText("ログイン", { timeout: 10000 });
 
-    // ログインボタン or テキストが表示されること
-    await expect(page.getByText("ログイン")).toBeVisible();
+    // ログイン手段が提示されること
+    await expect(page.getByRole("link", { name: /ログイン/ }).first()).toBeVisible();
   });
 
   test("未ログイン時のログインボタンが正しい URL に向いている", async ({ page }) => {
@@ -115,9 +124,22 @@ test.describe("サブスクリプション API エンドポイント", () => {
     expect(res.status()).toBe(401);
   });
 
+  /*
+   * この 2 本は SHOPIFY_WEBHOOK_SECRET が **設定されているとき**にだけ意味を持つ。
+   * 未設定だと validateWebhookRequest() は HMAC 判定より前に 500
+   * (Internal Server Error) を返す — 設定漏れを 401 で隠さないための意図的な
+   * 順序であり、テストのために入れ替えると「エンドポイントは正常だが署名が
+   * 不正」と「そもそも設定されていない」を運用側で区別できなくなる。
+   * よって CRON_SECRET 系と同じく秘密情報ゲートの skip とする
+   * (skip は pnpm report:e2e-skips で CI サマリに出るので不可視にはならない)。
+   */
   test("Subscription Webhook API: HMAC なしの POST は 401 を返す", async ({
     request,
   }) => {
+    if (!process.env.SHOPIFY_WEBHOOK_SECRET) {
+      test.skip(true, "SHOPIFY_WEBHOOK_SECRET が設定されていません (未設定時は 500 が正)");
+      return;
+    }
     const res = await request.post("/api/subscription/webhook", {
       data: JSON.stringify({ status: "active" }),
       headers: { "Content-Type": "application/json" },
@@ -128,6 +150,10 @@ test.describe("サブスクリプション API エンドポイント", () => {
   test("Subscription Webhook API: 不正 HMAC は 401 を返す", async ({
     request,
   }) => {
+    if (!process.env.SHOPIFY_WEBHOOK_SECRET) {
+      test.skip(true, "SHOPIFY_WEBHOOK_SECRET が設定されていません (未設定時は 500 が正)");
+      return;
+    }
     const res = await request.post("/api/subscription/webhook", {
       data: JSON.stringify({ status: "active" }),
       headers: {
@@ -305,11 +331,17 @@ test.describe("サブスクリプション操作 UI（ログイン済みユー�
     // ページが正常にロードされること
     await expect(page.locator("h1")).toBeVisible({ timeout: 10000 });
 
-    // 文言が壊れていないこと（undefined や [object Object] が表示されていないこと）
-    const bodyText = await page.locator("body").textContent();
-    expect(bodyText).not.toContain("undefined");
-    expect(bodyText).not.toContain("[object Object]");
-    expect(bodyText).not.toContain("[object Promise]");
+    /* 文言が壊れていないこと（undefined や [object Object] が表示されていないこと）。
+     *
+     * `locator("body").textContent()` は **インラインの <script> の中身まで**
+     * 拾うので、dev サーバの RSC flight ペイロード (self.__next_f.push(...)) に
+     * 含まれる "undefined" で必ず落ちる — 画面に何も出ていなくても落ちる偽陽性。
+     * 見たいのは「利用者に見える文字」なので innerText を使う (script/style と
+     * 非表示要素を除いた描画テキストだけを返す)。 */
+    const visibleText = await page.locator("body").innerText();
+    expect(visibleText).not.toContain("undefined");
+    expect(visibleText).not.toContain("[object Object]");
+    expect(visibleText).not.toContain("[object Promise]");
   });
 
   test("頻度変更 UI の選択肢が正しいテキストで表示される（ログイン済み・契約あり想定）", async ({
@@ -339,6 +371,11 @@ test.describe("サブスクリプション フロー シミュレーション", 
   test("フロー 1: 定期購入商品選択 → カートへ追加 → チェックアウト URL 生成", async ({
     page,
   }) => {
+    /* SellingPlan を持つ実商品が必要。見本カタログ (PREVIEW_SEED_STOREFRONT) は
+     * sellingPlanGroups を意図的に空にしているので、資格情報が無い環境では
+     * 商品詳細を 5 枚たどって 30 秒の予算を使い切るだけになる (実測 2026-08-09)。 */
+    test.skip(!STOREFRONT_CONFIGURED, SELLING_PLAN_SKIP_REASON);
+
     // ステップ1: 商品一覧ページから定期便対応商品を探す
     await page.goto("/ja/products");
 
@@ -429,19 +466,22 @@ test.describe("サブスクリプション フロー シミュレーション", 
     await expect(page.locator("body")).not.toContainText("エラーが発生しました");
     await expect(page.locator("body")).not.toContainText("500");
 
-    // 定期便ページへの直接アクセス
+    // 定期便ページへの直接アクセス —— 未ログインなので /ja/login へ送られる
+    // (middleware.ts の accountMatch ガード)。
     await page.goto("/ja/account/subscriptions");
+    await page.waitForURL(/\/ja\/login/);
     await expect(page.locator("h1")).toBeVisible({ timeout: 10000 });
-    await expect(page.locator("h1")).toContainText("定期便");
+    await expect(page.locator("h1")).toContainText("ログイン");
   });
 
   test("フロー 3: 定期便管理ページのスキップ・一時停止ボタンの存在確認（ログイン必要）", async ({
     page,
   }) => {
-    // 未ログイン状態ではボタンが存在しない（ログインフォームが表示される）
+    // 未ログイン状態では /ja/login へ送られる (middleware.ts の accountMatch)。
     await page.goto("/ja/account/subscriptions");
 
-    await expect(page.locator("h1")).toContainText("定期便", { timeout: 10000 });
+    await page.waitForURL(/\/ja\/login/);
+    await expect(page.locator("h1")).toContainText("ログイン", { timeout: 10000 });
 
     // 未ログイン時はアクションボタンが存在しないこと
     const skipButton = await page.getByText("次回スキップ").isVisible().catch(() => false);

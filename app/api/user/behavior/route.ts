@@ -15,7 +15,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAuth } from "@/lib/firebase/auth-guard";
+import { resolveIdentity } from "@/lib/firebase/auth-guard";
 import { addBehaviorLog } from "@/lib/firebase/server-actions";
 import { parseJsonBody } from "@/lib/validation/zod-helpers";
 import { enforceRateLimit, limiters } from "@/lib/ratelimit";
@@ -27,6 +27,7 @@ const BehaviorActionSchema = z.enum([
   "purchase",
   "line_message",
   "search",
+  "audio_play",
 ]);
 
 // Explicit whitelist. Do NOT use .catchall() — behavior payloads come from
@@ -51,21 +52,25 @@ const BehaviorBodySchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
-    // Authentication — silently skip if not logged in (behavior tracking is best-effort)
-    const auth = await requireAuth();
+    // Authentication — silently skip if not logged in (behavior tracking is best-effort).
+    // A5: `requireAuth()` (Shopify 専用) から `resolveIdentity()` に替えて LINE
+    // ログインの行動も記録する。`userKey` は Shopify = 数値 ID / LINE = "line:<id>"
+    // で名前空間が分かれており、どちらも `users/{userKey}/behaviorLog` に落ちる
+    // (favorites・comments と同じ規則なのでデータ移行は不要)。
+    const auth = await resolveIdentity();
     if (!auth.authenticated) {
       // Return 200 to avoid client-side error handling for non-logged-in users
       return NextResponse.json({ skipped: true, reason: "not_authenticated" });
     }
 
-    const limited = await enforceRateLimit(request, limiters.authedUser, auth.customerId);
+    const limited = await enforceRateLimit(request, limiters.authedUser, auth.userKey);
     if (limited) return limited;
 
     const parsed = await parseJsonBody(request, BehaviorBodySchema);
     if (!parsed.ok) return parsed.response;
 
     const result = await addBehaviorLog(
-      auth.customerId,
+      auth.userKey,
       parsed.data.action,
       "web", // always web from this route
       parsed.data.metadata ?? {}

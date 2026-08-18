@@ -1,30 +1,261 @@
+import type { Metadata } from "next";
 import { cookies } from "next/headers";
-import { getTranslations, getLocale } from "next-intl/server";
-import { getCustomerFromSession, getSubscriptionsFromSession } from "@/lib/shopify/auth";
-import { Link } from "@/i18n/navigation";
-import { Button } from "@/components/ui/button";
-import { ImagePlaceholder } from "@/components/media/image-placeholder";
-import { Separator } from "@/components/ui/separator";
-import { DashboardSummary } from "@/components/account/dashboard-summary";
-import { FavoritesSection } from "@/components/account/favorites-section";
-import { FollowsSection } from "@/components/account/follows-section";
-import { EventsSection } from "@/components/account/events-section";
+import { getLocale, getTranslations } from "next-intl/server";
+
+import {
+  AccountCardGrid,
+  AccountCta,
+  AccountExpCard,
+  AccountGreetingBand,
+  AccountOpsBand,
+  AccountPaymentMethodCard,
+  AccountRecordCard,
+  AccountSectionHeader,
+  AccountTitleBlock,
+} from "@/components/account/account-parts";
 import { LineAccountView } from "@/components/account/line-account-view";
 import { LineLinkageEntry } from "@/components/account/line-linkage-entry";
+import { captionClass } from "@/components/editorial/rule-list";
+import { Button } from "@/components/ui/button";
+import { customerAccountPortalUrl } from "@/lib/account-links";
+import {
+  buildAccountView,
+  formatRecordDate,
+  type AccountRecord,
+  type AccountView,
+} from "@/lib/account-view";
+import { resolveIdentity } from "@/lib/firebase/auth-guard";
+import { getEventRegistrations, getFavorites } from "@/lib/firebase/server-actions";
+import { seedAccountView } from "@/lib/preview-seed";
+import type { Customer } from "@/lib/shopify/customer";
+import { getCustomerFromSession, getSubscriptionsFromSession } from "@/lib/shopify/auth";
+import { cn, formatPrice } from "@/lib/utils";
 
-function formatPrice(amount: string, currency: string, locale: string) {
-  return new Intl.NumberFormat(locale, {
-    style: "currency",
-    currency,
-  }).format(parseFloat(amount));
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("common");
+  return { title: t("account") };
 }
 
-function formatDate(dateStr: string, locale: string) {
-  return new Date(dateStr).toLocaleDateString(locale, {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
+/**
+ * マイページ /ja/account —【R2: 確定版】マイページ (トップ)
+ * 親 `8095:731` / PC `8095:733` / SP `8095:792`。お支払い方法の節は
+ * PC `8144:1248`〜`8144:1257` / SP `8145:1248`〜`8145:1257`。
+ *
+ * 確定版の節構成 (Figma 実測どおり・順序も同じ):
+ *   1. TitleBlock          主見出し + 「…としてログイン中」(+ PC のみ「設定・契約 →」)
+ *   2. GreetingBand        面つきの挨拶
+ *   3. これから            次回の定期便 + これから開催のイベント申込 (RecordCard)
+ *   4. 続き                お気に入り (ExpCard)
+ *   5. これまで            注文履歴 (RecordCard)
+ *   6. お支払い方法        ご登録のカード (PaymentMethodCard) + 変更は外部リンク 1 本
+ *   7. AccountOpsBand      契約・お支払い・お届け先の案内 + CTA
+ *
+ * 確定版に**無い**もの: 住所の編集 UI / 支払方法の変更 UI / お気に入りの削除 UI。
+ * お届け先・お支払い方法・注文明細は Shopify の顧客アカウントポータルへ 1 本の
+ * 外部リンクで送る設計 (AccountOpsBand 8095:788 の本文がそう言っている)。
+ * ここで独自の CRUD 画面を足さない。
+ *
+ * 認証は既存のまま (getCustomerFromSession / LINE セッション判定に手を入れない)。
+ */
+export default async function AccountPage() {
+  const t = await getTranslations("account");
+  const tCommon = await getTranslations("common");
+  const locale = await getLocale();
+
+  let customer: Customer | null = null;
+  try {
+    customer = await getCustomerFromSession();
+  } catch {
+    // fall through — check for LINE session below
+  }
+
+  /* 計測用の見本 (PREVIEW_SEED=1 のときだけ)。実セッションがあるときは呼ばない
+     ので、実データを見本で上書きすることはない。フラグ未設定なら null。 */
+  const seeded = customer ? null : seedAccountView();
+
+  if (!customer && !seeded) {
+    // P7-fix: Check if user is logged in via LINE (without Shopify session).
+    // LINE-only users have line_session + line_user cookies but no shop_at/shop_rt.
+    const cookieStore = await cookies();
+    const hasLineSession = cookieStore.has("line_session");
+    const lineUserCookie = cookieStore.get("line_user")?.value;
+    const lineDisplayName = getLineDisplayName(lineUserCookie);
+
+    if (hasLineSession && lineDisplayName) {
+      // Show LINE-only account view with Shopify connection prompt
+      return <LineAccountView displayName={lineDisplayName} locale={locale} />;
+    }
+
+    // Fully unauthenticated — show login prompt
+    return (
+      <div className="flex min-h-[70vh] items-center justify-center px-4 py-24">
+        <div className="max-w-sm text-center">
+          <h1 className="page-title mb-4 text-foreground">{tCommon("account")}</h1>
+          <p className={cn(captionClass, "mb-8 text-muted-foreground")}>
+            {t("loginRequired")}
+          </p>
+          <Button variant="outline" asChild>
+            <a href={`/${locale}/login`}>{tCommon("login")}</a>
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  const view: AccountView = customer ? await loadAccountView(customer) : (seeded as AccountView);
+  const portalUrl = customerAccountPortalUrl();
+  /* 会員ランク (フリー / スタンダード / プレミアム) の表示は持たない。
+   * elxea は会員制度を持たず、会員かどうかは「roji 契約の有無」の二値である
+   * (Setaka 確定 2026-08-17 / main #62)。R2 確定版の account-parts + loadAccountView
+   * にはランク表示がそもそも無いため、ここは ours をそのまま採る。 */
+
+  const recordDate = (record: AccountRecord) => formatRecordDate(record.date, locale);
+
+  return (
+    <>
+      <AccountTitleBlock
+        title={tCommon("account")}
+        identity={view.email ? t("loggedInAs", { email: view.email }) : undefined}
+        action={
+          portalUrl ? { label: t("settingsLink"), href: portalUrl, external: true } : undefined
+        }
+      />
+
+      <AccountGreetingBand
+        greeting={
+          view.displayName
+            ? t("greeting", { name: view.displayName })
+            : t("greetingNoName")
+        }
+        lead={t("greetingLead")}
+      />
+
+      {/* 3. これから — 次回の定期便 + これから開催のイベント */}
+      {view.upcoming.length > 0 ? (
+        <>
+          <AccountSectionHeader
+            title={t("upcomingHeading")}
+            action={{ label: t("upcomingAll"), href: "/account/subscriptions" }}
+          />
+          <AccountCardGrid columns={3}>
+            {view.upcoming.map((record) => {
+              const date = recordDate(record);
+              const isSubscription = record.kind === "subscription";
+              return (
+                <AccountRecordCard
+                  key={record.id}
+                  meta={
+                    date
+                      ? isSubscription
+                        ? t("upcomingDeliveryMeta", { date })
+                        : t("upcomingEventMeta", { date })
+                      : undefined
+                  }
+                  title={
+                    isSubscription
+                      ? t("upcomingDeliveryTitle", { title: record.title })
+                      : record.title
+                  }
+                  note={isSubscription ? t("upcomingDeliveryNote") : t("upcomingEventNote")}
+                  href={record.href}
+                />
+              );
+            })}
+          </AccountCardGrid>
+        </>
+      ) : null}
+
+      {/* 4. 続き — お気に入り */}
+      {view.continueItems.length > 0 ? (
+        <>
+          <AccountSectionHeader
+            title={t("continueHeading")}
+            action={{ label: t("continueAll"), href: "/journal" }}
+          />
+          <AccountCardGrid columns={2}>
+            {view.continueItems.map((item) => (
+              <AccountExpCard
+                key={item.id}
+                label={t("continueFavorite")}
+                title={item.title}
+                imageUrl={item.imageUrl}
+                href={item.href}
+              />
+            ))}
+          </AccountCardGrid>
+        </>
+      ) : null}
+
+      {/* 5. これまで — 注文履歴 */}
+      {view.past.length > 0 ? (
+        <>
+          <AccountSectionHeader
+            title={t("pastHeading")}
+            action={
+              portalUrl ? { label: t("pastAll"), href: portalUrl, external: true } : undefined
+            }
+          />
+          <AccountCardGrid columns={3}>
+            {view.past.map((record) => {
+              const date = recordDate(record);
+              return (
+                <AccountRecordCard
+                  key={record.id}
+                  meta={date ? t("pastOrderMeta", { date }) : undefined}
+                  title={t("pastOrderTitle", { name: record.title })}
+                  note={
+                    record.amount
+                      ? formatPrice(record.amount.value, record.amount.currencyCode)
+                      : undefined
+                  }
+                />
+              );
+            })}
+          </AccountCardGrid>
+        </>
+      ) : null}
+
+      {/* 6. お支払い方法 — 登録カードの表示のみ。変更は外部リンク 1 本 */}
+      {view.paymentMethod || portalUrl ? (
+        <>
+          <AccountSectionHeader
+            title={t("paymentHeading")}
+            action={
+              portalUrl
+                ? { label: t("paymentChange"), href: portalUrl, external: true }
+                : undefined
+            }
+          />
+          <AccountCardGrid columns={2}>
+            {view.paymentMethod ? (
+              <AccountPaymentMethodCard
+                label={t("paymentCardLabel")}
+                brand={view.paymentMethod.brand}
+                masked={t("paymentCardMasked", { last4: view.paymentMethod.last4 })}
+                note={t("paymentCardNote")}
+              />
+            ) : (
+              /* 登録カードを読む経路がまだ無い (アプリ権限
+                 read_customer_payment_methods 未付与)。分からないものを
+                 「未登録」と断定せず、確認先だけを案内する。 */
+              <p className={cn(captionClass, "text-muted-foreground")}>
+                {t("paymentUnavailable")}
+              </p>
+            )}
+          </AccountCardGrid>
+        </>
+      ) : null}
+
+      {/* 7. 末尾の案内帯 */}
+      <AccountOpsBand note={t("opsNote")}>
+        <AccountCta label={t("manageSubscription")} href="/account/subscriptions" />
+      </AccountOpsBand>
+
+      {/* LINE 連携エントリ (Web 側導線 / Phase 2)。確定版のフレームには無いが、
+          唯一の Web 側入口なので残す。NEXT_PUBLIC_LIFF_ID 未設定なら描かれない。 */}
+      <LineLinkageEntry locale={locale} />
+    </>
+  );
 }
 
 /**
@@ -41,227 +272,40 @@ function getLineDisplayName(cookieValue: string | undefined): string | null {
   }
 }
 
-export default async function AccountPage() {
-  const t = await getTranslations("account");
-  const tCommon = await getTranslations("common");
-  const locale = await getLocale();
+/** 実データ (Shopify + Firestore) からマイページの描画モデルを組む。 */
+async function loadAccountView(customer: Customer): Promise<AccountView> {
+  const [subscriptions, activity] = await Promise.all([
+    getSubscriptionsFromSession().catch(() => []),
+    loadActivity(),
+  ]);
 
-  let customer = null;
+  return buildAccountView({
+    customer,
+    subscriptions,
+    favorites: activity.favorites,
+    events: activity.events,
+  });
+}
+
+/**
+ * Firestore 側 (お気に入り / イベント申込) を server component から直接読む。
+ * 既存の /api/user/* と同じ関数・同じ userKey を使う (二重定義しない)。
+ * 失敗しても節が消えるだけなのでページ全体は落とさない。
+ */
+async function loadActivity(): Promise<{
+  favorites: Awaited<ReturnType<typeof getFavorites>>;
+  events: Awaited<ReturnType<typeof getEventRegistrations>>;
+}> {
   try {
-    customer = await getCustomerFromSession();
+    const identity = await resolveIdentity();
+    if (!identity.authenticated) return { favorites: [], events: [] };
+
+    const [favorites, events] = await Promise.all([
+      getFavorites(identity.userKey).catch(() => []),
+      getEventRegistrations(identity.userKey).catch(() => []),
+    ]);
+    return { favorites, events };
   } catch {
-    // fall through — check for LINE session below
+    return { favorites: [], events: [] };
   }
-
-  if (!customer) {
-    // P7-fix: Check if user is logged in via LINE (without Shopify session).
-    // LINE-only users have line_session + line_user cookies but no shop_at/shop_rt.
-    const cookieStore = await cookies();
-    const hasLineSession = cookieStore.has("line_session");
-    const lineUserCookie = cookieStore.get("line_user")?.value;
-    const lineDisplayName = getLineDisplayName(lineUserCookie);
-
-    if (hasLineSession && lineDisplayName) {
-      // Show LINE-only account view with Shopify connection prompt
-      return (
-        <LineAccountView
-          displayName={lineDisplayName}
-          locale={locale}
-        />
-      );
-    }
-
-    // Fully unauthenticated — show login prompt
-    return (
-      <div className="min-h-[70vh] flex items-center justify-center px-4 py-24">
-        <div className="text-center max-w-sm">
-          <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-4">
-            Account
-          </p>
-          <h1 className="text-2xl font-normal mb-4">{tCommon("account")}</h1>
-          <p className="text-sm text-muted-foreground leading-relaxed mb-8">{t("loginRequired")}</p>
-          <Button variant="outline" asChild>
-            <a href={`/${locale}/login`}>{tCommon("login")}</a>
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  const displayName = [customer.firstName, customer.lastName]
-    .filter(Boolean)
-    .join(" ");
-  const email = customer.emailAddress?.emailAddress;
-  const orders = customer.orders?.edges ?? [];
-
-  // Fetch subscriptions for summary count (graceful fallback if API doesn't support it)
-  let subscriptionCount = 0;
-  try {
-    const subscriptions = await getSubscriptionsFromSession();
-    subscriptionCount = subscriptions.length;
-  } catch {
-    // Subscription API may not be available
-  }
-
-  /* 会員ランク (フリー / スタンダード / プレミアム) の表示は廃止した。
-   * elxea は会員制度を持たず、会員かどうかは「roji 契約の有無」の二値である
-   * (Setaka 確定 2026-08-17)。契約の有無は下の定期便セクション
-   * (`subscriptionCount`) がそのまま表しているので、ランク表示は不要。 */
-
-    return (
-      <div className="section-narrow py-20">
-        <div className="mb-12 flex items-start justify-between gap-6">
-          <div>
-            <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-4">
-              Account
-            </p>
-            <h1 className="mb-4">{tCommon("account")}</h1>
-            {displayName && (
-              <p className="text-sm text-muted-foreground">{displayName}</p>
-            )}
-            {email && <p className="text-sm text-muted-foreground">{email}</p>}
-          </div>
-
-          <Button variant="outline" size="sm" className="shrink-0" asChild>
-            <a href={`/api/auth/logout?locale=${locale}`}>{tCommon("logout")}</a>
-          </Button>
-        </div>
-
-      {/* Dashboard summary — subscriptions card is clickable */}
-      <DashboardSummary
-        orderCount={orders.length}
-        subscriptionCount={subscriptionCount}
-        labels={{
-          favorites: t("dashboardFavorites"),
-          follows: t("dashboardFollows"),
-          events: t("dashboardEvents"),
-          orders: t("dashboardOrders"),
-          subscriptions: t("dashboardSubscriptions"),
-        }}
-        links={{
-          subscriptions: "/account/subscriptions",
-        }}
-      />
-
-      {/* LINE 連携エントリ（Web 側導線 / Phase 2）— NEXT_PUBLIC_LIFF_ID 未設定なら非表示 */}
-      <LineLinkageEntry locale={locale} />
-
-      {/* Subscriptions summary — link to dedicated page */}
-      <section className="mb-12">
-        <h2 className="text-lg mb-6 pb-3 border-b border-border">
-          {t("subscriptions")}
-        </h2>
-        {subscriptionCount === 0 ? (
-          <div>
-            <p className="text-muted-foreground text-sm mb-4">
-              {t("noSubscriptions")}
-            </p>
-            <Button variant="outline" size="sm" asChild>
-              <Link href="/products">{tCommon("products")}</Link>
-            </Button>
-          </div>
-        ) : (
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">
-              {subscriptionCount}件のご契約
-            </p>
-            <Button variant="outline" size="sm" asChild>
-              <Link href="/account/subscriptions">{t("viewSubscriptions")}</Link>
-            </Button>
-          </div>
-        )}
-      </section>
-
-      {/* Favorite products */}
-      <FavoritesSection
-        type="product"
-        title={t("favoriteProducts")}
-        emptyMessage={t("noFavoriteProducts")}
-        errorMessage={t("actionError")}
-        removedMessage={t("removedFromFavorites")}
-        locale={locale}
-        productBaseUrl="/products"
-        articleBaseUrl="/journal"
-      />
-
-      {/* Favorite articles */}
-      <FavoritesSection
-        type="article"
-        title={t("favoriteArticles")}
-        emptyMessage={t("noFavoriteArticles")}
-        errorMessage={t("actionError")}
-        removedMessage={t("removedFromFavorites")}
-        locale={locale}
-        productBaseUrl="/products"
-        articleBaseUrl="/journal"
-      />
-
-      {/* Following farmers */}
-      <FollowsSection
-        title={t("followingFarmers")}
-        emptyMessage={t("noFollows")}
-        errorMessage={t("actionError")}
-        removedMessage={t("unfollowed")}
-        locale={locale}
-      />
-
-      {/* Registered events */}
-      <EventsSection
-        title={t("registeredEvents")}
-        emptyMessage={t("noEventRegistrations")}
-        errorMessage={t("actionError")}
-        cancelledMessage={t("eventCancelled")}
-        locale={locale}
-      />
-
-      {/* Order history summary */}
-      <section>
-        <h2 className="mb-6 pb-3 border-b border-border">
-          {t("orderHistory")}
-        </h2>
-
-        {orders.length === 0 ? (
-          <p className="text-muted-foreground text-sm">{t("noOrders")}</p>
-        ) : (
-          <div className="space-y-4">
-            {orders.slice(0, 3).map(({ node: order }) => (
-              <div
-                key={order.id}
-                className="flex items-center justify-between py-4 border-b border-border"
-              >
-                <div>
-                  <p className="text-sm font-medium">{order.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {formatDate(order.processedAt, locale)}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm">
-                    {formatPrice(
-                      order.totalPrice.amount,
-                      order.totalPrice.currencyCode,
-                      locale
-                    )}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-
-      {/* Quick links */}
-      <Separator className="mt-12" />
-      <section className="pt-8">
-        <div className="flex flex-wrap gap-4">
-          <Button variant="link" className="p-0 h-auto text-muted-foreground" asChild>
-            <Link href="/products">{tCommon("products")}</Link>
-          </Button>
-          <Button variant="link" className="p-0 h-auto text-muted-foreground" asChild>
-            <Link href="/journal">{tCommon("journal")}</Link>
-          </Button>
-        </div>
-      </section>
-    </div>
-  );
 }

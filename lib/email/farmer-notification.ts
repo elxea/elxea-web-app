@@ -1,5 +1,5 @@
 import { Resend } from "resend";
-import { getSiteUrl } from "@/lib/env";
+import { siteUrl } from "@/lib/site-url";
 
 let _resend: Resend | null = null;
 
@@ -15,7 +15,7 @@ function getResend(): Resend {
 }
 
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "info@elxea.com";
-const SITE_URL = getSiteUrl();
+const SITE_URL = siteUrl();
 
 // ─── Types ────────────────────────────────────────────────────────────
 

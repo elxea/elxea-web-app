@@ -1,9 +1,10 @@
 "use client";
 
-import Image from "next/image";
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { LanguageSwitcher } from "./language-switcher";
+import { Columns } from "./container";
+import { Logo } from "./logo";
 import { CookieSettingsButton } from "./cookie-settings-button";
 import { Separator } from "@/components/ui/separator";
 
@@ -25,16 +26,13 @@ export function Footer({ groups: externalGroups }: FooterProps) {
     // instead of teaching each one to dodge the footer.
     <footer className="border-t border-border mt-auto bg-background pb-[calc(2rem+env(safe-area-inset-bottom,0px))]">
       <div className="section-wide">
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-12">
+        {/* Figma Footer / Columns 5663:49 = 292px 列 x4 + 48px gap x3 = 1312。
+            旧実装は md:grid-cols-5 で 5 トラック中 4 つしか埋まらず、実測列幅が
+            292px ではなく 224px になっていた。 */}
+        <Columns count={4} gap="lg">
           {/* Brand — always rendered */}
           <div>
-            <Image
-              src="/logo.png"
-              alt="elxea"
-              width={100}
-              height={24}
-              className="mb-4"
-            />
+            <Logo size="md" className="mb-4" />
             <p className="text-sm text-muted-foreground leading-relaxed">
               {t("home.tagline")}
             </p>
@@ -125,14 +123,6 @@ export function Footer({ groups: externalGroups }: FooterProps) {
                   </li>
                   <li>
                     <Link
-                      href="/farmers"
-                      className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      {t("common.farmers")}
-                    </Link>
-                  </li>
-                  <li>
-                    <Link
                       href="/events"
                       className="text-sm text-muted-foreground hover:text-foreground transition-colors"
                     >
@@ -189,7 +179,7 @@ export function Footer({ groups: externalGroups }: FooterProps) {
               */}
             </>
           )}
-        </div>
+        </Columns>
 
         {/* Legal links + Copyright */}
         <Separator className="mt-12" />

@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { getBaseUrl } from "@/lib/base-url";
+import { getBaseUrl, getRequestOrigin } from "@/lib/base-url";
 import { encryptToken } from "@/lib/shopify/customer";
+import {
+  clearFlowCookie,
+  getCookieSpec,
+  isSecure,
+  resolveCookieDomain,
+} from "@/lib/auth/cookies";
 
 /**
  * LINE Login OAuth 2.0 callback endpoint.
@@ -15,6 +21,18 @@ import { encryptToken } from "@/lib/shopify/customer";
 /**
  * I4: Resolve locale from cookie or accept-language header, defaulting to "ja".
  */
+/**
+ * Base for LINE's API endpoints.
+ *
+ * Env-overridable for the same reason `SHOPIFY_CUSTOMER_ACCOUNT_*_URL` already
+ * is: these calls are made server-side, so a browser-level test harness cannot
+ * intercept them, and without an override there is no way to drive this route's
+ * SUCCESS path in an end-to-end test. That gap is not hypothetical — it is why a
+ * change that destroyed the session cookies this route issues passed a full green
+ * suite. Unset (production, and every normal run) it is the real LINE host.
+ */
+const LINE_API_BASE = process.env.LINE_API_BASE_URL || "https://api.line.me";
+
 function resolveLocale(request: NextRequest): string {
   // Check NEXT_LOCALE cookie first (set by next-intl)
   const localeCookie = request.cookies.get("NEXT_LOCALE")?.value;
@@ -28,6 +46,20 @@ function resolveLocale(request: NextRequest): string {
 }
 
 export async function GET(request: NextRequest) {
+  /* Redirect targets are built from the origin the USER addressed, not from
+   * `request.url`.
+   *
+   * `request.url` / `nextUrl` report the origin the server is bound to. On Vercel
+   * that coincides with the request host, which is why this route appeared to
+   * work; anywhere else — a dev server, anything behind a proxy — it does not,
+   * and the callback bounced the user to the server's own origin. Landing on a
+   * different origin also means the apex-scoped session cookies just issued do
+   * not apply there, so the user arrives logged out.
+   *
+   * `getRequestOrigin` is fail-closed: an unrecognised Host falls back to
+   * `nextUrl.origin`, so a spoofed header cannot turn this into an open
+   * redirect. */
+  const requestOrigin = getRequestOrigin(request);
   const searchParams = request.nextUrl.searchParams;
   const code = searchParams.get("code");
   const state = searchParams.get("state");
@@ -37,11 +69,11 @@ export async function GET(request: NextRequest) {
   // Handle LINE auth errors
   if (error) {
     console.error("[line-callback] LINE auth error:", error);
-    return NextResponse.redirect(new URL(`/${locale}/login?error=LineAuthFailed`, request.url));
+    return NextResponse.redirect(new URL(`/${locale}/login?error=LineAuthFailed`, requestOrigin));
   }
 
   if (!code || !state) {
-    return NextResponse.redirect(new URL(`/${locale}/login?error=MissingParams`, request.url));
+    return NextResponse.redirect(new URL(`/${locale}/login?error=MissingParams`, requestOrigin));
   }
 
   // Verify state (CSRF protection)
@@ -50,34 +82,41 @@ export async function GET(request: NextRequest) {
 
   if (!savedState || savedState !== state) {
     console.error("[line-callback] State mismatch");
-    return NextResponse.redirect(new URL(`/${locale}/login?error=StateMismatch`, request.url));
+    return NextResponse.redirect(new URL(`/${locale}/login?error=StateMismatch`, requestOrigin));
   }
 
-  // Clear state cookie. Must match the domain used when the cookie was set
-  // in /api/line-login/init — otherwise the delete silently no-ops and the
-  // stale state cookie lingers until natural expiry.
-  const baseUrl = getBaseUrl();
-  const hostname = new URL(baseUrl).hostname;
-  const sharedCookieDomain =
-    hostname === "elxea.com" || hostname.endsWith(".elxea.com")
-      ? ".elxea.com"
-      : undefined;
-  cookieStore.delete({
-    name: "line_oauth_state",
-    path: "/",
-    ...(sharedCookieDomain ? { domain: sharedCookieDomain } : {}),
-  });
+  const baseUrl = getBaseUrl(request);
+  const stateDomain = resolveCookieDomain(request);
+
+  /* Expire the one-shot state cookie at BOTH scopes, on whatever response we end
+   * up returning.
+   *
+   * It cannot be done through `cookieStore.delete()`: that store is keyed by
+   * cookie name and can hold only one directive per name, so it can express one
+   * scope, never two. And one scope is not enough here — `/api/line-login/init`
+   * issued this cookie Domain-scoped while the legacy `/api/line-login` issued it
+   * host-only, so after this deploys both shapes exist in real browsers. The old
+   * code additionally derived the Domain from `getBaseUrl()` (env) rather than
+   * from the request, which is a different input from the one used at issue time;
+   * that mismatch is what made the delete a silent no-op.
+   *
+   * Applied at every exit after the state check, so a failed exchange does not
+   * strand a state cookie that a later attempt would compare against. */
+  const clearState = <T extends NextResponse>(res: T): T => {
+    clearFlowCookie(res, "line_oauth_state");
+    return res;
+  };
 
   const channelId = process.env.AUTH_LINE_ID;
   const channelSecret = process.env.AUTH_LINE_SECRET;
 
   if (!channelId || !channelSecret) {
-    return NextResponse.redirect(new URL(`/${locale}/login?error=NotConfigured`, request.url));
+    return clearState(NextResponse.redirect(new URL(`/${locale}/login?error=NotConfigured`, requestOrigin)));
   }
 
   try {
     // Exchange code for tokens
-    const tokenRes = await fetch("https://api.line.me/oauth2/v2.1/token", {
+    const tokenRes = await fetch(`${LINE_API_BASE}/oauth2/v2.1/token`, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
@@ -92,19 +131,19 @@ export async function GET(request: NextRequest) {
     if (!tokenRes.ok) {
       const err = await tokenRes.text();
       console.error("[line-callback] Token exchange failed:", err);
-      return NextResponse.redirect(new URL(`/${locale}/login?error=TokenFailed`, request.url));
+      return clearState(NextResponse.redirect(new URL(`/${locale}/login?error=TokenFailed`, requestOrigin)));
     }
 
     const tokens = await tokenRes.json();
 
     // Get user profile
-    const profileRes = await fetch("https://api.line.me/v2/profile", {
+    const profileRes = await fetch(`${LINE_API_BASE}/v2/profile`, {
       headers: { Authorization: `Bearer ${tokens.access_token}` },
     });
 
     if (!profileRes.ok) {
       console.error("[line-callback] Profile fetch failed");
-      return NextResponse.redirect(new URL(`/${locale}/login?error=ProfileFailed`, request.url));
+      return clearState(NextResponse.redirect(new URL(`/${locale}/login?error=ProfileFailed`, requestOrigin)));
     }
 
     const profile = await profileRes.json();
@@ -115,7 +154,7 @@ export async function GET(request: NextRequest) {
     let email: string | null = null;
     if (tokens.id_token) {
       try {
-        const verifyRes = await fetch("https://api.line.me/oauth2/v2.1/verify", {
+        const verifyRes = await fetch(`${LINE_API_BASE}/oauth2/v2.1/verify`, {
           method: "POST",
           headers: { "Content-Type": "application/x-www-form-urlencoded" },
           body: new URLSearchParams({
@@ -180,13 +219,21 @@ export async function GET(request: NextRequest) {
       displayName,
     });
 
-    const response = NextResponse.redirect(new URL(`/${locale}/login/complete?linked=true`, request.url));
+    const response = NextResponse.redirect(new URL(`/${locale}/login/complete?linked=true`, requestOrigin));
 
-    // Scope session cookies to the apex so the user stays logged in whether
-    // they browse `elxea.com` or `www.elxea.com`. See init route for context.
+    /* Scope session cookies to the apex so the user stays logged in whether they
+     * browse `elxea.com` or `www.elxea.com`. See the init route for context.
+     *
+     * `secure` now follows the registry's prod-only rule instead of being pinned
+     * to `true`. In production the value is identical (`NODE_ENV === "production"`),
+     * so behaviour there is unchanged; the difference is that the flow becomes
+     * observable over plain http locally and in Ring 2, where a Secure cookie is
+     * simply not stored and the Domain-scoped deletion under test could never be
+     * verified. */
+    const lineSessionSecure = isSecure(getCookieSpec("line_session")!);
     const sharedCookieOpts = {
-      ...(sharedCookieDomain ? { domain: sharedCookieDomain } : {}),
-      secure: true,
+      ...(stateDomain ? { domain: stateDomain } : {}),
+      secure: lineSessionSecure,
       sameSite: "lax" as const,
       maxAge: 60 * 60 * 24 * 30, // 30 days
       path: "/",
@@ -224,9 +271,9 @@ export async function GET(request: NextRequest) {
     });
 
     // Redirect to login complete page
-    return response;
+    return clearState(response);
   } catch (err) {
     console.error("[line-callback] Unexpected error:", err);
-    return NextResponse.redirect(new URL(`/${locale}/login?error=Unexpected`, request.url));
+    return clearState(NextResponse.redirect(new URL(`/${locale}/login?error=Unexpected`, requestOrigin)));
   }
 }

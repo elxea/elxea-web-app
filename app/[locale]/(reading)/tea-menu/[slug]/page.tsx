@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getLocale, getTranslations } from "next-intl/server";
+import type { PortableTextBlock } from "@portabletext/types";
+
 import { getClient } from "@/sanity/lib/client";
 import { TEA_MENU_BY_SLUG_QUERY } from "@/sanity/lib/queries";
 import { urlFor } from "@/sanity/lib/image";
@@ -9,9 +11,103 @@ import { PortableText } from "@/components/sanity/portable-text";
 import { ImageCard } from "@/components/media/image-card";
 import { Breadcrumb } from "@/components/seo/breadcrumb";
 import { TeaOriginBlock } from "@/components/viz/map/tea-origin-block";
-import { resolveTeaOriginPlace } from "@/lib/roji/tea-origins";
+import { FlavorMatrixBlock } from "@/components/viz/flavor/flavor-matrix-block";
+import { AromaFieldBlock } from "@/components/viz/aroma/aroma-field-block";
+import { TerroirLensBlock } from "@/components/viz/terroir/terroir-lens-block";
+import { teaCategoryLabel, teaCategoryOf } from "@/lib/roji/tea-category";
+import { resolveTeaOrigin, resolveTeaOriginPlace } from "@/lib/roji/tea-origins";
 import { isFictionalSlug } from "@/lib/fictional-content";
-import type { PortableTextBlock } from "@portabletext/types";
+import { Button } from "@/components/ui/button";
+import {
+  bodySmClass,
+  captionClass,
+  h4Class,
+  overlineClass,
+} from "@/components/editorial/rule-list";
+import {
+  PageSection,
+  SectionBody,
+  SectionHead,
+  SpecBand,
+  type SpecItem,
+} from "@/components/editorial/section-blocks";
+import { formatNetWeight, type NetWeightValue } from "@/lib/format-net-weight";
+import { seedTeaMenuDetail } from "@/lib/preview-seed";
+import { cn } from "@/lib/utils";
+
+/**
+ * お茶メニュー詳細 — Figma【R2: 確定版】EC 系詳細の節骨格で実装。
+ *
+ * ## この画面に R2 確定版フレームが無いことの扱い (C9-1 の判断)
+ * Structure List「お茶メニュー詳細」(https://app.notion.com/36b70c9d064c8159915bca38ddc7965d)
+ * の `ステータス：Design` は **Not started** で、`Figma` プロパティが指す
+ * `6654:13189` は R1 世代の「お茶メニュー詳細 変A（部品ベース）」だった
+ * (旧 elxea ブランドの Header/Footer Module を含む)。R2 確定版セクションを
+ * 3 ページ (7567:2 EC / 7567:4 Journal / 7567:6 Event) 全数走査してもこの画面は無い。
+ *
+ * よって**確定済みの兄弟テンプレから導出**する:
+ * - 構造の正本 = 商品詳細【R2: 確定版】PC `8056:1517` / SP `8057:1700` の節骨格
+ *   (同じ Figma ページ 7567:2 = EC 系。`components/editorial/section-blocks.tsx`
+ *   がその実測値を体現している)
+ * - 内容モデル・ラベルの正本 = 変A `6654:13189`
+ *   (お茶の詳細 4 項目 / 淹れ方ガイド 3 項目 / 購入 / 関連記事)
+ *
+ * Figma 実測 (px) → 実装の対応:
+ * - 節上下余白        PC 64 / SP 32     → `PageSection` (`py-8 lg:py-16`)
+ * - 見出し overline→title PC 8 / SP 20 → `SectionHead`
+ * - 見出し→本体       PC 32 / SP 20     → `SectionBody`
+ * - スペック帯        PC 4列 304 gap32 / SP 2列 163.5 gap16 → `SpecBand`
+ * - hero 2 カラム     変A 560 + gap64 + 656 → `lg:grid-cols-2 lg:gap-x-16`
+ * - hero 写真         変A PC 560x560 / SP 358x340 → `aspectRatio="1/1"`
+ * - 購入ボタン        変A PC 88x36 / SP 358x36 → DS Button 既定 size (h36) + `w-full lg:w-auto`
+ *
+ * データが無い節は枠ごと出さない (C4-2 PDP / C4-3 / 農家詳細と同じ方針)。
+ * 変A では値が空でもスペック 4 行が常時出ていたが、これは是正する。
+ *
+ * 生 px・生カラーは書かない。文字組みは `typography.style.*` トークン
+ * (rule-list からの再輸出)、色は semantic token、寸法は Tailwind spacing scale。
+ */
+
+type TeaMenu = {
+  _id?: string;
+  displayName: string;
+  slug?: { current: string };
+  productNumber?: string;
+  category?: string;
+  variety?: string;
+  origin?: string;
+  season?: string;
+  /** 実データは文字列 `"50g"` / schema どおりの数値 `50` の両方があり得る。 */
+  netWeight?: NetWeightValue;
+  photo?: { asset: object; alt?: string };
+  imageUrl?: string;
+  description?: string | PortableTextBlock[];
+  color?: string;
+  brewingGuide?: { temperature?: string; water?: string; time?: string };
+  relatedArticle?: { title: string; slug: { current: string } };
+  shopifyHandle?: string;
+  seo?: { title?: string; description?: string };
+};
+
+/** 値が入っている行だけ残す (データが無い節・行は出さない方針)。 */
+function presentSpecs(
+  rows: readonly { term: string; value?: string | null }[]
+): SpecItem[] {
+  return rows.filter(
+    (row): row is { term: string; value: string } => Boolean(row.value)
+  );
+}
+
+async function fetchTea(slug: string, locale: string): Promise<TeaMenu | null> {
+  const client = getClient();
+  const tea: TeaMenu | null = await client.fetch(TEA_MENU_BY_SLUG_QUERY, {
+    slug,
+    language: locale,
+  });
+  // Preview 限定: production dataset に該当のお茶が無いと確定版の節を実寸計測
+  // できないため、見本を返す。フラグ未設定なら null なので production は無影響。
+  return tea ?? seedTeaMenuDetail(slug);
+}
 
 export async function generateMetadata({
   params,
@@ -22,13 +118,13 @@ export async function generateMetadata({
   const locale = await getLocale();
   if (isFictionalSlug("teaMenu", slug)) return {};
   try {
-    const client = getClient();
-    const tea = await client.fetch(TEA_MENU_BY_SLUG_QUERY, { slug, language: locale });
+    const tea = await fetchTea(slug, locale);
     if (!tea) return {};
-    const seo = tea.seo;
-    const title = seo?.title || tea.displayName;
-    const description = seo?.description || (typeof tea.description === "string" ? tea.description?.slice(0, 160) : undefined);
-    const image = tea.photo?.asset ? urlFor(tea.photo).width(800).url() : undefined;
+    const title = tea.seo?.title || tea.displayName;
+    const description =
+      tea.seo?.description ||
+      (typeof tea.description === "string" ? tea.description.slice(0, 160) : undefined);
+    const image = tea.photo?.asset ? urlFor(tea.photo).width(800).url() : tea.imageUrl;
     return {
       title,
       description,
@@ -47,24 +143,47 @@ export default async function TeaMenuDetailPage({
   const { slug } = await params;
   const locale = await getLocale();
   const t = await getTranslations("teaMenu");
-  const tCommon = await getTranslations("common");
+  const bt = await getTranslations("breadcrumb");
 
-  // Fictional/seed tea menu -> behave as if the document does not exist.
+  // 架空・シードのお茶メニューは「文書が存在しない」扱いにする (#66)。
   if (isFictionalSlug("teaMenu", slug)) notFound();
 
-  let tea;
+  let tea: TeaMenu | null;
   try {
-    const client = getClient();
-    tea = await client.fetch(TEA_MENU_BY_SLUG_QUERY, { slug, language: locale });
+    tea = await fetchTea(slug, locale);
   } catch {
     return (
-      <div className="section-narrow">
-        <p className="text-muted-foreground">{t("loadError")}</p>
+      <div className="page-container py-16">
+        <p className={cn(bodySmClass, "text-muted-foreground")}>{t("loadError")}</p>
       </div>
     );
   }
 
   if (!tea) notFound();
+
+  const heroImage =
+    tea.imageUrl ??
+    (tea.photo?.asset ? urlFor(tea.photo).width(800).height(800).url() : undefined);
+
+  /** 変A `6654:13244` Spec Table の 4 行。値が無い行は落とす。 */
+  const specItems = presentSpecs([
+    { term: t("variety"), value: tea.variety },
+    { term: t("origin"), value: tea.origin },
+    { term: t("season"), value: tea.season },
+    {
+      term: t("netWeight"),
+      // 内容量は数値 `50` と文字列 `"50g"` の両方が実データに入っている。
+      // 単位付けは `formatNetWeight` に集約する (素で `g` を足すと `50gg`)。
+      value: formatNetWeight(tea.netWeight),
+    },
+  ]);
+
+  /** 変A `6654:13259` Brewing List の 3 行。値が無い行は落とす。 */
+  const brewItems = presentSpecs([
+    { term: t("temperature"), value: tea.brewingGuide?.temperature },
+    { term: t("water"), value: tea.brewingGuide?.water },
+    { term: t("time"), value: tea.brewingGuide?.time },
+  ]);
 
   /**
    * 産地の地図の代替テキスト。地図の中に文字を置かない設計なので、
@@ -81,133 +200,235 @@ export default async function TeaMenuDetailPage({
     ? t("originMapAlt", { place: originPlace })
     : t("originMapAltUnknown");
 
+  /**
+   * R1-B: 味の四象限 / 香りの場 / 土地を読む の 3 枚。
+   *
+   * 3 枚とも **データ層 (`lib/roji/tea-*.ts`) だけがダミーを持ち**、描画側は
+   * データを知らない。Tea Menu List 218 件が正本になったら差し替えるのは
+   * データ層だけで、この画面と `components/viz/**` には手を入れない。
+   *
+   * 図の代替テキストは i18n 側で組む — 図の中に文字を置かない設計なので、
+   * 図が何を語っているかはここでしか伝わらない (産地の地図と同じ方針)。
+   * `terroirElevation` だけ `t.raw` を使うのは、`{value}` を**クライアント側で
+   * 差し替える**ため (標高は DEM の実測値で、サーバー側では確定しない)。
+   */
+  const teaOrigin = resolveTeaOrigin(
+    tea.productNumber === null || tea.productNumber === undefined
+      ? ""
+      : String(tea.productNumber)
+  );
+  /**
+   * 図に載る比較対象のカテゴリー名 (「緑茶」/「紅茶」…)。
+   *
+   * 図そのものは色でカテゴリーを示すが、色だけでは何のカテゴリーか伝わらない。
+   * 図の外の一文で必ず名指しする — 「同じ緑茶だけを並べています」。
+   * 判定は `teaCategoryOf` が一手に握る (`lib/roji/tea-category.ts`)。
+   */
+  const categoryText = teaCategoryLabel(
+    teaCategoryOf(tea.productNumber, tea.category),
+    locale
+  );
+  const flavorMapLabel = t("flavorMapAlt", { place: tea.displayName });
+  const terroirMapLabel = originPlace
+    ? t("terroirMapAlt", { place: originPlace })
+    : t("terroirMapAltUnknown");
+
   return (
-    <div className="section-wide">
-      {/* 変A: breadcrumb */}
-      <Breadcrumb
-        locale={locale}
-        items={[
-          { label: tCommon("home"), href: "/" },
-          { label: tCommon("teaMenu"), href: "/tea-menu" },
-          { label: tea.displayName },
-        ]}
-      />
-
-      {/* 変A: 2カラム hero (写真左 / 情報右) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 mb-16 md:mb-24">
-        <ImageCard
-          image={tea.photo?.asset ? urlFor(tea.photo).width(800).height(533).url() : undefined}
-          alt={tea.photo?.alt || tea.displayName}
-          width={800}
-          height={533}
-          sizes="(max-width: 1024px) 100vw, 50vw"
-          style={tea.color ? { backgroundColor: tea.color } : undefined}
-          priority
+    <>
+      <div className="page-container pt-6">
+        <Breadcrumb
+          locale={locale}
+          className="mb-0"
+          items={[
+            { label: bt("home"), href: "/" },
+            { label: t("title"), href: "/tea-menu" },
+            { label: tea.displayName },
+          ]}
         />
-
-        <div className="flex flex-col justify-center">
-          <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-3">
-            {tea.category}
-          </p>
-          <h1 className="mb-2">{tea.displayName}</h1>
-          {tea.productNumber && (
-            <p className="text-xs text-muted-foreground tracking-wider mb-6">
-              No. {tea.productNumber}
-            </p>
-          )}
-
-          {tea.description && (
-            <div className="text-sm text-muted-foreground leading-relaxed">
-              {typeof tea.description === "string" ? (
-                <p>{tea.description}</p>
-              ) : (
-                <PortableText value={tea.description as PortableTextBlock[]} />
-              )}
-            </div>
-          )}
-        </div>
       </div>
 
-      {/* 変A: お茶の詳細 (全幅・罫線行テーブル) */}
-      <section className="mb-16 md:mb-24 max-w-3xl">
-        <h2 className="text-sm font-medium mb-6">{t("details")}</h2>
-        <dl className="text-sm border-t border-border">
-          <div className="flex justify-between gap-4 py-4 border-b border-border">
-            <dt className="text-muted-foreground">{t("variety")}</dt>
-            <dd className="text-right">{tea.variety}</dd>
-          </div>
-          <div className="flex justify-between gap-4 py-4 border-b border-border">
-            <dt className="text-muted-foreground">{t("origin")}</dt>
-            <dd className="text-right">{tea.origin}</dd>
-          </div>
-          <div className="flex justify-between gap-4 py-4 border-b border-border">
-            <dt className="text-muted-foreground">{t("season")}</dt>
-            <dd className="text-right">{tea.season}</dd>
-          </div>
-          <div className="flex justify-between gap-4 py-4 border-b border-border">
-            <dt className="text-muted-foreground">{t("netWeight")}</dt>
-            <dd className="text-right">{tea.netWeight}g</dd>
-          </div>
-        </dl>
-      </section>
+      {/* Hero — 変A 6654:13234 / 6656:7944 (写真 + 情報 2 カラム) */}
+      <PageSection>
+        <div className="lg:grid lg:grid-cols-2 lg:gap-x-16">
+          <ImageCard
+            image={heroImage}
+            alt={tea.photo?.alt || tea.displayName}
+            aspectRatio="1/1"
+            width={800}
+            height={800}
+            sizes="(max-width: 1024px) 100vw, 50vw"
+            style={tea.color ? { backgroundColor: tea.color } : undefined}
+            priority
+          />
 
-      {/* R1-A: 産地の地図。銘柄番号から座標が引けないときは自分で null を返す。
-          詳細表の「産地」(Sanity の自由記述) の直後に置き、同じ話題を
-          文字 → 図の順で読ませる。 */}
+          {/* 変A の Info Column は写真の上端に揃う (中央寄せではない)。
+              段間はいずれも 24 (`mt-6`)。SP は写真の下に 20 で積む
+              (変A 6656:7944 = 写真下端 340 → Info Column y360)。 */}
+          <div data-slot="tea-hero-info" className="mt-5 lg:mt-0">
+            {tea.category ? (
+              <p className={cn(overlineClass, "text-muted-foreground")}>{tea.category}</p>
+            ) : null}
+            {/* ページ主見出しは 44px display の全体裁定 (`.page-title`) に従う。
+                変A は jp/h1 (32px) だが、C4-2 / C4-3 / 農家詳細と同じ扱いにする。 */}
+            <h1 className={cn("page-title text-foreground", tea.category && "mt-6")}>
+              {tea.displayName}
+            </h1>
+            {tea.productNumber ? (
+              <p className={cn(captionClass, "mt-6 text-muted-foreground")}>
+                No. {tea.productNumber}
+              </p>
+            ) : null}
+            {tea.description ? (
+              <div className={cn(bodySmClass, "mt-6 text-foreground")}>
+                {typeof tea.description === "string" ? (
+                  <p>{tea.description}</p>
+                ) : (
+                  <PortableText value={tea.description} />
+                )}
+              </div>
+            ) : null}
+          </div>
+        </div>
+      </PageSection>
+
+      {/* お茶の詳細 — 変A 6654:13242 / 6656:7952 */}
+      {specItems.length > 0 ? (
+        <PageSection>
+          <SectionHead overline="SPECIFICATION" title={t("details")} />
+          <SectionBody>
+            <SpecBand items={specItems} />
+          </SectionBody>
+        </PageSection>
+      ) : null}
+
+      {/* R1-B-1: 味の四象限。詳細表 (品種・産地・収穫時期) が「何であるか」を
+          語った直後に、「どんな味か」を図で置く。文字 → 図 の順で読ませるのは
+          産地の地図と同じ作法。
+          載るのは **同じカテゴリーの銘柄だけ** (`docs/roji-dataviz-rules.md`)。
+          絞り込みはデータ層が行うので、ここは判定材料 (銘柄番号とカテゴリー) を
+          渡すだけでよい。 */}
+      <PageSection>
+        <SectionHead overline={t("flavorMapOverline")} title={t("flavorMap")} />
+        <SectionBody>
+          <FlavorMatrixBlock
+            menuNumber={tea.productNumber}
+            category={tea.category}
+            label={flavorMapLabel}
+          />
+          <p className={cn(captionClass, "mt-5 text-muted-foreground lg:mt-8")}>
+            {t("flavorMapScope", { category: categoryText })}{" "}
+            {t("flavorMapNote")}
+          </p>
+        </SectionBody>
+      </PageSection>
+
+      {/* R1-B-2: 香りの場。味の次に香り。点ではなく領域で置くので、四象限の
+          作法は共有しつつ「比べる図」には見せない。比較対象は味と同じく
+          同一カテゴリーに限る。 */}
+      <PageSection>
+        <SectionHead overline={t("aromaMapOverline")} title={t("aromaMap")} />
+        <SectionBody>
+          <AromaFieldBlock
+            menuNumber={tea.productNumber}
+            category={tea.category}
+            label={t("aromaMapAlt")}
+          />
+          <p className={cn(captionClass, "mt-5 text-muted-foreground lg:mt-8")}>
+            {t("aromaMapScope", { category: categoryText })}{" "}
+            {t("aromaMapNote")}
+          </p>
+        </SectionBody>
+      </PageSection>
+
+      {/* R1-A: 産地の地図。銘柄番号から座標が引けないときは自分で null を返す
+          (ブロックごと描かない)。詳細表の「産地」(Sanity の自由記述) の直後に
+          置き、同じ話題を文字 → 図の順で読ませる。
+          節の余白・見出しは `PageSection` / `SectionHead` の確定版リズムに
+          合わせるのではなく、`TeaOriginBlock` が自前の枠を持つ (main 由来の
+          実装をそのまま使い、確定版の節骨格には手を入れない)。 */}
       <TeaOriginBlock
         menuNumber={tea.productNumber}
         heading={t("origin")}
         mapLabel={originMapLabel}
       />
 
-      {/* 変A: 淹れ方ガイド (3ボックス横並び / SP 積上げ) */}
-      {tea.brewingGuide && (
-        <section className="mb-16 md:mb-24 max-w-3xl">
-          <h2 className="text-sm font-medium mb-6">{t("brewingGuide")}</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="border border-border rounded-md p-5 flex items-baseline justify-between sm:flex-col sm:items-start sm:gap-2">
-              <p className="text-xs text-muted-foreground">{t("temperature")}</p>
-              <p className="text-lg font-medium">{tea.brewingGuide.temperature}</p>
-            </div>
-            <div className="border border-border rounded-md p-5 flex items-baseline justify-between sm:flex-col sm:items-start sm:gap-2">
-              <p className="text-xs text-muted-foreground">{t("water")}</p>
-              <p className="text-lg font-medium">{tea.brewingGuide.water}</p>
-            </div>
-            <div className="border border-border rounded-md p-5 flex items-baseline justify-between sm:flex-col sm:items-start sm:gap-2">
-              <p className="text-xs text-muted-foreground">{t("time")}</p>
-              <p className="text-lg font-medium">{tea.brewingGuide.time}</p>
-            </div>
-          </div>
-        </section>
-      )}
+      {/* R1-B-3: 土地を読む。産地の地図が「どこか」を示した直後に、その土地が
+          「どういう土地か」を五つのレンズで語る。産地が引けない銘柄でも、
+          既定の主産地 (川根本町・大井川流域) に落として節ごとは残す —
+          この節は銘柄固有の事実ではなく roji の土地の語り方そのものだから。 */}
+      <PageSection>
+        <SectionHead overline={t("terroirMapOverline")} title={t("terroirMap")} />
+        <SectionBody>
+          <TerroirLensBlock
+            origin={{ lat: teaOrigin.lat, lng: teaOrigin.lng }}
+            placeLabel={originPlace}
+            label={terroirMapLabel}
+            copy={{
+              elevationUnit: t.raw("terroirElevation"),
+              teaLabel: t("terroirTeaLabel"),
+              close: t("terroirClose"),
+              hint: t("terroirHint"),
+            }}
+          />
+        </SectionBody>
+      </PageSection>
 
-      {/* 変A: 購入する */}
-      {tea.shopifyHandle && (
-        <div className="mb-16 md:mb-24">
-          <Link
-            href={`/products/${tea.shopifyHandle}`}
-            className="inline-block text-sm font-medium border border-foreground px-8 py-3 hover:bg-foreground hover:text-background transition-colors"
-          >
-            {t("buyNow")}
-          </Link>
-        </div>
-      )}
+      {/* 淹れ方ガイド — 変A 6654:13257 / 6656:7967 */}
+      {brewItems.length > 0 ? (
+        <PageSection>
+          <SectionHead overline="HOW TO BREW" title={t("brewingGuide")} />
+          <SectionBody>
+            {/* 変A は値を大きく見せ SP は縦積みにする造作。専用部品を作らず
+                `SpecBand` の emphasis variant で寄せる (Boss 裁定 2026-08-09・
+                c9-1 注1h / 確認事項2)。枠線つきボックスは採らない (R2 の
+                スペック帯と同じ罫線 1 本の系統を維持する)。 */}
+            <SpecBand items={brewItems} emphasis />
+          </SectionBody>
+        </PageSection>
+      ) : null}
 
-      {/* 変A: 関連記事 (全幅行) */}
-      {tea.relatedArticle && (
-        <div className="max-w-3xl pt-8 border-t border-border">
-          <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-3">
-            {t("relatedArticle")}
-          </p>
-          <Link
-            href={`/journal/${tea.relatedArticle.slug.current}`}
-            className="group flex items-center justify-between gap-4 text-sm hover:text-muted-foreground transition-colors"
-          >
-            <span className="underline underline-offset-2">{tea.relatedArticle.title}</span>
-            <span aria-hidden="true" className="text-muted-foreground group-hover:translate-x-1 transition-transform">→</span>
-          </Link>
-        </div>
-      )}
-    </div>
+      {/* 購入・関連記事 — 変A 6654:13269 / 6656:7979 (1 ブロックにまとめる) */}
+      {tea.shopifyHandle || tea.relatedArticle ? (
+        <PageSection>
+          {tea.shopifyHandle ? (
+            <div data-slot="tea-buy">
+              <Button asChild className="w-full lg:w-auto">
+                <Link href={`/products/${tea.shopifyHandle}`}>{t("buyNow")}</Link>
+              </Button>
+            </div>
+          ) : null}
+
+          {tea.relatedArticle ? (
+            <div
+              data-slot="tea-related-article"
+              className={cn(tea.shopifyHandle && "mt-8")}
+            >
+              <p className={cn(overlineClass, "text-muted-foreground")}>
+                {t("relatedArticle")}
+              </p>
+              <Link
+                href={`/journal/${tea.relatedArticle.slug.current}`}
+                className="group mt-4 flex items-center justify-between gap-4 border-t border-b border-border py-3"
+              >
+                <span
+                  className={cn(
+                    h4Class,
+                    "text-foreground underline-offset-4 group-hover:underline"
+                  )}
+                >
+                  {tea.relatedArticle.title}
+                </span>
+                <span
+                  aria-hidden="true"
+                  className="text-muted-foreground transition-transform group-hover:translate-x-1"
+                >
+                  →
+                </span>
+              </Link>
+            </div>
+          ) : null}
+        </PageSection>
+      ) : null}
+    </>
   );
 }

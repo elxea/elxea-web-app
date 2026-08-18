@@ -1,4 +1,6 @@
 import { cookies } from "next/headers";
+
+import { COOKIE_NAME, getCookieSpec, isSecure } from "@/lib/auth/cookies";
 import {
   decryptToken,
   refreshAccessToken,
@@ -10,10 +12,16 @@ import {
   type MembershipTier,
 } from "./customer";
 
-const ACCESS_TOKEN_COOKIE = "shop_at";
-const REFRESH_TOKEN_COOKIE = "shop_rt";
-const EXPIRES_AT_COOKIE = "shop_exp";
-const AUTH_FLAG_COOKIE = "shop_auth"; // non-httpOnly, for client-side UI checks
+/* Cookie names come from the registry rather than being re-declared here.
+ * They used to be four local string literals, which is how the codebase ended up
+ * with the same names spelled out at six call sites and no single place that
+ * knew the full set. Keeping them as module-level consts initialised from the
+ * registry also keeps them statically resolvable, which the registry scanner in
+ * `__tests__/auth-cookie-registry.test.ts` relies on. */
+const ACCESS_TOKEN_COOKIE = COOKIE_NAME.shopAccessToken;
+const REFRESH_TOKEN_COOKIE = COOKIE_NAME.shopRefreshToken;
+const EXPIRES_AT_COOKIE = COOKIE_NAME.shopExpiresAt;
+const AUTH_FLAG_COOKIE = COOKIE_NAME.shopAuthFlag; // non-httpOnly, for client-side UI checks
 
 type Session = {
   accessToken: string;
@@ -123,7 +131,7 @@ export async function setSessionCookies(
   const cookieStore = await cookies();
   const cookieOptions = {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: isSecure(getCookieSpec(ACCESS_TOKEN_COOKIE)!),
     sameSite: "lax" as const,
     path: "/",
   };
@@ -144,21 +152,22 @@ export async function setSessionCookies(
   // Non-httpOnly flag for client-side UI (login/account label toggle)
   cookieStore.set(AUTH_FLAG_COOKIE, "1", {
     httpOnly: false,
-    secure: process.env.NODE_ENV === "production",
+    secure: isSecure(getCookieSpec(AUTH_FLAG_COOKIE)!),
     sameSite: "lax",
     path: "/",
     maxAge: expiresIn,
   });
 }
 
-export async function clearSession(): Promise<void> {
-  const cookieStore = await cookies();
-  cookieStore.delete(ACCESS_TOKEN_COOKIE);
-  cookieStore.delete(REFRESH_TOKEN_COOKIE);
-  cookieStore.delete(EXPIRES_AT_COOKIE);
-  cookieStore.delete(AUTH_FLAG_COOKIE);
-  cookieStore.delete("shop_cid"); // cached customer ID from id_token
-}
+/* `clearSession()` was removed here.
+ *
+ * It was a FOURTH implementation of "delete the auth cookies", with zero callers,
+ * and it deleted host-only only — so anything that started calling it would have
+ * reproduced the exact bug this change fixes. Deletion now lives solely in
+ * `clearAuthCookies()` (lib/auth/cookies.ts), which emits both scopes. A
+ * store-based variant can be reintroduced there if a Server Action ever needs
+ * one; it must not come back as a private copy.
+ */
 
 /**
  * Lightweight check for middleware — only checks if cookies exist (no decryption).

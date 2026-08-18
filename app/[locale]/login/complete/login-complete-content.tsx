@@ -4,10 +4,28 @@ import { useCallback } from "react";
 import { motion } from "motion/react";
 import { useTranslations } from "next-intl";
 import { Check } from "lucide-react";
+import {
+  AuthCard,
+  AuthCardActions,
+  AuthCardBanner,
+  AuthCardDescription,
+  AuthCardHeader,
+  AuthCardMark,
+  AuthCardTitle,
+  AuthSection,
+} from "@/components/auth/auth-card";
 import { Button } from "@/components/ui/button";
 import { Link } from "@/i18n/navigation";
 import { useChatContext } from "@/components/chat/chat-provider";
 
+/**
+ * ログイン完了画面 — Figma【R2: 確定版】`AWLnI0XF07e8rScuxPYPc7`
+ * section 6749:10277 / PC 6749:10278 / SP 6750:15880 / Complete Card 6750:10383
+ *
+ * 骨格はログイン画面と同じ認証カード (components/auth/auth-card.tsx)。
+ * 完了マーク → 見出し → 連携完了バナー → アクション 2 件の順。
+ * 登場アニメーションは Figma に無い実装側の追加 (静止状態は確定版と一致)。
+ */
 export function LoginCompleteContent() {
   const t = useTranslations("loginComplete");
   const { setIsOpen } = useChatContext();
@@ -17,71 +35,64 @@ export function LoginCompleteContent() {
   }, [setIsOpen]);
 
   return (
-    <div className="flex min-h-[60vh] items-center justify-center px-4 py-16">
-      {/* Card (変A / 成功状態を枠付きカードに集約) */}
-      <div className="w-full max-w-sm rounded-lg border border-border bg-card px-6 py-10 md:px-8 md:py-12">
-        <div className="flex flex-col items-center gap-8 text-center">
-          {/* Animated check mark */}
-          <motion.div
-            initial={{ scale: 0, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ type: "spring", stiffness: 200, damping: 15, delay: 0.1 }}
-            className="flex size-16 items-center justify-center rounded-full bg-success/25"
-          >
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ type: "spring", stiffness: 300, damping: 20, delay: 0.3 }}
-            >
-              <Check
-                className="size-8 text-success-foreground"
-                strokeWidth={3}
-                aria-hidden="true"
-              />
-            </motion.div>
-          </motion.div>
+    <AuthSection>
+      <AuthCard>
+        {/* Check Circle 6750:10384 */}
+        <motion.div
+          initial={{ scale: 0, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ type: "spring", stiffness: 200, damping: 15, delay: 0.1 }}
+        >
+          <AuthCardMark>
+            <Check className="size-8" strokeWidth={3} aria-hidden="true" />
+          </AuthCardMark>
+        </motion.div>
 
-          {/* Heading */}
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: 0.4 }}
-            className="flex flex-col gap-3"
-          >
-            <h1 className="font-heading text-xl tracking-tight">
-              {t("title")}
-            </h1>
-            <p className="text-sm leading-relaxed text-muted-foreground">
-              {t("description")}
-            </p>
-          </motion.div>
+        {/* Heading 6750:10386 — 「連携完了」は確定版で weight 700 */}
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.4 }}
+          className="w-full"
+        >
+          <AuthCardHeader className="gap-3 md:gap-2">
+            <AuthCardTitle emphasis="strong">{t("title")}</AuthCardTitle>
+            <AuthCardDescription>{t("description")}</AuthCardDescription>
+          </AuthCardHeader>
+        </motion.div>
 
-          {/* Action buttons + status pill */}
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: 0.6 }}
-            className="flex w-full flex-col gap-3"
-          >
-            <p className="rounded-md border border-border bg-muted px-4 py-2.5 text-xs text-muted-foreground">
-              {t("heading")}
-            </p>
+        {/* LinkSuccessBanner 6750:15802 — 完了画面では常時表示 */}
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.5 }}
+          className="w-full"
+        >
+          <AuthCardBanner tone="success">{t("heading")}</AuthCardBanner>
+        </motion.div>
 
-            <Button size="lg" className="w-full" asChild>
+        {/* Actions 6750:15804 — SP は gap 12 / PC は 16 */}
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.6 }}
+          className="w-full"
+        >
+          <AuthCardActions className="gap-3 md:gap-4">
+            <Button className="w-full shadow-xs" asChild>
               <Link href="/">{t("exploreTea")}</Link>
             </Button>
 
             <Button
-              variant="outline"
-              size="lg"
-              className="w-full"
+              variant="secondary"
+              className="w-full shadow-xs"
               onClick={handleOpenChat}
             >
               {t("startChat")}
             </Button>
-          </motion.div>
-        </div>
-      </div>
-    </div>
+          </AuthCardActions>
+        </motion.div>
+      </AuthCard>
+    </AuthSection>
   );
 }

@@ -62,10 +62,6 @@
           "built": true
         },
         {
-          "path": "tokens/elxea-custom.json",
-          "built": false
-        },
-        {
           "path": "tokens/overrides/cjk.json",
           "built": true
         }
@@ -99,9 +95,9 @@
     },
     "methodology": {
       "type": "notion_spec",
-      "name": "Design Ops Spec v18",
+      "name": "Design Ops Spec",
       "url": "https://www.notion.so/39070c9d064c8148b983f9004c85fc3d",
-      "note": "方法論の正本。本 kit は原則を複製しない。リポの docs/design-ops-spec.md は stale (main=v14 / 作業ツリー=v4) なので読まない。"
+      "note": "方法論の正本 (Notion)。本 kit は原則を複製しない。コード側ミラーは置かない方針 (旧 docs/design-ops-spec.md は 2026-08-10 に削除済み)。SoT の向きは案件単位で宣言され、roji は Figma が正本 (Setaka 宣言 2026-08-08・Spec v21 で本文へ反映済み)。"
     }
   },
   "tokens": {
@@ -117,7 +113,7 @@
         "dist/tokens-cjk.css"
       ],
       "name_transform": "sd.config.mjs の name/tailwind-compat が color.semantic.* から semantic を除去する (color.semantic.primary -> --color-primary)。他はパス連結。",
-      "token_count": 303
+      "token_count": 304
     },
     "color": {
       "semantic": {
@@ -128,17 +124,17 @@
           "note": "Figma page background 相当 (base.json は VariableID:373:398 と記す)。2026-07-13 に sand から cream へ是正済。"
         },
         "foreground": {
-          "value": "oklch(0.482 0.005 271.3)",
+          "value": "oklch(0.397 0.002 247.9)",
           "css_var": "--color-foreground",
           "hex_note": "#5d5e61 charcoal / gray-100"
         },
         "card": {
-          "value": "oklch(0.863 0.026 102.0)",
+          "value": "oklch(0.963 0.008 98.9)",
           "css_var": "--color-card",
           "hex_note": "#d5d3c0 sand / gray-40"
         },
         "card-foreground": {
-          "value": "oklch(0.482 0.005 271.3)",
+          "value": "oklch(0.397 0.002 247.9)",
           "css_var": "--color-card-foreground"
         },
         "popover": {
@@ -146,7 +142,7 @@
           "css_var": "--color-popover"
         },
         "popover-foreground": {
-          "value": "oklch(0.482 0.005 271.3)",
+          "value": "oklch(0.397 0.002 247.9)",
           "css_var": "--color-popover-foreground"
         },
         "primary": {
@@ -155,12 +151,12 @@
           "hex_note": "#464748 graphite / gray-120"
         },
         "primary-foreground": {
-          "value": "oklch(1 0 0)",
+          "value": "oklch(0.979 0.005 95.5)",
           "css_var": "--color-primary-foreground",
           "hex_note": "#ffffff"
         },
         "secondary": {
-          "value": "oklch(0.846 0.173 85.6)",
+          "value": "oklch(0.863 0.026 102.0)",
           "css_var": "--color-secondary",
           "hex_note": "#ffc200 gold",
           "warning": "コードでは secondary = gold。elxea-custom.json では secondary = sand。意味が反転している。conflicts[c-02] 参照。"
@@ -170,7 +166,7 @@
           "css_var": "--color-secondary-foreground"
         },
         "muted": {
-          "value": "oklch(0.933 0.012 96.4)",
+          "value": "oklch(0.893 0.018 99.0)",
           "css_var": "--color-muted"
         },
         "muted-foreground": {
@@ -189,25 +185,25 @@
           "css_var": "--color-accent-foreground"
         },
         "destructive": {
-          "value": "oklch(0.572 0.133 16.4)",
+          "value": "oklch(0.537 0.135 17)",
           "css_var": "--color-destructive",
-          "hex_note": "#b9525c tea-red"
+          "hex_note": "#ae4751 tea-red (Figma Variable destructive の実値。C6-1R で #b9525c のドリフトから是正)"
         },
         "destructive-foreground": {
           "value": "oklch(1 0 0)",
           "css_var": "--color-destructive-foreground"
         },
         "border": {
-          "value": "oklch(0.615 0.006 106.6)",
+          "value": "oklch(0.617 0.025 101.7)",
           "css_var": "--color-border",
           "hex_note": "#858581 ash / gray-80"
         },
         "input": {
-          "value": "oklch(0.615 0.006 106.6)",
+          "value": "oklch(0.617 0.025 101.7)",
           "css_var": "--color-input"
         },
         "ring": {
-          "value": "oklch(0.615 0.006 106.6)",
+          "value": "oklch(0.617 0.025 101.7)",
           "css_var": "--color-ring",
           "warning": "コードの ring は ash。elxea-custom.json は gold。conflicts[c-02] 参照。"
         },
@@ -345,9 +341,8 @@
     },
     "typography": {
       "family": {
-        "sans": "aktiv-grotesk, kozuka-gothic-pro, sans-serif",
+        "sans": "aktiv-grotesk, dnp-shuei-gothic-gin-std, sans-serif",
         "heading": "aktiv-grotesk-extended, dnp-shuei-gothic-gin-std, sans-serif",
-        "secondary": "neue-haas-grotesk-text, ryo-gothic-plusn, sans-serif",
         "special": "dnp-shuei-ymincho-std, Georgia, serif",
         "mono": "SF Mono, Menlo, monospace"
       },
@@ -449,28 +444,28 @@
           "letterSpacing": "0.02em"
         },
         "body-lg": {
-          "fontFamily": "aktiv-grotesk, kozuka-gothic-pro, sans-serif",
+          "fontFamily": "aktiv-grotesk, dnp-shuei-gothic-gin-std, sans-serif",
           "fontSize": "1.125rem",
           "fontWeight": "400",
           "lineHeight": "1.75",
           "letterSpacing": "0.05em"
         },
         "body": {
-          "fontFamily": "aktiv-grotesk, kozuka-gothic-pro, sans-serif",
+          "fontFamily": "aktiv-grotesk, dnp-shuei-gothic-gin-std, sans-serif",
           "fontSize": "1rem",
           "fontWeight": "400",
           "lineHeight": "1.75",
           "letterSpacing": "0.05em"
         },
         "body-sm": {
-          "fontFamily": "aktiv-grotesk, kozuka-gothic-pro, sans-serif",
+          "fontFamily": "aktiv-grotesk, dnp-shuei-gothic-gin-std, sans-serif",
           "fontSize": "0.875rem",
           "fontWeight": "400",
           "lineHeight": "1.5",
           "letterSpacing": "0.05em"
         },
         "caption": {
-          "fontFamily": "aktiv-grotesk, kozuka-gothic-pro, sans-serif",
+          "fontFamily": "aktiv-grotesk, dnp-shuei-gothic-gin-std, sans-serif",
           "fontSize": "0.75rem",
           "fontWeight": "400",
           "lineHeight": "1.5",
@@ -801,22 +796,6 @@
       "_note": "ビルドされるのは base.json の値。elxea-custom.json の低不透明度版 (0.05-0.18 + xs / inner) はビルドされていない → conflicts[c-01]。"
     },
     "elevation": {
-      "level": {
-        "0": "0",
-        "1": "10",
-        "2": "20",
-        "3": "30",
-        "4": "40",
-        "5": "50"
-      },
-      "zIndex": {
-        "0": "0",
-        "10": "10",
-        "20": "20",
-        "30": "30",
-        "40": "40",
-        "50": "50"
-      },
       "opacity": {
         "0": "0",
         "5": "0.05",
@@ -843,9 +822,9 @@
           "default": "2px"
         },
         "ringColor": {
-          "default": "oklch(0.615 0.006 106.6)",
+          "default": "oklch(0.617 0.025 101.7)",
           "primary": "oklch(0.397 0.002 247.9)",
-          "destructive": "oklch(0.572 0.133 16.4)"
+          "destructive": "oklch(0.537 0.135 17)"
         },
         "actual_in_components": "shadcn の Button / Badge は focus-visible:ring-[3px] + ring-ring/50 を使う。トークンの ringWidth 2px/4px とも focus.ringColor とも束縛されていない → known_gaps[gap-focus-binding]。"
       },
@@ -1006,7 +985,9 @@
           "sm": "2rem",
           "md": "2.25rem",
           "lg": "2.5rem",
-          "xl": "2.75rem"
+          "xl": "2.75rem",
+          "service": "2.1875rem",
+          "cta": "2.6875rem"
         },
         "padding": {
           "sm": "0.75rem",
@@ -1020,7 +1001,7 @@
           "lg": "1rem"
         },
         "radius": {
-          "default": "0.375rem"
+          "default": "0.5rem"
         },
         "iconGap": {
           "default": "0.5rem"
@@ -1092,6 +1073,48 @@
         "height": {
           "mobile": "3.5rem",
           "desktop": "6rem"
+        }
+      },
+      "header": {
+        "height": {
+          "mobile": "3.75rem",
+          "desktop": "4.25rem"
+        }
+      },
+      "footer": {
+        "padding": {
+          "block": "4rem"
+        },
+        "column": {
+          "gap": "3rem"
+        }
+      },
+      "logo": {
+        "height": {
+          "sm": "1rem",
+          "md": "1.125rem",
+          "lg": "1.5rem"
+        },
+        "aspectRatio": {
+          "wordmark": "4.159"
+        }
+      },
+      "reactionChip": {
+        "height": {
+          "pc": "2.8125rem",
+          "sp": "3.3125rem"
+        }
+      },
+      "scaleBar": {
+        "height": {
+          "default": "0.1875rem"
+        }
+      },
+      "timeMarker": {
+        "dial": {
+          "size": {
+            "default": "2.75rem"
+          }
         }
       },
       "sidebar": {
@@ -1178,28 +1201,28 @@
             "letterSpacing": "0.03em"
           },
           "body-lg": {
-            "fontFamily": "neue-haas-grotesk-text, kozuka-gothic-pro, sans-serif",
+            "fontFamily": "aktiv-grotesk, dnp-shuei-gothic-gin-std, sans-serif",
             "fontSize": "1.125rem",
             "fontWeight": "400",
             "lineHeight": "1.9",
             "letterSpacing": "0.04em"
           },
           "body": {
-            "fontFamily": "neue-haas-grotesk-text, kozuka-gothic-pro, sans-serif",
+            "fontFamily": "aktiv-grotesk, dnp-shuei-gothic-gin-std, sans-serif",
             "fontSize": "1rem",
             "fontWeight": "400",
             "lineHeight": "1.8",
             "letterSpacing": "0.04em"
           },
           "body-sm": {
-            "fontFamily": "neue-haas-grotesk-text, kozuka-gothic-pro, sans-serif",
+            "fontFamily": "aktiv-grotesk, dnp-shuei-gothic-gin-std, sans-serif",
             "fontSize": "0.875rem",
             "fontWeight": "400",
             "lineHeight": "1.8",
             "letterSpacing": "0.04em"
           },
           "caption": {
-            "fontFamily": "neue-haas-grotesk-text, kozuka-gothic-pro, sans-serif",
+            "fontFamily": "aktiv-grotesk, dnp-shuei-gothic-gin-std, sans-serif",
             "fontSize": "0.75rem",
             "fontWeight": "400",
             "lineHeight": "1.75",
@@ -1230,6 +1253,13 @@
         "--overlay-foreground": "oklch(0.98 0.01 60)",
         "--overlay-foreground-muted": "oklch(0.75 0.01 60)",
         "--overlay-border": "oklch(1 0.02 60 / 0.4)",
+        "--overlay-scrim": "color-mix(in oklab, var(--color-brand-graphite) 62%, transparent)",
+        "--graphite-pressed": "oklch(0.333 0.007 274.8)",
+        "--z-sticky": "1020",
+        "--z-chat": "1030",
+        "--z-overlay": "1040",
+        "--z-modal": "1050",
+        "--elevation-shadow-modal": "0 12px 40px 0 color-mix(in oklab, var(--color-brand-graphite) 18%, transparent)",
         "--sidebar": "hsl(0 0% 98%)",
         "--sidebar-foreground": "hsl(240 5.3% 26.1%)",
         "--sidebar-primary": "hsl(240 5.9% 10%)",
@@ -1237,7 +1267,16 @@
         "--sidebar-accent": "hsl(240 4.8% 95.9%)",
         "--sidebar-accent-foreground": "hsl(240 5.9% 10%)",
         "--sidebar-border": "hsl(220 13% 91%)",
-        "--sidebar-ring": "hsl(217.2 91.2% 59.8%)"
+        "--sidebar-ring": "hsl(217.2 91.2% 59.8%)",
+        "--motion-enter-duration": "var(--motion-duration-fast)",
+        "--motion-exit-duration": "var(--motion-duration-fast)",
+        "--motion-rise-distance": "var(--spacing-2)",
+        "--motion-recede-distance": "var(--spacing-1)",
+        "--motion-sheet-x": "100%",
+        "--motion-sheet-y": "0%",
+        "--motion-zoom-from": "0.95",
+        "--motion-travel": "0",
+        "--page-margin": "var(--layout-grid-margin-desktop)"
       },
       "dark": {
         "--sidebar": "hsl(240 5.9% 10%)",
@@ -1252,6 +1291,8 @@
       "theme_inline": {
         "--color-brand-line": "var(--brand-line)",
         "--color-overlay": "var(--overlay)",
+        "--color-overlay-scrim": "var(--overlay-scrim)",
+        "--color-graphite-pressed": "var(--graphite-pressed)",
         "--color-overlay-foreground": "var(--overlay-foreground)",
         "--color-overlay-foreground-muted": "var(--overlay-foreground-muted)",
         "--color-overlay-border": "var(--overlay-border)",
@@ -1319,7 +1360,7 @@
       "sm": "40rem",
       "md": "48rem",
       "lg": "64rem",
-      "xl": "80rem",
+      "xl": "82rem",
       "2xl": "96rem"
     },
     "status": "確定 (デザイン BP はブリーフ提供の実測値 / コード BP はコード実読)",
@@ -1345,7 +1386,7 @@
   "components": {
     "code_sot": {
       "path": "components/ui",
-      "count_tsx": 56,
+      "count_tsx": 60,
       "list": [
         "accordion",
         "alert",
@@ -1370,6 +1411,7 @@
         "drawer",
         "dropdown-menu",
         "empty",
+        "empty-state",
         "field",
         "form",
         "hover-card",
@@ -1383,8 +1425,10 @@
         "native-select",
         "navigation-menu",
         "pagination",
+        "pill-button",
         "popover",
         "progress",
+        "quantity-stepper",
         "radio-group",
         "resizable",
         "scroll-area",
@@ -1393,6 +1437,7 @@
         "sheet",
         "sidebar",
         "skeleton",
+        "skeleton-bar",
         "slider",
         "sonner",
         "spinner",
@@ -1412,10 +1457,13 @@
           "outline",
           "secondary",
           "ghost",
-          "link"
+          "link",
+          "service"
         ],
         "size": [
           "default",
+          "service",
+          "cta",
           "xs",
           "sm",
           "lg",
@@ -1851,8 +1899,8 @@
     {
       "id": "NN-02",
       "rule": "コードを読むときは必ず `git show origin/main:<path>` を使う。作業ツリーの内容を根拠にしない。",
-      "why": "elxea-web-app の作業ツリーは origin/main より古いことがある。docs/design-ops-spec.md は main=v14 / 作業ツリー=v4 で、どちらも stale (正本は Notion v18)。",
-      "verified_at": "2026-07-31"
+      "why": "elxea-web-app の作業ツリーは origin/main より古いことがある。デザイン方法論の正本は Notion の Design Ops Spec のみで、リポ内にミラーは置かない (旧 docs/design-ops-spec.md は v14 書き出しのまま stale だったため 2026-08-10 に削除済み)。",
+      "verified_at": "2026-08-10"
     },
     {
       "id": "NN-03",
@@ -1947,17 +1995,6 @@
     }
   },
   "conflicts": [
-    {
-      "id": "c-auto-unbuilt-tokens-elxea-custom-json",
-      "severity": "HIGH",
-      "detected_by": "generate-design-kit.ts (自動検出)",
-      "title": "tokens/elxea-custom.json がビルドパイプラインに入っていない",
-      "code_value": "sd.config.mjs の source は [tokens/base.json, tokens/overrides/cjk.json] のみ。tokens/elxea-custom.json は含まれない。",
-      "other_value": "tokens/elxea-custom.json は存在し現役に見える ($meta: name=elxea-custom / version=0.2.0-dogfood-phase-B / phase=DS-1 / base-layer=shadcn/ui defaults (oklch / new-york style) / sibling-file=tokens/base.json / spec=https://www.notion.so/36970c9d064c813fb7abdc9e3403c14c / brand-source=https://www.notion.so/circl/Visual-Identity-f87f290633774500bc2294a94ed66296)。",
-      "impact": "tokens/elxea-custom.json の値を『実装値』と信じて読むと外す。CSS には 1 バイトも出ていない。",
-      "resolution": "オーナー判断待ち。削除も統合もせず、状態を可視化したまま維持する。",
-      "evidence": "sd.config.mjs の source 配列と tokens/ 配下の実ファイル一覧の差集合"
-    },
     {
       "id": "c-02",
       "severity": "HIGH",
@@ -2109,9 +2146,11 @@
         }
       ],
       "impact": "コードの layout.grid トークンをそのまま使うと、Figma カンプより左右余白が 16px 狭く、列間が 16px 詰まる。",
-      "resolution": "未決。実装上は globals.css の .section-wide (max-w-7xl mx-auto px-6) が使われており、px-6 = 24px で layout.grid.margin.desktop (64px) とも実測 80px とも一致しない (第 3 の値)。3 者の整合を取る判断が要る。",
+      "resolution": "解消。Figma 側が Foundations 規約 64/32/16 に是正され (Header/Footer マスター 64px / SP 16px)、コード側の layout.grid.margin (desktop 4rem=64px / tablet 2rem=32px / mobile 1rem=16px) と一致した。実装の第 3 の値 (px-6=24px) は app/globals.css の --page-margin (layout.grid.margin.* を参照する responsive custom property) に置換し、三つ巴を解消した。gutter は未使用のため据え置き。",
       "evidence": "git show origin/main:tokens/base.json (layout.grid / layout.container) / git show origin/main:app/globals.css (.section-wide)",
-      "verified_at": "2026-07-31"
+      "verified_at": "2026-08-07",
+      "status": "RESOLVED 2026-08-07",
+      "resolved_by": "app/globals.css の :root --page-margin / .page-inset / .section-* (padding-inline: var(--page-margin))"
     },
     {
       "id": "c-05",
@@ -2120,20 +2159,22 @@
       "code_value": ".section-narrow = max-w-3xl mx-auto px-6 py-16 / .section-wide = max-w-7xl mx-auto px-6 py-16 / .section-full = w-full py-16 (app/globals.css @layer base)",
       "other_value": "layout.grid.margin.desktop = 64px / layout.container.xl = 1280px",
       "impact": "max-w-7xl (1280px) は container.xl と一致するが Tailwind 既定値を解決しているだけでトークン束縛ではない。px-6 (24px) はどのグリッドトークンとも一致しない。",
-      "resolution": "未決 (c-04 と同根)。",
+      "resolution": "解消。.section-narrow / .section-wide の px-6 (24px) を padding-inline: var(--page-margin) に置換し、--page-margin は var(--layout-grid-margin-{mobile,tablet,desktop}) を解決する。セクション余白が layout.grid トークンに束縛された。max-w-* は従来どおり Tailwind 既定値を使うが container.xl (1280px) と一致する既知の非束縛として残す。",
       "evidence": "git show origin/main:app/globals.css",
-      "verified_at": "2026-07-31"
+      "verified_at": "2026-08-07",
+      "status": "RESOLVED 2026-08-07",
+      "resolved_by": "app/globals.css @layer base の .section-narrow / .section-wide"
     },
     {
       "id": "c-06",
       "severity": "MID",
-      "title": "z-index に 2 系統ある",
-      "code_value": "tokens/base.json elevation.level = 0/10/20/30/40/50 (semantic 名: flat/raised/floating/overlay/modal/top)",
-      "other_value": "tokens/elxea-custom.json z-index = hide -1 / base 0 / raised 10 / dropdown 1000 / sticky 1020 / fixed 1030 / overlay 1040 / modal 1050 / popover 1060 / toast 1070 / max 9999",
-      "impact": "同じ『overlay』が 30 と 1040 の 2 通り。custom 側はビルドされないので実効値は base だが、設計意図としてどちらかが未決。",
-      "resolution": "実装値は base.json の 0-50。",
-      "evidence": "git show origin/main:tokens/base.json / tokens/elxea-custom.json",
-      "verified_at": "2026-07-31"
+      "title": "z-index に 3 系統あった (解決済み — 1 系統へ統合)",
+      "code_value": "app/globals.css :root の名前付きレイヤー --z-sticky 1020 / --z-chat 1030 / --z-overlay 1040 / --z-modal 1050 が唯一の SoT",
+      "other_value": "廃止: (a) tokens/base.json elevation.level と elevation.zIndex (どちらも 0/10/20/30/40/50 の同値重複) を削除 (b) components/ui/** の生 z-50 (13 ファイル 21 箇所) は編集せず app/globals.css 末尾の素の .z-50 規則で --z-modal へ接続 (c) tokens/elxea-custom.json は 2026-08-14 に削除済み",
+      "impact": "統合前は同じ『overlay』が 30 と 1040 の 2 通りあり、shadcn の生 z-50 が下端固定 UI (1020/1030) に必ず負けるため、音声再生中にモーダルやシートの下部が音声バーに覆われて押せなかった。",
+      "resolution": "実装値は app/globals.css の --z-* (1020-1050) のみ。raw scale トークンは参照ゼロを実測 (--elevation-level-* / --elevation-zIndex-* を app/components/lib/hooks/stories/scripts/e2e で grep して 0 件) してから削除した。回帰検出は e2e/mobile.spec.ts の Bottom-fixed occlusion (SP) が担う。",
+      "evidence": "grep -rn '--elevation-level|--elevation-zIndex' app components lib hooks stories scripts e2e -> 0 hits / e2e/mobile.spec.ts",
+      "verified_at": "2026-08-17"
     },
     {
       "id": "c-07",
@@ -2185,9 +2226,11 @@
       "figma_value_a": "Header (Module) 5653:29 — Header / Logo が x=32。Top Bar は 1440 幅で、コンテンツを 32px インセットで置いている。",
       "figma_value_b": "Footer (Module) 5662:49 — Footer / Content が x=80, width=1280。ページ本体と同じ 80px 余白。",
       "impact": "ヘッダーのロゴ左端とページ本文の左端が 48px ずれる。全 43 画面に Header/Footer が各 40 instance 入っているため、ずれは全画面に波及する。",
-      "resolution": "未決。(a) Header を 80px に揃える (b) ヘッダーだけ広めのバー幅を意図とみなし仕様として明記する、のいずれか。Setaka またはデザイン判断。",
+      "resolution": "解消。Figma 側で Header/Footer マスターを 64px に統一。コード側は Header の内側ラッパーが持っていた px-6 (24px) を .page-inset に置換し、Footer (.section-wide) と同じ --page-margin を解決するようにした。ロゴ左端とページ本文左端が同一トークンに束縛される。",
       "evidence": "get_metadata(5653:29) の 5653:32 x=32 / get_metadata(5662:49) の 5662:51 x=80",
-      "verified_at": "2026-07-31"
+      "verified_at": "2026-08-07",
+      "status": "RESOLVED 2026-08-07",
+      "resolved_by": "components/layout/header.tsx の max-w-7xl mx-auto page-inset / app/globals.css .page-inset"
     }
   ],
   "known_gaps": [
@@ -2320,23 +2363,25 @@
     }
   ],
   "spec_refs": {
-    "design_ops_spec_v18": "https://www.notion.so/39070c9d064c8148b983f9004c85fc3d",
+    "design_ops_spec": "https://www.notion.so/39070c9d064c8148b983f9004c85fc3d (Notion 正本。版は本文の「版数・変更履歴」を参照)",
     "elxea_custom_token_spec": "https://www.notion.so/36970c9d064c813fb7abdc9e3403c14c (tokens/elxea-custom.json の $meta.spec が指す先。本セッションでは未読)",
     "elxea_visual_identity": "https://www.notion.so/circl/Visual-Identity-f87f290633774500bc2294a94ed66296 (tokens/elxea-custom.json の $meta.brand-source。本セッションでは未読)",
     "elxea_brand_context_skill": "/Users/setaka/github/elxea/agents/_shared/skills/elxea-brand-context/SKILL.md",
     "figma_file": "https://www.figma.com/design/AWLnI0XF07e8rScuxPYPc7/",
-    "stale_do_not_read": "リポの docs/design-ops-spec.md (main=v14 / 作業ツリー=v4)。正本は上記 Notion v18。"
+    "mirror_policy": "Design Ops Spec のコード側ミラーは置かない。旧 docs/design-ops-spec.md は 2026-08-10 に削除済み (v14 書き出しで stale・二重正本の温床だったため)。方法論は上記 design_ops_spec の Notion ページを読む。"
   },
   "counts": {
     "_method": "generate-design-kit.ts による実カウント (手計算なし)",
-    "conflicts": 11,
+    "conflicts": 7,
+    "conflicts_total": 10,
+    "conflicts_resolved": 3,
     "conflicts_by_severity": {
-      "HIGH": 2,
-      "MID": 5,
+      "HIGH": 1,
+      "MID": 2,
       "LOW": 4
     },
-    "conflicts_auto_detected": 1,
-    "conflicts_manual": 10,
+    "conflicts_auto_detected": 0,
+    "conflicts_manual": 7,
     "known_gaps": 18,
     "known_gaps_open": 17,
     "known_gaps_resolved": 1,
@@ -2345,6 +2390,6 @@
     "_figma_node_count_method": "components.figma_mirror 配下に現れる distinct な Figma node ID (\\d+:\\d+) を、直近の verified_at の有無で分類した実カウント。",
     "figma_nodes_verified": 48,
     "figma_nodes_unverified": 0,
-    "code_ui_components": 56
+    "code_ui_components": 60
   }
 }

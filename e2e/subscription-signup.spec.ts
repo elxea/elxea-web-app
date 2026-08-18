@@ -15,6 +15,24 @@
 
 import { test, expect, type Page } from "@playwright/test";
 
+import { SELLING_PLAN_SKIP_REASON, STOREFRONT_CONFIGURED } from "./support/preconditions";
+
+/**
+ * SellingPlan を持つ実商品を要求するテストの前に置くゲート。
+ *
+ * 以前は Shopify が無いと `/ja/products` が 0 件で
+ * `findSubscriptionProductUrl()` が即 null を返し、各テストが自前の
+ * `test.skip()` に落ちていた。見本カタログ (PREVIEW_SEED_STOREFRONT) を入れた
+ * あとは商品が並ぶので、このヘルパーが商品詳細ページを最大 5 枚たどるようになり、
+ * dev サーバでは 1 テストの 30 秒予算を使い切って **timeout で赤くなる**
+ * (実測 2026-08-09: 9 本が同じ /ja/products/... の goto で timeout)。
+ * 「商品が見つからないので skip」を暗黙に踏むのではなく、必要な前提を明示して
+ * skip する。
+ */
+function requireSellingPlanFixtures() {
+  test.skip(!STOREFRONT_CONFIGURED, SELLING_PLAN_SKIP_REASON);
+}
+
 // ─── ヘルパー: 定期便商品をページ上で見つける ─────────────────────────────
 
 /**
@@ -56,6 +74,9 @@ async function findSubscriptionProductUrl(page: Page): Promise<string | null> {
 // ─── テストスイート: 定期便申込フロー ──────────────────────────────────────
 
 test.describe("定期便申込フロー", () => {
+  // SellingPlan を持つ実商品が必要 (見本カタログには無い)。
+  requireSellingPlanFixtures();
+
   test("定期便商品に「購入方法」セクションが表示される", async ({ page }) => {
     const productUrl = await findSubscriptionProductUrl(page);
 
@@ -392,7 +413,9 @@ test.describe("定期便申込フロー", () => {
 // ─── テストスイート: 定期便申込 UI ─────────────────────────────────────────
 
 test.describe("定期便申込 UI", () => {
+
   test("定期便商品詳細ページが正常に表示される", async ({ page }) => {
+    requireSellingPlanFixtures();
     const productUrl = await findSubscriptionProductUrl(page);
 
     if (!productUrl) {
@@ -412,6 +435,7 @@ test.describe("定期便申込 UI", () => {
   });
 
   test("通常購入ボタンは初期状態でアクティブになっている", async ({ page }) => {
+    requireSellingPlanFixtures();
     const productUrl = await findSubscriptionProductUrl(page);
 
     if (!productUrl) {
@@ -433,6 +457,7 @@ test.describe("定期便申込 UI", () => {
   test("定期購入選択時にサブスクリプション価格情報が表示される（割引がある場合）", async ({
     page,
   }) => {
+    requireSellingPlanFixtures();
     const productUrl = await findSubscriptionProductUrl(page);
 
     if (!productUrl) {
@@ -464,8 +489,11 @@ test.describe("定期便申込 UI", () => {
   }) => {
     await page.goto("/ja/account/subscriptions");
 
-    // 未ログイン時はログイン誘導が表示される
-    await expect(page.locator("h1")).toContainText("定期便", { timeout: 10000 });
-    await expect(page.getByText("ログイン")).toBeVisible();
+    // 未ログイン時は /ja/login へ 307 リダイレクトされる
+    // (middleware.ts の accountMatch ガード)。旧アサーション (h1 に「定期便」)
+    // は誘導がページ内にあった時代のもの。
+    await page.waitForURL(/\/ja\/login/);
+    await expect(page.locator("h1")).toContainText("ログイン", { timeout: 10000 });
+    await expect(page.getByRole("link", { name: /ログイン/ }).first()).toBeVisible();
   });
 });

@@ -15,6 +15,10 @@ on:
       - main
       # backup/* は監査対象外 (docs/ops/branch-divergence.md)
       - "backup/**"
+      # G1 の TEMPORARY 除外 (統合ブランチ本体の branches-ignore 追加) は 2026-08-18 の
+      # 段階 C (main への合流) で削除した。統合ブランチを main へ合流させ終えたため、
+      # 除外を残す理由が消えた (残したまま合流させると以後どの統合ブランチも無保護になる)。
+      # 以後は統合ブランチも他の全ブランチと同じくこのガードの対象になる。
 
 concurrency:
   group: push-guard-${{ github.ref }}

@@ -469,8 +469,8 @@
     {
       "id": "NN-02",
       "rule": "コードを読むときは必ず `git show origin/main:<path>` を使う。作業ツリーの内容を根拠にしない。",
-      "why": "elxea-web-app の作業ツリーは origin/main より古いことがある。docs/design-ops-spec.md は main=v14 / 作業ツリー=v4 で、どちらも stale (正本は Notion v18)。",
-      "verified_at": "2026-07-31"
+      "why": "elxea-web-app の作業ツリーは origin/main より古いことがある。デザイン方法論の正本は Notion の Design Ops Spec のみで、リポ内にミラーは置かない (旧 docs/design-ops-spec.md は v14 書き出しのまま stale だったため 2026-08-10 に削除済み)。",
+      "verified_at": "2026-08-10"
     },
     {
       "id": "NN-03",
@@ -716,9 +716,11 @@
         }
       ],
       "impact": "コードの layout.grid トークンをそのまま使うと、Figma カンプより左右余白が 16px 狭く、列間が 16px 詰まる。",
-      "resolution": "未決。実装上は globals.css の .section-wide (max-w-7xl mx-auto px-6) が使われており、px-6 = 24px で layout.grid.margin.desktop (64px) とも実測 80px とも一致しない (第 3 の値)。3 者の整合を取る判断が要る。",
+      "resolution": "解消。Figma 側が Foundations 規約 64/32/16 に是正され (Header/Footer マスター 64px / SP 16px)、コード側の layout.grid.margin (desktop 4rem=64px / tablet 2rem=32px / mobile 1rem=16px) と一致した。実装の第 3 の値 (px-6=24px) は app/globals.css の --page-margin (layout.grid.margin.* を参照する responsive custom property) に置換し、三つ巴を解消した。gutter は未使用のため据え置き。",
       "evidence": "git show origin/main:tokens/base.json (layout.grid / layout.container) / git show origin/main:app/globals.css (.section-wide)",
-      "verified_at": "2026-07-31"
+      "verified_at": "2026-08-07",
+      "status": "RESOLVED 2026-08-07",
+      "resolved_by": "app/globals.css の :root --page-margin / .page-inset / .section-* (padding-inline: var(--page-margin))"
     },
     {
       "id": "c-05",
@@ -727,20 +729,22 @@
       "code_value": ".section-narrow = max-w-3xl mx-auto px-6 py-16 / .section-wide = max-w-7xl mx-auto px-6 py-16 / .section-full = w-full py-16 (app/globals.css @layer base)",
       "other_value": "layout.grid.margin.desktop = 64px / layout.container.xl = 1280px",
       "impact": "max-w-7xl (1280px) は container.xl と一致するが Tailwind 既定値を解決しているだけでトークン束縛ではない。px-6 (24px) はどのグリッドトークンとも一致しない。",
-      "resolution": "未決 (c-04 と同根)。",
+      "resolution": "解消。.section-narrow / .section-wide の px-6 (24px) を padding-inline: var(--page-margin) に置換し、--page-margin は var(--layout-grid-margin-{mobile,tablet,desktop}) を解決する。セクション余白が layout.grid トークンに束縛された。max-w-* は従来どおり Tailwind 既定値を使うが container.xl (1280px) と一致する既知の非束縛として残す。",
       "evidence": "git show origin/main:app/globals.css",
-      "verified_at": "2026-07-31"
+      "verified_at": "2026-08-07",
+      "status": "RESOLVED 2026-08-07",
+      "resolved_by": "app/globals.css @layer base の .section-narrow / .section-wide"
     },
     {
       "id": "c-06",
       "severity": "MID",
-      "title": "z-index に 2 系統ある",
-      "code_value": "tokens/base.json elevation.level = 0/10/20/30/40/50 (semantic 名: flat/raised/floating/overlay/modal/top)",
-      "other_value": "tokens/elxea-custom.json z-index = hide -1 / base 0 / raised 10 / dropdown 1000 / sticky 1020 / fixed 1030 / overlay 1040 / modal 1050 / popover 1060 / toast 1070 / max 9999",
-      "impact": "同じ『overlay』が 30 と 1040 の 2 通り。custom 側はビルドされないので実効値は base だが、設計意図としてどちらかが未決。",
-      "resolution": "実装値は base.json の 0-50。",
-      "evidence": "git show origin/main:tokens/base.json / tokens/elxea-custom.json",
-      "verified_at": "2026-07-31"
+      "title": "z-index に 3 系統あった (解決済み — 1 系統へ統合)",
+      "code_value": "app/globals.css :root の名前付きレイヤー --z-sticky 1020 / --z-chat 1030 / --z-overlay 1040 / --z-modal 1050 が唯一の SoT",
+      "other_value": "廃止: (a) tokens/base.json elevation.level と elevation.zIndex (どちらも 0/10/20/30/40/50 の同値重複) を削除 (b) components/ui/** の生 z-50 (13 ファイル 21 箇所) は編集せず app/globals.css 末尾の素の .z-50 規則で --z-modal へ接続 (c) tokens/elxea-custom.json は 2026-08-14 に削除済み",
+      "impact": "統合前は同じ『overlay』が 30 と 1040 の 2 通りあり、shadcn の生 z-50 が下端固定 UI (1020/1030) に必ず負けるため、音声再生中にモーダルやシートの下部が音声バーに覆われて押せなかった。",
+      "resolution": "実装値は app/globals.css の --z-* (1020-1050) のみ。raw scale トークンは参照ゼロを実測 (--elevation-level-* / --elevation-zIndex-* を app/components/lib/hooks/stories/scripts/e2e で grep して 0 件) してから削除した。回帰検出は e2e/mobile.spec.ts の Bottom-fixed occlusion (SP) が担う。",
+      "evidence": "grep -rn '--elevation-level|--elevation-zIndex' app components lib hooks stories scripts e2e -> 0 hits / e2e/mobile.spec.ts",
+      "verified_at": "2026-08-17"
     },
     {
       "id": "c-07",
@@ -792,9 +796,11 @@
       "figma_value_a": "Header (Module) 5653:29 — Header / Logo が x=32。Top Bar は 1440 幅で、コンテンツを 32px インセットで置いている。",
       "figma_value_b": "Footer (Module) 5662:49 — Footer / Content が x=80, width=1280。ページ本体と同じ 80px 余白。",
       "impact": "ヘッダーのロゴ左端とページ本文の左端が 48px ずれる。全 43 画面に Header/Footer が各 40 instance 入っているため、ずれは全画面に波及する。",
-      "resolution": "未決。(a) Header を 80px に揃える (b) ヘッダーだけ広めのバー幅を意図とみなし仕様として明記する、のいずれか。Setaka またはデザイン判断。",
+      "resolution": "解消。Figma 側で Header/Footer マスターを 64px に統一。コード側は Header の内側ラッパーが持っていた px-6 (24px) を .page-inset に置換し、Footer (.section-wide) と同じ --page-margin を解決するようにした。ロゴ左端とページ本文左端が同一トークンに束縛される。",
       "evidence": "get_metadata(5653:29) の 5653:32 x=32 / get_metadata(5662:49) の 5662:51 x=80",
-      "verified_at": "2026-07-31"
+      "verified_at": "2026-08-07",
+      "status": "RESOLVED 2026-08-07",
+      "resolved_by": "components/layout/header.tsx の max-w-7xl mx-auto page-inset / app/globals.css .page-inset"
     }
   ],
   "known_gaps": [
@@ -927,12 +933,12 @@
     }
   ],
   "spec_refs": {
-    "design_ops_spec_v18": "https://www.notion.so/39070c9d064c8148b983f9004c85fc3d",
+    "design_ops_spec": "https://www.notion.so/39070c9d064c8148b983f9004c85fc3d (Notion 正本。版は本文の「版数・変更履歴」を参照)",
     "elxea_custom_token_spec": "https://www.notion.so/36970c9d064c813fb7abdc9e3403c14c (tokens/elxea-custom.json の $meta.spec が指す先。本セッションでは未読)",
     "elxea_visual_identity": "https://www.notion.so/circl/Visual-Identity-f87f290633774500bc2294a94ed66296 (tokens/elxea-custom.json の $meta.brand-source。本セッションでは未読)",
     "elxea_brand_context_skill": "/Users/setaka/github/elxea/agents/_shared/skills/elxea-brand-context/SKILL.md",
     "figma_file": "https://www.figma.com/design/AWLnI0XF07e8rScuxPYPc7/",
-    "stale_do_not_read": "リポの docs/design-ops-spec.md (main=v14 / 作業ツリー=v4)。正本は上記 Notion v18。"
+    "mirror_policy": "Design Ops Spec のコード側ミラーは置かない。旧 docs/design-ops-spec.md は 2026-08-10 に削除済み (v14 書き出しで stale・二重正本の温床だったため)。方法論は上記 design_ops_spec の Notion ページを読む。"
   },
   "annotations": {
     "tokens": {
@@ -970,7 +976,7 @@
             "hex_note": "#ffc200 gold"
           },
           "destructive": {
-            "hex_note": "#b9525c tea-red"
+            "hex_note": "#ae4751 tea-red (Figma Variable destructive の実値。C6-1R で #b9525c のドリフトから是正)"
           },
           "border": {
             "hex_note": "#858581 ash / gray-80"
@@ -1460,9 +1466,9 @@
       },
       "methodology": {
         "type": "notion_spec",
-        "name": "Design Ops Spec v18",
+        "name": "Design Ops Spec",
         "url": "https://www.notion.so/39070c9d064c8148b983f9004c85fc3d",
-        "note": "方法論の正本。本 kit は原則を複製しない。リポの docs/design-ops-spec.md は stale (main=v14 / 作業ツリー=v4) なので読まない。"
+        "note": "方法論の正本 (Notion)。本 kit は原則を複製しない。コード側ミラーは置かない方針 (旧 docs/design-ops-spec.md は 2026-08-10 に削除済み)。SoT の向きは案件単位で宣言され、roji は Figma が正本 (Setaka 宣言 2026-08-08・Spec v21 で本文へ反映済み)。"
       }
     }
   }

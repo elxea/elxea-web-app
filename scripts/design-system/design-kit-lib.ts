@@ -573,8 +573,15 @@ export function buildKit(opts: { volatile: boolean }): BuildResult {
   };
   countFigmaNodes(components["figma_mirror"], null, figmaNodes);
 
+  // A conflict carrying `status: "RESOLVED <date>"` stays in the file as an
+  // audit trail but no longer counts as open — same convention as known_gaps.
+  const isResolved = (c: JsonObject): boolean =>
+    String(c["status"] ?? "").startsWith("RESOLVED");
+  const openConflicts = conflicts.filter((c) => !isResolved(c));
+  const resolvedConflicts = conflicts.filter(isResolved);
+
   const severity: Record<string, number> = {};
-  for (const c of conflicts) {
+  for (const c of openConflicts) {
     const s = String(c["severity"] ?? "UNKNOWN");
     severity[s] = (severity[s] ?? 0) + 1;
   }
@@ -607,10 +614,14 @@ export function buildKit(opts: { volatile: boolean }): BuildResult {
     spec_refs: manual["spec_refs"] ?? {},
     counts: {
       _method: "generate-design-kit.ts による実カウント (手計算なし)",
-      conflicts: conflicts.length,
+      conflicts: openConflicts.length,
+      conflicts_total: conflicts.length,
+      conflicts_resolved: resolvedConflicts.length,
       conflicts_by_severity: severity,
-      conflicts_auto_detected: buildAutoConflicts().length,
-      conflicts_manual: manualConflicts.length,
+      conflicts_auto_detected: buildAutoConflicts().filter(
+        (c) => !isResolved(c),
+      ).length,
+      conflicts_manual: manualConflicts.filter((c) => !isResolved(c)).length,
       known_gaps: knownGaps.length,
       known_gaps_open: knownGaps.filter(
         (g) => !String(g["status"] ?? "").startsWith("RESOLVED"),

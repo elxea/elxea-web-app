@@ -1,12 +1,30 @@
 import { useTranslations } from "next-intl";
 import { getLocale, getTranslations } from "next-intl/server";
+import { Sprout } from "lucide-react";
 import { Link } from "@/i18n/navigation";
 import { getClient } from "@/sanity/lib/client";
 import { ImageCard } from "@/components/media/image-card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { pillClass } from "@/components/ui/pill-button";
 import { EVENTS_QUERY } from "@/sanity/lib/queries";
 import { urlFor } from "@/sanity/lib/image";
-import { previewSeedEnabled, seedEvents, isSeedId } from "@/lib/preview-seed";
+import { previewSeedEnabled, seedEvents } from "@/lib/preview-seed";
+import { isPastEvent, isSameEventDay } from "@/lib/format-date";
 import { filterOutFictional } from "@/lib/fictional-content";
+
+/** 一覧カード 1 件が使うフィールド (Sanity / preview seed の共通部分)。 */
+type EventCard = {
+  _id: string;
+  slug: { current: string };
+  imageUrl?: string;
+  image?: { asset: object; alt?: string };
+  title: string;
+  date: string;
+  endDate?: string;
+  location?: string;
+  memberOnly?: boolean;
+  externalUrl?: string;
+};
 
 export default function EventsPage() {
   const t = useTranslations("common");
@@ -45,16 +63,37 @@ async function EventsList() {
     // Preview-only: the production dataset has no future events, so the list is
     // empty. Fall back to the shared seed events (same 3 as the top page) so the
     // layout can be reviewed. No effect when the flag is unset.
-    const events =
+    const source =
       (!fetched || fetched.length === 0) && previewSeedEnabled()
         ? seedEvents()
         : fetched;
 
+    // 開催が終わったイベントは一覧に出さない (Sanity のデータは消さない)。
+    // `EVENTS_QUERY` 側にも `coalesce(endDate, date) >= now()` があるが、それを通らない経路が
+    // 残っている: preview seed は固定日付なので時間が経てば過去になるし、
+    // 取得側を差し替えれば GROQ のフィルタごと外れる。**表示する直前**でもう
+    // 一度落として、どの経路から来ても過去日のカードが並ばないようにする。
+    const events = ((source ?? []) as EventCard[]).filter(
+      (event) => !isPastEvent(event.date, event.endDate)
+    );
+
     if (!events || events.length === 0) {
+      /* P1 一覧そのものが空。障害 (loadError) とは必ず出し分ける — 再試行では
+         なく横に抜ける出口 (商品一覧) を出す。他の P1 一覧 (farmers /
+         tea-menu / collections 等) と同じ EmptyState + 4 部構成キーに揃える。 */
       return (
-        <p className="text-muted-foreground text-sm">
-          {t("empty")}
-        </p>
+        <EmptyState
+          className="mt-8 lg:mt-12"
+          icon={Sprout}
+          count={t("empty.eyebrow")}
+          title={t("empty.title")}
+          body={t("empty.body")}
+          action={
+            <Link href="/products" className={pillClass("outline")}>
+              {t("empty.ctaLabel")}
+            </Link>
+          }
+        />
       );
     }
 
@@ -62,18 +101,7 @@ async function EventsList() {
       // 変A: image-top card grid (page-local card). PC 3col / SP 1col.
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-14">
         {events.map(
-          (event: {
-            _id: string;
-            slug: { current: string };
-            imageUrl?: string;
-            image?: { asset: object; alt?: string };
-            title: string;
-            date: string;
-            endDate?: string;
-            location?: string;
-            memberOnly?: boolean;
-            externalUrl?: string;
-          }) => {
+          (event) => {
             const cardClass = "group block";
             const inner = (
               <>
@@ -96,7 +124,12 @@ async function EventsList() {
                     month: "long",
                     day: "numeric",
                   })}
+                  {/* 一覧カードは日付だけを出す面なので、終了日は**別の日のときだけ**
+                      併記する。同日開催 (例: 14:00–17:00) で無条件に併記すると
+                      「2026年8月10日 — 2026年8月10日」と同じ日付を 2 回描くため。
+                      時刻レンジは詳細側 (`formatEventSchedule`) が受け持つ。 */}
                   {event.endDate &&
+                    !isSameEventDay(event.date, event.endDate) &&
                     ` — ${new Date(event.endDate).toLocaleDateString(locale, {
                       year: "numeric",
                       month: "long",
@@ -114,15 +147,9 @@ async function EventsList() {
               </>
             );
 
-            // Seed (dummy) events have no real detail route -> render non-linked.
-            if (isSeedId(event._id)) {
-              return (
-                <div key={event._id} className="block cursor-default">
-                  {inner}
-                </div>
-              );
-            }
-
+            // 見本カード (seed) も `seedEventDetail()` が `/events/[slug]` を
+            // 解決できるようになったので通常どおり詳細へリンクする (C7-1)。
+            // 以前は詳細ルートが無く非リンクにしていた。
             if (event.externalUrl) {
               return (
                 <a

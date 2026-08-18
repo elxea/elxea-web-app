@@ -1,5 +1,13 @@
 import { createHash, randomBytes, createCipheriv, createDecipheriv } from "crypto";
 
+import {
+  matchesExpectedBillingDate,
+  STALE_BILLING_CYCLE_VIEW,
+} from "@/lib/subscription-view";
+
+import { SHOPIFY_API_VERSION } from "./api-version";
+import { reportSubscriptionFailure } from "./subscription-failure";
+
 const CLIENT_ID = process.env.SHOPIFY_CUSTOMER_ACCOUNT_CLIENT_ID || "";
 const SESSION_SECRET = process.env.SESSION_SECRET || "";
 
@@ -34,7 +42,7 @@ const TOKEN_URL =
 const LOGOUT_URL =
   process.env.SHOPIFY_CUSTOMER_ACCOUNT_LOGOUT_URL ||
   `https://${DEFAULT_ACCOUNT_DOMAIN}/authentication/logout`;
-const CUSTOMER_API_URL = `https://shopify.com/${process.env.SHOPIFY_SHOP_ID}/account/customer/api/2025-04/graphql`;
+const CUSTOMER_API_URL = `https://shopify.com/${process.env.SHOPIFY_SHOP_ID}/account/customer/api/${SHOPIFY_API_VERSION}/graphql`;
 
 export { LOGOUT_URL };
 
@@ -100,6 +108,18 @@ export function buildAuthorizeUrl({
  * out of our site alone leaves Shopify's session cookie intact and the next
  * login silently re-authenticates the previous user.
  *
+ * `idTokenHint` is REQUIRED, not optional. Shopify rejects an RP-initiated
+ * logout that omits `id_token_hint` with `400 invalid_request` — measured
+ * 2026-08-18 against the real endpoint (see
+ * docs/release-gates/gate0-e7121ae.md). The parameter used to be optional and
+ * silently omitted when absent, which meant a LINE-only user — who never holds a
+ * Shopify `id_token` — hit that 400 on their very first logout. Requiring it
+ * turns that class of regression into a type error at the call site instead of a
+ * runtime 400 for the user.
+ *
+ * Callers that have no token must NOT pass a placeholder; they must skip the
+ * Shopify round trip entirely and complete logout locally.
+ *
  * Ref: OpenID Connect RP-Initiated Logout 1.0
  * https://openid.net/specs/openid-connect-rpinitiated-1_0.html
  */
@@ -107,15 +127,13 @@ export function buildLogoutUrl({
   idTokenHint,
   postLogoutRedirectUri,
 }: {
-  idTokenHint?: string;
+  idTokenHint: string;
   postLogoutRedirectUri: string;
 }): string {
   const params = new URLSearchParams({
     post_logout_redirect_uri: postLogoutRedirectUri,
+    id_token_hint: idTokenHint,
   });
-  if (idTokenHint) {
-    params.set("id_token_hint", idTokenHint);
-  }
   return `${LOGOUT_URL}?${params.toString()}`;
 }
 
@@ -310,36 +328,6 @@ export async function getCustomer(accessToken: string): Promise<Customer | null>
   return json.data?.customer ?? null;
 }
 
-export async function getSubscriptionContracts(
-  accessToken: string
-): Promise<SubscriptionContract[]> {
-  const res = await fetch(CUSTOMER_API_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: accessToken,
-    },
-    body: JSON.stringify({ query: SUBSCRIPTION_CONTRACTS_QUERY }),
-  });
-
-  if (!res.ok) {
-    console.error("Subscription API error:", res.status);
-    return [];
-  }
-
-  const json = await res.json();
-  if (json.errors) {
-    // Customer Account API may not support subscriptionContracts on all plans
-    console.error("Subscription API GraphQL errors:", JSON.stringify(json.errors));
-    return [];
-  }
-
-  const edges = json.data?.customer?.subscriptionContracts?.edges ?? [];
-  return edges.map((e: { node: SubscriptionContract }) => e.node);
-}
-
-// --- Subscription contract ownership verification ---
-
 /**
  * Query used to prove that a subscription contract belongs to the customer who
  * owns `accessToken`.
@@ -356,6 +344,25 @@ const SUBSCRIPTION_CONTRACT_OWNERSHIP_QUERY = /* GraphQL */ `
     customer {
       subscriptionContract(id: $id) {
         id
+      }
+    }
+  }
+`;
+
+const UPCOMING_BILLING_CYCLES_QUERY = /* GraphQL */ `
+  query UpcomingBillingCycles($id: ID!, $first: Int!) {
+    customer {
+      subscriptionContract(id: $id) {
+        id
+        upcomingBillingCycles(first: $first, sortKey: CYCLE_INDEX) {
+          edges {
+            node {
+              cycleIndex
+              skipped
+              billingAttemptExpectedDate
+            }
+          }
+        }
       }
     }
   }
@@ -446,6 +453,145 @@ export async function verifySubscriptionContractOwnership(
   return requested !== null && requested === returned;
 }
 
+export type UpcomingBillingCycle = {
+  cycleIndex: number;
+  skipped: boolean;
+  billingAttemptExpectedDate: string | null;
+};
+
+/**
+ * Resolve the cycle index of the next billing cycle that has not already been
+ * skipped, for a contract owned by the bearer of `accessToken`.
+ *
+ * Returns `null` when the index cannot be determined (not owned, API failure,
+ * no upcoming cycles). Callers must treat `null` as "do not proceed" — never as
+ * "use a default index".
+ *
+ * Cycle indexes are 1-based, so there is no valid `0`. We read the real value
+ * from `upcomingBillingCycles` instead of assuming one.
+ *
+ * Ref: https://shopify.dev/docs/api/customer/latest/objects/SubscriptionContract
+ */
+export async function resolveNextBillingCycleIndex(
+  accessToken: string,
+  subscriptionContractId: string,
+  lookahead: number = 10
+): Promise<number | null> {
+  const cycle = await resolveNextBillingCycle(
+    accessToken,
+    subscriptionContractId,
+    lookahead
+  );
+  return cycle ? cycle.cycleIndex : null;
+}
+
+/**
+ * `resolveNextBillingCycleIndex` と同じ解決を行い、**周期そのもの** (index と
+ * 予定日) を返す。予定日は「顧客が画面で見たお届け予定」と突き合わせるために要る
+ * (`skipNextBillingCycle` の二重実行ガード)。
+ */
+export async function resolveNextBillingCycle(
+  accessToken: string,
+  subscriptionContractId: string,
+  lookahead: number = 10
+): Promise<UpcomingBillingCycle | null> {
+  if (!accessToken) return null;
+  if (!isSubscriptionContractGid(subscriptionContractId)) return null;
+
+  let json: {
+    data?: {
+      customer?: {
+        subscriptionContract?: {
+          id?: string;
+          upcomingBillingCycles?: { edges?: { node: UpcomingBillingCycle }[] };
+        } | null;
+      } | null;
+    };
+    errors?: unknown[];
+  };
+
+  try {
+    const res = await fetch(CUSTOMER_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: accessToken,
+      },
+      body: JSON.stringify({
+        query: UPCOMING_BILLING_CYCLES_QUERY,
+        variables: { id: subscriptionContractId, first: lookahead },
+      }),
+      cache: "no-store",
+    });
+
+    if (!res.ok) {
+      console.error(
+        "[resolveNextBillingCycleIndex] Customer API error:",
+        res.status
+      );
+      return null;
+    }
+
+    json = await res.json();
+  } catch (e) {
+    console.error("[resolveNextBillingCycleIndex] request failed:", e);
+    return null;
+  }
+
+  if (json.errors && json.errors.length > 0) {
+    console.error(
+      "[resolveNextBillingCycleIndex] GraphQL errors:",
+      JSON.stringify(json.errors)
+    );
+    return null;
+  }
+
+  const contract = json.data?.customer?.subscriptionContract;
+  if (!contract?.id) return null;
+
+  const edges = contract.upcomingBillingCycles?.edges ?? [];
+  const next = edges
+    .map((e) => e.node)
+    .find((node) => node && node.skipped === false);
+
+  if (!next || typeof next.cycleIndex !== "number" || next.cycleIndex < 1) {
+    return null;
+  }
+  return {
+    cycleIndex: next.cycleIndex,
+    skipped: next.skipped,
+    billingAttemptExpectedDate: next.billingAttemptExpectedDate ?? null,
+  };
+}
+
+export async function getSubscriptionContracts(
+  accessToken: string
+): Promise<SubscriptionContract[]> {
+  const res = await fetch(CUSTOMER_API_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: accessToken,
+    },
+    body: JSON.stringify({ query: SUBSCRIPTION_CONTRACTS_QUERY }),
+  });
+
+  if (!res.ok) {
+    console.error("Subscription API error:", res.status);
+    return [];
+  }
+
+  const json = await res.json();
+  if (json.errors) {
+    // Customer Account API may not support subscriptionContracts on all plans
+    console.error("Subscription API GraphQL errors:", JSON.stringify(json.errors));
+    return [];
+  }
+
+  const edges = json.data?.customer?.subscriptionContracts?.edges ?? [];
+  return edges.map((e: { node: SubscriptionContract }) => e.node);
+}
+
 // --- Subscription management mutations ---
 
 const SUBSCRIPTION_PAUSE_MUTATION = /* GraphQL */ `
@@ -493,13 +639,23 @@ const SUBSCRIPTION_CANCEL_MUTATION = /* GraphQL */ `
   }
 `;
 
+/**
+ * `subscriptionBillingCycleSkip` takes exactly one argument:
+ *   billingCycleInput: SubscriptionBillingCycleInput!
+ *     { contractId: ID!, selector: { date: DateTime, index: Int } }
+ *
+ * The previous version of this document passed `subscriptionContractId` and
+ * `billingCycleIndex` as top-level arguments. Neither argument exists on this
+ * mutation, so every skip request failed schema validation before it ever
+ * reached the store.
+ *
+ * Ref: https://shopify.dev/docs/api/customer/latest/mutations/subscriptionBillingCycleSkip
+ */
 const SUBSCRIPTION_BILLING_SKIP_MUTATION = /* GraphQL */ `
-  mutation subscriptionBillingCycleSkip($subscriptionContractId: ID!, $billingCycleIndex: Int!) {
-    subscriptionBillingCycleSkip(
-      subscriptionContractId: $subscriptionContractId
-      billingCycleIndex: $billingCycleIndex
-    ) {
+  mutation subscriptionBillingCycleSkip($billingCycleInput: SubscriptionBillingCycleInput!) {
+    subscriptionBillingCycleSkip(billingCycleInput: $billingCycleInput) {
       billingCycle {
+        cycleIndex
         skipped
       }
       userErrors {
@@ -520,49 +676,93 @@ async function executeSubscriptionMutation(
   query: string,
   variables: Record<string, unknown>
 ): Promise<SubscriptionMutationResult> {
-  const res = await fetch(CUSTOMER_API_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: accessToken,
-    },
-    body: JSON.stringify({ query, variables }),
-  });
+  let json: {
+    data?: Record<string, { userErrors?: { message: string }[] } | null>;
+    errors?: { message: string }[];
+  };
 
-  if (!res.ok) {
-    return { success: false, error: `API error: ${res.status}` };
+  try {
+    const res = await fetch(CUSTOMER_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: accessToken,
+      },
+      body: JSON.stringify({ query, variables }),
+      cache: "no-store",
+    });
+
+    if (!res.ok) {
+      // HTTP status も顧客には返さない (外部 API の内部状態を推し量る材料になる)。
+      reportSubscriptionFailure("customerApiMutation", `HTTP ${res.status}`);
+      return { success: false };
+    }
+
+    json = await res.json();
+  } catch (e) {
+    reportSubscriptionFailure("customerApiMutation:transport", e);
+    return { success: false };
   }
 
-  const json = await res.json();
   // Check for userErrors in any mutation response
   const data = json.data;
   if (data) {
     const mutationKey = Object.keys(data)[0];
     if (mutationKey) {
-      const result = data[mutationKey];
-      if (result?.userErrors?.length > 0) {
-        return {
-          success: false,
-          error: result.userErrors.map((e: { message: string }) => e.message).join(", "),
-        };
+      const userErrors = data[mutationKey]?.userErrors;
+      if (userErrors && userErrors.length > 0) {
+        // Shopify の userErrors はストア側の事情 (在庫・プラン構成・内部 ID) を
+        // 含みうるので転送しない。画面は `actionError` にフォールバックする。
+        reportSubscriptionFailure("customerApiMutation:userErrors", userErrors, {
+          mutationKey,
+        });
+        return { success: false };
       }
     }
   }
 
-  if (json.errors) {
-    return {
-      success: false,
-      error: json.errors.map((e: { message: string }) => e.message).join(", "),
-    };
+  if (json.errors && json.errors.length > 0) {
+    reportSubscriptionFailure("customerApiMutation:graphqlErrors", json.errors);
+    return { success: false };
+  }
+
+  // No data at all means the request did not produce a mutation result — treat
+  // that as failure rather than reporting success on an empty response.
+  if (!data) {
+    reportSubscriptionFailure("customerApiMutation:emptyResponse", "no data field");
+    return { success: false };
   }
 
   return { success: true };
 }
 
+/**
+ * Shared shape guard for every contract-scoped subscription mutation.
+ *
+ * Why every mutation needs it, not just skip: `subscriptionContractId` reaches
+ * these functions from a Server Action argument, i.e. from an untrusted HTTP
+ * body. The Customer Account API scopes the *contract* to the token holder, but
+ * it does not police the *shape* of the id — a caller can hand us
+ * `gid://shopify/Customer/1` or a raw `1111` and we would forward it to Shopify
+ * and surface whatever error comes back. Rejecting the wrong shape here keeps
+ * malformed ids from reaching Shopify at all (no request is issued), so the
+ * response cannot be used to probe which resources exist on the store.
+ *
+ * Kept identical in wording to the skip path so all four operations
+ * (pause / activate / cancel / skip) fail the same way for the same reason.
+ */
+const INVALID_CONTRACT_ID: SubscriptionMutationResult = {
+  success: false,
+  error: "Invalid subscription contract ID",
+};
+
 export async function pauseSubscription(
   accessToken: string,
   subscriptionContractId: string
 ): Promise<SubscriptionMutationResult> {
+  if (!isSubscriptionContractGid(subscriptionContractId)) {
+    return INVALID_CONTRACT_ID;
+  }
   return executeSubscriptionMutation(accessToken, SUBSCRIPTION_PAUSE_MUTATION, {
     subscriptionContractId,
   });
@@ -572,6 +772,9 @@ export async function activateSubscription(
   accessToken: string,
   subscriptionContractId: string
 ): Promise<SubscriptionMutationResult> {
+  if (!isSubscriptionContractGid(subscriptionContractId)) {
+    return INVALID_CONTRACT_ID;
+  }
   return executeSubscriptionMutation(accessToken, SUBSCRIPTION_ACTIVATE_MUTATION, {
     subscriptionContractId,
   });
@@ -581,19 +784,84 @@ export async function cancelSubscription(
   accessToken: string,
   subscriptionContractId: string
 ): Promise<SubscriptionMutationResult> {
+  if (!isSubscriptionContractGid(subscriptionContractId)) {
+    return INVALID_CONTRACT_ID;
+  }
   return executeSubscriptionMutation(accessToken, SUBSCRIPTION_CANCEL_MUTATION, {
     subscriptionContractId,
   });
 }
 
+/**
+ * Skip a billing cycle of a subscription contract.
+ *
+ * When `billingCycleIndex` is omitted we resolve the real next un-skipped cycle
+ * index from `upcomingBillingCycles` rather than guessing. There is no safe
+ * default: cycle indexes are 1-based, and picking the wrong index would skip a
+ * delivery the customer did not ask to skip.
+ *
+ * The resolve step queries the contract through `customer`, so it doubles as an
+ * ownership check for the token holder.
+ */
 export async function skipNextBillingCycle(
   accessToken: string,
   subscriptionContractId: string,
-  billingCycleIndex: number = 0
+  billingCycleIndex?: number,
+  expectedBillingDate?: string | null
 ): Promise<SubscriptionMutationResult> {
+  if (!isSubscriptionContractGid(subscriptionContractId)) {
+    return INVALID_CONTRACT_ID;
+  }
+
+  let cycleIndex = billingCycleIndex;
+
+  if (cycleIndex === undefined) {
+    const resolved = await resolveNextBillingCycle(
+      accessToken,
+      subscriptionContractId
+    );
+    if (resolved === null) {
+      return {
+        success: false,
+        error: "Could not determine the next billing cycle to skip",
+      };
+    }
+
+    // 二重実行ガード (2026-08-11 の失敗系監査 Medium-4)。
+    //
+    // サーバは常に「次の未スキップ周期」を自分で解決する。そのため、別タブや
+    // リロード後にもう一度スキップが飛ぶと、顧客が意図した周期ではなく**その次の
+    // 周期**が黙って飛ぶ (連続 2 周期スキップ = 顧客の意図と違う売上減)。
+    //
+    // そこで「顧客が画面で見ていたお届け予定日」を突き合わせ、一致しないときは
+    // 何もせず拒否する。index はクライアントから受け取らない (詐称できない) まま、
+    // 期待とのズレだけを検出する形。日付が読めない場合も**倒す側は拒否**にする —
+    // 検証できないまま周期を飛ばす方が実害が大きい。
+    if (expectedBillingDate !== undefined) {
+      if (
+        !matchesExpectedBillingDate(
+          resolved.billingAttemptExpectedDate,
+          expectedBillingDate
+        )
+      ) {
+        return { success: false, error: STALE_BILLING_CYCLE_VIEW };
+      }
+    }
+
+    cycleIndex = resolved.cycleIndex;
+  }
+
+  // Cycle indexes are 1-based; reject 0 / negatives / non-integers outright
+  // instead of letting Shopify interpret them.
+  if (!Number.isInteger(cycleIndex) || cycleIndex < 1) {
+    return { success: false, error: "Invalid billing cycle index" };
+  }
+
   return executeSubscriptionMutation(accessToken, SUBSCRIPTION_BILLING_SKIP_MUTATION, {
-    subscriptionContractId,
-    billingCycleIndex,
+    billingCycleInput: {
+      contractId: subscriptionContractId,
+      selector: { index: cycleIndex },
+    },
   });
 }
 

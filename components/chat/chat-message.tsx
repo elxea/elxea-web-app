@@ -177,11 +177,15 @@ function FeedbackButtons({
           onClick={() => handleFeedback(1)}
           className={cn(
             "px-1.5 py-0.5 rounded text-xs transition-colors",
+            // 淡い塗り (bg-*/10 /5) は敷かない。DS 規約: 役割色の文字の背後に
+            // 不透明度つきの面を置くと合成後の対比が読めなくなる (destructive
+            // 側は Figma 値のままで 3.946:1 と AA 未達だった)。選択済みは
+            // 隣の礼文 + もう一方の disabled でも伝わるので、色だけで示す。
             selectedRating === 1
-              ? "text-primary bg-primary/10"
+              ? "text-primary"
               : selectedRating !== null
                 ? "text-muted-foreground/40 cursor-not-allowed"
-                : "text-muted-foreground hover:text-primary hover:bg-primary/5",
+                : "text-muted-foreground hover:text-primary",
           )}
           aria-label="Good response"
         >
@@ -193,11 +197,12 @@ function FeedbackButtons({
           onClick={() => handleFeedback(-1)}
           className={cn(
             "px-1.5 py-0.5 rounded text-xs transition-colors",
+            // 淡い塗りを敷かない理由は上の高評価側と同じ (J1 / L2 の AA 未達)。
             selectedRating === -1
-              ? "text-destructive bg-destructive/10"
+              ? "text-destructive"
               : selectedRating !== null
                 ? "text-muted-foreground/40 cursor-not-allowed"
-                : "text-muted-foreground hover:text-destructive hover:bg-destructive/5",
+                : "text-muted-foreground hover:text-destructive",
           )}
           aria-label="Bad response"
         >

@@ -18,13 +18,31 @@ function getResend(): Resend {
 }
 
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "no-reply@elxea.com";
-const TO_EMAIL = process.env.CONTACT_TO_EMAIL || "support@elxea.com";
+// 既定の受信先は info@ に統一 (Setaka 確定 2026-08-11)。画面に出す問い合わせ先と
+// 実際の受信箱が別アドレスだと、返信元と案内先が食い違う。
+const TO_EMAIL = process.env.CONTACT_TO_EMAIL || "info@elxea.com";
+const BUSINESS_TO_EMAIL = process.env.CONTACT_BUSINESS_TO_EMAIL || "info@elxea.com";
+
+/**
+ * お問い合わせの種類。Figma【R2: 確定版】`8109:46695` の 2 択に対応する。
+ *
+ * R2 で法人ページが `/contact` に統合されたため、R1 で URL (`/contact/business`)
+ * が担っていた「どのメールボックスへ送るか」の振り分けをこの軸に移した。
+ * 送信先は R1 と同じ 2 つ (一般 = CONTACT_TO_EMAIL / 法人 = CONTACT_BUSINESS_TO_EMAIL)。
+ */
+const CATEGORY_ROUTING = {
+  customer: { to: TO_EMAIL, label: "お問い合わせ" },
+  business: { to: BUSINESS_TO_EMAIL, label: "お取引・取材等のご相談" },
+} as const;
 
 const ContactFormSchema = z.object({
   name: z.string().trim().min(1).max(100),
   email: z.string().trim().email().max(254),
-  subject: z.string().trim().min(1).max(200),
+  // R2 で `件名` field が廃止されたため任意にした (旧クライアントからの送信は引き続き通る)。
+  subject: z.string().trim().min(1).max(200).optional(),
   message: z.string().trim().min(1).max(5000),
+  // 未選択のまま送れる項目なので任意。既定は一般問い合わせ。
+  category: z.enum(["customer", "business"]).default("customer"),
 });
 
 export async function POST(request: NextRequest) {
@@ -42,14 +60,28 @@ export async function POST(request: NextRequest) {
 
     const parsed = await parseJsonBody(request, ContactFormSchema);
     if (!parsed.ok) return parsed.response;
-    const { name, email, subject, message } = parsed.data;
+    const { name, email, subject, message, category } = parsed.data;
+    const routed = CATEGORY_ROUTING[category];
+
+    // 件名は R2 で廃止された任意項目。無いときは種類ラベルだけで件名を組む
+    // (「データが無い行は出さない」= 空の `件名:` を本文に残さない)。
+    const mailSubject = subject
+      ? `[${routed.label}] ${subject}`
+      : `[${routed.label}] ${name}`;
 
     const { error } = await getResend().emails.send({
       from: `elxea <${FROM_EMAIL}>`,
-      to: [TO_EMAIL],
+      to: [routed.to],
       replyTo: email,
-      subject: `[お問い合わせ] ${subject}`,
-      text: `名前: ${name}\nメール: ${email}\n件名: ${subject}\n\n${message}`,
+      subject: mailSubject,
+      text: [
+        `種類: ${routed.label}`,
+        `名前: ${name}`,
+        `メール: ${email}`,
+        ...(subject ? [`件名: ${subject}`] : []),
+        "",
+        message,
+      ].join("\n"),
     });
 
     if (error) {

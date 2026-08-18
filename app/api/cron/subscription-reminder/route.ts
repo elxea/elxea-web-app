@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import { getSubscriptionContracts } from "@/lib/shopify/subscription-admin";
 import { sendSubscriptionReminder } from "@/lib/email/subscription-reminder";
+import {
+  claimReminderSend,
+  recordReminderOutcome,
+} from "@/lib/email/reminder-send-log";
 
 /**
  * Cron-triggered subscription renewal reminder.
@@ -10,6 +14,15 @@ import { sendSubscriptionReminder } from "@/lib/email/subscription-reminder";
  *
  * Expected to be called daily by Vercel Cron (vercel.json).
  * Protected by CRON_SECRET header check.
+ *
+ * 2026-08-11 の失敗系監査で塞いだ 2 点:
+ *
+ *   1. **二重送信** — 対象日の一致だけで拾っていたため、cron が同日に二重発火すると
+ *      同じ顧客へ 2 通届いた。送信前に「契約 x 対象日」の予約を取り
+ *      (`lib/email/reminder-send-log.ts`)、取れたときだけ送る。
+ *   2. **沈黙** — `sendSubscriptionReminder` は Resend のエラー応答を例外ではなく
+ *      `{ success: false }` で返すため、throw 経路にしか無かった Sentry には
+ *      一切乗らなかった。エラー応答も監視に上げる。
  */
 
 const CRON_SECRET = process.env.CRON_SECRET || "";
@@ -43,7 +56,7 @@ export async function GET(request: NextRequest) {
   const results: {
     contractId: string;
     customerEmail: string;
-    status: "sent" | "skipped" | "error";
+    status: "sent" | "skipped" | "duplicate" | "error";
     detail?: string;
   }[] = [];
 
@@ -104,6 +117,45 @@ export async function GET(request: NextRequest) {
         contract.deliveryPolicy.intervalCount
       );
 
+      // 送る前に「契約 x 対象日」の予約を取る。取れなければ送らない
+      // (同日の二重発火で顧客に 2 通届くのを防ぐ)。
+      const claim = await claimReminderSend(contract.id, reminderDateStr);
+
+      if (!claim.claimed) {
+        if (claim.reason === "duplicate") {
+          // 正常系: この対象日はもう送っている。異常ではないので Sentry には上げない。
+          results.push({
+            contractId: contract.id,
+            customerEmail,
+            status: "duplicate",
+            detail: "Already sent for this reminder date",
+          });
+          continue;
+        }
+
+        // 予約自体が取れなかった (Firestore 障害など)。送らずに監視へ上げる —
+        // 予約なしで送ると二重送信を防げなくなる。
+        console.error(
+          `[Subscription Reminder] 送信予約が取れないため送信しません (${contract.id}): ${claim.detail}`
+        );
+        Sentry.captureMessage("[Subscription Reminder] claim failed", {
+          level: "error",
+          tags: { cron: "subscription-reminder", phase: "claim" },
+          extra: {
+            contractId: contract.id,
+            reminderDate: reminderDateStr,
+            detail: claim.detail,
+          },
+        });
+        results.push({
+          contractId: contract.id,
+          customerEmail,
+          status: "error",
+          detail: `Reminder claim failed: ${claim.detail}`,
+        });
+        continue;
+      }
+
       try {
         const result = await sendSubscriptionReminder({
           customerEmail,
@@ -111,6 +163,27 @@ export async function GET(request: NextRequest) {
           nextBillingDate: contract.nextBillingDate!,
           items,
           deliveryInterval,
+        });
+
+        // Resend のエラー応答は例外にならない。ここで監視に上げないと不着が沈黙する。
+        if (!result.success) {
+          console.error(
+            `[Subscription Reminder] 送信に失敗しました (${contract.id}): ${result.error}`
+          );
+          Sentry.captureMessage("[Subscription Reminder] email not sent", {
+            level: "error",
+            tags: { cron: "subscription-reminder", phase: "send" },
+            extra: {
+              contractId: contract.id,
+              reminderDate: reminderDateStr,
+              reason: result.error,
+            },
+          });
+        }
+
+        await recordReminderOutcome(claim.docId, {
+          sent: result.success,
+          error: result.error,
         });
 
         results.push({
@@ -122,6 +195,10 @@ export async function GET(request: NextRequest) {
       } catch (error) {
         const message =
           error instanceof Error ? error.message : "Unknown error";
+        await recordReminderOutcome(claim.docId, {
+          sent: false,
+          error: message,
+        });
         results.push({
           contractId: contract.id,
           customerEmail,
@@ -139,9 +216,10 @@ export async function GET(request: NextRequest) {
     const sent = results.filter((r) => r.status === "sent").length;
     const errors = results.filter((r) => r.status === "error").length;
     const skipped = results.filter((r) => r.status === "skipped").length;
+    const duplicates = results.filter((r) => r.status === "duplicate").length;
 
     console.log(
-      `[Subscription Reminder] Processed ${dueContracts.length} contracts: ${sent} sent, ${errors} errors, ${skipped} skipped`
+      `[Subscription Reminder] Processed ${dueContracts.length} contracts: ${sent} sent, ${errors} errors, ${skipped} skipped, ${duplicates} duplicates`
     );
 
     return NextResponse.json({
@@ -151,6 +229,7 @@ export async function GET(request: NextRequest) {
       sent,
       errors,
       skipped,
+      duplicates,
       results,
     });
   } catch (error) {

@@ -27,14 +27,14 @@ export const Default: Story = {
             </Button>
           </CollapsibleTrigger>
         </div>
-        <div className="rounded-md border px-4 py-2 font-mono text-sm shadow-sm">
+        <div className="rounded-md border border-border px-4 py-2 font-mono text-sm shadow-sm">
           Item 1
         </div>
         <CollapsibleContent className="space-y-2">
-          <div className="rounded-md border px-4 py-2 font-mono text-sm shadow-sm">
+          <div className="rounded-md border border-border px-4 py-2 font-mono text-sm shadow-sm">
             Item 2
           </div>
-          <div className="rounded-md border px-4 py-2 font-mono text-sm shadow-sm">
+          <div className="rounded-md border border-border px-4 py-2 font-mono text-sm shadow-sm">
             Item 3
           </div>
         </CollapsibleContent>

@@ -45,8 +45,11 @@ export default function PasswordPage() {
             autoFocus
             className="border border-border bg-popover px-3 py-2.5 text-sm outline-none"
           />
+          {/* 枠は不透明度を落とさない: 面 `card` #f4f3ed に対し `border-destructive/40`
+              の合成色は 1.781:1 で WCAG 1.4.11 (非テキスト 3:1) を満たさない。
+              100% なら 4.944:1 で合格する (C6-1R)。 */}
           {error && (
-            <p className="rounded-md border border-destructive/40 px-3 py-2 text-center text-sm text-destructive">
+            <p className="rounded-md border border-destructive px-3 py-2 text-center text-sm text-destructive">
               Incorrect password.
             </p>
           )}

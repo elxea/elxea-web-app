@@ -154,6 +154,37 @@ export const SUBSCRIPTION_BILLING_ATTEMPT_CREATE_MUTATION = /* GraphQL */ `
   }
 `;
 
+/**
+ * 契約の `nextBillingDate` を明示的に設定する。
+ *
+ * `SubscriptionContract.nextBillingDate` は Shopify の公式ドキュメントで
+ * "This field is managed by the apps" と明記されており、**前進はアプリの責務**。
+ * `subscriptionBillingAttemptCreate` は billing cycle を課金するだけで
+ * `nextBillingDate` に触れないため、このミューテーションを呼ばない限り
+ * 契約は 1 回課金した時点で永久に同じ請求日に留まる。
+ *
+ * `subscriptionContractUpdate` の draft 3 段 (create → update → commit) でも
+ * `nextBillingDate` は書けるが、単一フィールドの整合にはこの専用ミューテーションを使う
+ * (draft は契約全体を書き換える経路なので、周期の整合だけを目的にするには過剰)。
+ *
+ * Ref: https://shopify.dev/docs/api/admin-graphql/latest/mutations/subscriptionContractSetNextBillingDate
+ * Ref: https://shopify.dev/docs/api/admin-graphql/latest/objects/SubscriptionContract
+ */
+export const SUBSCRIPTION_CONTRACT_SET_NEXT_BILLING_DATE_MUTATION = /* GraphQL */ `
+  mutation SubscriptionContractSetNextBillingDate($contractId: ID!, $date: DateTime!) {
+    subscriptionContractSetNextBillingDate(contractId: $contractId, date: $date) {
+      contract {
+        id
+        nextBillingDate
+      }
+      userErrors {
+        field
+        message
+      }
+    }
+  }
+`;
+
 export const CUSTOMER_TAGS_ADD_MUTATION = /* GraphQL */ `
   mutation tagsAdd($id: ID!, $tags: [String!]!) {
     tagsAdd(id: $id, tags: $tags) {
@@ -191,51 +222,6 @@ export const SUBSCRIPTION_DRAFT_COMMIT_MUTATION = /* GraphQL */ `
   mutation SubscriptionDraftCommit($draftId: ID!) {
     subscriptionDraftCommit(draftId: $draftId) {
       contract {
-        id
-        status
-      }
-      userErrors {
-        field
-        message
-      }
-    }
-  }
-`;
-
-export const SUBSCRIPTION_DRAFT_LINE_ADD_MUTATION = /* GraphQL */ `
-  mutation SubscriptionDraftLineAdd($draftId: ID!, $input: SubscriptionLineInput!) {
-    subscriptionDraftLineAdd(draftId: $draftId, input: $input) {
-      lineAdded {
-        id
-        title
-        variantTitle
-        quantity
-        currentPrice { amount currencyCode }
-        productId
-        variantId
-        variantImage { url altText }
-        sku
-      }
-      draft {
-        id
-        status
-      }
-      userErrors {
-        field
-        message
-      }
-    }
-  }
-`;
-
-export const SUBSCRIPTION_DRAFT_LINE_REMOVE_MUTATION = /* GraphQL */ `
-  mutation SubscriptionDraftLineRemove($draftId: ID!, $lineId: ID!) {
-    subscriptionDraftLineRemove(draftId: $draftId, lineId: $lineId) {
-      lineRemoved {
-        id
-        title
-      }
-      draft {
         id
         status
       }

@@ -42,14 +42,21 @@ export function ImageGallery({ images }: { images: ImageType[] }) {
         />
       </button>
 
-      {/* Thumbnails */}
+      {/* Thumbnails —
+          `scrollbar-none` は横スクロール列の共通指定 (app/globals.css)。
+          スワイプもキーボード送りも従来どおりで、ブラウザのスクロールバー
+          だけを出さない。 */}
       {images.length > 1 && (
-        <div className="flex gap-3 overflow-x-auto" role="listbox" aria-label="Product images">
+        <div
+          className="flex gap-3 overflow-x-auto scrollbar-none"
+          role="listbox"
+          aria-label="Product images"
+        >
           {images.map((image, i) => (
             <Button
               key={i}
               variant="ghost"
-              className={`w-20 h-20 p-0 flex-shrink-0 overflow-hidden border transition-all duration-200 ${
+              className={`w-20 h-20 p-0 flex-shrink-0 overflow-hidden border transition-all duration-fast ${
                 i === selected ? "border-foreground" : "border-transparent hover:border-muted-foreground/30"
               }`}
               onClick={() => setSelected(i)}

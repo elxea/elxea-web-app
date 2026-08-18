@@ -22,6 +22,9 @@ const SIZES = [
   "xs",
   "sm",
   "lg",
+  // 本レーン (C7-1) で追加した size のみを足した。既存 size の網羅範囲は
+  // 変えていない (`service` の網羅追加は DS トークン整合タスクへ申し送り)。
+  "cta",
   "icon",
   "icon-xs",
   "icon-sm",

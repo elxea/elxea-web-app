@@ -1,17 +1,66 @@
 name: CI
 
+# Trigger design (2026-08-09, P0 of the QA plan).
+#
+# The problem this fixes: triggers were `main` / `developer` / `PR to main` only,
+# so `feat/**` — where all the actual work happens — never ran CI at all. The
+# C1 design-system branch reached 151 commits ahead of main without a single run.
+# CI existed and looked healthy; it just wasn't pointed at the code being written.
+#
+# `feat/**` now runs a lean gate on every push. Heavy jobs (Chromatic) stay on
+# PRs, because they cost more than they return on a work-in-progress branch.
+#
+# There is no branch protection on this repo (GitHub Free + private = required
+# status checks are a paid feature; `gh api .../branches/main/protection` returns
+# 403 "Upgrade to GitHub Pro"). So CI here *inspects and reports* — it cannot
+# block a merge. Enforcement is the operational rule in docs/ci-gates.md: Boss
+# confirms CI green before merging.
 on:
   push:
-    branches: [main, developer]
+    branches: [main, developer, "feat/**"]
+    # Docs-only pushes cannot break any of these gates, and ~21% of this branch's
+    # commits are fidelity-table markdown. Skipping them keeps the Actions budget
+    # for pushes that can actually regress something. PRs are deliberately NOT
+    # filtered — a PR gets the full suite regardless of what it touches.
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
+      - "LICENSE"
+  # No `branches:` filter — every PR is checked, whatever its base.
   pull_request:
-    branches: [main]
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  # Cancel superseded runs everywhere EXCEPT the auto-deploy branch.
+  #
+  # Since 2026-08-12 the production deploy is a job in THIS workflow (see
+  # `deploy-production` at the bottom), so a workflow-level cancel would abort a
+  # `vercel deploy` mid-flight — exactly what the old deploy.yml avoided with its
+  # own `cancel-in-progress: false`. A job-level `concurrency:` cannot save it:
+  # workflow-level cancellation kills the whole run regardless. So the guard has
+  # to live here.
+  #
+  # Effect: on the deploy branch runs QUEUE instead of cancelling (FIFO, so the
+  # newest commit still ends up as the final production deploy). Every other
+  # branch keeps the old cheap cancel-the-stale-run behaviour.
+  # 出荷ブランチ (= 本番の正本 main) の run はキャンセルしない。2026-08-17 の
+  # 一本化で feat/c1-ds-foundation から main へ変更。
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 env:
   NODE_VERSION: "22"
+  # NOT a credential — a throwaway string that only has to be non-empty.
+  # `lib/shopify/customer.ts` throws at module load when this is unset (unless
+  # NODE_ENV=test), and it is only ever used as a sha256 input for token
+  # encryption at runtime. Nothing in CI signs or verifies anything with it, and
+  # the real value lives in the Vercel project env.
+  #
+  # Needed by two jobs for different reasons:
+  #  - build: `next build` aborts at "Collecting page data" on /api/auth/logout.
+  #  - e2e-tests: the Playwright `webServer` runs `pnpm dev`, which inherits
+  #    process.env; without this every route 500s and the suite fails wholesale
+  #    (41 failures traced to this single cause on run 31321859910).
+  SESSION_SECRET: ci-build-only-placeholder-not-a-secret
 
 jobs:
   static-checks:
@@ -38,7 +87,13 @@ jobs:
         run: pnpm lint
 
       - name: Type check
-        run: pnpm tsc --noEmit
+        # `pnpm typecheck`, not a bare `pnpm tsc --noEmit`. The script is
+        # `typecheck:clean && next typegen && tsc --noEmit`: without the
+        # `next typegen` step, the generated route types under .next/types are
+        # missing, so any type error involving a generated PageProps / route type
+        # was invisible to CI while the pre-push hook (which does run the script)
+        # caught it locally. CI and pre-push now check the same thing.
+        run: pnpm typecheck
 
       - name: Validate design tokens
         # Fails the build (validate-tokens.ts exits 1) when tokens drift from
@@ -93,6 +148,9 @@ jobs:
         # or over-filtered run FAILS instead of passing vacuously.
         # Raise TEST_FLOOR_UNIT toward the real count over time.
         # docs/ops/test-floor.md
+        #
+        # 移植元: main #58 (e1b778b)。一本化 (2026-08-17) で ci.yml をデプロイ配線の
+        # 正本に統一する際、c1-ds 側の ci.yml にこの step が無かったため戻した。
         env:
           TEST_FLOOR_UNIT: "150"
         run: node scripts/ops/check-test-floor.mjs --file test-results/junit.xml --min "${TEST_FLOOR_UNIT}" --label unit
@@ -104,6 +162,108 @@ jobs:
           name: unit-test-results
           path: test-results/
           retention-days: 7
+
+  coverage:
+    name: coverage
+    needs: static-checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Measure coverage
+        # `@vitest/coverage-v8` was in devDependencies but nothing ever ran it, so
+        # the untested surface (36 of 38 API routes, most of lib/) was real but
+        # invisible — nobody could see it shrinking. Fails when coverage drops
+        # below the pinned baseline in vitest.config.ts.
+        #
+        # Uses `pnpm test:coverage` (VITEST_COVERAGE=1) rather than `--coverage`:
+        # the CLI flag makes @chromatic-com/storybook's bundled chromatic CLI
+        # parse argv, hit the boolean, and throw
+        # `Cannot create property 'provider' on boolean 'true'`, which fails
+        # config load before any test runs. See the comment in vitest.config.ts.
+        run: pnpm test:coverage
+
+      - name: Publish coverage to job summary
+        if: always()
+        run: |
+          {
+            echo "## Coverage"
+            echo
+            if [ -f coverage/coverage-summary.json ]; then
+              node -e '
+                const t = require("./coverage/coverage-summary.json").total;
+                const row = (k) => `| ${k} | ${t[k].pct}% | ${t[k].covered}/${t[k].total} |`;
+                console.log("| Metric | % | Covered |");
+                console.log("| --- | ---: | ---: |");
+                for (const k of ["statements", "branches", "functions", "lines"]) console.log(row(k));
+              '
+            else
+              echo "[WARN] coverage/coverage-summary.json not found."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 7
+
+  build:
+    name: build
+    needs: static-checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NODE_OPTIONS: --max-old-space-size=4096
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Production build
+        # Previously CI never built. The first real build was `vercel build --prod`
+        # in deploy.yml, i.e. *after* the merge to main — so a broken build was
+        # discovered in production deploys rather than on the branch.
+        #
+        # `pnpm build` = `node sd.config.mjs && tsx scripts/check-placeholders.ts
+        # && next build`, so this also exercises token generation and the
+        # placeholder scan.
+        run: pnpm build
+        env:
+          # Seeded preview data so the seeded routes render at real density
+          # during prerender instead of collapsing to empty states.
+          PREVIEW_SEED: "1"
+          # Public (non-secret) Sanity coordinates, same values e2e-tests uses.
+          NEXT_PUBLIC_SANITY_PROJECT_ID: 5s8ahx87
+          NEXT_PUBLIC_SANITY_DATASET: production
+          # SESSION_SECRET comes from the workflow-level `env` block.
 
   storybook-tests:
     name: storybook-tests
@@ -161,27 +321,53 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium
 
       - name: Run E2E tests (with retries for flaky tests)
-        # PLAYWRIGHT_JUNIT_OUTPUT_NAME makes the junit reporter write to a FILE.
-        # Playwright's --reporter=junit prints to stdout unless this env is set,
-        # so the previous `--output=test-results/e2e-junit.xml` (which is the
-        # ARTIFACTS dir, not the report path) never produced a junit file. We
-        # now write the junit to a known path and keep artifacts in a separate
-        # dir so the P5 floor check below can read the real executed count.
-        run: pnpm test:e2e --retries=2 --reporter=junit --output=test-results/e2e-artifacts
+        # Reporters now come from playwright.config.ts (list + html + json +
+        # junit). The old `--reporter=junit --output=test-results/e2e-junit.xml`
+        # was silently broken: `--output` is the artifacts *directory*, not the
+        # JUnit path, so the XML went to stdout and the uploaded artifact
+        # contained no report.
+        run: pnpm test:e2e --retries=2
         env:
           CI: true
-          PLAYWRIGHT_JUNIT_OUTPUT_NAME: test-results/e2e-junit.xml
           NEXT_PUBLIC_SANITY_PROJECT_ID: 5s8ahx87
           NEXT_PUBLIC_SANITY_DATASET: production
+          # Seeded product catalogue for the dev server the Playwright webServer
+          # starts. CI has no Shopify Storefront credentials, so every
+          # product-backed route used to degrade to "商品を読み込めませんでした"
+          # — which also made an unknown product slug answer 200 instead of 404
+          # and turned a zero-hit search into an error message. This flag only
+          # takes effect when the credentials are absent, so it can never mask a
+          # real Shopify outage. See lib/preview-seed-storefront.ts.
+          #
+          # NOT `PREVIEW_SEED=1`: the master flag also injects a seeded *cart*,
+          # which would break the cart empty-state specs.
+          PREVIEW_SEED_STOREFRONT: "1"
 
       - name: Verify E2E test floor (P5 — 空回り検知)
         # Same 0件成功 guard for the e2e suite. In CI several specs are
         # intentionally ignored (external services), so the floor is set below
         # the CI-run count with margin. Raise TEST_FLOOR_E2E over time.
         # docs/ops/test-floor.md
+        #
+        # 移植元: main #58 (e1b778b)。JUnit の出力先は playwright.config.ts の
+        # reporter 定義 (test-results/e2e-junit.xml) を読む。
+        if: always()
         env:
           TEST_FLOOR_E2E: "15"
         run: node scripts/ops/check-test-floor.mjs --file test-results/e2e-junit.xml --min "${TEST_FLOOR_E2E}" --label e2e
+
+      - name: Report skipped tests (no-op green visibility)
+        # Runs even when the suite fails. 33 runtime skip guards mean a large part
+        # of this job can pass without asserting anything (CRON_SECRET,
+        # SHOPIFY_WEBHOOK_SECRET, Shopify SellingPlan fixtures are all absent in
+        # CI). This publishes the count and the reasons to the job summary so the
+        # gap is visible on every run.
+        #
+        # Deliberately does NOT fail the build and does NOT enable those tests —
+        # switching them on requires provisioning secrets, which is a separate
+        # decision (see docs/ci-gates.md for the list).
+        if: always()
+        run: pnpm report:e2e-skips
 
       - name: Upload E2E results
         if: always()
@@ -201,20 +387,18 @@ jobs:
 
   visual-regression:
     name: visual-regression
-    # Runs on PRs AND on main pushes. The `if: github.event_name ==
-    # 'pull_request'` guard that used to live here made `autoAcceptChanges: main`
-    # below unreachable: the job never ran on main, so no main push ever produced
-    # a new baseline. Chromatic kept comparing every PR against the last manually
-    # accepted build (#43, 2026-07-13) and reported the same frozen 69 changes on
-    # five unrelated PRs (#44/#45/#46/#47/#49) — a permanently red gate that can
-    # no longer tell a real regression from the backlog. See issue #50.
+    # Runs on PRs AND on main pushes. Chromatic bills per snapshot, so it does
+    # NOT run on every `feat/**` push (that would burn the quota on intermediate
+    # states nobody reviews). But PR-only was also wrong: it made
+    # `autoAcceptChanges: main` below unreachable, so no main push ever produced
+    # a new baseline and every PR kept diffing against the last manually
+    # accepted build — a permanently red gate (main #51 / issue #50).
     #
-    # Push runs are scoped to `main` on purpose. This workflow also triggers on
-    # pushes to `developer`, but `autoAcceptChanges` below only matches `main`,
-    # so a `developer` push would produce a build nobody ever accepts: a red
-    # check and burnt snapshots, with the baseline left where it was. `main` is
-    # the only branch that defines the baseline, so it is the only branch whose
-    # pushes need a Chromatic build.
+    # `main` is the only branch that defines the baseline, so it is the only
+    # branch whose pushes need a Chromatic build.
+    #
+    # 移植元: main #51 (0e43663)。一本化 (2026-08-17) で c1-ds の PR-only 版に
+    # 上書きされないよう main 腕を戻した。
     if: >-
       github.event_name == 'pull_request' ||
       (github.event_name == 'push' && github.ref == 'refs/heads/main')
@@ -263,6 +447,16 @@ jobs:
 
   staging-smoke:
     name: staging-smoke
+    # 出荷しているブランチを見る。ここが `main` に留まっていたため、この監視は
+    # **一度も走っていなかった**: main は出荷ブランチより ~205 commit 遅れていて
+    # push が来ないので、ref が一致せず毎回 skip される。skip された job は
+    # Actions の一覧で成功と見分けがつかないため、無音のまま「監視あり」と
+    # 見做されていた (下の deploy-production が DEPLOY_BRANCH で直したのと同じ
+    # 誤り)。デプロイ判定 (DEPLOY_ENABLED) には触らない — これは監視の対象を
+    # 実際に出荷する側へ向け直すだけ。
+    #
+    # !! DEPLOY_BRANCH を変えるときは、この行も一緒に変える。!!
+    # 2026-08-17: 一本化で出荷ブランチが main になったため main に合わせた。
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     needs: [unit-tests, e2e-tests]
     runs-on: ubuntu-latest
@@ -301,3 +495,219 @@ jobs:
         env:
           BASE_URL: ${{ secrets.STAGING_URL }}
           CI: true
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Production deploy (moved here from .github/workflows/deploy.yml, 2026-08-12)
+  # ─────────────────────────────────────────────────────────────────────────
+  #
+  # deploy.yml had three independent defects; living in this workflow fixes all
+  # three at once:
+  #
+  #  1. It shipped WITHOUT looking at a single test result — `on: push:
+  #     branches: [main]`, no `needs:`, no gate, no `environment:`. The `needs:`
+  #     below makes a green suite a hard precondition: if anything it depends on
+  #     fails, this job never starts.
+  #  2. It targeted `main`, which is ~205 commits BEHIND the branch that actually
+  #     ships. A push to main therefore rolled production BACKWARDS — this really
+  #     happened on 2026-08-12 and had to be manually recovered. See DEPLOY_BRANCH.
+  #  3. It used `vercel build` + `vercel deploy --prebuilt`, broken since
+  #     2026-07-31 (3 consecutive failures). Root cause in the deploy step below.
+  #
+  # Why `needs:` and not `workflow_run:`
+  #   `workflow_run` "will only trigger a workflow run if the workflow file
+  #   exists on the default branch", and the triggered run then executes in
+  #   DEFAULT BRANCH context (GITHUB_SHA = last commit on the default branch).
+  #   Both properties are fatal here: the gate would never fire for a `feat/**`
+  #   push, and if it ever did it would deploy main's tip — re-creating defect 2.
+  #   https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows
+  #   `needs:` has neither problem: same workflow, same run, same commit, and
+  #   ordering guaranteed by the dependency graph. (`workflow_dispatch` is out for
+  #   the same default-branch reason, so there is no manual Actions deploy from a
+  #   feature branch — manual deploys stay a local `vercel --prod`.)
+  #
+  # `visual-regression` is deliberately absent from `needs:` — it is PR-only, and
+  # depending on a skipped job would skip this one too.
+  deploy-production:
+    name: deploy-production
+    # ── DEPLOY_BRANCH ──────────────────────────────────────────────────────
+    # The single line that decides which branch reaches production.
+    #
+    # 2026-08-17: main 一本化にあわせて `feat/c1-ds-foundation` から `main` に
+    # 変更した。ここが「もう push されないブランチ」に留まると auto-deploy は
+    # 無言で死ぬ (ref が一致しなくなり毎回この job が skip されるだけで、どこも
+    # エラーを出さない。skip された job は Actions 一覧で成功と見分けがつかない)。
+    #
+    # 本番の正本は main (docs/ops/production-source-of-truth.md)。この行と
+    # その宣言は必ず一致させる。
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [static-checks, unit-tests, coverage, build, storybook-tests, e2e-tests]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Second layer of serialisation, for the cross-workflow case: the workflow
+    # concurrency group is per-ref, this one is global to the deploy.
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    env:
+      # NOT secrets — the team and project identifiers from .vercel/project.json,
+      # which is git-ignored, hence pinned here. The Vercel CLI reads both from
+      # the environment, so no interactive `vercel link` is needed.
+      VERCEL_ORG_ID: team_6ut7roUVtRU2EGbPVR9DNTy6
+      VERCEL_PROJECT_ID: prj_sVwjaJwPAKxRcKu3wVejiqGPt5o6
+      # Pinned deliberately (移植元: main deploy.yml)。This used to be
+      # `vercel@latest`, which meant a third-party patch release could break
+      # production deploys with zero changes in this repo — and on 2026-07-30
+      # exactly that happened (57.0.0 deployed fine, 58.4.4 did not). Deploys
+      # must be reproducible, so the CLI is a pinned input like any other
+      # dependency. Bump intentionally, and check the run stays green after you do.
+      VERCEL_CLI_VERSION: "58.9.4"
+      # Public production URL, asserted by the smoke check after every deploy.
+      PRODUCTION_URL: "https://elxea.com"
+      # Supplied ONCE, as an env var. The CLI picks VERCEL_TOKEN up automatically,
+      # so no step passes it as a `--token=` flag: the value never lands on a
+      # command line (which can surface in process listings and step logs).
+      # GitHub masks it either way — keeping it off argv is defence in depth.
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+    steps:
+      - name: Preflight — require VERCEL_TOKEN secret
+        # Fail loudly rather than deep inside the CLI with an opaque auth error.
+        run: |
+          if [ -z "${VERCEL_TOKEN}" ]; then
+            echo "::error title=VERCEL_TOKEN not set::The 'VERCEL_TOKEN' repository secret is missing, so this deploy cannot authenticate to Vercel."
+            echo "To enable deploys:"
+            echo "  1. Create a PROJECT-SCOPED token at https://vercel.com/account/tokens (scope it to the elxea-web-app project only)"
+            echo "  2. Run: gh secret set VERCEL_TOKEN --repo <owner>/elxea-web-app"
+            exit 1
+          fi
+          echo "VERCEL_TOKEN is present."
+
+      - name: Arming switch — is auto-deploy enabled?
+        # ── KILL SWITCH ────────────────────────────────────────────────────
+        # Production only changes when the repository variable DEPLOY_ENABLED is
+        # the exact string "true":
+        #     gh variable set DEPLOY_ENABLED --body true   --repo <owner>/elxea-web-app
+        #     gh variable set DEPLOY_ENABLED --body false  --repo <owner>/elxea-web-app
+        #
+        # The switch is deliberately phrased as ENABLED (opt in) and not DISABLED
+        # (opt out), because only opt-in fails safe. With a DISABLED flag, an
+        # unset, misspelled, or accidentally deleted variable silently means
+        # "deploy to production"; with ENABLED, every one of those cases means
+        # "do nothing". The variable is currently UNSET, so this wiring lands
+        # inert and the first real deploy is a deliberate act.
+        #
+        # This is a STEP-level gate, not a job-level `if:`, on purpose: the job
+        # still runs, so every run shows on the record that the chain reached the
+        # deploy and that the gate is what stopped it. A skipped job would be
+        # indistinguishable from a broken `needs:` graph.
+        id: arm
+        run: |
+          if [ "${{ vars.DEPLOY_ENABLED }}" = "true" ]; then
+            echo "armed=true" >> "$GITHUB_OUTPUT"
+            echo "DEPLOY_ENABLED=true — proceeding to deploy ${GITHUB_SHA}."
+          else
+            echo "armed=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Auto-deploy is disabled::DEPLOY_ENABLED is not 'true', so no deployment was created. All gates passed; this commit is deployable. Enable with: gh variable set DEPLOY_ENABLED --body true"
+          fi
+
+      - name: Checkout
+        if: steps.arm.outputs.armed == 'true'
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        # Only needed to run the Vercel CLI itself. Note there is no pnpm setup
+        # and no `pnpm install` in this job any more: the build happens on
+        # Vercel's infrastructure now (see the deploy step), so the runner never
+        # needs the dependency tree.
+        if: steps.arm.outputs.armed == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install Vercel CLI
+        if: steps.arm.outputs.armed == 'true'
+        run: npm install --global "vercel@${VERCEL_CLI_VERSION}"
+
+      - name: Verify Vercel credentials
+        # Cheap auth probe that creates nothing. Deliberately `vercel whoami`
+        # rather than the `vercel pull` the old workflow used: `pull` downloads
+        # the production environment (including secret values) onto the runner's
+        # disk, and now that Vercel does the building we have no use for it. Same
+        # early-failure benefit, no secret materialised.
+        if: steps.arm.outputs.armed == 'true'
+        run: vercel whoami
+
+      - name: Deploy to production
+        # Deploys FROM SOURCE. No `vercel build`, no `--prebuilt`.
+        #
+        # Why --prebuilt was removed (this is what broke on 2026-07-31/08-01/08-12):
+        #   `vercel deploy --prebuilt` uploaded fine (1.7MB) and then failed on
+        #   VERCEL's build machine while rehydrating the deployment:
+        #     Downloading 391 deployment files...
+        #     Error: ENOENT ... lstat '/vercel/path0/node_modules/.pnpm/@opentelemetry+api@1.9.1/.../context.js'
+        #   391 files is far too few for a Next.js prebuilt output. Cause: the
+        #   bare `node_modules` line in .vercelignore matches at ANY depth, so it
+        #   also stripped `.vercel/output/functions/*.func/node_modules/**` — the
+        #   dependencies Next.js had just traced into the functions. The upload
+        #   shipped dangling references and Vercel failed resolving them.
+        #   Note this means adding node_modules to .vercelignore is not the fix;
+        #   it is already there and it IS the fault.
+        #
+        # Deploying from source sidesteps that interaction entirely: Vercel
+        # installs and builds, and node_modules is correctly excluded from the
+        # upload. Vercel also documents --prebuilt as the wrong choice when build
+        # time needs System Environment Variables ("If you need System
+        # Environment Variables at build time, do not use the --prebuilt flag"):
+        #   https://vercel.com/docs/cli/deploy#when-not-to-use---prebuilt
+        # Nothing is lost by not building here — the `build` job above already
+        # fails this workflow before the deploy on any build break.
+        if: steps.arm.outputs.armed == 'true'
+        id: deploy
+        run: |
+          # --meta attaches the source git SHA + ref to the Vercel deployment
+          # (移植元: main #56 / 4c176dd)。A CLI deploy carries NO git metadata by
+          # default, so the prod↔main sync monitor
+          # (scripts/ops/check-prod-main-sync.mjs, P2) has no way to learn "which
+          # commit is live". These two meta keys are its ONLY input: the monitor
+          # reads meta.githubCommitSha from the Vercel REST API and compares it to
+          # origin/main HEAD. Drop them and prod-main-sync.yml goes red every day.
+          #
+          # `vercel deploy` writes the deployment URL to stdout and progress to
+          # stderr, so capturing stdout yields exactly this run's deployment.
+          deployment_url="$(vercel deploy --prod \
+            --meta githubCommitSha="${GITHUB_SHA}" \
+            --meta githubCommitRef="${GITHUB_REF_NAME}")"
+          echo "deployment_url=${deployment_url}" >> "$GITHUB_OUTPUT"
+          echo "Deployed: ${deployment_url}"
+
+      - name: Smoke check — production must actually serve traffic
+        # A green `vercel deploy` is not proof the site works: the same class of
+        # defect that made 2026-07-31 fail loudly (files missing from the
+        # deployment) can also produce a "successful" deploy that serves errors.
+        # So assert the production domain really returns 200 before calling this
+        # job successful.
+        #
+        # 移植元: main deploy.yml。c1-ds 側の配線にはデプロイ後の 200 確認が無く、
+        # 一本化でこれを落とすと「緑なのに本番が壊れている」を検知できなくなる。
+        #
+        # This does NOT roll back; it only reports. Rolling back unattended is a
+        # riskier action, and Vercel keeps the previous deployment available for
+        # an instant manual rollback.
+        if: steps.arm.outputs.armed == 'true'
+        env:
+          DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment_url }}
+        run: |
+          echo "Deployment: ${DEPLOYMENT_URL}"
+          code=000
+          # Retry: alias propagation is not instant, and a single transient
+          # network blip should not fail an otherwise good deploy.
+          for attempt in 1 2 3 4 5; do
+            code="$(curl -sS -o /dev/null -w '%{http_code}' -L --max-time 20 "${PRODUCTION_URL}" || echo 000)"
+            if [ "${code}" = "200" ]; then
+              echo "${PRODUCTION_URL} returned 200 on attempt ${attempt}."
+              exit 0
+            fi
+            echo "Attempt ${attempt}: ${PRODUCTION_URL} returned HTTP ${code}; retrying in 10s..."
+            sleep 10
+          done
+          echo "::error title=Production smoke check failed::${PRODUCTION_URL} did not return 200 after 5 attempts (last: HTTP ${code}). The deploy may have shipped a broken build — check ${DEPLOYMENT_URL} and consider rolling back in the Vercel dashboard."
+          exit 1

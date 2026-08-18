@@ -144,7 +144,10 @@ describe("read paths consult the deny-list", () => {
     ["app/sitemap.ts", "isFictionalSlug", "teaMenu"],
     ["app/sitemap.ts", "isFictionalSlug", "playlist"],
     // list views
-    ["app/[locale]/(reading)/farmers/page.tsx", "filterOutFictional", "farmer"],
+    // R2 確定版では農家一覧の専用ルート (farmers/page.tsx) は無くなり、
+    // つくり手の一覧は About ページ (「つくり手」節) が担う。ガードの要件は
+    // 変わらないので、対象ファイルだけを実在する一覧ビューに差し替える。
+    ["app/[locale]/(reading)/about/page.tsx", "filterOutFictional", "farmer"],
     ["app/[locale]/(reading)/tea-menu/page.tsx", "filterOutFictional", "teaMenu"],
     ["app/[locale]/(reading)/playlists/page.tsx", "filterOutFictional", "playlist"],
     ["app/[locale]/events/page.tsx", "filterOutFictional", "event"],

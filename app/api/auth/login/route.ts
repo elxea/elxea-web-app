@@ -7,10 +7,34 @@ import {
   buildAuthorizeUrl,
 } from "@/lib/shopify/customer";
 import { sanitizeReturnTo } from "@/lib/auth/return-to";
+import { getRequestHostname, getRequestOrigin, isTrustedAuthHost } from "@/lib/base-url";
 
 export async function GET(request: NextRequest) {
-  // NEXT_PUBLIC_APP_URL allows overriding the redirect URI base (e.g. for tunnels in local dev)
-  const origin = process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin;
+  /* Refuse to start an OAuth round trip we know cannot come back.
+   *
+   * `redirect_uri` is matched by Shopify against a registered allow-list by exact
+   * string, so on an unregistered host the user is sent to Shopify only to be
+   * rejected there — an opaque third-party error instead of a legible one from
+   * us. This gate turns that into a local, explainable response.
+   *
+   * 503 rather than a 4xx: the host is not wrong, it is not configured yet, and
+   * that is a server-side condition an operator fixes by registering it.
+   *
+   * `isTrustedAuthHost` is fail-CLOSED: it accepts a host only at or under our
+   * own apex, or one named explicitly in `LINE_ALLOWED_CALLBACK_HOSTS`. Production
+   * and www therefore pass with no configuration at all, while a preview
+   * deployment is refused rather than silently authenticating against production
+   * — which is what used to happen, because `NEXTAUTH_URL` is unset in preview
+   * while Vercel injects `VERCEL_PROJECT_PRODUCTION_URL` everywhere. */
+  const hostname = getRequestHostname(request);
+  if (!isTrustedAuthHost(hostname)) {
+    return NextResponse.json(
+      { error: "auth_host_not_registered", host: hostname },
+      { status: 503 },
+    );
+  }
+
+  const origin = getRequestOrigin(request);
   const redirectUri = `${origin}/api/auth/callback`;
 
   const codeVerifier = generateCodeVerifier();

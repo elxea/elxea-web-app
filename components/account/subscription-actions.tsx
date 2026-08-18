@@ -2,7 +2,21 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+
+import {
+  SubscriptionActionRow,
+  SubscriptionMessage,
+  SubscriptionPanel,
+  SubscriptionPanelBody,
+  SubscriptionPanelHint,
+} from "@/components/account/subscription-parts";
 import { Button } from "@/components/ui/button";
+import {
+  frequencyOptionKey,
+  isSameFrequency,
+  STALE_BILLING_CYCLE_VIEW,
+  type FrequencyOption,
+} from "@/lib/subscription-view";
 import {
   pauseSubscriptionAction,
   activateSubscriptionAction,
@@ -11,78 +25,117 @@ import {
   changeDeliveryFrequencyAction,
 } from "@/lib/shopify/subscription-actions";
 
-type FrequencyOption = {
-  label: string;
-  interval: "WEEK" | "MONTH";
-  intervalCount: number;
-};
+/**
+ * 定期便カードの操作 —【R2: 確定版】(Figma PC 6717:14527 / SP 6723:14747)。
+ *
+ * 確定版の操作は 2 層になっている:
+ *   1. カード内のボタン列 — 次回をスキップ (ghost) / 一時停止 (outline) /
+ *      お届け頻度を変更 (outline) / 解約する (destructive)。
+ *      一時停止中は「再開」(塗り) 1 個だけ (Figma 6718:14902)。
+ *   2. カード内に開くパネル — 「お届け頻度を変更」(6719:14705) と
+ *      「解約」(6719:14723)。Figma の「定期便の操作」節はこのパネルの見た目を
+ *      並べた注記フレームで、ページ常設の節ではない。
+ *
+ * 解約は**必ず 2 段**にする (ボタン → 確認パネルの「本当に解約する」)。確定版が
+ * その形 (6719:14725「本当に解約しますか？この操作は取り消せません。」) を持っている。
+ *
+ * Server Action (`lib/shopify/subscription-actions`) の呼び方は C5-0 の確定形の
+ * まま変えない。所有者照合・billingCycle の実データ解決はすべてサーバ側にある。
+ */
 
 export type SubscriptionActionLabels = {
   skipNext: string;
   changeFrequency: string;
   pauseSubscription: string;
   cancelSubscription: string;
+  cancelPanelTitle: string;
+  cancelConfirmBody: string;
   confirmCancel: string;
   resumeSubscription: string;
   selectFrequency: string;
   cancel: string;
   actionError: string;
+  /** 見ていた画面が古くてスキップを中止したときの案内。 */
+  staleViewError: string;
   frequencyChanged: string;
   frequencyChangeError: string;
-  frequencyOptions: {
-    everyWeek: string;
-    every2Weeks: string;
-    everyMonth: string;
-    every2Months: string;
-    every3Months: string;
-  };
+  previewNotice: string;
+  frequencyOptionLabels: Record<string, string>;
 };
+
+type PanelKind = "frequency" | "cancel" | null;
 
 export function SubscriptionActions({
   contractId,
-  status,
+  kind,
+  nextBillingDate,
   currentInterval,
   currentIntervalCount,
+  frequencyOptions,
   labels,
+  preview = false,
 }: {
   contractId: string;
-  status: string;
+  /** 表示モデルの状態 (active / paused)。cancelled では描画しない。 */
+  kind: "active" | "paused";
+  /**
+   * この画面が表示しているお届け予定日。スキップ操作でサーバへ渡し、
+   * 「顧客が狙った周期」と「サーバが解決した次の周期」が一致するかの照合に使う。
+   * 別タブ・リロード後の再実行で 2 周期目まで飛ぶのを防ぐためのもので、
+   * 周期を指定する手段ではない (サーバは常に自分で解決する)。
+   */
+  nextBillingDate: string | null;
   currentInterval?: string;
   currentIntervalCount?: number;
+  /**
+   * 選べるお届け頻度。Shopify に実在する selling plan からサーバ側で導出した
+   * ものだけを受ける (`lib/subscription-frequencies.server.ts`)。ここで固定の
+   * 一覧を持たないのが要点で、実在しないプランを提示して必ず失敗させないため。
+   */
+  frequencyOptions: FrequencyOption[];
   labels: SubscriptionActionLabels;
+  /**
+   * 計測用の見本 (PREVIEW_SEED=1) のとき true。見本の契約は Shopify に存在しない
+   * ため、Server Action を**一度も呼ばない**。実契約へ誤って mutation が飛ぶ経路を
+   * 作らないためのガード (押しても案内を出すだけ)。
+   */
+  preview?: boolean;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [confirmAction, setConfirmAction] = useState<string | null>(null);
-  const [showFrequencyPicker, setShowFrequencyPicker] = useState(false);
+  const [openPanel, setOpenPanel] = useState<PanelKind>(null);
 
-  const frequencyOptions: FrequencyOption[] = [
-    { label: labels.frequencyOptions.everyWeek, interval: "WEEK", intervalCount: 1 },
-    { label: labels.frequencyOptions.every2Weeks, interval: "WEEK", intervalCount: 2 },
-    { label: labels.frequencyOptions.everyMonth, interval: "MONTH", intervalCount: 1 },
-    { label: labels.frequencyOptions.every2Months, interval: "MONTH", intervalCount: 2 },
-    { label: labels.frequencyOptions.every3Months, interval: "MONTH", intervalCount: 3 },
-  ];
-
-  function isCurrentFrequency(option: FrequencyOption): boolean {
-    return (
-      option.interval === currentInterval &&
-      option.intervalCount === currentIntervalCount
-    );
+  function resetMessages() {
+    setError(null);
+    setSuccessMessage(null);
   }
 
-  async function handleAction(action: string) {
-    if (action === "cancel" && confirmAction !== "cancel") {
-      setConfirmAction("cancel");
+  function togglePanel(next: Exclude<PanelKind, null>) {
+    resetMessages();
+    setOpenPanel((current) => (current === next ? null : next));
+  }
+
+  /**
+   * 切り替え先が 1 つも無い (ストアのプランが 1 種類だけ / 読めなかった) ときは
+   * 「お届け頻度を変更」を出さない。押しても現在値しか並ばないパネルが開くだけで、
+   * 顧客には行き止まりに見えるため。
+   */
+  const canChangeFrequency = frequencyOptions.some(
+    (option) => !isSameFrequency(option, currentInterval, currentIntervalCount)
+  );
+
+  function handleAction(action: "pause" | "activate" | "cancel" | "skip") {
+    resetMessages();
+
+    if (preview) {
+      setSuccessMessage(labels.previewNotice);
       return;
     }
 
-    setError(null);
-    setSuccessMessage(null);
     startTransition(async () => {
-      let result;
+      let result: { success: boolean; error?: string } | undefined;
       switch (action) {
         case "pause":
           result = await pauseSubscriptionAction(contractId);
@@ -94,24 +147,37 @@ export function SubscriptionActions({
           result = await cancelSubscriptionAction(contractId);
           break;
         case "skip":
-          result = await skipNextDeliveryAction(contractId);
+          // 画面が見せているお届け予定日を一緒に渡す。サーバはこれと自分で解決した
+          // 周期が食い違ったら何もしない (別タブ・リロード後の再実行で 2 周期目まで
+          // 飛ぶのを防ぐ)。
+          result = await skipNextDeliveryAction(contractId, nextBillingDate);
           break;
       }
 
       if (result && !result.success) {
-        setError(result.error ?? labels.actionError);
-      } else {
-        setConfirmAction(null);
-        router.refresh();
+        // 「見ていた画面が古い」は機械可読コードで返る。顧客には何をすれば
+        // よいか (再読み込み) が分かる案内に差し替える。
+        setError(
+          result.error === STALE_BILLING_CYCLE_VIEW
+            ? labels.staleViewError
+            : (result.error ?? labels.actionError)
+        );
+        return;
       }
+      setOpenPanel(null);
+      router.refresh();
     });
   }
 
-  async function handleFrequencyChange(option: FrequencyOption) {
-    if (isCurrentFrequency(option)) return;
+  function handleFrequencyChange(option: FrequencyOption) {
+    if (isSameFrequency(option, currentInterval, currentIntervalCount)) return;
+    resetMessages();
 
-    setError(null);
-    setSuccessMessage(null);
+    if (preview) {
+      setSuccessMessage(labels.previewNotice);
+      return;
+    }
+
     startTransition(async () => {
       const result = await changeDeliveryFrequencyAction(
         contractId,
@@ -120,23 +186,22 @@ export function SubscriptionActions({
       );
 
       if (result.success) {
-        setShowFrequencyPicker(false);
+        setOpenPanel(null);
         setSuccessMessage(labels.frequencyChanged);
         router.refresh();
-      } else {
-        setError(result.error ?? labels.frequencyChangeError);
+        return;
       }
+      setError(result.error ?? labels.frequencyChangeError);
     });
   }
 
   return (
-    <div>
-      <div className="flex flex-wrap gap-2 items-center">
-        {status === "ACTIVE" && (
+    <>
+      <SubscriptionActionRow>
+        {kind === "active" ? (
           <>
             <Button
-              variant="outline"
-              size="sm"
+              variant="ghost"
               disabled={isPending}
               onClick={() => handleAction("skip")}
             >
@@ -144,100 +209,121 @@ export function SubscriptionActions({
             </Button>
             <Button
               variant="outline"
-              size="sm"
-              disabled={isPending}
-              onClick={() => {
-                setShowFrequencyPicker(!showFrequencyPicker);
-                setConfirmAction(null);
-              }}
-            >
-              {labels.changeFrequency}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
               disabled={isPending}
               onClick={() => handleAction("pause")}
             >
               {labels.pauseSubscription}
             </Button>
-            {confirmAction === "cancel" ? (
+            {canChangeFrequency ? (
               <Button
-                variant="destructive"
-                size="sm"
+                variant="outline"
                 disabled={isPending}
-                onClick={() => handleAction("cancel")}
+                aria-expanded={openPanel === "frequency"}
+                onClick={() => togglePanel("frequency")}
               >
-                {labels.confirmCancel}
+                {labels.changeFrequency}
               </Button>
-            ) : (
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled={isPending}
-                className="text-muted-foreground"
-                onClick={() => handleAction("cancel")}
-              >
-                {labels.cancelSubscription}
-              </Button>
-            )}
+            ) : null}
+            <Button
+              variant="destructive"
+              disabled={isPending}
+              aria-expanded={openPanel === "cancel"}
+              onClick={() => togglePanel("cancel")}
+            >
+              {labels.cancelSubscription}
+            </Button>
           </>
-        )}
-        {status === "PAUSED" && (
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={isPending}
-            onClick={() => handleAction("activate")}
-          >
+        ) : (
+          <Button disabled={isPending} onClick={() => handleAction("activate")}>
             {labels.resumeSubscription}
           </Button>
         )}
-      </div>
+      </SubscriptionActionRow>
 
-      {/* Frequency picker */}
-      {showFrequencyPicker && status === "ACTIVE" && (
-        <div className="mt-4 p-4 border border-border bg-muted/30">
-          <p className="text-xs text-muted-foreground mb-3">
-            {labels.selectFrequency}
-          </p>
-          <div className="flex flex-wrap gap-2">
+      {/* お届け頻度を変更 (Figma 6719:14705 / SP 6723:14845) */}
+      {openPanel === "frequency" && kind === "active" ? (
+        <SubscriptionPanel title={labels.changeFrequency}>
+          <SubscriptionPanelHint>{labels.selectFrequency}</SubscriptionPanelHint>
+          <SubscriptionActionRow>
             {frequencyOptions.map((option) => {
-              const isCurrent = isCurrentFrequency(option);
+              const isCurrent = isSameFrequency(
+                option,
+                currentInterval,
+                currentIntervalCount
+              );
               return (
                 <Button
-                  key={`${option.interval}-${option.intervalCount}`}
-                  variant={isCurrent ? "default" : "outline"}
-                  size="sm"
+                  key={frequencyOptionKey(option)}
+                  /* 確定版の chips は 5 個すべて塗りなし (ghost)。いま契約している
+                     頻度をどう示すかは確定版に指定が無いので、塗り (primary) +
+                     `aria-pressed` で示す (押せないだけだと画面上でどれが現在値か
+                     分からず、頻度変更の主目的が果たせない)。DS の控えめな塗り
+                     `secondary` は二重定義で実行時に金色に解決するため使わない
+                     (是正は DS トークン整合タスク 3b670c9d-064c-8166 側)。 */
+                  variant={isCurrent ? "default" : "ghost"}
+                  aria-pressed={isCurrent}
                   disabled={isPending || isCurrent}
                   onClick={() => handleFrequencyChange(option)}
-                  className={isCurrent ? "pointer-events-none" : ""}
                 >
-                  {option.label}
+                  {labels.frequencyOptionLabels[frequencyOptionKey(option)]}
                 </Button>
               );
             })}
-          </div>
-          <div className="mt-3">
+          </SubscriptionActionRow>
+          <SubscriptionActionRow>
             <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowFrequencyPicker(false)}
+              variant="outline"
               disabled={isPending}
-              className="text-muted-foreground"
+              onClick={() => setOpenPanel(null)}
             >
               {labels.cancel}
             </Button>
-          </div>
-        </div>
-      )}
+          </SubscriptionActionRow>
+          {successMessage ? (
+            <SubscriptionMessage>{successMessage}</SubscriptionMessage>
+          ) : null}
+          {error ? (
+            <SubscriptionMessage tone="error">{error}</SubscriptionMessage>
+          ) : null}
+        </SubscriptionPanel>
+      ) : null}
 
-      {error && (
-        <p className="text-xs text-destructive mt-2">{error}</p>
-      )}
-      {successMessage && (
-        <p className="text-xs text-green-700 mt-2">{successMessage}</p>
-      )}
-    </div>
+      {/* 解約 (Figma 6719:14723 / SP 6723:14863) — 破壊的操作なので必ず確認を挟む */}
+      {openPanel === "cancel" && kind === "active" ? (
+        <SubscriptionPanel title={labels.cancelPanelTitle}>
+          <SubscriptionPanelBody>{labels.cancelConfirmBody}</SubscriptionPanelBody>
+          <SubscriptionActionRow>
+            <Button
+              variant="destructive"
+              disabled={isPending}
+              onClick={() => handleAction("cancel")}
+            >
+              {labels.confirmCancel}
+            </Button>
+            <Button
+              variant="outline"
+              disabled={isPending}
+              onClick={() => setOpenPanel(null)}
+            >
+              {labels.cancel}
+            </Button>
+          </SubscriptionActionRow>
+          {successMessage ? (
+            <SubscriptionMessage>{successMessage}</SubscriptionMessage>
+          ) : null}
+          {error ? (
+            <SubscriptionMessage tone="error">{error}</SubscriptionMessage>
+          ) : null}
+        </SubscriptionPanel>
+      ) : null}
+
+      {/* パネルを開いていないときの結果表示 (スキップ / 停止 / 再開) */}
+      {openPanel === null && successMessage ? (
+        <SubscriptionMessage>{successMessage}</SubscriptionMessage>
+      ) : null}
+      {openPanel === null && error ? (
+        <SubscriptionMessage tone="error">{error}</SubscriptionMessage>
+      ) : null}
+    </>
   );
 }

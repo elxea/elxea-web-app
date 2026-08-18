@@ -46,6 +46,22 @@
     "error": "Something went wrong. Please try again.",
     "loginRequired": "Please log in to continue."
   },
+  "cart": {
+    "subtitle": "Items in your cart"
+  },
+  "audio": {
+    "statePlay": "play",
+    "statePause": "pause",
+    "stateLoading": "loading",
+    "stateRetry": "retry",
+    "ariaPlay": "Play background music",
+    "ariaPause": "Pause background music",
+    "ariaLoading": "Loading background music",
+    "ariaError": "Background music failed to play — press to retry",
+    "noteDefault": "sound from nature",
+    "noteBlocked": "tap to allow sound",
+    "noteUnavailable": "sound unavailable"
+  },
   "home": {
     "tagline": "Single-Origin Japanese Tea",
     "hero": "Single-Origin Japanese Tea",
@@ -82,17 +98,40 @@
     "addedToFavorites": "Added to favorites",
     "removedFromFavorites": "Removed from favorites",
     "favoriteError": "Action failed. Please try again.",
-    "loginRequiredForFavorite": "Please log in to add to favorites."
+    "loginRequiredForFavorite": "Please log in to add to favorites.",
+    "listLead": "Single-origin teas and teaware, from seasonal picks to everyday cups.",
+    "noProductsFiltered": {
+      "eyebrow": "0 results",
+      "title": "No products match this filter",
+      "body": "Choose another category, or clear the filter to see every product.",
+      "ctaLabel": "Clear the filter"
+    }
   },
   "collection": {
-    "empty": "No collections available",
-    "loadError": "Could not load collections."
+    "empty": {
+      "eyebrow": "0 items",
+      "title": "No collections yet",
+      "body": "Seasonal sets are being prepared. They will appear here once ready.",
+      "ctaLabel": "Browse teas"
+    },
+    "loadError": "Could not load collections.",
+    "emptyProducts": {
+      "eyebrow": "0 items",
+      "title": "No products in this collection right now",
+      "body": "You can look through other collections or the full product list.",
+      "ctaLabel": "See other collections"
+    }
   },
   "search": {
     "placeholder": "Search tea or keywords",
     "noResults": "No tea matched \"{q}\". Try another keyword.",
     "results": "{count} results",
-    "loadError": "Search failed."
+    "loadError": "Search failed.",
+    "productsHeading": "Tea",
+    "articlesHeading": "Stories",
+    "articleResults": "{count} stories found",
+    "browseJournal": "Browse the Journal",
+    "partialLoadError": "Part of the results could not be loaded. Please try again shortly."
   },
   "journal": {
     "title": "Journal",
@@ -101,8 +140,8 @@
     "tagArchiveDescription": "Articles tagged “{name}”",
     "categoryArchiveTitle": "Category: {name}",
     "categoryArchiveDescription": "Stories about {name}",
-    "empty": "No articles yet.",
     "loadError": "Could not load articles.",
+    "loading": "Loading articles",
     "writtenBy": "Written by",
     "relatedArticles": "Related Articles",
     "media": "Video / Audio",
@@ -112,13 +151,98 @@
     "addedToBookmarks": "Added to bookmarks",
     "removedFromBookmarks": "Removed from bookmarks",
     "bookmarkError": "Action failed. Please try again.",
-    "loginRequiredForBookmark": "Please log in to add to bookmarks."
+    "loginRequiredForBookmark": "Please log in to add to bookmarks.",
+    "bookmarkLoading": "Checking bookmark status",
+    "bookmarkLoginRequired": "Log in to bookmark this story",
+    "bookmarkStatusUnknown": "Could not load the bookmark status. Press to check again.",
+    "bookmarkStatusRetry": "Checking the bookmark status again.",
+    "featured": "Featured",
+    "popular": "Popular",
+    "categories": "Categories",
+    "teaInArticle": "Teas to pair with this story",
+    "toProduct": "View product →",
+    "moreInCategory": "Read more in \"{name}\"",
+    "allArticles": "All articles",
+    "tagHeading": "# {name}",
+    "tagMapTitle": "Journal tags",
+    "categoryStackTitle": "Read by category",
+    "categoryStackDescription": "Every category laid out in one scroll — no tabs to switch. Stop at whichever shelf catches your eye and start reading.",
+    "categoryStackMeta": "{count} categories · {total} articles",
+    "lastUpdated": "Updated {date}",
+    "articleCount": "{count}",
+    "shelfMore": "More in {name} →",
+    "otherReadings": "Other readings in this issue",
+    "openThisReading": "Open this reading",
+    "close": "Close",
+    "onlyOneReading": "This is the only connected reading in this issue for now.",
+    "teaSpecNo": "No.",
+    "teaSpecCategory": "Category",
+    "teaSpecName": "Name",
+    "teaSpecVariety": "Variety",
+    "teaSpecSeason": "Season",
+    "teaDetailHowToEnjoy": "How to brew, in detail",
+    "teaDetailTaste": "Layers of taste — astringency, aroma, finish",
+    "audioPlay": "Play",
+    "audioPause": "Pause",
+    "audioLoading": "Loading",
+    "audioError": "Could not play this audio. Please try again later.",
+    "audioNowPlaying": "Now playing",
+    "audioClose": "Close player",
+    "audioSeek": "Seek",
+    "audioTrackList": "Tracks",
+    "audioExternalNote": "Full-length tracks and downloads are on SoundCloud",
+    "audioInterviewNote": "Plays on this page. Not published to external streaming services.",
+    "audioInterviewLabel": "Interview audio",
+    "readTime": "{minutes} min read",
+    "audioTrackLabel": "Music in this issue",
+    "bookmarkSaved": "Saved",
+    "bookmarkSaving": "Saving…",
+    "bookmarkLoginToSave": "Log in to save",
+    "emptyAll": {
+      "eyebrow": "0 items",
+      "title": "No readings yet",
+      "body": "The first article is in preparation. Please wait a little longer.",
+      "ctaLabel": "Browse teas"
+    },
+    "emptyFiltered": {
+      "eyebrow": "0 results",
+      "title": "No readings match this filter yet",
+      "body": "Choose another category, or clear the filter to see every reading.",
+      "ctaLabel": "Clear the filter"
+    },
+    "emptyCategoryList": {
+      "eyebrow": "0 items",
+      "title": "No categories yet",
+      "body": "As readings grow, we will arrange them by category.",
+      "ctaLabel": "See the journal"
+    },
+    "emptyCategory": {
+      "eyebrow": "0 items",
+      "title": "No articles in this category yet",
+      "body": "Other categories do have readings.",
+      "ctaLabel": "See other categories"
+    },
+    "emptyTag": {
+      "eyebrow": "0 items",
+      "title": "No readings with this tag yet",
+      "body": "You can also browse other tags, or the journal as a whole.",
+      "ctaLabel": "See all of the journal"
+    },
+    "audioExpand": "Open player",
+    "audioCollapse": "Collapse player",
+    "audioOpenArticle": "Open the article"
   },
   "teaMenu": {
     "title": "Tea Menu",
     "description": "Our curated selection of specialty teas",
-    "empty": "No tea items yet.",
+    "empty": {
+      "eyebrow": "0 items",
+      "title": "No tea menu yet",
+      "body": "We will add them in turn, together with how to brew each one.",
+      "ctaLabel": "Browse products"
+    },
     "loadError": "Could not load tea menu.",
+    "originsMapAlt": "A map of the origins of the teas currently listed, framed so that all of them fit. Point colour shows the tea category.",
     "details": "Details",
     "variety": "Variety",
     "origin": "Origin",
@@ -131,20 +255,64 @@
     "water": "Water",
     "time": "Brew time",
     "buyNow": "Buy Now",
-    "relatedArticle": "Related Article"
+    "relatedArticle": "Related Article",
+    "flavorMap": "Flavor map",
+    "flavorMapOverline": "FLAVOR MAP",
+    "flavorMapAlt": "Teas plotted across sweetness/astringency and lightness/depth. {place} stands out within it.",
+    "flavorMapAltUnknown": "Teas plotted across sweetness/astringency and lightness/depth.",
+    "flavorMapScope": "Only other {category} is placed here.",
+    "flavorMapNote": "Positions and sizes are sample values for now.",
+    "aromaMap": "Aroma field",
+    "aromaMapOverline": "AROMA FIELD",
+    "aromaMapAlt": "Aroma regions laid over cool/warm and rising/lingering axes.",
+    "aromaMapScope": "Only aromas of the same {category} are layered here.",
+    "aromaMapNote": "Aroma is drawn as regions rather than points; overlaps are where aromas meet.",
+    "terroirMap": "Reading the land",
+    "terroirMapOverline": "TERROIR",
+    "terroirMapAlt": "The terrain around {place} seen through five lenses: elevation, contour, climate, soil and gardens.",
+    "terroirMapAltUnknown": "The terrain of the origin seen through five lenses: elevation, contour, climate, soil and gardens.",
+    "terroirElevation": "Elevation {value} m",
+    "terroirTeaLabel": "Tea",
+    "terroirClose": "Close",
+    "terroirHint": "Tap a point to read the land"
   },
   "playlist": {
-    "title": "Sound from Nature",
+    "artistsHead": "The artists on this playlist",
+    "artistsNote": "Photos and descriptions come from each artist's profile.",
+    "curatedBy": "Curated by",
     "description": "Playlists inspired by the sounds of nature",
-    "empty": "No playlists yet.",
+    "featured": "Featured",
+    "heading": "Playlists",
+    "lead": "Music for tea time — while you brew, while you wait, while you drink.",
+    "listenKicker": "Listen to this playlist",
     "loadError": "Could not load playlists.",
-    "recorded": "Recorded",
-    "listen": "Listen"
+    "minutes": "MIN",
+    "minutesShort": "min",
+    "otherHead": "Other playlists",
+    "popular": "Most played",
+    "scenes": "Scenes",
+    "teasHead": "Teas for this playlist",
+    "teasNote": "A suggestion, not a rule — choose what you like.",
+    "title": "Sound from Nature",
+    "tracks": "TRACKS",
+    "tracksHead": "Track by track",
+    "tracksShort": "tracks",
+    "emptyAll": {
+      "eyebrow": "0 items",
+      "title": "No playlists yet",
+      "body": "We are choosing a piece of music to sit alongside your tea.",
+      "ctaLabel": "Read the journal"
+    },
+    "emptyFiltered": {
+      "eyebrow": "0 results",
+      "title": "No playlists match this filter yet",
+      "body": "Choose another scene, or clear the filter to see every playlist.",
+      "ctaLabel": "Clear the filter"
+    }
   },
   "elxeaJournal": {
     "title": "elxea Journal",
-    "description": "A newsletter about seasonal tea and everyday life",
-    "empty": "No journals yet.",
+    "description": "The Set Edition — seasonal tea and the places it comes from, sent with your assortment.",
     "loadError": "Could not load journals.",
     "teaSection": "About the Tea in This Issue",
     "teaDetailLink": "Learn more",
@@ -157,25 +325,78 @@
     "variety": "Variety",
     "season": "Season",
     "origin": "Origin",
-    "netWeight": "Net Wt."
+    "netWeight": "Net Wt.",
+    "kicker": "ELXEA JOURNAL",
+    "issueTeas": "Tea in This Issue",
+    "teaDetailOpen": "Open tea details →",
+    "otherReads": "More Reading in This Issue",
+    "nextReadTag": "Keep reading “{name}”",
+    "featuredIssue": "This issue",
+    "otherIssues": "Other issues",
+    "themes": "Themes",
+    "emptyAll": {
+      "eyebrow": "0 items",
+      "title": "elxea Journal is not published yet",
+      "body": "The next issue is in preparation. Look forward to a seasonal letter.",
+      "ctaLabel": "Read the journal"
+    },
+    "emptyFiltered": {
+      "eyebrow": "0 results",
+      "title": "No issues match this filter yet",
+      "body": "Choose another theme, or clear the filter to see every issue.",
+      "ctaLabel": "Clear the filter"
+    }
   },
   "people": {
     "loadError": "Could not load profile.",
-    "articlesByAuthor": "Articles by this author"
+    "articlesByAuthor": "Articles by this author",
+    "kickerDefault": "PEOPLE",
+    "interviewerLabel": "Interviewer",
+    "workKicker": "THE WORK",
+    "interviewKicker": "INTERVIEW",
+    "interviewHead": "In conversation",
+    "questionPrefix": "Q",
+    "profileKicker": "PROFILE",
+    "teasKicker": "TEAS BY THIS PERSON",
+    "storiesKicker": "STORIES",
+    "otherKicker": "OTHER PEOPLE",
+    "otherHead": "The people behind roji"
   },
   "farmer": {
     "heading": "Farmers",
     "lead": "",
-    "empty": "No farmer profiles yet.",
+    "empty": {
+      "eyebrow": "0 items",
+      "title": "No farmer profiles yet",
+      "body": "We are visiting the growing regions and hearing their stories.",
+      "ctaLabel": "Browse teas"
+    },
     "loadError": "Could not load farmer profiles.",
+    "byRegion": "Browse by region",
     "follow": "Follow",
     "unfollow": "Unfollow",
     "followedMessage": "Now following this farmer",
-    "unfollowedMessage": "Unfollowed"
+    "unfollowedMessage": "Unfollowed",
+    "kickerDefault": "PEOPLE",
+    "interviewerLabel": "Interviewer",
+    "workKicker": "THE WORK",
+    "interviewKicker": "INTERVIEW",
+    "interviewHead": "In conversation",
+    "questionPrefix": "Q",
+    "profileKicker": "PROFILE",
+    "fieldKicker": "THE FIELD",
+    "teasKicker": "TEAS BY THIS PERSON",
+    "otherKicker": "OTHER PEOPLE",
+    "otherHead": "The people behind roji"
   },
   "event": {
     "lead": "",
-    "empty": "No upcoming events.",
+    "empty": {
+      "eyebrow": "0 items",
+      "title": "No upcoming events yet",
+      "body": "We are preparing the next gathering. It will appear here once the date is set.",
+      "ctaLabel": "Browse teas"
+    },
     "loadError": "Could not load events.",
     "detailsLink": "Details & Register →",
     "register": "Register",
@@ -185,12 +406,50 @@
     "dateLabel": "Date",
     "locationLabel": "Location",
     "detailsHeading": "Details & Registration",
-    "detailsPageLink": "Open details & registration page"
+    "detailsPageLink": "Open details & registration page",
+    "memberOnlyNotice": "This is a members-only event. Please log in to join."
   },
   "page": {
-    "loadError": "Could not load page."
+    "loadError": "Could not load page.",
+    "contents": "Contents",
+    "updatedAt": "Last updated {date}",
+    "published": "Published",
+    "updated": "Last updated",
+    "contact": "Contact",
+    "contactValue": "Contact form",
+    "related": {
+      "terms": "Terms of service",
+      "tokushoho": "Legal notice",
+      "contact": "Contact us"
+    }
   },
   "account": {
+    "settingsLink": "Settings & contracts →",
+    "loggedInAs": "Signed in as {email}",
+    "greeting": "Welcome back, {name}.",
+    "greetingNoName": "Welcome back.",
+    "greetingLead": "Your next delivery and upcoming seats, gathered here.",
+    "upcomingHeading": "Coming up",
+    "upcomingAll": "See all plans →",
+    "upcomingDeliveryMeta": "Delivery on {date}",
+    "upcomingDeliveryTitle": "Next subscription — {title}",
+    "upcomingDeliveryNote": "Can be changed or skipped",
+    "upcomingEventMeta": "Event on {date}",
+    "upcomingEventNote": "Attending",
+    "continueHeading": "Pick up again",
+    "continueAll": "See all journal →",
+    "continueFavorite": "Saved",
+    "pastHeading": "So far",
+    "pastAll": "See all orders →",
+    "pastOrderMeta": "Ordered on {date}",
+    "pastOrderTitle": "Order {name}",
+    "paymentHeading": "Payment method",
+    "paymentChange": "Change payment method →",
+    "paymentCardLabel": "Card on file",
+    "paymentCardMasked": "•••• {last4}",
+    "paymentCardNote": "Changes are made at checkout.",
+    "paymentUnavailable": "You can review your payment method from the settings page.",
+    "opsNote": "Contracts, payment and delivery addresses are managed here. Your preferences and records live in your tea chart.",
     "loginRequired": "Please log in to view your account.",
     "orderHistory": "Order History",
     "noOrders": "You have no orders yet.",
@@ -208,13 +467,16 @@
     "intervalDay": "Every {count} day(s)",
     "manageSubscription": "Manage subscription",
     "subscriptionNote": "You can manage your subscription from this page.",
-    "skipNext": "Skip next",
+    "skipNext": "Skip next delivery",
     "pauseSubscription": "Pause",
     "resumeSubscription": "Resume",
-    "cancelSubscription": "Cancel",
-    "confirmCancel": "Confirm cancel",
+    "cancelSubscription": "Cancel subscription",
+    "cancelPanelTitle": "Cancellation",
+    "cancelConfirmBody": "Cancel this subscription? This cannot be undone.",
+    "confirmCancel": "Yes, cancel it",
     "actionError": "Action failed. Please try again.",
-    "changeFrequency": "Change frequency",
+    "staleViewError": "The delivery date shown was out of date, so nothing was skipped. Please reload the page and try again.",
+    "changeFrequency": "Change delivery frequency",
     "frequencyEveryMonth": "Monthly",
     "frequencyEvery2Months": "Every 2 months",
     "frequencyEvery3Months": "Every 3 months",
@@ -250,7 +512,21 @@
     "viewSubscriptions": "Manage Subscriptions",
     "viewOrders": "View Order History",
     "subscriptionNoteManage": "You can manage your subscriptions — change frequency, skip, pause, or cancel — from this page.",
+    "subscriptionStatusUnknown": "Checking",
+    "subscriptionNoteActive": "Change the plan, skip a delivery, or cancel from here.",
+    "subscriptionNotePaused": "Paused. Resume any time to start deliveries again.",
+    "subscriptionNoteCancelled": "This subscription has been cancelled. To start again, please order from the product page.",
+    "subscriptionNoteUnknown": "We could not confirm the status of this subscription. Please contact us.",
+    "nextDeliveryLabel": "Next delivery: ",
+    "nextDeliveryPaused": "Paused",
+    "nextDeliveryNone": "—",
+    "intervalLine": "Delivery frequency: {value}",
+    "intervalYear": "Every {count} year(s)",
+    "lineVariantQty": "{variant} × {quantity}",
+    "lineQty": "× {quantity}",
+    "previewNotice": "This is a preview, so the action was not performed.",
     "backToAccount": "Back to My Account",
+    "backToAccountLink": "← Back to My Account",
     "lineConnected": "Connected via LINE",
     "connectShopifyHeading": "Connect Your Email",
     "connectShopifyDescription": "Connect your email address to access all features, including order history, subscription management, and favorites.",
@@ -286,10 +562,18 @@
     "heading": "Sign in to elxea",
     "description": "Sign in with LINE to continue your conversation across Web and LINE.",
     "lineButton": "Sign in with LINE",
+    "lineButtonUnavailable": "Unavailable right now",
     "or": "or",
     "shopifyButton": "Sign in with Email",
-    "terms": "By signing in, you agree to our Terms of Service and Privacy Policy.",
-    "linkedSuccess": "Your LINE account has been linked"
+    "terms": "By signing in, you agree to our <terms>Terms of Service</terms> and <privacy>Privacy Policy</privacy>.",
+    "linkedSuccess": "Your LINE account has been linked",
+    "errorLineAuthFailed": "LINE sign-in failed. Please try again.",
+    "errorStateMismatch": "Your session has expired. Please try again.",
+    "errorTokenFailed": "Could not obtain an authentication token. Please try again.",
+    "errorProfileFailed": "Could not load your LINE profile. Please try again.",
+    "errorNotConfigured": "LINE sign-in is not configured. Please contact the administrator.",
+    "errorMissingParams": "Authentication parameters were missing. Please try again.",
+    "errorUnexpected": "An unexpected error occurred. Please try again."
   },
   "loginComplete": {
     "title": "Account Linked",
@@ -306,53 +590,264 @@
   },
   "about": {
     "title": "About elxea",
-    "subtitle": "A new specialty tea experience connecting farmers and consumers",
-    "mission": "Our Mission",
-    "missionText": "elxea is a D2C brand that delivers specialty teas, carefully cultivated by tea farmers across Japan, directly to your doorstep. Through transparent transactions where you can see the faces of the producers, we create new value and experiences in tea.",
-    "story": "Our Story",
-    "storyText": "Japanese tea culture has a history spanning centuries, yet many remarkable tea farmers remain unknown to consumers. elxea was born to directly connect these farmers with consumers, offering rich experiences through tea.\n\nWe visit farms, deeply understand the local climate and production methods, and carefully select the highest quality tea leaves. Through our subscription service, we deliver seasonal teas and introduce you to the profound world of Japanese tea.",
-    "values": "Our Values",
-    "value1Title": "Transparency",
-    "value1Text": "We disclose all producer, origin, and production information. We deliver tea you can choose with confidence.",
-    "value2Title": "Sustainability",
-    "value2Text": "We support sustainable farming practices and contribute to the future of Japanese tea culture.",
-    "value3Title": "Quality",
-    "value3Text": "We handle only specialty-grade tea leaves and deliver them in optimal condition."
+    "subtitle": "Single-origin leaves from small tea gardens across Japan. What we have decided, and what we have deliberately left open.",
+    "overline": "ABOUT ELXEA",
+    "statementTitle": "From small tea gardens across Japan.",
+    "statementLead1": "elxea is a craft tea brand built on single-origin leaves, selected one garden at a time from small growers across Japan.",
+    "statementLead2": "This page sets out, in order, what we have decided and what we have left open.",
+    "us": {
+      "no": "01",
+      "short": "About us",
+      "title": "About us",
+      "body1": "elxea is a craft tea brand built on single-origin leaves from small growers across Japan. We work with three kinds of tea: green, oolong and black.",
+      "body2": "Every product comes from one garden, one cultivar and one harvest. So the same name can taste a little different from year to year. We do not treat that as a flaw.",
+      "imageAlt": "Tea leaves"
+    },
+    "origins": {
+      "overline": "ORIGINS",
+      "a1": "Honyama, Shizuoka",
+      "a2": "Yame, Fukuoka",
+      "a3": "Wazuka, Kyoto",
+      "a4": "Kirishima, Kagoshima"
+    },
+    "criteria": {
+      "no": "02",
+      "short": "How we choose",
+      "title": "How we choose — what we decide, and what we leave to you",
+      "decided": "What we decide",
+      "undecided": "What we leave open",
+      "d1": "We visit every garden ourselves",
+      "u1": "Water temperature and steeping time",
+      "d2": "One garden, one cultivar, one harvest",
+      "u2": "Where and when you drink it",
+      "d3": "Keeping the time from picking to delivery short",
+      "u3": "The order you try them in",
+      "note": "We publish our criteria as principles. Grades, purchase prices and minimum yields are not published."
+    },
+    "chapter": {
+      "overline": "NO RIGHT ANSWER",
+      "title": "We do not set a right answer.",
+      "body": "How you brew it, and when you drink it, are yours."
+    },
+    "how": {
+      "no": "03",
+      "short": "How it is made",
+      "title": "How it is made",
+      "s1Name": "Select",
+      "s1Body": "We select the leaves that were good that year, garden by garden.",
+      "s2Name": "Portion",
+      "s2Body": "We portion and pack them ourselves.",
+      "s3Name": "Deliver",
+      "s3Body": "We keep the time from picking to your hands as short as we can."
+    },
+    "makers": {
+      "no": "04",
+      "short": "The growers",
+      "title": "The growers",
+      "overline": "PRODUCER"
+    },
+    "attitude": {
+      "no": "05",
+      "short": "Living with tea",
+      "title": "Living with tea",
+      "s1Name": "Brew",
+      "s1Body": "We do not fix the water temperature or the steeping time. We only offer a guide.",
+      "s2Name": "Read",
+      "s2Body": "Each month we add one piece of reading about that month's leaves.",
+      "s3Name": "Change",
+      "s3Body": "If it does not suit you, change it next month. A subscription can be paused at any time."
+    },
+    "company": {
+      "no": "06",
+      "short": "Company",
+      "title": "Company",
+      "name": "Name",
+      "nameValue": "elxea Inc.",
+      "headOffice": "Head office",
+      "branchOffice": "Kyoto office",
+      "handles": "We handle",
+      "handlesValue": "Green tea / Oolong tea / Black tea",
+      "contact": "Contact"
+    },
+    "links": {
+      "products": "See all leaves →",
+      "journal": "Read the journal →"
+    }
   },
   "faq": {
-    "title": "Frequently Asked Questions",
-    "subtitle": "If you have any questions, please don't hesitate to contact us.",
-    "q1": "What is the subscription service?",
-    "a1": "Our subscription delivers carefully selected specialty teas monthly or bimonthly. We send seasonal teas directly from farmers to your door.",
-    "q2": "Can I cancel my subscription?",
-    "a2": "Yes, you can cancel anytime. Please manage your subscription from your account page. Cancel at least 3 days before the next delivery date.",
-    "q3": "How much is shipping?",
-    "a3": "Flat rate of ¥550 (tax included) nationwide. Free shipping on orders over ¥5,000. Subscriptions always ship free.",
-    "q4": "How long does delivery take?",
-    "a4": "Orders are typically shipped within 3-5 business days. Delivery takes 1-3 days after shipping (varies by region).",
-    "q5": "What payment methods are accepted?",
-    "a5": "We accept credit cards (Visa, Mastercard, American Express, JCB), Apple Pay, Google Pay, and Shop Pay.",
-    "q6": "Can I return or exchange items?",
-    "a6": "As food products, we cannot accept returns for customer convenience. If you receive a defective product, please contact us within 7 days of delivery for a replacement or refund.",
-    "q7": "Is gift wrapping available?",
-    "a7": "Currently in preparation. Please stay tuned for future updates.",
-    "q8": "Can I change my delivery address or frequency?",
-    "a8": "Yes, you can change your delivery address and frequency (monthly ↔ bimonthly) from your account page. Please make changes at least 3 days before the next delivery date."
+    "title": "Frequently asked questions",
+    "subtitle": "If anything is unclear, please ask.",
+    "kicker": "FAQ",
+    "lead": "The questions we receive most, with the gist of each answer readable without opening it. Open only the ones you want in full.",
+    "reading": {
+      "heading": "READING THIS PAGE",
+      "rows": [
+        {
+          "label": "Answers",
+          "value": "The gist reads in one line, unopened"
+        },
+        {
+          "label": "Not here?",
+          "value": "Use the contact link at the foot of the page"
+        },
+        {
+          "label": "Updated",
+          "value": "5 August 2026"
+        }
+      ]
+    },
+    "index": {
+      "label": "Categories"
+    },
+    "groups": [
+      {
+        "no": "01",
+        "en": "ABOUT TEA",
+        "title": "About tea",
+        "items": [
+          {
+            "q": "How should I brew it?",
+            "summary": "We do not prescribe one way. Only a guideline, printed on the back of the pack.",
+            "body": "Neither water temperature nor steeping time has a right answer here. The back of the pack notes a guideline such as 70C for 90 seconds. Some people run the second infusion hotter; others keep it the same. Brew one cup to the guideline, then move it wherever you like."
+          },
+          {
+            "q": "What does single origin mean?",
+            "summary": "Tea from a single farm, a single cultivar and a single harvest."
+          },
+          {
+            "q": "How long does it keep, and how should I store it?",
+            "summary": "One year unopened, about a month once opened. Keep it cool and dark."
+          }
+        ]
+      },
+      {
+        "no": "02",
+        "en": "ORDER & DELIVERY",
+        "title": "Orders and delivery",
+        "items": [
+          {
+            "q": "How much is shipping?",
+            "summary": "A flat 550 yen nationwide, free on orders over 5,000 yen."
+          },
+          {
+            "q": "How long does delivery take?",
+            "summary": "Dispatched within 5 business days of your order, arriving 1-3 days after dispatch (remote islands excepted)."
+          },
+          {
+            "q": "Can I change or cancel an order?",
+            "summary": "Yes, before it ships. Contact us and we will adjust it."
+          }
+        ]
+      },
+      {
+        "no": "03",
+        "en": "SUBSCRIPTION",
+        "title": "Subscription",
+        "items": [
+          {
+            "q": "Can I choose the delivery interval?",
+            "summary": "Every two, four or eight weeks, and you can change it later."
+          },
+          {
+            "q": "Can I skip or stop?",
+            "summary": "Any time. There is no minimum number of deliveries."
+          },
+          {
+            "q": "Can I see the next tea in advance?",
+            "summary": "We email you five days before dispatch, and you can swap it."
+          }
+        ]
+      },
+      {
+        "no": "04",
+        "en": "ACCOUNT & OTHER",
+        "title": "Account and other",
+        "items": [
+          {
+            "q": "Do I need an account to buy?",
+            "summary": "No, you can order without registering."
+          },
+          {
+            "q": "Can I send it as a gift?",
+            "summary": "Yes, gift wrapping and a message card are available."
+          },
+          {
+            "q": "Who do I contact about press or wholesale?",
+            "summary": "Use the Other category on the contact form."
+          }
+        ]
+      }
+    ],
+    "chapter": {
+      "overline": "NO RIGHT ANSWER",
+      "title": "We do not set a right way to brew.",
+      "body": "What is written here is only a guideline. The rest is yours."
+    },
+    "still": {
+      "overline": "STILL LOOKING",
+      "title": "If you did not find it",
+      "rows": [
+        {
+          "title": "Contact us",
+          "desc": "Send us a note and we will reply within three business days.",
+          "href": "/contact"
+        },
+        {
+          "title": "More about tea",
+          "desc": "Reading on brewing, origins and cultivars.",
+          "href": "/journal"
+        }
+      ]
+    }
   },
   "contact": {
-    "title": "Contact Us",
-    "subtitle": "If you have any questions or requests, please feel free to reach out using the form below.",
+    "title": "Contact",
+    "overline": "CONTACT",
+    "lead": "Questions, things you noticed, press enquiries and wholesale — all of it comes here. Someone reads every message and replies in turn.",
+    "metaHeading": "About getting in touch",
+    "metaReply": "Reply",
+    "metaReplyValue": "Within 2 business days (excl. weekends and holidays)",
+    "metaFormHours": "Form",
+    "metaFormHoursValue": "Open 24 hours",
+    "metaEmail": "Email",
+    "metaPhone": "Phone",
+    "metaPhoneValue": "Weekdays 10:00–17:00",
+    "beforeHeading": "Before you write",
+    "beforeLead": "The answer may already be written down. Have a look at the frequently asked questions first, and use the form below only if it does not settle things.",
+    "beforeFaq": "Frequently asked questions",
+    "beforeFaqDesc": "Delivery, payment and subscriptions — the questions we get most",
+    "beforeShipping": "Delivery and returns",
+    "beforeShippingDesc": "Dispatch times, shipping fees, and the terms for returns and exchanges",
+    "beforeSubscription": "Changing or pausing a subscription",
+    "beforeSubscriptionDesc": "How to change a delivery date, skip, or cancel",
+    "formHeading": "Send via the form",
+    "formLead": "Only three things are required: your name, your email address, and your message.",
+    "category": "Type of enquiry",
+    "categoryHint": "Customer enquiry / Wholesale, press and other business",
+    "categoryPlaceholder": "Please choose",
+    "categoryCustomer": "Customer enquiry",
+    "categoryBusiness": "Wholesale, press and other business",
     "name": "Name",
-    "email": "Email Address",
-    "subject": "Subject",
+    "namePlaceholder": "e.g. Taro Yamada",
+    "email": "Email address",
+    "emailPlaceholder": "e.g. you@example.com",
     "message": "Message",
+    "messagePlaceholder": "Tell us as much as you know about your question or the trouble you are having.",
+    "required": "Required",
+    "privacyNote": "What you send us is handled in line with our <policy>privacy policy</policy>.",
     "submit": "Send",
-    "success": "Your inquiry has been received. We will respond within 2 business days.",
+    "success": "Your enquiry has been received. We will reply within 2 business days.",
     "error": "Failed to send. Please try again.",
-    "emailDirect": "Email Us Directly",
-    "emailAddress": "support@elxea.com",
-    "responseTime": "We typically respond within 2 business days.",
-    "businessLink": "For business inquiries"
+    "hintsHeading": "Helpful to include",
+    "hintOrder": "Order number",
+    "hintOrderDesc": "For orders already dispatched",
+    "hintProduct": "Product name",
+    "hintProductDesc": "Which tea it concerns",
+    "hintSituation": "What happened",
+    "hintSituationDesc": "When, and what went wrong",
+    "hintsNote": "Leave anything you are unsure about blank.",
+    "chapterTitle": "Every reply is written by hand.",
+    "chapterBody": "That is why it sometimes takes us a little while."
   },
   "contactBusiness": {
     "title": "For Business",
@@ -370,7 +865,6 @@
     "success": "Your inquiry has been received. We will respond within 2 business days.",
     "error": "Failed to send. Please try again.",
     "emailDirect": "Email Us Directly",
-    "emailAddress": "info@elxea.com",
     "responseTime": "We typically respond within 2 business days."
   },
   "shippingInfo": {
@@ -381,7 +875,7 @@
     "freeShipping": "Free shipping on orders over ¥5,000",
     "subscriptionFree": "Subscriptions always ship free",
     "deliveryTime": "Delivery Time",
-    "deliveryTimeText": "Orders are typically shipped within 3-5 business days after confirmation. Estimated delivery after shipping:",
+    "deliveryTimeText": "Orders are dispatched within 5 business days. Estimated delivery after shipping:",
     "region1": "Kanto, Chubu, Kansai",
     "region1Days": "1-2 days after shipping",
     "region2": "Hokkaido, Tohoku, Chugoku, Shikoku, Kyushu",
@@ -414,7 +908,7 @@
     "planHeading": "Discover the joy of great tea, delivered to your door.",
     "planName": "Single Origin Tea Subscription",
     "planFirstPrice": "Special introductory price",
-    "planPrice": "¥1,480",
+    "planPrice": "¥1,880",
     "planPriceSuffix": "(tax incl.)",
     "planFreeShipping": "+ Free shipping",
     "planNote": "* From the 2nd delivery: ¥2,280 per shipment (free shipping).",
@@ -439,7 +933,7 @@
     "perk2Title": "Member-only pricing on your favorites.",
     "perk2Body": "Purchase individual packs and value packs of your favorite teas at a special 10% discount.",
     "disclaimerLine1": "* This is a recurring subscription plan.",
-    "disclaimerLine2": "* First-time buyers receive their selected tea set at the special price of ¥1,480 (tax incl.).",
+    "disclaimerLine2": "* First-time buyers receive their selected tea set at the special price of ¥1,880 (tax incl.).",
     "disclaimerLine3": "* Shipping is always free for this plan.",
     "disclaimerLine4": "* From the 2nd delivery, you can switch to a different tea category. If no changes are made, we'll send our seasonal recommendation.",
     "disclaimerLine5": "* No cancellation fees or penalties for skipping deliveries.",
@@ -448,7 +942,7 @@
     "faqQ1": "Can I cancel my subscription?",
     "faqA1": "Yes, you can cancel anytime. There are no cancellation fees.",
     "faqQ2": "How long does delivery take?",
-    "faqA2": "Orders are typically shipped within 3-5 business days.",
+    "faqA2": "Orders are dispatched within 5 business days.",
     "faqQ3": "How is the tea shipped?",
     "faqA3": "We ship via Yamato Transport (Nekopos or Takkyubin).",
     "faqQ4": "When am I charged for the first order?",
@@ -456,7 +950,7 @@
     "faqQ5": "When are subsequent payments charged?",
     "faqA5": "The next payment is charged 30 days after your first delivery.",
     "faqQ6": "What payment methods are accepted?",
-    "faqA6": "We accept Visa, Mastercard, JCB, American Express, Apple Pay, and Google Pay.",
+    "faqA6": "Subscriptions can be paid by credit card only (Visa, Mastercard, American Express, JCB).",
     "faqQ7": "Can I return or exchange items?",
     "faqA7": "Due to the nature of the product, we cannot accept returns or exchanges for customer convenience. Please contact us if you receive a defective item.",
     "faqQ8": "Can I make a one-time purchase instead?",
@@ -531,5 +1025,506 @@
     "errorMessage": "An error occurred. Please try again.",
     "stepOf": "{current} / {total}",
     "chatCta": "Record your experience →"
+  },
+  "tastingNoteR2": {
+    "title": "Tasting Notes",
+    "lead": "The teas you have drunk, and a line about each. What comes next is decided here.",
+    "empty": {
+      "eyebrow": "0 items",
+      "title": "No notes yet",
+      "body": "Once you have had a cup, you can keep a record of it here.",
+      "ctaLabel": "Choose a tea"
+    },
+    "moodAgain": "Would brew again",
+    "moodMatched": "Good match",
+    "moodLogged": "Just a note",
+    "outroLink": "Looking for your next cup → the tea shelf"
+  },
+  "shipping": {
+    "title": "Delivery",
+    "kicker": "DELIVERY",
+    "lead": "What happens between your order and the parcel arriving. If anything is unclear, please contact us.",
+    "facts": {
+      "heading": "At a glance",
+      "rows": [
+        {
+          "label": "Dispatch",
+          "value": "Within 5 business days of order"
+        },
+        {
+          "label": "Arrival",
+          "value": "1-3 days after dispatch"
+        },
+        {
+          "label": "Carrier",
+          "value": "Yamato Transport"
+        }
+      ]
+    },
+    "index": {
+      "label": "On this page",
+      "rates": "Rates and timings",
+      "dispatch": "When we dispatch",
+      "method": "Method and time slots",
+      "returns": "Returns"
+    },
+    "rates": {
+      "heading": "Rates and timings",
+      "note": "Shipping cost and delivery time vary by region.",
+      "colArea": "Region",
+      "colFee": "Shipping",
+      "colEta": "Estimate",
+      "free": "Orders over 8,000 yen ship free, to any region.",
+      "rows": [
+        {
+          "area": "Honshu, Shikoku, Kyushu",
+          "fee": "770 yen",
+          "eta": "Next day to 2 days"
+        },
+        {
+          "area": "Hokkaido",
+          "fee": "1,100 yen",
+          "eta": "2-3 days"
+        },
+        {
+          "area": "Okinawa and remote islands",
+          "fee": "1,650 yen",
+          "eta": "3-5 days"
+        }
+      ]
+    },
+    "dispatch": {
+      "heading": "When we dispatch",
+      "note": "Dispatch time depends on what you ordered and when.",
+      "rows": [
+        {
+          "term": "Standard orders",
+          "desc": "Dispatched within 5 business days of your order."
+        },
+        {
+          "term": "Subscriptions",
+          "desc": "Dispatched three days before the scheduled delivery date."
+        },
+        {
+          "term": "Holidays",
+          "desc": "We pause dispatch, and need a few extra days either side."
+        }
+      ]
+    },
+    "method": {
+      "heading": "Method and time slots",
+      "body": "We ship by Yamato Transport takkyubin. The dispatch email carries your tracking number. You can choose the delivery date and time slot at checkout.",
+      "slotsHeading": "Available time slots",
+      "slots": [
+        "Morning",
+        "14:00 - 16:00",
+        "16:00 - 18:00",
+        "18:00 - 20:00",
+        "19:00 - 21:00"
+      ],
+      "slotsNote": "Some slots are unavailable in certain regions."
+    },
+    "chapter": {
+      "title": "Arriving in good condition matters more than arriving fast.",
+      "body": "To keep the time since picking short, we wrap and send each order as it comes rather than in batches."
+    },
+    "returns": {
+      "heading": "Returns and exchanges",
+      "note": "As a food product, we cannot accept returns or exchanges for change of mind.",
+      "rows": [
+        {
+          "term": "Faulty or wrong item",
+          "desc": "Tell us within seven days of arrival. We cover the return postage."
+        },
+        {
+          "term": "How to reach us",
+          "desc": "Use the contact form and include your order number."
+        },
+        {
+          "term": "Once opened",
+          "desc": "We will check the condition and discuss it with you individually."
+        }
+      ]
+    },
+    "links": {
+      "products": "Browse the teas",
+      "contact": "Contact us"
+    }
+  },
+  "returns": {
+    "title": "Returns and exchanges",
+    "kicker": "RETURNS",
+    "breadcrumbParent": "Shopping",
+    "lead": "As food and drink, we cannot accept returns for change of mind. If the fault is ours, however, we cover everything including postage.",
+    "summary": {
+      "heading": "The short version",
+      "rows": [
+        {
+          "label": "Change of mind",
+          "value": "Not accepted"
+        },
+        {
+          "label": "Faulty or wrong",
+          "value": "We cover the full cost"
+        },
+        {
+          "label": "Unopened exchange",
+          "value": "Within 7 days of arrival"
+        }
+      ]
+    },
+    "index": {
+      "label": "On this page",
+      "cases": "Returns for change of mind",
+      "flow": "If it arrived faulty or wrong",
+      "excluded": "What we cannot accept",
+      "contact": "Return address and contact"
+    },
+    "cases": {
+      "heading": "What happens in your case",
+      "note": "Pick the closest one. If none fits, or you are unsure, just get in touch as you are.",
+      "rows": [
+        {
+          "term": "Still unopened",
+          "desc": "We accept an exchange within seven days of arrival. Return postage is yours."
+        },
+        {
+          "term": "Already opened",
+          "desc": "For food safety we cannot take it back, but we are glad to talk about taste and aroma."
+        },
+        {
+          "term": "Damaged or broken",
+          "desc": "That is our fault. Send one photo with your message and we cover everything, postage included."
+        },
+        {
+          "term": "Wrong item arrived",
+          "desc": "That is our fault. Choose between the correct item or a refund."
+        }
+      ]
+    },
+    "flow": {
+      "heading": "From your message to a resolution",
+      "note": "The path from your message to a resolution. You may stop at any stage.",
+      "rows": [
+        {
+          "step": "01",
+          "name": "You tell us",
+          "desc": "Use the contact form with your order number and what happened."
+        },
+        {
+          "step": "02",
+          "name": "We reply",
+          "desc": "Within one to two business days, with whether to return it and where."
+        },
+        {
+          "step": "03",
+          "name": "Refund or exchange",
+          "desc": "Refunds take 7-10 days. Exchanges ship once we confirm stock."
+        }
+      ]
+    },
+    "chapter": {
+      "title": "First, tell us how it was.",
+      "body": "Whether it can be returned comes after. Even the reason it did not suit you is a clue for us."
+    },
+    "excluded": {
+      "heading": "What we cannot accept",
+      "note": "We cannot take back anything matching the below. If you are unsure, contact us first.",
+      "rows": [
+        {
+          "term": "Opened or used items",
+          "desc": "For food safety reasons"
+        },
+        {
+          "term": "Items over 8 days since arrival",
+          "desc": "We cannot verify the condition"
+        },
+        {
+          "term": "Items stored outside room temperature",
+          "desc": "The flavour will have changed"
+        },
+        {
+          "term": "Items sent directly to a recipient",
+          "desc": "We need to hear from the recipient"
+        }
+      ]
+    },
+    "contact": {
+      "heading": "Return address and contact",
+      "note": "Please return only after we have replied, so nothing crosses in the post.",
+      "subheading": "Contact",
+      "rows": [
+        {
+          "label": "Return to",
+          "value": "We tell you after you contact us"
+        },
+        {
+          "label": "Reach us",
+          "value": "Contact form"
+        },
+        {
+          "label": "Hours",
+          "value": "10:00 - 17:00 / weekdays only"
+        }
+      ]
+    },
+    "links": {
+      "products": "Browse the teas",
+      "shipping": "Delivery",
+      "contact": "Contact us"
+    }
+  },
+  "catalog": {
+    "all": "All",
+    "byKind": "Browse by kind",
+    "showMore": "Show {count} more",
+    "sortLabel": "Sort",
+    "sortNewest": "Newest",
+    "sortPriceAsc": "Price: low to high",
+    "sortPriceDesc": "Price: high to low",
+    "sortRecommended": "Recommended",
+    "sortOldest": "Oldest first"
+  },
+  "productDetail": {
+    "specOrigin": "産地",
+    "specHarvest": "摘採",
+    "specFinish": "仕上げ",
+    "specVarietyFallback": "—",
+    "specOriginFallback": "—",
+    "specHarvestFallback": "—",
+    "specFinishFallback": "—",
+    "tasteMapOverline": "TASTE MAP",
+    "tasteMapTitle": "味と香りのマップ",
+    "tasteMapLead": "図の見方 — 横軸: 味（すっきり ↔ 濃厚）／ 縦軸: 香り（穏やか ↔ 華やか）。点線は淹れ方で動く範囲。",
+    "tasteMapNote": "位置は「淹れ方で動く範囲」の目安です。点数ではありません。どこが良いかは決めていません。",
+    "tastePoint1": "青い草の香り",
+    "tastePoint2": "蒸した栗のような甘み",
+    "tastePoint3": "厚い旨み",
+    "tastePoint4": "二煎目の渋み",
+    "tasteLegend1Term": "旨み",
+    "tasteLegend1Body": "低温・長めに出すほど厚くなる",
+    "tasteLegend2Term": "渋み",
+    "tasteLegend2Body": "湯温を上げると立ち上がる",
+    "tasteLegend3Term": "香り",
+    "tasteLegend3Body": "淹れたての立ち香がいちばん強い",
+    "tastingOverline": "TASTING",
+    "tastingTitle": "味の記憶",
+    "tasting1Body": "青い草と、蒸した栗。湯気に鼻を近づけたときにいちばん濃く出ます。",
+    "tasting2Title": "一煎目",
+    "tasting2Body": "旨みが厚く、渋みはほとんど立ちません。温度を下げるほど甘みが残ります。",
+    "tasting3Title": "二煎目以降",
+    "tasting3Body": "渋みが輪郭をつくり、味が引き締まります。どちらが良いかは決めていません。",
+    "brewOverline": "HOW TO BREW",
+    "brewTitle": "淹れ方の目安",
+    "brew1Name": "茶葉 3g",
+    "brew1Body": "小さじ山盛り1杯ほど。急須に入れます。",
+    "brew2Name": "湯 70℃ / 100ml",
+    "brew2Body": "沸かした湯を一度うつわに移すと、だいたいこのくらいになります。",
+    "brew3Name": "60秒",
+    "brew3Body": "急須をゆらさずに待ちます。最後の一滴まで注ぎ切ります。",
+    "brewNote": "数値は目安です。温度・時間を変えれば味も変わります。好きな一杯は、手元で探してください。",
+    "specSheetOverline": "SPECIFICATION",
+    "specSheet1Term": "茶種",
+    "specSheet7Term": "保存",
+    "specSheet7Value": "密閉・冷暗所／開封後1か月",
+    "specSheet8Term": "賞味期限",
+    "specSheet8Value": "製造から12か月",
+    "chapterTitle": "その日の湯温が、その日の味になる。",
+    "chapterBody": "同じ茶葉でも、同じ味には二度ならない。それを不便と呼ぶか、面白いと呼ぶかは、飲む人にゆだねています。",
+    "fieldOverline": "THE FIELD",
+    "fieldTitle": "霧が、葉をやわらかくする",
+    "fieldBody": "知覧は朝霧の多い土地です。霧が日射をやわらげるあいだ、葉は渋みを溜めこまずに育ちます。摘採は年に四度ありますが、この茶葉は一番茶だけを使っています。",
+    "faqOverline": "FAQ",
+    "faqQ1": "開封後はどのくらいもちますか",
+    "faqA1": "密閉して冷暗所なら1か月が目安です。冷蔵庫に入れる場合は、出したあと常温に戻してから開けてください。",
+    "faqQ2": "深蒸しとの違いは",
+    "faqA2": "浅蒸しは葉の形が残り、水色が澄みます。深蒸しに比べて渋みが出にくく、香りが立ちやすい傾向があります。",
+    "faqQ3": "どの茶器が合いますか",
+    "faqA3": "特に決めていません。急須でも、蓋碗でも、耐熱グラスでも構いません。抽出時間だけ合わせてください。",
+    "faqQ4": "定期便はありますか",
+    "faqA4": "この茶葉単体の定期便はありません。季節ごとの詰め合わせは定期便のページをご覧ください。",
+    "alsoOverline": "ALSO",
+    "alsoTitle": "近い茶葉",
+    "note1": "— ご注文から5営業日以内に発送します",
+    "note2": "— 開封後は密閉して冷暗所へ。1か月を目安に",
+    "note3": "— のし・ギフト包装は承っていません",
+    "readingOverline": "JOURNAL",
+    "readingTitle": "Reading"
+  },
+  "subscriptionR2": {
+    "metaTitle": "ROJI TEA CLUB — 定期便",
+    "metaDescription": "産地の違うお茶が、毎月ひと箱。その月の畑がいちばん良かった順に、3種だけお届けします。",
+    "heroOverline": "ROJI TEA CLUB — SUBSCRIPTION",
+    "heroTitle": "産地の違うお茶が、毎月ひと箱。",
+    "heroLead": "決まった正解は入っていません。その月の畑がいちばん良かった順に、3種だけ。淹れ方はあなたの好きにしてください。",
+    "heroCta": "定期便の中身を見る",
+    "firstDeliveryRibbon": "今申し込むと、初回のお届けは {firstDelivery}。この3種が届きます",
+    "boxOverline": "THIS MONTH'S BOX",
+    "boxTitle": "今月の3種",
+    "box1Title": "01 知覧 ゆたかみどり — 鹿児島 / 浅蒸し",
+    "box1Body": "青い草の香りに、蒸した栗のような甘み。まず70℃で、旨みのほうから飲んでみてください。",
+    "box2Title": "02 嬉野 釜炒り茶 — 佐賀 / 釜炒り",
+    "box2Body": "釜で炒った香ばしさと、後に残らない軽さ。熱めの湯のほうが香りは立ちます。",
+    "box3Title": "03 川根 やぶきた — 静岡 / 中蒸し",
+    "box3Body": "山あいの一番茶。渋みの輪郭がはっきりしていて、食事のあとに合います。",
+    "included1Term": "茶葉 3種",
+    "included1Value": "各 15g（産地違い）",
+    "included2Term": "淹れ方の栞",
+    "included2Value": "その月の茶に合わせた温度と時間の目安",
+    "included3Term": "生産者の便り",
+    "included3Value": "その月の畑からの手紙（読みもの）",
+    "included4Term": "お届け",
+    "included4Value": "ポスト投函 / 送料は月額に含みます",
+    "step1Name": "選ぶ",
+    "step1Body": "3種おまかせ or 好み指定",
+    "step2Name": "頻度を決める",
+    "step2Body": "毎月 / 隔月",
+    "step3Name": "発送前に確認・修正",
+    "step3Body": "中身は事前に通知します",
+    "step4Name": "いつでも調整",
+    "step4Body": "停止・スキップ自由",
+    "storyOverline": "EPISODE 01 — つくる人",
+    "storyBody": "わたしの畑は、朝の霧が濃い。霧が晴れるまで摘まない。その日の葉がいちばん開くのを待ってから、手で摘みます。だから月によって味が違う。違うことが、うちのお茶のいちばんの自慢です。同じ味を約束できない代わりに、その月のいちばんを約束します。",
+    "monthsOverline": "12 MONTHS",
+    "month1Term": "1月",
+    "month1Value": "冬の蔵出し・熟成のすすんだ煎茶",
+    "month2Term": "2月",
+    "month2Value": "早出しの新芽・浅蒸し",
+    "month3Term": "3月",
+    "month3Value": "春摘みの走り・香りの軽い茶",
+    "month4Term": "4月",
+    "month4Value": "一番茶・八十八夜前の摘みたて",
+    "month5Term": "5月",
+    "month5Value": "新茶・産地違いの飲みくらべ",
+    "month6Term": "6月",
+    "month6Value": "冷茶に向く浅蒸しの3種",
+    "month7Term": "7月",
+    "month7Value": "水出し・低温抽出のための茶",
+    "month8Term": "8月",
+    "month8Value": "香ばしい焙じ茶と番茶",
+    "month9Term": "9月",
+    "month9Value": "秋の口切り・ひと夏越した茶",
+    "month10Term": "10月",
+    "month10Value": "佐賀・嬉野の釜炒り茶から始まる3種",
+    "month11Term": "11月",
+    "month11Value": "火入れの強い晩秋の茶",
+    "month12Term": "12月",
+    "month12Value": "一年の総集編・よく飲まれた3種",
+    "nextMonthTitle": "次月のお届け",
+    "nextMonthChip": "10月のお届け",
+    "nextMonthBody": "10月は、佐賀・嬉野の釜炒り茶から始まる3種。焙煎の浅い順に並べて箱に入れます。気に入った1種だけを翌月に増やすこともできます。",
+    "price1Term": "月額",
+    "price1Value": "{monthlyPrice}（税込・送料込み）",
+    "monthlyPriceUnavailable": "価格は準備中です",
+    "price2Term": "お届け頻度",
+    "price2Value": "毎月 / 隔月から選べます",
+    "price3Term": "含まれるもの",
+    "price3Value": "茶葉3種・淹れ方の栞・生産者の便り",
+    "price4Term": "停止・スキップ",
+    "price4Value": "マイページからいつでも。回数の縛りはありません",
+    "voicesOverline": "VOICES",
+    "voicesTitle": "つくり手の声",
+    "voice1Title": "嬉野・釜炒り 中村",
+    "voice1Body": "同じ畑でも、摘む日が3日ちがえば別の茶になります。その差を隠さずに送りたいと思っています。",
+    "voice2Title": "知覧・浅蒸し 川畑",
+    "voice2Body": "霧が晴れるまで摘まない。待った分だけ、湯を下げたときの甘みが出ます。",
+    "voice3Title": "川根・中蒸し 大石",
+    "voice3Body": "渋みは悪者ではありません。食事のあとに飲むなら、むしろ輪郭があるほうがいい。",
+    "faqOverline": "FAQ",
+    "faqQ1": "解約・スキップはできますか",
+    "faqA1": "次回のご請求日の前日までに、マイページから停止・スキップができます。この期限を過ぎたお手続きは、その次の回から反映されます。回数の縛りはありません。",
+    "faqQ2": "支払い方法は",
+    "faqA2": "クレジットカード（Visa、Mastercard、American Express、JCB）のみご利用いただけます。初回はご注文の確定時、2回目以降はお申し込み日を起点とした応当日に、ご登録のカードへ自動で請求します。",
+    "faqQ3": "配送はどうなりますか",
+    "faqA3": "ポスト投函でお届けします。送料は月額に含まれます。日時指定は承っていません。",
+    "faqQ4": "中身は選べますか",
+    "faqA4": "3種おまかせのほか、浅蒸し・釜炒り・焙じなど好みの指定ができます。中身は発送前にお知らせします。",
+    "faqQ5": "ギフトに使えますか",
+    "faqA5": "お届け先を分けて登録できます。栞と生産者の便りは毎月同封します。",
+    "planLead": "月々 {monthlyPrice}（送料・淹れ方の栞つき / いつでも停止できます）",
+    "planCta": "ROJI TEA CLUB に申し込む",
+    "planNote": "解約・スキップはマイページからいつでも。"
+  },
+  "signs": {
+    "title": "Signs of Others",
+    "lead": "This week's tally for this place, and a few words with no names attached. Both are given the same weight.",
+    "stats": {
+      "heading": "This week",
+      "brewsUnit": "cups",
+      "brewsLabel": "Cups brewed here this week",
+      "visitorsUnit": "people",
+      "visitorsLabel": "People who came here this week"
+    },
+    "timeOfDay": {
+      "heading": "Time of day",
+      "barLabel": "relative volume",
+      "morning": "Morning 7–10",
+      "noon": "Midday 11–15",
+      "evening": "Evening 16–19",
+      "night": "Night 20–24",
+      "level": {
+        "high": "Busy",
+        "mid": "Steady",
+        "low": "Quiet"
+      }
+    },
+    "notes": {
+      "heading": "A few words",
+      "noReply": "Three reactions only. No replies."
+    },
+    "reactions": {
+      "wakaru": "I get it",
+      "iina": "Nice",
+      "kininaru": "Curious"
+    },
+    "rules": {
+      "heading": "How this place works",
+      "anonymous": {
+        "title": "No names",
+        "body": "Notes and reactions are anonymous. Authorship cannot be traced afterwards."
+      },
+      "noReply": {
+        "title": "No replies",
+        "body": "There is no one-to-one channel. Reactions reach the writer only as a count."
+      },
+      "threeOnly": {
+        "title": "Three reactions",
+        "body": "I get it, Nice, Curious. Choosing words is taken off your hands from the start."
+      }
+    },
+    "shopLink": "See the teas →",
+    "shopNote": "This is the only way into the shop from this page."
+  },
+  "homeR2": {
+    "heroTitle": "Tea, as a daily practice.",
+    "heroSubtitle": "お茶のある毎日を、elxea から。",
+    "heroLead": "茶葉と道具、そして淹れ方の物語。elxea は、日々の中に「お茶の時間」をつくるための店です。",
+    "heroCta": "茶葉の一覧へ",
+    "seasonalLabel": "新着・季節の一報",
+    "teaTitle": "茶葉",
+    "categoriesTitle": "行為から、茶葉を探す",
+    "journalLabel": "ジャーナル",
+    "eventLabel": "イベント",
+    "voicesTitle": "つくり手の声",
+    "chapterTitle": "正解を、押し付けない。",
+    "chapterBody": "elxea が届けるのは素材と、その背景にある物語。淹れ方はあなたのものです。",
+    "guideTitle": "elxea でできること",
+    "guideLead": "お茶を買う。読む。体験する。elxea は、日々の中に「お茶の時間」をつくる、ひとつづきのサービスです。",
+    "guideTeaTitle": "お茶",
+    "guideTeaBody": "シングルオリジン煎茶からほうじ茶・和紅茶・道具まで。茶葉と道具のオンラインストア。",
+    "guideTeaLink": "茶葉の一覧へ →",
+    "guideJournalTitle": "ジャーナル",
+    "guideJournalBody": "淹れ方と産地の読みもの。季節ごとの扱い方から、産地をたずねた記録まで。",
+    "guideJournalLink": "ジャーナルを読む →",
+    "guideEventTitle": "イベント",
+    "guideEventBody": "淹れ方をたしかめる少人数の会。オンラインと対面で開催しています。",
+    "guideEventLink": "イベントを見る →",
+    "guideRojiTitle": "roji",
+    "guideRojiBody": "お茶・読みもの・体験をひとつづきに楽しむ、elxea の統合サービス。",
+    "guideRojiLink": "roji について →",
+    "guideAboutTitle": "elxea について",
+    "guideAboutBody": "ブランドの考え方と、店の運営について。",
+    "guideAboutLink": "アバウトページへ →",
+    "purchaseLink": "茶葉の一覧へ →"
   }
 }

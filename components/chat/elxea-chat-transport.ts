@@ -5,6 +5,7 @@
  * Workers API の { message, session_id } → SSE レスポンス形式と橋渡しする。
  */
 import type { ChatTransport, UIMessage, UIMessageChunk } from "ai";
+import { randomId } from "@/lib/random-id";
 
 // ---------------------------------------------------------------------------
 // Types (H-4: product_card / quick_replies イベント)
@@ -122,7 +123,7 @@ export class ElxeaChatTransport implements ChatTransport<UIMessage> {
     if (!body) throw new Error("No response body");
 
     // Workers の SSE レスポンスを Vercel AI SDK の UIMessageChunk に変換
-    const partId = crypto.randomUUID();
+    const partId = randomId();
     let textStarted = false;
     let textEnded = false;
     const callbacks = this.callbacks;

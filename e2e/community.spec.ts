@@ -13,7 +13,7 @@ test.describe("Community features — Unauthenticated", () => {
       const productExists = await productLink.isVisible().catch(() => false);
 
       if (!productExists) {
-        test.skip();
+        test.skip(true, "商品一覧に商品カードが無い — Shopify に公開商品が必要です");
         return;
       }
 
@@ -56,7 +56,7 @@ test.describe("Community features — Unauthenticated", () => {
       const articleExists = await articleLink.isVisible().catch(() => false);
 
       if (!articleExists) {
-        test.skip();
+        test.skip(true, "ジャーナル一覧に記事カードが無い — Sanity に公開記事が必要です");
         return;
       }
 
@@ -87,11 +87,18 @@ test.describe("Community features — Unauthenticated", () => {
   // Account page — unauthenticated
   // ---------------------------------------------------------------------------
   test.describe("Account page", () => {
-    test("shows login prompt for unauthenticated users", async ({ page }) => {
+    /*
+     * 未ログインの /ja/account は **ページ内のログイン誘導ではなく
+     * /ja/login への 307 リダイレクト**になった (middleware.ts の accountMatch
+     * ガード。LINE ユーザーがログイン方法を選べるように Shopify OAuth 直行を
+     * やめた P3-fix)。旧アサーション (ページ内文言
+     * 「マイページを表示するにはログインが必要です」) は到達不能になった
+     * `app/[locale]/account/page.tsx` の分岐を見ていた。
+     */
+    test("redirects unauthenticated users to the login page", async ({ page }) => {
       await page.goto("/ja/account");
-      await expect(
-        page.getByText("マイページを表示するにはログインが必要です")
-      ).toBeVisible();
+      await page.waitForURL(/\/ja\/login/);
+      await expect(page.locator("h1")).toContainText("ログイン");
     });
 
     test("shows login button", async ({ page }) => {
@@ -225,7 +232,9 @@ test.describe("Community API — Unauthenticated", () => {
     const res = await request.get("/api/user/comments");
     expect(res.status()).toBe(400);
     const body = await res.json();
-    expect(body.error).toContain("Missing required params");
+    // 文言は zod 化で "Missing required params" から変わった
+    // (app/api/user/comments/route.ts の formatZodError 経路)。
+    expect(body.error).toContain("Invalid query parameters");
   });
 
   test("POST /api/user/comments returns 401 without auth", async ({
@@ -252,12 +261,9 @@ test.describe("Community API — Unauthenticated", () => {
 });
 
 test.describe("Community features — Page load verification", () => {
-  test("farmers page loads for community interaction", async ({ page }) => {
-    await page.goto("/ja/farmers");
-    await expect(page.locator("h1")).toBeVisible();
-    // Page should not show error
-    await expect(page.locator("body")).not.toContainText("エラーが発生しました");
-  });
+  // 農家一覧 (/ja/farmers) は 2026-08-14 に廃止。フォロー / コメントの導線は
+  // 農家詳細 (/ja/farmers/[slug]) 側に残るが、slug は実データ依存なのでここでは
+  // 検証しない (API レベルの検証は本ファイル上部の describe が担う)。
 
   test("events page loads for event registration", async ({ page }) => {
     await page.goto("/ja/events");

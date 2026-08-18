@@ -75,7 +75,7 @@
       },
       "body-lg": {
         "$value": {
-          "fontFamily": "neue-haas-grotesk-text, kozuka-gothic-pro, sans-serif",
+          "fontFamily": "aktiv-grotesk, dnp-shuei-gothic-gin-std, sans-serif",
           "fontSize": "1.125rem",
           "fontWeight": "400",
           "lineHeight": "1.9",
@@ -85,7 +85,7 @@
       },
       "body": {
         "$value": {
-          "fontFamily": "neue-haas-grotesk-text, kozuka-gothic-pro, sans-serif",
+          "fontFamily": "aktiv-grotesk, dnp-shuei-gothic-gin-std, sans-serif",
           "fontSize": "1rem",
           "fontWeight": "400",
           "lineHeight": "1.8",
@@ -95,7 +95,7 @@
       },
       "body-sm": {
         "$value": {
-          "fontFamily": "neue-haas-grotesk-text, kozuka-gothic-pro, sans-serif",
+          "fontFamily": "aktiv-grotesk, dnp-shuei-gothic-gin-std, sans-serif",
           "fontSize": "0.875rem",
           "fontWeight": "400",
           "lineHeight": "1.8",
@@ -105,7 +105,7 @@
       },
       "caption": {
         "$value": {
-          "fontFamily": "neue-haas-grotesk-text, kozuka-gothic-pro, sans-serif",
+          "fontFamily": "aktiv-grotesk, dnp-shuei-gothic-gin-std, sans-serif",
           "fontSize": "0.75rem",
           "fontWeight": "400",
           "lineHeight": "1.75",

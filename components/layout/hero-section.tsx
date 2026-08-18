@@ -81,7 +81,7 @@ const heroSectionVariants = cva(
       },
       /**
        * size: maps to spacing scale from tokens/base.json
-       *   L → py-24 (--spacing-24 = 6rem), container xl (--layout-container-xl = 80rem)
+       *   L → py-24 (--spacing-24 = 6rem), container xl (--layout-container-xl = 82rem)
        *   M → py-16 (--spacing-16 = 4rem), container lg (--layout-container-lg = 64rem)
        *   S → py-10 (--spacing-10 = 2.5rem), container md (--layout-container-md = 48rem)
        */

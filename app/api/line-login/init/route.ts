@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import crypto from "crypto";
-import { getBaseUrl } from "@/lib/base-url";
+import { getBaseUrl, getRequestHostname, isTrustedAuthHost } from "@/lib/base-url";
+import { getCookieSpec, isSecure, resolveCookieDomain } from "@/lib/auth/cookies";
 
 /**
  * LINE Login state initialization endpoint.
@@ -24,35 +25,57 @@ import { getBaseUrl } from "@/lib/base-url";
  * The legacy GET /api/line-login (server redirect) remains for back-compat
  * and is safe to remove once all clients ship the new button.
  */
-export async function POST() {
+export async function POST(request: NextRequest) {
+
+  /* Fail closed on a host that is not ours.
+   *
+   * This is the fix for "login from a preview lands on the production top page".
+   * `NEXTAUTH_URL` is not set in the preview environment (verified 2026-08-18 by
+   * listing variable names only), while Vercel injects
+   * `VERCEL_PROJECT_PRODUCTION_URL` into every environment — so `getBaseUrl()`
+   * resolved to the PRODUCTION origin on previews, and the LINE round trip
+   * quietly delivered the user to production instead of the deployment they were
+   * testing. Silently sending someone to a different deployment is worse than
+   * refusing, so an untrusted host now gets a legible 503 instead.
+   *
+   * `isTrustedAuthHost` is satisfied by any host at or under our apex, so
+   * production and www are unaffected without any configuration. */
+  const hostname = getRequestHostname(request);
+  if (!isTrustedAuthHost(hostname)) {
+    return NextResponse.json(
+      { error: "auth_host_not_registered", host: hostname },
+      { status: 503 },
+    );
+  }
   const channelId = process.env.AUTH_LINE_ID;
   if (!channelId) {
-    return NextResponse.json(
-      { error: "LINE Login not configured" },
-      { status: 500 }
-    );
+    /* 503, not 500. The channel is not broken, it is not configured for this
+     * deployment — a preview without LINE credentials is an expected state, not
+     * an internal error. The login button reads this and stays disabled with a
+     * specific reason instead of offering a control that cannot work. */
+    return NextResponse.json({ error: "auth_not_configured" }, { status: 503 });
   }
 
   const state = crypto.randomBytes(32).toString("hex");
 
-  // Cookie must be readable on both elxea.com and www.elxea.com. The init POST
-  // may land on either host (depending on which one the user opened), but the
-  // callback always comes back to NEXTAUTH_URL, which is pinned to one host.
-  // A host-only cookie would miss the opposite host and the CSRF state check
-  // would fail (seen as "セッションの有効期限が切れました" in production).
-  // Scope to `.elxea.com` so both hosts share the same cookie jar. On
-  // localhost / preview deployments we fall back to host-only.
-  const baseUrl = getBaseUrl();
-  const hostname = new URL(baseUrl).hostname;
-  const cookieDomain =
-    hostname === "elxea.com" || hostname.endsWith(".elxea.com")
-      ? ".elxea.com"
-      : undefined;
+  /* The cookie must be readable on both elxea.com and www.elxea.com. This POST
+   * may land on either host (whichever the user opened), but the callback always
+   * returns to the one host pinned in env. A host-only cookie would miss the
+   * opposite host and the CSRF state check would fail — seen in production as
+   * "セッションの有効期限が切れました".
+   *
+   * The Domain is derived from the REQUEST, not from `getBaseUrl()`. Deriving it
+   * from env meant the issuing Domain and the deleting Domain came from different
+   * inputs, and under Next 16 the env-derived host is unrelated to the host the
+   * request actually arrived on. */
+  const baseUrl = getBaseUrl(request);
+  const cookieDomain = resolveCookieDomain(request);
+  const stateSpec = getCookieSpec("line_oauth_state")!;
 
   const cookieStore = await cookies();
   cookieStore.set("line_oauth_state", state, {
     httpOnly: true,
-    secure: true,
+    secure: isSecure(stateSpec),
     sameSite: "lax",
     maxAge: 600,
     path: "/",
@@ -61,13 +84,27 @@ export async function POST() {
 
   const redirectUri = `${baseUrl}/api/line-callback`;
 
+  /* No `prompt` parameter.
+   *
+   * This used to send `prompt: "consent"`, with a comment claiming it was needed
+   * "to ensure fresh token exchange". That is not what it does. LINE's own
+   * documentation states that `prompt=consent` forces the consent screen even
+   * when the user has already granted every requested permission — so returning
+   * users were made to re-consent on every single login. Token exchange is
+   * established by `code` + `state` + `code_verifier` and is unaffected by this
+   * parameter, so the stated reason did not hold.
+   *
+   * The Shopify authorize URL keeps its `prompt=login` — that one is deliberate
+   * (shared devices / account switching) and is a different parameter on a
+   * different IdP. `__tests__/authorize-url-prompt.test.ts` asserts both facts
+   * together so that removing one is never mistaken for licence to remove the
+   * other. */
   const params = new URLSearchParams({
     response_type: "code",
     client_id: channelId,
     redirect_uri: redirectUri,
     state,
     scope: "profile openid email",
-    prompt: "consent",
   });
 
   const authUrl = `https://access.line.me/oauth2/v2.1/authorize?${params.toString()}`;

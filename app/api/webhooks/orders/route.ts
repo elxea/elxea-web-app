@@ -6,6 +6,7 @@ import {
   checkWebhookIdempotency,
 } from "@/lib/shopify/webhooks/verify";
 import { getAdminFirestore } from "@/lib/firebase/admin";
+import { notifyWebhookException } from "@/lib/line/monitoring-alerts";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 
 /**
@@ -375,6 +376,19 @@ export async function POST(request: NextRequest) {
         customerId: order.customer?.id,
       },
     });
+
+    // 運営宛の監視通知。注文の取り込みが落ちると Firestore 側の履歴・ペルソナが
+    // 欠けるが、顧客側には何も見えないため気づけない。載せるのは注文番号だけで、
+    // 顧客の識別子 (customerId) やメールは載せない。
+    // `.catch` は保険 (monitoring-alerts 側でも例外は外に出さない)。通知の失敗で
+    // 500 応答そのものが崩れると、Shopify の再送判定まで巻き込むため。
+    await notifyWebhookException({
+      webhook: topic,
+      reference: `注文 #${order.order_number}`,
+      message: error instanceof Error ? error.message : "Unknown error",
+    }).catch((notifyError) =>
+      console.error("[Webhook:orders] 監視通知の送出に失敗しました:", notifyError),
+    );
 
     // Return 500 so Shopify will retry
     return NextResponse.json(

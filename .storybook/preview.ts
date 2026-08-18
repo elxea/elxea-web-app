@@ -1,7 +1,24 @@
+import { createElement } from "react";
 import type { Preview } from "@storybook/nextjs-vite";
+import { NextIntlClientProvider } from "next-intl";
+
+import messages from "../messages/ja.json";
 import "../app/globals.css";
 
 const preview: Preview = {
+  /**
+   * next-intl の locale context を全 story に供給する。`@/i18n/navigation` の
+   * Link は locale を読むため、これが無いと Link を含む部品の story が
+   * "No intl context found" で落ちる (2026-08-08 catalog パターンで顕在化)。
+   */
+  decorators: [
+    (Story) =>
+      createElement(
+        NextIntlClientProvider,
+        { locale: "ja", messages, timeZone: "Asia/Tokyo" },
+        createElement(Story)
+      ),
+  ],
   parameters: {
     controls: {
       matchers: {

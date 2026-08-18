@@ -1,28 +1,118 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import { notFound } from "next/navigation";
 import { getLocale, getTranslations } from "next-intl/server";
+import type { PortableTextBlock } from "@portabletext/types";
+
 import { getClient } from "@/sanity/lib/client";
 import { JOURNAL_BY_SLUG_QUERY } from "@/sanity/lib/queries";
 import { urlFor } from "@/sanity/lib/image";
+import { Section } from "@/components/layout/container";
+import { Breadcrumb } from "@/components/seo/breadcrumb";
 import { PortableText } from "@/components/sanity/portable-text";
-import { ImageWithFallback } from "@/components/media/image-with-fallback";
-import { TeaSpecCard } from "@/components/journal/tea-spec-card";
-import { JournalWashTheme } from "@/components/viz/wash/journal-wash-theme";
+import { captionClass } from "@/components/editorial/rule-list";
+import { AuthorByline } from "@/components/journal/author-byline";
+import { ReadingProgress } from "@/components/journal/reading-progress";
+import {
+  ArticleBlock,
+  ArticleColumn,
+  ArticleHead,
+  ArticleImageBleed,
+  ArticleLead,
+  ArticleNextRead,
+  ArticlePill,
+  ArticleProductRow,
+  ArticleProse,
+  ArticleReadList,
+  ArticleReadRow,
+  articlePagePadding,
+} from "@/components/journal/article-blocks";
 import { Link } from "@/i18n/navigation";
 import { filterOutFictional, isFictionalSlug } from "@/lib/fictional-content";
+import {
+  previewImageForKey,
+  previewSeedEnabled,
+  seedJournalDetail,
+  withSeedJournalDetail,
+} from "@/lib/preview-seed";
+import { cn } from "@/lib/utils";
 
-// 短縮ラベル (Figma Journal Theme Badge 6934:143 が正)
-const themeLabels: Record<string, string> = {
-  akane: "茜",
-  sui: "翠",
-  sohi: "そひ",
+/**
+ * elxea Journal 記事詳細 — Figma【R2: 確定版】本文完結 + 末尾のみ回遊
+ * (同梱セット文脈・執筆者クレジット) PC 8110:46893 / SP 8110:47043 の実装。
+ *
+ * 確定版の節構成をそのまま順に組む:
+ *   1. ReadingProgress   2px の追従バー (ヘッダー直下)
+ *   2. Breadcrumb        PC のみ Figma に掲載 (共通部品のまま)
+ *   3. Head              ELXEA JOURNAL キッカー + 記事タイトル + 執筆者クレジット
+ *   4. lead              明朝のリード文
+ *   5. 冒頭写真          本文から左右 40 はみ出す (SP は全幅) + 写真内キャプション
+ *   6. 本文              段落 24 / 節見出し前 80・後 44 の縦リズム
+ *   7. この号に入っているお茶  同梱セットの文脈 (thumb + 名称 + 産地 + 詳細リンク)
+ *   8. この号のほかの読みもの  末尾のみの回遊 (行 72 / thumb 56) = 行き止まり回避
+ *   9. NextRead          テーマ回遊の pill (末尾のみ)
+ *
+ * データが無い節は枠ごと出さない (空枠を出さない方針 — C4-2 PDP / C4-3 / C4-4a と同じ)。
+ * 7〜9 は C4-4b で Sanity schema に追加した `author` / `mainImage.caption` /
+ * `otherReads` / `nextReadTags` と既存の `teaMenus` を唯一の根拠にする。
+ *
+ * 確定版に枠が無いが実装に残すもの (意図的差分):
+ * - Playlist …… Figma 非掲載だが既存データ (`playlist`) を落とさないため、
+ *   同梱文脈の節として「この号に入っているお茶」の直後に置く。
+ * 確定版で落としたもの (意図的差分):
+ * - Theme badge (6934:143) …… 確定版の Head は色バッジではなく英字キッカーに
+ *   置き換わった。バッジは一覧 (`app/[locale]/elxea-journal/page.tsx`) に残る。
+ * - TeaSpecCard の 3 カラムグリッド …… 確定版では 1 行の product row になった。
+ */
+
+type PhotoRef = { asset: object; alt?: string; caption?: string };
+
+type ReadRef = {
+  _id: string;
+  title: string;
+  slug: { current: string };
+  thumbnail?: PhotoRef;
+  mainImage?: PhotoRef;
 };
 
-const themeColors: Record<string, string> = {
-  akane: "var(--color-brand-tea-red)",
-  sui: "var(--color-brand-tea-green)",
-  sohi: "var(--color-brand-tea-warm)",
+type TagRef = { _id: string; title: string; slug: { current: string } };
+
+type TeaMenuRef = {
+  _id: string;
+  slug: { current: string };
+  title?: string;
+  displayName?: string;
+  origin?: string;
+  variety?: string;
+  photo?: PhotoRef;
+};
+
+type Journal = {
+  _id: string;
+  title: string;
+  slug: { current: string };
+  theme?: string;
+  summary?: string;
+  body?: PortableTextBlock[];
+  mainImage?: PhotoRef;
+  /** プレビュー見本のみが使う平坦なキャプション (実データは mainImage.caption)。 */
+  mainImageCaption?: string;
+  author?: {
+    name: string;
+    role?: string;
+    image?: { asset: object };
+    slug?: { current: string };
+  };
+  teaMenus?: TeaMenuRef[];
+  relatedPost?: ReadRef;
+  otherReads?: ReadRef[];
+  nextReadTags?: TagRef[];
+  playlist?: {
+    title: string;
+    slug: { current: string };
+    albumImage?: { asset: object };
+    spotifyUrl?: string;
+  };
+  seo?: { title?: string; description?: string };
 };
 
 export async function generateMetadata({
@@ -34,12 +124,17 @@ export async function generateMetadata({
   const locale = await getLocale();
   try {
     const client = getClient();
-    const journal = await client.fetch(JOURNAL_BY_SLUG_QUERY, { slug, language: locale });
+    const journal: Journal | null = await client.fetch(JOURNAL_BY_SLUG_QUERY, {
+      slug,
+      language: locale,
+    });
     if (!journal) return {};
     const seo = journal.seo;
     const title = seo?.title || journal.title;
     const description = seo?.description || journal.summary?.slice(0, 160);
-    const image = journal.mainImage?.asset ? urlFor(journal.mainImage).width(1200).url() : undefined;
+    const image = journal.mainImage?.asset
+      ? urlFor(journal.mainImage).width(1200).url()
+      : undefined;
     return {
       title,
       description,
@@ -50,6 +145,17 @@ export async function generateMetadata({
   }
 }
 
+/** 写真の URL。プレビュー時だけプレースホルダを補う (production は無影響)。 */
+function photoUrl(
+  photo: PhotoRef | undefined,
+  seedKey: string,
+  width: number,
+  height: number
+): string | undefined {
+  if (photo?.asset) return urlFor(photo).width(width).height(height).url();
+  return previewSeedEnabled() ? previewImageForKey(seedKey) : undefined;
+}
+
 export default async function ElxeaJournalDetailPage({
   params,
 }: {
@@ -58,18 +164,27 @@ export default async function ElxeaJournalDetailPage({
   const { slug } = await params;
   const locale = await getLocale();
   const t = await getTranslations("elxeaJournal");
+  const bt = await getTranslations("breadcrumb");
 
-  let journal;
+  let journal: Journal | null;
   try {
     const client = getClient();
     journal = await client.fetch(JOURNAL_BY_SLUG_QUERY, { slug, language: locale });
   } catch {
     return (
-      <div className="section-narrow">
-        <p className="text-muted-foreground">{t("loadError")}</p>
-      </div>
+      <Section spacing="none" className={articlePagePadding}>
+        <ArticleColumn>
+          <p className={cn(captionClass, "text-muted-foreground")}>
+            {t("loadError")}
+          </p>
+        </ArticleColumn>
+      </Section>
     );
   }
+
+  // Preview-only: 一覧の見本カード (`seed-journal-N`) から開いたときだけ見本の
+  // 詳細を返す。フラグ未設定時は常に null なので production は 404 のまま。
+  journal = journal ?? (seedJournalDetail(slug) as Journal | null);
 
   if (!journal) notFound();
 
@@ -87,137 +202,199 @@ export default async function ElxeaJournalDetailPage({
       ? journal.playlist
       : null;
 
-  const themeLabel = themeLabels[journal.theme] || journal.theme;
-  const themeColor = themeColors[journal.theme] || "var(--color-brand-ash)";
+  // Preview-only: production dataset の journal は確定版のフィールドを持たない
+  // ため、フラグが立っているときだけ未入力欄を見本で埋めて実寸を確認できる
+  // ようにする。フラグ未設定時は byte-identical (何も足さない)。
+  journal = withSeedJournalDetail(journal) as Journal;
+
+  /* --- 5. 冒頭写真 -------------------------------------------------------- */
+
+  const heroImage = photoUrl(journal.mainImage, journal._id, 1440, 864);
+  const heroCaption = journal.mainImage?.caption ?? journal.mainImageCaption;
+
+  /* --- 7. この号に入っているお茶 ------------------------------------------ */
+
+  const teaRows = (journalTeaMenus ?? []).map((tea, i) => ({
+    key: tea._id,
+    href: `/tea-menu/${tea.slug.current}`,
+    image: photoUrl(tea.photo, `${tea._id}-${i}`, 320, 320),
+    imageAlt: tea.photo?.alt ?? tea.displayName ?? tea.title ?? "",
+    title: tea.displayName || tea.title || "",
+    // Figma のメタは「産地 / 同梱文脈」の 2 部構成。同梱文脈は節ラベル
+    // (この号に入っているお茶) が担うので、品目側は実データの産地と品種だけを出す。
+    meta: [tea.origin, tea.variety].filter(Boolean).join(" / ") || undefined,
+  }));
+
+  /* --- 8. この号のほかの読みもの ------------------------------------------ */
+
+  // 確定版は 3 本。`otherReads` 未設定なら既存の `relatedPost` を 1 行として使う。
+  const readSource: ReadRef[] =
+    journal.otherReads && journal.otherReads.length > 0
+      ? journal.otherReads
+      : journal.relatedPost
+        ? [journal.relatedPost]
+        : [];
+
+  const readRows = readSource.slice(0, 3).map((read) => {
+    const image = read.thumbnail ?? read.mainImage;
+    return {
+      key: read._id,
+      href: `/journal/${read.slug.current}`,
+      image: photoUrl(image, read._id, 112, 112),
+      imageAlt: image?.alt ?? read.title,
+      title: read.title,
+    };
+  });
+
+  /* --- 9. テーマ回遊 ------------------------------------------------------ */
+
+  const nextReadTags = (journal.nextReadTags ?? []).slice(0, 2);
 
   return (
-    <article className="py-20">
-      {/* 号のテーマ色を背景のにじみへ渡す (描画は持たない)。バッジの色と
-          面の色が同じ号の色から来ることで、テーマがラベルではなく空気になる。 */}
-      <JournalWashTheme theme={journal.theme} />
+    <>
+      <ReadingProgress />
 
-      {/* ① 変A: Theme badge + Title + Summary をヒーロー画像の上に (Figma 6760:120) */}
-      <header className="section-narrow mb-10">
-        <span
-          className="inline-block text-sm font-normal leading-normal text-foreground px-2 py-1 rounded-full tracking-wider mb-4"
-          style={{ backgroundColor: themeColor }}
-        >
-          {themeLabel}
-        </span>
-        <h1 className="mb-6">{journal.title}</h1>
-        {journal.summary && (
-          <p className="text-muted-foreground text-sm leading-relaxed max-w-2xl">
-            {journal.summary}
-          </p>
-        )}
-      </header>
-
-      {/* ② 変A: Hero image — タイトル下・本文幅に内包 */}
-      {journal.mainImage?.asset && (
-        <div className="section-narrow mb-16">
-          <div className="w-full aspect-[2/1] sm:aspect-[16/9] bg-muted overflow-hidden">
-            <ImageWithFallback
-              src={urlFor(journal.mainImage).width(1600).height(900).url()}
-              fallbackSrc="/placeholder-hero-day.jpg"
-              alt={journal.mainImage.alt || journal.title}
-              fill
-              sizes="(max-width: 768px) 100vw, 768px"
-              className="w-full h-full object-cover"
-              priority
+      <Section spacing="none" className={articlePagePadding}>
+        <ArticleColumn>
+          {/* Breadcrumb は共通部品が下余白 32 を内包するので、確定版の縦リズム
+              24 に合わせるため打ち消して Head 側の mt-6 で作る。 */}
+          <div className="[&_nav]:mb-0">
+            <Breadcrumb
+              items={[
+                { label: bt("home"), href: "/" },
+                { label: t("title"), href: "/elxea-journal" },
+                { label: journal.title },
+              ]}
+              locale={locale}
             />
           </div>
-        </div>
-      )}
 
-      {/* ③ Body (Portable Text) */}
-      {journal.body && (
-        <div className="section-narrow mb-20">
-          <div className="prose-custom">
-            <PortableText value={journal.body} />
-          </div>
-        </div>
-      )}
-
-      {/* ④ お届けのお茶について */}
-      {journalTeaMenus.length > 0 && (
-        <section className="section-wide py-16 border-t border-border">
-          <div className="mb-12">
-            <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-4">
-              Tea Selection
-            </p>
-            <h2 className="text-2xl font-normal">{t("teaSection")}</h2>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-14">
-            {journalTeaMenus.map(
-              (tea: {
-                _id: string;
-                slug: { current: string };
-                displayName: string;
-                productNumber: string;
-                category: string;
-                variety: string;
-                season: string;
-                origin: string;
-                netWeight: number;
-                photo?: { asset: object; alt?: string };
-              }) => (
-                <TeaSpecCard key={tea._id} tea={tea} />
+          <ArticleHead
+            overline={t("kicker")}
+            title={journal.title}
+            className="mt-6"
+          >
+            {journal.author ? (
+              journal.author.slug?.current ? (
+                /* C17-1: 著者ページは People 詳細へ統合済み (旧 URL は
+                   next.config.ts の 308 で寄せてある)。 */
+                <Link href={`/people/${journal.author.slug.current}`}>
+                  <AuthorByline
+                    name={journal.author.name}
+                    role={journal.author.role}
+                    avatarUrl={
+                      journal.author.image?.asset
+                        ? urlFor(journal.author.image).width(64).height(64).url()
+                        : undefined
+                    }
+                  />
+                </Link>
+              ) : (
+                <AuthorByline
+                  name={journal.author.name}
+                  role={journal.author.role}
+                  avatarUrl={
+                    journal.author.image?.asset
+                      ? urlFor(journal.author.image).width(64).height(64).url()
+                      : undefined
+                  }
+                />
               )
-            )}
-          </div>
-        </section>
-      )}
+            ) : null}
+          </ArticleHead>
 
-      {/* ⑤ Playlist */}
-      {journalPlaylist && (
-        <section className="section-narrow py-16 border-t border-border">
-          <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-4">
-            Soundtrack
-          </p>
-          <h3 className="text-base font-medium mb-8">{t("relatedPlaylist")}</h3>
-          <Link
-            href={`/playlists/${journalPlaylist.slug.current}`}
-            className="flex items-center gap-5 group"
-          >
-            {journalPlaylist.albumImage?.asset && (
-              <Image
-                src={urlFor(journalPlaylist.albumImage).width(120).height(120).url()}
-                alt={journalPlaylist.title}
-                width={120}
-                height={120}
-                className="size-20 object-cover flex-shrink-0"
-              />
-            )}
-            <div>
-              <p className="text-sm font-medium group-hover:underline underline-offset-4">
-                {journalPlaylist.title}
-              </p>
-              {journalPlaylist.spotifyUrl && (
-                <p className="text-xs text-muted-foreground mt-2">Spotify</p>
-              )}
-            </div>
-          </Link>
-        </section>
-      )}
+          {journal.summary ? (
+            <ArticleLead className="mt-6">{journal.summary}</ArticleLead>
+          ) : null}
 
-      {/* ⑥ Related article (コラム) */}
-      {journal.relatedPost && (
-        <section className="section-narrow py-16 border-t border-border">
-          <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-4">
-            Related Article
-          </p>
-          <h3 className="text-base font-medium mb-4">{t("relatedPost")}</h3>
-          <Link
-            href={`/journal/${journal.relatedPost.slug.current}`}
-            className="text-sm underline underline-offset-4 hover:text-muted-foreground transition-colors"
-          >
-            {journal.relatedPost.title}
-          </Link>
-        </section>
-      )}
+          {heroImage ? (
+            <ArticleImageBleed
+              className="mt-6"
+              src={heroImage}
+              alt={journal.mainImage?.alt || journal.title}
+              caption={heroCaption}
+              priority
+            />
+          ) : null}
 
-      {/* Bottom spacing */}
-      <div className="pb-16" />
-    </article>
+          {journal.body ? (
+            <ArticleProse className="mt-6">
+              <PortableText value={journal.body} />
+            </ArticleProse>
+          ) : null}
+
+          {teaRows.length > 0 ? (
+            <ArticleBlock className="mt-6" label={t("issueTeas")}>
+              <ul className="space-y-6">
+                {teaRows.map((tea) => (
+                  <ArticleProductRow
+                    key={tea.key}
+                    image={tea.image}
+                    imageAlt={tea.imageAlt}
+                    title={tea.title}
+                    meta={tea.meta}
+                    href={tea.href}
+                    linkLabel={t("teaDetailOpen")}
+                  />
+                ))}
+              </ul>
+            </ArticleBlock>
+          ) : null}
+
+          {/* 確定版に枠は無いが、既存のプレイリストデータを落とさないため
+              同梱文脈の節として残す (意図的差分)。 */}
+          {journalPlaylist ? (
+            <ArticleBlock className="mt-6" label={t("relatedPlaylist")}>
+              <ul className="space-y-6">
+                <ArticleProductRow
+                  image={
+                    journalPlaylist.albumImage?.asset
+                      ? urlFor(journalPlaylist.albumImage)
+                          .width(320)
+                          .height(320)
+                          .url()
+                      : undefined
+                  }
+                  imageAlt={journalPlaylist.title}
+                  title={journalPlaylist.title}
+                  meta={journalPlaylist.spotifyUrl ? "Spotify" : undefined}
+                  href={`/playlists/${journalPlaylist.slug.current}`}
+                  linkLabel={t("teaDetailLink")}
+                />
+              </ul>
+            </ArticleBlock>
+          ) : null}
+
+          {readRows.length > 0 ? (
+            <ArticleBlock className="mt-6" label={t("otherReads")} gap="sm">
+              <ArticleReadList>
+                {readRows.map((read) => (
+                  <ArticleReadRow
+                    key={read.key}
+                    href={read.href}
+                    image={read.image}
+                    imageAlt={read.imageAlt}
+                    title={read.title}
+                  />
+                ))}
+              </ArticleReadList>
+            </ArticleBlock>
+          ) : null}
+
+          {nextReadTags.length > 0 ? (
+            <ArticleNextRead className="mt-6">
+              {nextReadTags.map((tag) => (
+                <ArticlePill
+                  key={tag._id}
+                  href={`/journal/tag/${tag.slug.current}`}
+                >
+                  {t("nextReadTag", { name: tag.title })}
+                </ArticlePill>
+              ))}
+            </ArticleNextRead>
+          ) : null}
+        </ArticleColumn>
+      </Section>
+    </>
   );
 }

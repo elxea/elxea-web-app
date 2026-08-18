@@ -42,6 +42,14 @@ export const journal = defineType({
       type: "blockContent",
     }),
     defineField({
+      name: "author",
+      title: "執筆者",
+      description:
+        "記事冒頭のクレジット (Figma 確定版 8110:46903)。未設定なら枠ごと出さない。",
+      type: "reference",
+      to: [{ type: "author" }],
+    }),
+    defineField({
       name: "mainImage",
       title: "メイン画像",
       type: "image",
@@ -50,6 +58,13 @@ export const journal = defineType({
         defineField({
           name: "alt",
           title: "代替テキスト",
+          type: "string",
+        }),
+        defineField({
+          name: "caption",
+          title: "キャプション",
+          description:
+            "写真左下に重ねるクレジット・撮影メモ (例: PHOTO — 朝霧の斜面 5:40)。",
           type: "string",
         }),
       ],
@@ -72,6 +87,24 @@ export const journal = defineType({
       title: "関連記事",
       type: "reference",
       to: [{ type: "article" }],
+    }),
+    defineField({
+      name: "otherReads",
+      title: "この号のほかの読みもの",
+      description:
+        "記事末尾に 3 本まで並べる読みもの (Figma 確定版 8110:46934)。未設定なら relatedPost を 1 行だけ出し、それも無ければ枠ごと出さない。",
+      type: "array",
+      of: [{ type: "reference", to: [{ type: "article" }] }],
+      validation: (rule) => rule.max(3),
+    }),
+    defineField({
+      name: "nextReadTags",
+      title: "テーマ回遊タグ",
+      description:
+        "末尾の回遊ボタンに出すタグ (Figma 確定版 8110:46945)。行き止まりを作らないための導線。2 件まで。",
+      type: "array",
+      of: [{ type: "reference", to: [{ type: "tag" }] }],
+      validation: (rule) => rule.max(2),
     }),
     defineField({
       name: "playlist",

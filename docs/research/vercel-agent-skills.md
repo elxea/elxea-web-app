@@ -1,5 +1,13 @@
 # Vercel Agent Skills 調査
 
+> **歴史的記録 — 正本ではない (2026-08-10 隔離)**
+>
+> 本ファイルは 2026-03-09 時点の調査メモであり、以後更新していない。現行の方針・仕様の正本は
+> Notion 側にある (開発工程 = roji Dev Ops Spec https://app.notion.com/p/3b570c9d064c818fbee6f1dbeab63702 /
+> デザイン = Design Ops Spec https://www.notion.so/39070c9d064c8148b983f9004c85fc3d /
+> 品質保証・テスト = elxea Web アプリ品質保証プラン https://www.notion.so/3b770c9d064c81a8af6dc76490d8675e)。
+> 本ファイルを根拠に実装方針を決めないこと。当時の判断の経緯を辿る目的でのみ読む。
+
 調査日: 2026-03-09
 
 ## 概要

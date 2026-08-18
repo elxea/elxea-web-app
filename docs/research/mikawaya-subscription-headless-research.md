@@ -1,8 +1,22 @@
-# Mikawaya Subscription x ヘッドレス Next.js ストアフロント 調査結果
+# Mikawaya Subscription xヘッドレスNext.jsストアフロント 調査結果
+
+> # 不採用 — 歴史的記録 (現行仕様ではない)
+>
+> **2026-08-10 Setaka確認により、Mikawaya (サードパーティ定期購買アプリ) は採用しない。**
+> 定期便の課金・契約管理は**自前実装 (自前cron `/api/cron/billing`) に一本化**する。
+> **互換併存は禁止** — アプリと自前cronを並走させる構成は取らない
+> (同一ストアに二つの課金主体が並ぶと同一サイクルに二重課金が起きるため)。
+>
+> 本ファイルは「なぜこのアプリを評価し、なぜ採らなかったか」を残すための調査記録である。
+> **設計判断の根拠として引用してはならない。** 本文中の「推奨」「対策案」「アクションプラン」は
+> すべて失効している (§8参照)。
+>
+> - 現行の正本: `docs/subscription-test-plan.md` / `app/api/cron/billing/route.ts` / `lib/shopify/subscription-admin.ts`
+> - 決定の記録: Decision Log「定期便の課金・契約管理は自前cronに一本化する (Mikawaya不使用)」(2026-08-10)
 
 **調査日**: 2026-03-08
 **調査者**: Developer Agent
-**ステータス**: 調査完了 / 実装判断待ち
+**ステータス**: **不採用確定 (2026-08-10)** — 調査自体は2026-03-08に完了
 
 ---
 
@@ -256,13 +270,17 @@ mutation cartCreate($input: CartInput!) {
   ↓ Shopify Checkout にリダイレクト
 [Shopify Checkout]
   ↓ 決済処理
-  ↓ Subscription Contract 自動生成
-  ↓ Mikawaya が Webhook で Contract を検知
+  ↓ Subscription Contract自動生成
+  ↓ MikawayaがWebhookでContractを検知
 [Mikawaya]
-  ↓ 以降の請求管理を Mikawaya が自動化
+  ↓ 以降の請求管理をMikawayaが自動化
 ```
 
 このフローは既存の elxea のチェックアウトフロー（Cart API → checkoutUrl リダイレクト）と **完全に互換** がある。
+
+> **採用しなかった (2026-08-10)**: 上図の最後の 2 段 (Mikawaya が Contract を検知し、以降の請求管理を
+> 自動化する) が現行構成には存在しない。Subscription Contract の自動生成までは Shopify ネイティブなので
+> 同じだが、**以降の請求は自前 cron `/api/cron/billing` が起こす**。この点だけが現行と異なる。
 
 ---
 
@@ -286,20 +304,23 @@ mutation cartCreate($input: CartInput!) {
 
 ---
 
-## 8. 推奨アクションプラン
+## 8. 推奨アクションプラン → **失効 (2026-08-10)**
 
-### Phase 1: 確認（実装前）
-- [ ] Mikawaya サポートに問い合わせ: 「ヘッドレス（Next.js）ストアフロントで利用する場合、テーマコードのインストールは不要か？Selling Plan の作成と Storefront API 経由の取得だけで動作するか？」
-- [ ] マイページの扱いを確認: 「ヘッドレス環境でのマイページの推奨実装方法は？マイページ API のドキュメントは？」
-- [ ] Shopify Headless チャネルに `unauthenticated_read_selling_plans` スコープを追加
-- [ ] Customer Account API との互換性を確認
+**この節にあった行動計画は実行されない。** Mikawayaは不採用となったため、
+「Mikawayaサポートへの問い合わせ」「マイページAPI (Proプラン) の採用検討」を含む
+アプリ前提の項目はすべて破棄する。
 
-### Phase 2: 実装（確認後）
-- [ ] 商品クエリに `sellingPlanGroups` フィールドを追加
-- [ ] `SellingPlanSelector` コンポーネントを実装
-- [ ] `addToCart` アクションに `sellingPlanId` パラメータを追加
-- [ ] 価格表示コンポーネントを Selling Plan 対応に拡張
-- [ ] マイページの実装方針を決定・実装
+採用した路線は §7の高リスク項目1で挙げていた **対策案C
+「Shopify Customer Account API + Subscription Contract APIで自前実装」** であり、
+これは既に実装済みである (`lib/shopify/subscription-admin.ts` /
+`lib/shopify/subscription-actions.ts` / `app/api/cron/billing/route.ts`)。
+
+なお、本節に含まれていた項目のうち **Shopifyネイティブ機構に属するもの**
+(`unauthenticated_read_selling_plans` スコープ、商品クエリの `sellingPlanGroups`、
+Selling Planの選択UI、`addToCart` の `sellingPlanId`) は、アプリの採否とは無関係に
+必要な作業であり、自前実装の一部として実施済み。アプリ由来の要件ではない。
+
+現行の作業計画は `docs/subscription-test-plan.md` を参照する。
 
 ---
 

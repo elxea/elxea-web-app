@@ -1,57 +1,79 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import Image from "next/image";
-import { useTranslations } from "next-intl";
 import { getLocale, getTranslations } from "next-intl/server";
-import { Link } from "@/i18n/navigation";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
+
 import { SiteImage } from "@/components/site-image";
+import { Skeleton } from "@/components/ui/skeleton";
+import { CatalogGrid } from "@/components/catalog/catalog-list";
+import {
+  SectionBody,
+  SectionHead,
+  SpecBand,
+  TripleColumn,
+} from "@/components/editorial/section-blocks";
+import { ProductCard } from "@/components/product/product-card";
+import { Link } from "@/i18n/navigation";
+import {
+  ActionTile,
+  ActionTileGrid,
+  ChapterStatement,
+  FeedList,
+  QuietLinkRow,
+  ServiceGuideBlock,
+  TopHero,
+  TopSection,
+  TopSectionHead,
+  type FeedItem,
+} from "@/components/marketing/top-blocks";
 import { getClient } from "@/sanity/lib/client";
-import { FEATURED_ARTICLES_QUERY, EVENTS_QUERY } from "@/sanity/lib/queries";
-import { ArticleCard } from "@/components/journal/article-card";
-import { urlFor } from "@/sanity/lib/image";
-import { previewSeedEnabled, isSeedId } from "@/lib/preview-seed";
 import { filterOutFictional } from "@/lib/fictional-content";
+import {
+  ARTICLES_QUERY,
+  EVENTS_QUERY,
+  FEATURED_ARTICLES_QUERY,
+  TOP_FARMER_VOICES_QUERY,
+} from "@/sanity/lib/queries";
+import { formatArticleDate, isPastEvent } from "@/lib/format-date";
+import {
+  isSeedId,
+  previewSeedEnabled,
+  seedEvents,
+  seedFarmerVoices,
+  seedTopNotices,
+} from "@/lib/preview-seed";
 
 /**
- * 変A section header for data-driven blocks (Products / Journal / Events):
- * eyebrow + title on the left, "view all" pinned to the right on the same row.
- * Plain function (no hooks) so it is safe in both client and async-server callers.
+ * トップページ (/ja) — Figma【R2: 確定版】トップ (必須5本 + 追加4 /
+ * 導線ブロック最下部) PC `8109:46558` / SP `8109:46620`
+ * (file AWLnI0XF07e8rScuxPYPc7)。採用バナー `8114:23`
+ * 「決定 2026/08/08 見た目一括承認 (Setaka)・凍結」。
+ *
+ * 節の順序 (Figma の上から):
+ *  1. Hero (非対称 2 カラム / 8109:46560)
+ *  2. 新着・季節の一報 SEASONAL (8110:2503)   → 最新記事 3 件
+ *  3. 茶 (EC) 4 点 (8109:46596)               → Shopify 商品 4 件
+ *  4. 茶を探す (カテゴリ) 6 タイル (8109:46568) → Shopify コレクション 6 件
+ *  5. ジャーナル (8109:46605)                 → 特集記事 3 件
+ *  6. イベント (8110:2516)                    → 開催予定イベント 3 件
+ *  7. roji 定期便 (8110:2527)                 → SpecBand (定期便LP と同文言)
+ *  8. つくり手が見える VOICES (8110:2542)     → 一言のある農家 3 件
+ *  9. About / 章切り・明度反転 (8109:46592)
+ * 10. 導線ブロック (8109:46616)
+ * 11. 購入導線 (8109:46617)
+ *
+ * データが無い節は枠ごと出さない (空枠を出さない方針 — C4-2 / C4-3 と同じ)。
+ *
+ * 既知の差分 (忠実度対比表 docs/fidelity/c8-1-fidelity.md と対応):
+ * - 主見出しは Figma 52px (en/h1) だが全体裁定により 44px display (`.hero-display`)。
+ * - Figma の「茶葉診断への入口 (お茶カルテ)」節 (8110:2514) は `/karte` /
+ *   `/diagnosis` が未実装のため出していない (存在しないルートへリンクしない)。
+ * - カテゴリ 6 タイルと一報リストの文言は Figma の固定文言を焼かず実データから
+ *   組む (商品一覧 R2 でチップ文言を productType から組んでいるのと同じ方針)。
  */
-function SectionHeader({
-  eyebrow,
-  title,
-  viewAllHref,
-  viewAllLabel,
-}: {
-  eyebrow: string;
-  title: string;
-  viewAllHref: string;
-  viewAllLabel: string;
-}) {
-  return (
-    <div className="flex items-end justify-between gap-6 mb-12 md:mb-16">
-      <div className="flex flex-col">
-        <p className="text-[11px] text-muted-foreground uppercase tracking-[0.25em] mb-3">
-          {eyebrow}
-        </p>
-        <h2>{title}</h2>
-      </div>
-      <Button
-        variant="outline"
-        size="sm"
-        className="shrink-0 border-border text-muted-foreground hover:text-foreground"
-        asChild
-      >
-        <Link href={viewAllHref}>{viewAllLabel} →</Link>
-      </Button>
-    </div>
-  );
-}
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("home");
+  const th = await getTranslations("homeR2");
   // The `%s | elxea` title.template lives in this same route segment's layout
   // (app/[locale]/layout.tsx). Next.js applies title.template only to CHILD
   // segments, never the segment where it is defined — so the home page (same
@@ -60,414 +82,470 @@ export async function generateMetadata(): Promise<Metadata> {
   const brandedTitle = `${t("tagline")} | elxea`;
   return {
     title: brandedTitle,
-    description: t("hero"),
+    description: th("heroLead"),
     openGraph: {
       title: brandedTitle,
-      description: t("hero"),
+      description: th("heroLead"),
     },
   };
 }
 
-export default function HomePage() {
-  const t = useTranslations();
+export default async function HomePage() {
+  const t = await getTranslations("homeR2");
 
   return (
     <>
-      {/* Hero — 変A: left-aligned content over the day/night image (image + fallback preserved) */}
-      <section className="relative min-h-[90vh] flex items-center justify-start">
-        <SiteImage
-          slotId="site:top:hero-01"
-          src="/hero-day.jpg"
-          fallbackSrc="/placeholder-hero-day.jpg"
-          alt=""
-          aria-hidden="true"
-          fill
-          priority
-          className="object-cover"
-          sizes="100vw"
-        />
-        <div className="absolute inset-0 bg-overlay" />
-        <div className="relative w-full max-w-7xl mx-auto px-6 md:px-8">
-          <div className="max-w-xl text-left">
-            <p className="text-[11px] text-overlay-foreground-muted uppercase tracking-[0.25em] mb-8">
-              {t("home.tagline")}
-            </p>
-            <h1 className="hero-display mb-6 text-overlay-foreground">
-              Tea for Creativity.
-            </h1>
-            <p className="text-overlay-foreground-muted text-sm leading-relaxed mb-10 max-w-md">
-              {t("home.hero")}
-            </p>
-            <Button
-              variant="outline"
-              className="border-overlay-border text-overlay-foreground bg-transparent hover:bg-overlay-foreground hover:text-foreground hover:border-overlay-foreground transition-colors"
-              asChild
-            >
-              <Link href="/products">{t("common.products")}</Link>
-            </Button>
-          </div>
-        </div>
-      </section>
+      <TopHero
+        title={t("heroTitle")}
+        subtitle={t("heroSubtitle")}
+        lead={t("heroLead")}
+        ctaHref="/products"
+        ctaLabel={t("heroCta")}
+        image={
+          <SiteImage
+            slotId="site:top:hero-01"
+            src="/hero-day.jpg"
+            fallbackSrc="/placeholder-hero-day.jpg"
+            alt=""
+            aria-hidden="true"
+            width={864}
+            height={560}
+            priority
+            sizes="(max-width: 1024px) 100vw, 864px"
+            /* Figma の写真枠は SP 375x300 (5/4) / PC 864x560。インライン style が
+               常に勝つので、比だけを CSS 変数でブレークポイント切替する
+               (HeroFeature 8085:4305 と同じ手)。 */
+            className="w-full bg-muted object-cover [--top-hero-ar:5/4] lg:rounded-md lg:[--top-hero-ar:864/560]"
+            style={{ aspectRatio: "var(--top-hero-ar)" }}
+          />
+        }
+      />
 
-      {/* Featured Products */}
-      <section className="section-wide py-24">
-        <SectionHeader
-          eyebrow="Discover"
-          title={t("home.featuredProducts")}
-          viewAllHref="/products"
-          viewAllLabel={t("common.viewAll")}
-        />
+      <Suspense fallback={null}>
+        <SeasonalSection />
+      </Suspense>
+
+      {/* Figma SP は上下 64 (8109:46644)。PC は他節と同じ 96。
+          SP の head は見出し「茶葉」1 本だけで、PC の キッカー "TEA LEAVES"
+          (8109:46598) を持たないので SP では出さない。 */}
+      <TopSection className="py-16 lg:py-24">
+        <TopSectionHead overline="TEA LEAVES" title={t("teaTitle")} overlineSpHidden />
         <Suspense fallback={<FeaturedProductsSkeleton />}>
           <FeaturedProducts />
         </Suspense>
-      </section>
+      </TopSection>
 
-      {/* Our Story — full-width image section (image + fallback preserved) */}
-      <section className="relative min-h-[60vh] flex items-center justify-center">
-        <SiteImage
-          slotId="site:top:our-story-01"
-          src="/hero-night.jpg"
-          fallbackSrc="/placeholder-hero-night.jpg"
-          alt=""
-          aria-hidden="true"
-          fill
-          className="object-cover"
-          sizes="100vw"
-        />
-        <div className="absolute inset-0 bg-overlay" />
-        <div className="relative text-center max-w-xl px-8">
-          <p className="text-[11px] text-overlay-foreground-muted uppercase tracking-[0.25em] mb-6">
-            Our Story
-          </p>
-          <h2 className="text-overlay-foreground mb-8">
-            {t("home.storyHeading")}
-          </h2>
-          <Button
-            variant="outline"
-            className="border-overlay-border text-overlay-foreground bg-transparent hover:bg-overlay-foreground hover:text-foreground hover:border-overlay-foreground transition-colors"
-            asChild
-          >
-            <Link href="/about">{t("common.about")}</Link>
-          </Button>
-        </div>
-      </section>
-
-      {/* Journal — 変A: 2-column editorial grid */}
-      <section className="section-wide py-24">
-        <SectionHeader
-          eyebrow="Stories"
-          title={t("home.latestJournal")}
-          viewAllHref="/journal"
-          viewAllLabel={t("common.viewAll")}
-        />
-        <Suspense fallback={<ArticlesSkeleton />}>
-          <FeaturedArticles />
-        </Suspense>
-      </section>
-
-      {/* Events */}
       <Suspense fallback={null}>
-        <UpcomingEvents />
+        <CategoriesSection />
       </Suspense>
 
-      {/* Approach — full-width image section (image + fallback preserved) */}
-      <section className="relative min-h-[60vh] flex items-center justify-center">
-        <SiteImage
-          slotId="site:top:our-approach-01"
-          src="/hero-approach.jpg"
-          fallbackSrc="/placeholder-hero-approach.jpg"
-          alt=""
-          aria-hidden="true"
-          fill
-          className="object-cover"
-          sizes="100vw"
-        />
-        <div className="absolute inset-0 bg-overlay" />
-        <div className="relative text-center max-w-xl px-8">
-          <p className="text-[11px] text-overlay-foreground-muted uppercase tracking-[0.25em] mb-6">
-            Our Approach
-          </p>
-          <h2 className="text-overlay-foreground mb-8">
-            {t("home.approachHeading")}
-          </h2>
-          <Button
-            variant="outline"
-            className="border-overlay-border text-overlay-foreground bg-transparent hover:bg-overlay-foreground hover:text-foreground hover:border-overlay-foreground transition-colors"
-            asChild
-          >
-            <Link href="/about">{t("common.about")}</Link>
-          </Button>
-        </div>
-      </section>
+      <Suspense fallback={null}>
+        <JournalSection />
+      </Suspense>
+
+      <Suspense fallback={null}>
+        <EventsSection />
+      </Suspense>
+
+      <SubscriptionSection />
+
+      <Suspense fallback={null}>
+        <VoicesSection />
+      </Suspense>
+
+      <ChapterStatement
+        overline="OUR PHILOSOPHY"
+        title={t("chapterTitle")}
+        body={t("chapterBody")}
+      />
+
+      <ServiceGuideBlock
+        overline="ELXEA — OVERVIEW"
+        title={t("guideTitle")}
+        lead={t("guideLead")}
+        tiles={[
+          {
+            overline: "TEA",
+            title: t("guideTeaTitle"),
+            body: t("guideTeaBody"),
+            href: "/products",
+            linkLabel: t("guideTeaLink"),
+          },
+          {
+            overline: "JOURNAL",
+            title: t("guideJournalTitle"),
+            body: t("guideJournalBody"),
+            href: "/journal",
+            linkLabel: t("guideJournalLink"),
+          },
+          {
+            overline: "EVENT",
+            title: t("guideEventTitle"),
+            body: t("guideEventBody"),
+            href: "/events",
+            linkLabel: t("guideEventLink"),
+          },
+          {
+            /* Figma は「roji について」。専用の /roji ルートは無く、roji の実体は
+               定期便サービスなので定期便LP (/subscription) へ通す。 */
+            overline: "ROJI",
+            title: t("guideRojiTitle"),
+            body: t("guideRojiBody"),
+            href: "/subscription",
+            linkLabel: t("guideRojiLink"),
+          },
+        ]}
+        about={{
+          title: t("guideAboutTitle"),
+          body: t("guideAboutBody"),
+          href: "/about",
+          linkLabel: t("guideAboutLink"),
+        }}
+      />
+
+      {/* Figma SP は上下 64 (8109:46649)。PC は 96。 */}
+      <TopSection className="py-16 lg:py-24">
+        <QuietLinkRow href="/products" label={t("purchaseLink")} />
+      </TopSection>
     </>
   );
 }
 
-function FeaturedProductsSkeleton() {
-  return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-14">
-      {Array.from({ length: 6 }).map((_, i) => (
-        <div key={i}>
-          <Skeleton className="aspect-[3/2] w-full mb-5" />
-          <div className="space-y-2 flex flex-col items-center">
-            <Skeleton className="h-3 w-1/3" />
-            <Skeleton className="h-4 w-2/3" />
-            <Skeleton className="h-4 w-1/4" />
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
+/* -------------------------------------------------------------------------- */
+/* 2. 新着・季節の一報 (SEASONAL) — 最新記事 3 件 (Figma 8110:2503)             */
+/* -------------------------------------------------------------------------- */
 
-function ArticlesSkeleton() {
-  return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-12 max-w-[840px] mx-auto">
-      {Array.from({ length: 4 }).map((_, i) => (
-        <div key={i}>
-          <Skeleton className="aspect-[3/2] w-full mb-4" />
-          <div className="space-y-2">
-            <Skeleton className="h-3 w-16" />
-            <Skeleton className="h-4 w-3/4" />
-            <Skeleton className="h-4 w-1/2" />
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-/**
- * Preview-only seed for the Upcoming Events section.
- *
- * Local preview points at the *production* Sanity dataset, which currently has
- * no future-dated events, so UpcomingEvents renders null and the section
- * disappears. To review the page at Figma density WITHOUT writing anything to
- * the production dataset, set PREVIEW_SEED_EVENTS=1 in the preview process env
- * only. When the flag is unset the behaviour is byte-identical to before
- * (normal Sanity fetch), so production deploys are unaffected.
- *
- * `imageUrl` points at existing local /public assets (placeholder imagery for
- * preview; real event photos land via Sanity in production).
- */
-function getSeedEvents(): Array<{
+type ArticleRow = {
   _id: string;
-  slug: { current: string };
-  imageUrl?: string;
-  image?: { asset: object; alt?: string };
   title: string;
-  date: string;
-  endDate?: string;
-  location?: string;
-}> {
-  return [
-    {
-      _id: "seed-event-1",
-      slug: { current: "seed-event-1" },
-      imageUrl: "/hero-day.jpg",
-      title: "Morning Tea Ceremony",
-      date: "2026-07-25T01:00:00.000Z",
-      location: "elxea Studio, Tokyo",
-    },
-    {
-      _id: "seed-event-2",
-      slug: { current: "seed-event-2" },
-      imageUrl: "/hero-night.jpg",
-      title: "Farmer's Table: Single-Origin Tasting",
-      date: "2026-08-08T09:00:00.000Z",
-      location: "Kyoto Farmhouse",
-    },
-    {
-      _id: "seed-event-3",
-      slug: { current: "seed-event-3" },
-      imageUrl: "/hero-approach.jpg",
-      title: "Creativity & Tea Workshop",
-      date: "2026-08-22T05:30:00.000Z",
-      location: "elxea Gallery, Osaka",
-    },
-  ];
+  slug: { current: string };
+  publishedAt?: string;
+};
+
+/** 記事 3 件を一報リストの行に落とす。seed 行は詳細ルートが無いので一覧へ通す。 */
+function toFeedItems(articles: readonly ArticleRow[]): FeedItem[] {
+  return articles.slice(0, 3).map((article) => ({
+    href: isSeedId(article._id) ? "/journal" : `/journal/${article.slug.current}`,
+    title: article.title,
+    meta: formatArticleDate(article.publishedAt) || undefined,
+  }));
 }
 
-async function UpcomingEvents() {
+async function SeasonalSection() {
   const locale = await getLocale();
-  const t = await getTranslations();
+  const t = await getTranslations("homeR2");
 
+  let articles: ArticleRow[] = [];
   try {
-    const seedEnabled = previewSeedEnabled();
-    const events = seedEnabled
-      ? getSeedEvents()
-      // Hide the fictional/seed events still present in the production dataset.
-      : filterOutFictional(
-          "event",
-          await getClient().fetch(EVENTS_QUERY, { language: locale }),
-        );
-
-    if (!events || events.length === 0) {
-      return null;
-    }
-
-    const upcomingEvents = events.slice(0, 3) as Array<{
-      _id: string;
-      slug: { current: string };
-      imageUrl?: string;
-      image?: { asset: object; alt?: string };
-      title: string;
-      date: string;
-      endDate?: string;
-      location?: string;
-    }>;
-
-    return (
-      <section className="max-w-7xl mx-auto px-6 py-24">
-        <SectionHeader
-          eyebrow="Upcoming"
-          title={t("home.upcomingEvents")}
-          viewAllHref="/events"
-          viewAllLabel={t("common.viewAll")}
-        />
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-12">
-          {upcomingEvents.map((event) => {
-            const seeded = isSeedId(event._id);
-            const inner = (
-              <>
-                {/* EventCard (Figma 6598:155): aspect-3/2 + rounded-md frame */}
-                <div className="aspect-[3/2] bg-muted overflow-hidden rounded-md mb-4">
-                  {event.imageUrl ? (
-                    <Image
-                      src={event.imageUrl}
-                      alt={event.title}
-                      width={400}
-                      height={300}
-                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                    />
-                  ) : event.image?.asset ? (
-                    <Image
-                      src={urlFor(event.image).width(400).height(300).url()}
-                      alt={event.title}
-                      width={400}
-                      height={300}
-                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-muted-foreground text-sm">
-                      {event.title}
-                    </div>
-                  )}
-                </div>
-                <p className="text-xs text-muted-foreground mb-1.5">
-                  {new Date(event.date).toLocaleDateString(locale, {
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                  })}
-                </p>
-                <h3 className="text-sm font-medium leading-relaxed mb-1.5 group-hover:underline underline-offset-4">
-                  {event.title}
-                </h3>
-                {event.location && (
-                  <p className="text-sm text-muted-foreground">
-                    {t("event.locationLabel")}：{event.location}
-                  </p>
-                )}
-              </>
-            );
-
-            // Seed (dummy) events have no real detail route -> render non-linked.
-            if (seeded) {
-              return (
-                <div key={event._id} className="block cursor-default">
-                  {inner}
-                </div>
-              );
-            }
-
-            return (
-              <Link
-                key={event._id}
-                href={`/events/${event.slug.current}`}
-                className="group block"
-              >
-                {inner}
-              </Link>
-            );
-          })}
-        </div>
-      </section>
-    );
+    articles = previewSeedEnabled()
+      ? seedTopNotices()
+      : await getClient().fetch(ARTICLES_QUERY, {
+          language: locale,
+          start: 0,
+          end: 3,
+        });
   } catch {
     return null;
   }
+
+  const items = toFeedItems(articles ?? []);
+  if (items.length === 0) return null;
+
+  return (
+    <TopSection aria-label={t("seasonalLabel")}>
+      <TopSectionHead overline="SEASONAL" />
+      <FeedList items={items} />
+    </TopSection>
+  );
 }
 
+/* -------------------------------------------------------------------------- */
+/* 3. 茶 (EC) — Shopify 商品 4 件 (Figma 8109:46596 / PC 4列 / SP 2枚)          */
+/* -------------------------------------------------------------------------- */
+
+/** Figma は PC 4 列 x 1 段 (8109:46600)、SP は 2 枚 (8109:46646/46647)。 */
+const TOP_PRODUCT_COUNT = 4;
+const TOP_PRODUCT_COUNT_SP = 2;
+
 async function FeaturedProducts() {
+  const t = await getTranslations("home");
+
   try {
     const { getProducts } = await import("@/lib/shopify");
-    const { ProductGrid } = await import(
-      "@/components/product/product-grid"
-    );
-    const { products } = await getProducts({ first: 6 });
-    return <ProductGrid products={products} />;
-  } catch {
-    const { getTranslations } = await import("next-intl/server");
-    const t = await getTranslations("home");
+    const { products } = await getProducts({ first: TOP_PRODUCT_COUNT });
+    if (products.length === 0) {
+      return (
+        <p className="mt-6 text-sm text-muted-foreground lg:mt-12">
+          {t("productsPlaceholder")}
+        </p>
+      );
+    }
+
     return (
-      <p className="text-muted-foreground text-sm">
+      <CatalogGrid className="mt-6 grid-cols-1 lg:mt-12 lg:grid-cols-4">
+        {products.map((product, i) => (
+          <div
+            key={product.id}
+            /* SP は Figma の 2 枚に合わせる (3 枚目以降は PC のみ)。 */
+            className={i >= TOP_PRODUCT_COUNT_SP ? "hidden lg:block" : undefined}
+          >
+            <ProductCard product={product} />
+          </div>
+        ))}
+      </CatalogGrid>
+    );
+  } catch {
+    return (
+      <p className="mt-6 text-sm text-muted-foreground lg:mt-12">
         {t("productsPlaceholder")}
       </p>
     );
   }
 }
 
-async function FeaturedArticles() {
-  const locale = await getLocale();
-  const t = await getTranslations();
+function FeaturedProductsSkeleton() {
+  return (
+    <CatalogGrid className="mt-6 grid-cols-1 lg:mt-12 lg:grid-cols-4">
+      {Array.from({ length: TOP_PRODUCT_COUNT }).map((_, i) => (
+        <div
+          key={i}
+          className={i >= TOP_PRODUCT_COUNT_SP ? "hidden lg:block" : undefined}
+        >
+          <Skeleton className="aspect-[3/2] w-full" />
+          <div className="mt-3 space-y-2 lg:mt-5">
+            <Skeleton className="h-3 w-1/3" />
+            <Skeleton className="h-4 w-2/3" />
+            <Skeleton className="h-4 w-1/4" />
+          </div>
+        </div>
+      ))}
+    </CatalogGrid>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* 4. 茶を探す (カテゴリ) — Shopify コレクション 6 件 (Figma 8109:46568)        */
+/* -------------------------------------------------------------------------- */
+
+/** Figma は PC 3 列 x 2 段 = 6 タイル (8109:46572 / 8109:46582)。 */
+const TOP_CATEGORY_COUNT = 6;
+/** Figma SP は 1 列 x 3 段 = 3 タイル (8109:46631 / 46634 / 46637)。 */
+const TOP_CATEGORY_COUNT_SP = 3;
+
+async function CategoriesSection() {
+  const t = await getTranslations("homeR2");
 
   try {
-    const client = getClient();
-    const articles = await client.fetch(FEATURED_ARTICLES_QUERY, {
-      language: locale,
-    });
+    const { getCollections } = await import("@/lib/shopify");
+    const collections = (await getCollections(TOP_CATEGORY_COUNT)).slice(
+      0,
+      TOP_CATEGORY_COUNT
+    );
+    if (collections.length === 0) return null;
 
-    if (!articles || articles.length === 0) {
-      return (
-        <p className="text-muted-foreground text-sm">
-          {t("home.journalPlaceholder")}
-        </p>
-      );
-    }
-
+    /* Figma SP は上下 48 (8109:46629)。PC は 96。
+       SP の head はキッカー "CATEGORIES" (8109:46630) だけで、PC の 32px 見出し
+       (8109:46571) を持たない。タイルも SP は 3 枚 (節高 1037 =
+       48 + 17 + 24 + 284x3 + 24x2 + 48)。 */
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-12 max-w-[840px] mx-auto">
-        {articles.map(
-          (article: {
-            _id: string;
-            slug: { current: string };
-            title: string;
-            excerpt?: string;
-            thumbnail?: { asset: object; alt?: string };
-            mainImage?: { asset: object; alt?: string };
-            publishedAt?: string;
-            memberOnly?: boolean;
-            category?: { title: string; slug: { current: string } };
-            author?: { name: string; image?: { asset: object } };
-          }) => (
-            <ArticleCard
-              key={article._id}
-              article={article}
-              locale={locale}
-              memberOnlyLabel={t("common.memberOnly")}
+      <TopSection className="py-12 lg:py-24">
+        <TopSectionHead
+          overline="CATEGORIES"
+          title={t("categoriesTitle")}
+          titleSpHidden
+        />
+        <ActionTileGrid>
+          {collections.map((collection, i) => (
+            <ActionTile
+              key={collection.handle}
+              /* コレクション詳細 (/collections/[handle]) は 2026-08-14 に廃止。
+                 着地先は商品一覧のカテゴリ絞り込みに一本化する。絞り込みの軸は
+                 Shopify の productType なのでコレクション名を渡す。商品一覧側は
+                 未知の category を「すべて」に落とすので、名前が productType と
+                 一致しないコレクションでも 404 や 0 件にはならない。 */
+              href={`/products?category=${encodeURIComponent(collection.title)}`}
+              image={collection.image?.url}
+              imageAlt={collection.image?.altText || collection.title}
+              label={collection.title}
+              /* 4 枚目以降は PC のみ。実データが 1 件なら 1 枚しか出ない
+                 (「データが無い節は出さない」方針と同じで、枠は作らない)。 */
+              className={
+                i >= TOP_CATEGORY_COUNT_SP ? "hidden lg:flex" : undefined
+              }
             />
-          )
-        )}
-      </div>
+          ))}
+        </ActionTileGrid>
+      </TopSection>
     );
   } catch {
-    return (
-      <p className="text-muted-foreground text-sm">
-        {t("home.journalPlaceholder")}
-      </p>
-    );
+    return null;
   }
+}
+
+/* -------------------------------------------------------------------------- */
+/* 5. ジャーナル (読みもの・CTA なし) — 特集記事 3 件 (Figma 8109:46605)        */
+/* -------------------------------------------------------------------------- */
+
+async function JournalSection() {
+  const locale = await getLocale();
+  const t = await getTranslations("homeR2");
+
+  let articles: ArticleRow[] = [];
+  try {
+    articles = previewSeedEnabled()
+      ? seedTopNotices("journal")
+      : await getClient().fetch(FEATURED_ARTICLES_QUERY, { language: locale });
+  } catch {
+    return null;
+  }
+
+  const items = toFeedItems(articles ?? []);
+  if (items.length === 0) return null;
+
+  return (
+    <TopSection aria-label={t("journalLabel")}>
+      <TopSectionHead overline="JOURNAL" />
+      <FeedList items={items} />
+    </TopSection>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* 6. イベント (EVENT) — 開催予定 3 件 (Figma 8110:2516)                        */
+/* -------------------------------------------------------------------------- */
+
+type EventRow = {
+  _id: string;
+  title: string;
+  slug: { current: string };
+  date: string;
+  endDate?: string;
+  location?: string;
+};
+
+async function EventsSection() {
+  const locale = await getLocale();
+  const t = await getTranslations("homeR2");
+
+  let events: EventRow[] = [];
+  try {
+    events = previewSeedEnabled()
+      ? seedEvents()
+      // Hide the fictional/seed events still present in the production dataset.
+      : filterOutFictional(
+          "event",
+          await getClient().fetch(EVENTS_QUERY, { language: locale }),
+        );
+  } catch {
+    return null;
+  }
+
+  // 過去日のイベントはトップにも出さない。一覧 (`/events`) と同じ判定を使う
+  // ので、片方だけ過去日が残る状態にならない。
+  const upcoming = (events ?? []).filter(
+    (event) => !isPastEvent(event.date, event.endDate)
+  );
+
+  const items: FeedItem[] = upcoming.slice(0, 3).map((event) => {
+    const date = formatArticleDate(event.date);
+    return {
+      // seed イベントには詳細ルートが無いので一覧へ通す。
+      href: isSeedId(event._id) ? "/events" : `/events/${event.slug.current}`,
+      title: event.title,
+      meta: [date || null, event.location || null].filter(Boolean).join(" / ") || undefined,
+    };
+  });
+  if (items.length === 0) return null;
+
+  return (
+    <TopSection aria-label={t("eventLabel")}>
+      <TopSectionHead overline="EVENT" />
+      <FeedList items={items} />
+    </TopSection>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* 7. roji 定期便 — SpecBand 4 項目 (Figma 8110:2527)                           */
+/* 文言は定期便LP R2 (`subscriptionR2.included*`) と同じキーを使い二重管理しない。*/
+/* -------------------------------------------------------------------------- */
+
+async function SubscriptionSection() {
+  const ts = await getTranslations("subscriptionR2");
+
+  return (
+    <TopSection className="py-8 lg:py-16">
+      <SpecBand
+        items={[
+          { term: ts("included1Term"), value: ts("included1Value") },
+          { term: ts("included2Term"), value: ts("included2Value") },
+          { term: ts("included3Term"), value: ts("included3Value") },
+          { term: ts("included4Term"), value: ts("included4Value") },
+        ]}
+      />
+    </TopSection>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* 8. つくり手が見える (VOICES) — 一言のある農家 3 件 (Figma 8110:2542)         */
+/* -------------------------------------------------------------------------- */
+
+type FarmerVoice = {
+  _id: string;
+  name: string;
+  slug: { current: string };
+  region?: string;
+  quote: string;
+};
+
+async function VoicesSection() {
+  const locale = await getLocale();
+  const t = await getTranslations("homeR2");
+
+  let voices: FarmerVoice[] = [];
+  try {
+    voices = previewSeedEnabled()
+      ? seedFarmerVoices()
+      : await getClient().fetch(TOP_FARMER_VOICES_QUERY, { language: locale });
+  } catch {
+    return null;
+  }
+
+  const items = (voices ?? []).slice(0, 3);
+  if (items.length === 0) return null;
+
+  return (
+    <TopSection className="py-8 lg:pt-24 lg:pb-16">
+      {/* Figma 8110:2544 は「定期便LP R2 整合」の節見出し = jp/h3 20px (h27)。
+          トップ固有の 32px 見出し (TopSectionHead) ではなく、商品詳細 / 定期便LP と
+          共有の SectionHead (section-title = h3 トークン) を使う。 */}
+      <SectionHead overline="VOICES" title={t("voicesTitle")} />
+      <SectionBody>
+        <TripleColumn
+          items={items.map((voice) => {
+            const label = voice.region
+              ? `${voice.region} ${voice.name}`
+              : voice.name;
+            return {
+              /* 農家詳細への導線。seed は詳細ルートを持たず、逃がし先だった
+                 農家一覧 (/farmers) も 2026-08-14 に廃止したので、seed のときは
+                 リンクを張らず見出しだけ出す (404 になる導線を作らない)。 */
+              title: isSeedId(voice._id) ? (
+                label
+              ) : (
+                <Link
+                  href={`/farmers/${voice.slug.current}`}
+                  className="underline-offset-4 hover:underline"
+                >
+                  {label}
+                </Link>
+              ),
+              body: voice.quote,
+            };
+          })}
+        />
+      </SectionBody>
+    </TopSection>
+  );
 }

@@ -5,12 +5,25 @@ import { cn } from "@/lib/utils"
 
 function NativeSelect({
   className,
+  wrapperClassName,
   size = "default",
   ...props
-}: Omit<React.ComponentProps<"select">, "size"> & { size?: "sm" | "default" }) {
+}: Omit<React.ComponentProps<"select">, "size"> & {
+  size?: "sm" | "default";
+  /**
+   * 外枠 (`native-select-wrapper`) に足すクラス。既定は `w-fit` で中身幅に縮むため、
+   * 測度いっぱいに引き伸ばす場合だけ `w-full` を渡す
+   * (お問い合わせ R2 8109:46696 は control 幅 = 測度 640 / SP 343)。
+   * 既定は変えない (既存の catalog-toolbar は `w-fit` のまま)。
+   */
+  wrapperClassName?: string;
+}) {
   return (
     <div
-      className="group/native-select relative w-fit has-[select:disabled]:opacity-50"
+      className={cn(
+        "group/native-select relative w-fit has-[select:disabled]:opacity-50",
+        wrapperClassName
+      )}
       data-slot="native-select-wrapper"
     >
       <select

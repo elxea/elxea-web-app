@@ -11,12 +11,18 @@
  * deploys are unaffected. Nothing is ever written back to Sanity/Shopify.
  *
  * Flag:
- *   PREVIEW_SEED=1         -> unified master flag (all seeded sections)
- *   PREVIEW_SEED_EVENTS=1  -> legacy flag, kept for backward compatibility
+ *   PREVIEW_SEED=1                 -> unified master flag (all seeded sections)
+ *   PREVIEW_SEED_EVENTS=1          -> legacy flag, kept for backward compatibility
+ *   PREVIEW_SEED_DETERMINISTIC=1   -> pin every placeholder photo to one image
+ *                                     (screenshot-regression mode, see below)
  *
  * All `imageUrl` values point at existing local /public assets so no external
  * download / remote host is required.
  */
+
+import type { AccountView } from "@/lib/account-view";
+import type { SubscriptionContract } from "@/lib/shopify/customer";
+import type { Cart } from "@/lib/shopify/types";
 
 /** True when preview seeding is enabled via either the unified or legacy flag. */
 export function previewSeedEnabled(): boolean {
@@ -41,7 +47,15 @@ export function isSeedId(id: string | null | undefined): boolean {
   return typeof id === "string" && id.startsWith(SEED_ID_PREFIX);
 }
 
-/** Local /public images reused as preview placeholder photography. */
+/**
+ * Local /public images reused as preview placeholder photography.
+ *
+ * NOTE the pool is not aspect-ratio uniform — `hero-approach` is 1920x1200
+ * (1.60), `hero-day` / `hero-night` are 1920x1440 (1.33), and the three
+ * `placeholder-hero-*` are 1024x1024 (1.00). Anywhere a placeholder is rendered
+ * without a fixed frame, *which* image lands on a card changes that card's
+ * height. See `previewSeedDeterministic()`.
+ */
 const PREVIEW_IMAGES = [
   "/hero-day.jpg",
   "/hero-night.jpg",
@@ -51,8 +65,34 @@ const PREVIEW_IMAGES = [
   "/placeholder-hero-approach.jpg",
 ];
 
+/**
+ * Screenshot-regression mode: collapse the placeholder pool to a single image.
+ *
+ * Why this exists. Selection is already deterministic *per key*
+ * (`previewImageForKey`), but the keys are not stable across runs: the seeded
+ * pages fall back to a placeholder only for documents that have no real photo,
+ * and they read the live production Sanity dataset. As its content shifts, the
+ * set of ids — and therefore which of the six images appear and in what order —
+ * shifts with it. Because the pool spans three aspect ratios, that reshuffle
+ * moves total page height, which is what made screenshot diffing unusable on
+ * the journal SP routes (C16-1: `journal__sp` / `elxea-journal__sp` measured
+ * 52,422 px vs 51,889 px across two runs of *identical* code, swamping the
+ * 2-3 px deltas the comparison was trying to detect).
+ *
+ * With this flag on, every key resolves to `PREVIEW_IMAGES[0]`, so page height
+ * no longer depends on which documents came back. Layout/spacing measurement is
+ * unaffected — that is what the fidelity lanes actually measure. Turn it OFF
+ * when reviewing the seeded pages by eye, since every photo becomes identical.
+ *
+ * Default (flag unset) behaviour is byte-identical to before.
+ */
+export function previewSeedDeterministic(): boolean {
+  return process.env.PREVIEW_SEED_DETERMINISTIC === "1";
+}
+
 /** Deterministic image by numeric index (cycles through the pool). */
 export function previewImageAt(index: number): string {
+  if (previewSeedDeterministic()) return PREVIEW_IMAGES[0];
   const n = PREVIEW_IMAGES.length;
   return PREVIEW_IMAGES[((index % n) + n) % n];
 }
@@ -87,12 +127,23 @@ export type SeedEvent = {
 export function seedEvents(): SeedEvent[] {
   return [
     {
+      // 1 件目は Figma【R2: 確定版】イベント詳細 6657:7931 の見本と同じ値にして
+      // ある (一覧カード → 詳細で同じイベントが出る + 詳細を Figma と同条件で
+      // 実測できる)。日時は 2026-08-10 14:00 JST = 05:00 UTC。
+      //
+      // `endDate` = 17:00 JST (08:00 UTC)。Figma の見本は
+      // 「2026年8月10日（日）14:00–17:00」と時間レンジで書いているのに、見本データが
+      // 終了時刻を持っていなかったため `formatEventSchedule()` の**同日レンジ分岐が
+      // 一度も通らず**、実際の描画は「2026年8月10日(月) 14:00」だった (C6-1R で是正)。
+      // 見本に終了時刻を持たせて分岐を実際に踏ませる。
       _id: "seed-event-1",
       slug: { current: "seed-event-1" },
       imageUrl: "/hero-day.jpg",
-      title: "朝の茶会 — Morning Tea Ceremony",
-      date: "2026-07-25T01:00:00.000Z",
-      location: "elxea Studio, Tokyo",
+      title: "新茶テイスティング会 2026",
+      date: "2026-08-10T05:00:00.000Z",
+      endDate: "2026-08-10T08:00:00.000Z",
+      location: "東京・南青山 elxea atelier",
+      memberOnly: true,
     },
     {
       _id: "seed-event-2",
@@ -167,6 +218,293 @@ export function withSeedFarmers<T extends SeedFarmer>(
 }
 
 // ---------------------------------------------------------------------------
+// Farmer detail (R2 確定版 — Figma 8079:3748 / 8079:3966)
+// ---------------------------------------------------------------------------
+
+/**
+ * 農家詳細の確定版は 9 節構成だが、production dataset の farmer ドキュメントは
+ * まだ R2 のフィールド (work / interview / profileBand / fieldBand /
+ * fieldSeasons …) を持たない。素のままではほぼ全節が「データ無し = 非表示」に
+ * なり、レイアウトのレビューも Figma との実測対比もできない。
+ *
+ * そこで **プレビュー時のみ** 未入力フィールドを Figma 確定版の見本文言で
+ * 埋める。フラグが無いときは入力をそのまま返すので production は無影響
+ * (Sanity への書き戻しも一切しない)。
+ *
+ * 埋めるのは「未入力のフィールドだけ」。実データが入っている項目は上書きしない
+ * ので、編集側が本文を入れていくにつれて見本は自動的に減っていく。
+ */
+export type SeedFarmerDetail = {
+  kicker?: string;
+  role?: string;
+  meta?: string;
+  stats?: { value: string; label: string }[];
+  interviewer?: { name: string; role?: string; image?: { asset: object; alt?: string } };
+  quote?: string;
+  quoteBy?: string;
+  workHead?: string;
+  work?: { name: string; description?: string; photo?: { asset: object; alt?: string } }[];
+  interview?: { question: string; answer: string }[];
+  profileBand?: { label: string; value: string }[];
+  fieldBand?: { label: string; value: string }[];
+  fieldHead?: string;
+  fieldSeasons?: {
+    name: string;
+    description?: string;
+    photo?: { asset: object; alt?: string };
+  }[];
+  teasHead?: string;
+};
+
+/** Figma 確定版 (8079:3748) の見本文言。プレビュー専用の見本であり正本ではない。 */
+const SEED_FARMER_DETAIL = {
+  kicker: "PEOPLE 04 — ROASTER, HONYAMA",
+  role: "焙煎士 ／ roji の火入れを担う",
+  meta: "静岡県 本山｜2007年から、roji に届くすべての茶葉に火を入れている。",
+  stats: [
+    { value: "18", label: "YEARS" },
+    { value: "6", label: "STORIES" },
+  ],
+  interviewer: { name: "髙橋 志乃", role: "roji 編集 ／ 産地取材担当" },
+  quote:
+    "火は、こちらの都合では動いてくれない。その日の葉がどんな顔をしているかで、決めさせてもらう。",
+  workHead: "火入れは、三度に分けて決まる",
+  work: [
+    {
+      name: "葉を見る",
+      description:
+        "袋を開けて、まず匂いを嗅ぐ。数値は後から。手ざわりと香りで、その日の火の強さを決める。",
+    },
+    {
+      name: "火を入れる",
+      description:
+        "一度に仕上げず、弱い火で三度に分ける。急がないぶん、葉の芯まで均一に熱が通る。",
+    },
+    {
+      name: "止める",
+      description:
+        "いちばん難しいのは止めどき。冷まし台に広げた瞬間の香りで、合っていたかどうかが分かる。",
+    },
+  ],
+  interview: [
+    {
+      question: "焙煎士になろうと思ったきっかけは何でしたか。",
+      answer:
+        "なろうと思ったことはないんです。製材所にいたころ、木を乾かす釜の番をしていて、同じ木でも日によって仕上がりが変わるのが面白かった。お茶に変わっただけで、やっていることはあまり変わっていません。",
+    },
+    {
+      question: "いちばん難しいのはどの工程ですか。",
+      answer:
+        "止めどきです。火を入れるのは誰でもできますが、止めるのは戻せない。あと十秒いけるかもしれない、と思ったところで下ろします。",
+    },
+    {
+      question: "roji で飲む人に、何を届けたいですか。",
+      answer:
+        "「今日の分」でいいと思っています。毎日ちがう葉に、毎日ちがう火を入れているので、同じ味は二度と出ません。それを欠点だと思っていた時期もありましたが、いまはそれごと飲んでもらえたらいい。正解を決めてしまうと、次の年の葉が入る場所がなくなるので。",
+    },
+  ],
+  profileBand: [
+    { label: "拠点", value: "静岡県 静岡市 葵区 本山" },
+    { label: "担当", value: "火入れ・仕上げ（全ライン）" },
+    { label: "はじまり", value: "2007年 ／ 前職は製材所の乾燥釜" },
+    { label: "手の届く量", value: "年間 約1.2t まで" },
+  ],
+  fieldBand: [
+    { label: "産地", value: "静岡県 静岡市 葵区 本山 ／ 安倍川上流" },
+    { label: "標高", value: "320〜480m ／ 川霧の出る谷あい" },
+    { label: "品種", value: "やぶきた・つゆひかり・在来" },
+    { label: "栽培", value: "自然仕立て ／ 農薬不使用 (2015年〜)" },
+  ],
+  fieldHead: "畑の一年は、三つの季節で決まる",
+  fieldSeasons: [
+    {
+      name: "芽をまつ",
+      description:
+        "冬のあいだ畝の草は残しておく。土の温度が落ちきらないぶん、春の芽が揃って動きだす。",
+    },
+    {
+      name: "摘む",
+      description:
+        "一番茶は手摘みと機械を使い分ける。同じ畑でも斜面の上と下で三日ずれる、その差を待つ。",
+    },
+    {
+      name: "休ませる",
+      description: "摘んだあとは肥料を足さずに休ませる。収量は落ちるが、翌年の香りが変わる。",
+    },
+  ],
+  teasHead: "このひとが火を入れたお茶",
+} as const;
+
+/** 確定版 8 節「このひとが育てたお茶」の見本 (Shopify にハンドルが無いとき用)。 */
+export const SEED_FARMER_TEAS: { title: string; note: string; price: string }[] = [
+  { title: "本山 やぶきた 一番茶", note: "三度火・弱", price: "¥ 1,480" },
+  { title: "川根 在来 秋摘み", note: "二度火・中", price: "¥ 1,280" },
+  { title: "本山 くき ほうじ", note: "直火・強", price: "¥ 980" },
+];
+
+/**
+ * 未入力の R2 フィールドを見本で埋めた農家ドキュメントを返す。
+ * フラグ未設定なら入力をそのまま返す (production は完全に無影響)。
+ */
+export function withSeedFarmerDetail<T extends SeedFarmerDetail & { name: string }>(
+  farmer: T,
+): T {
+  if (!previewSeedEnabled()) return farmer;
+
+  const s = SEED_FARMER_DETAIL;
+  const has = (v: unknown) => (Array.isArray(v) ? v.length > 0 : Boolean(v));
+
+  return {
+    ...farmer,
+    kicker: has(farmer.kicker) ? farmer.kicker : s.kicker,
+    role: has(farmer.role) ? farmer.role : s.role,
+    meta: has(farmer.meta) ? farmer.meta : s.meta,
+    stats: has(farmer.stats) ? farmer.stats : [...s.stats],
+    interviewer: has(farmer.interviewer) ? farmer.interviewer : { ...s.interviewer },
+    quote: has(farmer.quote) ? farmer.quote : s.quote,
+    // 帰属は実在の氏名を使う (見本の氏名を inject しない)。
+    quoteBy: has(farmer.quoteBy)
+      ? farmer.quoteBy
+      : `${farmer.name} ／ ${has(farmer.role) ? farmer.role : s.role}`,
+    workHead: has(farmer.workHead) ? farmer.workHead : s.workHead,
+    work: has(farmer.work) ? farmer.work : s.work.map((w) => ({ ...w })),
+    interview: has(farmer.interview) ? farmer.interview : s.interview.map((q) => ({ ...q })),
+    profileBand: has(farmer.profileBand)
+      ? farmer.profileBand
+      : s.profileBand.map((r) => ({ ...r })),
+    fieldBand: has(farmer.fieldBand) ? farmer.fieldBand : s.fieldBand.map((r) => ({ ...r })),
+    fieldHead: has(farmer.fieldHead) ? farmer.fieldHead : s.fieldHead,
+    fieldSeasons: has(farmer.fieldSeasons)
+      ? farmer.fieldSeasons
+      : s.fieldSeasons.map((f) => ({ ...f })),
+    teasHead: has(farmer.teasHead) ? farmer.teasHead : s.teasHead,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// People 詳細 (/people/[slug]) — C12-1
+// ---------------------------------------------------------------------------
+
+/**
+ * People 詳細の凍結テンプレ (Figma 7822:37213 / 7823:37542) は農家詳細から
+ * 茶園 2 節を除いた構成なので、見本も `SeedFarmerDetail` から `fieldBand` /
+ * `fieldHead` / `fieldSeasons` を落とした形になる。
+ */
+export type SeedPersonDetail = {
+  kicker?: string;
+  role?: string;
+  meta?: string;
+  stats?: { value: string; label: string }[];
+  interviewer?: { name: string; role?: string; image?: { asset: object; alt?: string } };
+  quote?: string;
+  quoteBy?: string;
+  workHead?: string;
+  work?: { name: string; description?: string; photo?: { asset: object; alt?: string } }[];
+  interview?: { question: string; answer: string }[];
+  profileBand?: { label: string; value: string }[];
+  teasHead?: string;
+};
+
+/**
+ * 見本文言。プレビュー専用の見本であり正本ではない。
+ *
+ * 農家詳細の見本 (`SEED_FARMER_DETAIL` = 焙煎士) と**別の人物像**にしている。
+ * People 詳細は「作り手の共通テンプレ」で、焙煎士だけでなく書き手・編集も乗る枠
+ * なので、同じ見本を流用すると節の汎用性 (肩書や工程が茶の製造に限らないこと) が
+ * 検証できない。
+ */
+const SEED_PERSON_DETAIL = {
+  kicker: "PEOPLE 01 — EDITOR, TOKYO",
+  role: "編集 ／ roji の読みものをつくる",
+  meta: "東京都｜2019年から、産地に通って聞き書きを続けている。",
+  stats: [
+    { value: "7", label: "YEARS" },
+    { value: "42", label: "STORIES" },
+  ],
+  interviewer: { name: "白井 亮", role: "roji 焙煎 ／ 火入れ担当" },
+  quote:
+    "聞いたことを、そのまま書けるとは限らない。それでも、その人が黙った時間のことは残しておきたい。",
+  workHead: "聞き書きは、三度たずねて決まる",
+  work: [
+    {
+      name: "たずねる",
+      description:
+        "初回は録音しない。何を聞かないでおくかを決めるために行く。畑や作業場をただ一緒に歩く。",
+    },
+    {
+      name: "聞く",
+      description:
+        "二度目に録る。同じ問いをもう一度出すと、前回と違う答えが返ってくることがある。そこを書く。",
+    },
+    {
+      name: "戻す",
+      description:
+        "原稿は必ず本人に読んでもらう。直しが入った箇所こそ、その人が大事にしていることだと分かる。",
+    },
+  ],
+  interview: [
+    {
+      question: "産地に通うようになったきっかけは何でしたか。",
+      answer:
+        "最初は取材ではなく、単に買いに行っていました。畑のことを何も知らずに味の話をしているのが、だんだん気まずくなって。年に一度が季節ごとになり、いまは月に一度は誰かのところにいます。",
+    },
+    {
+      question: "書くときにいちばん気をつけていることは何ですか。",
+      answer:
+        "きれいにまとめすぎないことです。作り手の話はたいてい矛盾していて、去年と逆のことを言っていたりする。整えると読みやすくなるけれど、その人ではなくなる。だから言い切っていない部分は、言い切っていないまま置きます。",
+    },
+    {
+      question: "roji の読みもので、これから増やしたいものはありますか。",
+      answer:
+        "うまくいかなかった年の話です。霜が降りた、摘めなかった、火が入りすぎた。そういう年のほうが、その人の判断がよく見える。売る側としては書きにくいのですが、いちばん読みたいのはそこだと思っています。",
+    },
+  ],
+  profileBand: [
+    { label: "拠点", value: "東京都 ／ 月に一度は産地" },
+    { label: "担当", value: "聞き書き・産地取材・編集" },
+    { label: "はじまり", value: "2019年 ／ 前職は書店員" },
+    { label: "書いた本数", value: "42本 ／ 産地 11か所" },
+  ],
+  teasHead: "この人が聞いた人のお茶",
+} as const;
+
+/**
+ * 未入力の People 詳細フィールドを見本で埋めた author ドキュメントを返す。
+ * フラグ未設定なら入力をそのまま返す (production は完全に無影響)。
+ *
+ * 帰属 (`quoteBy`) だけは見本の氏名を注入せず、実在の氏名から組む
+ * (`withSeedFarmerDetail` と同じ方針 — 架空の人名を本人の発言として出さない)。
+ */
+export function withSeedPersonDetail<T extends SeedPersonDetail & { name: string }>(
+  person: T,
+): T {
+  if (!previewSeedEnabled()) return person;
+
+  const s = SEED_PERSON_DETAIL;
+  const has = (v: unknown) => (Array.isArray(v) ? v.length > 0 : Boolean(v));
+
+  return {
+    ...person,
+    kicker: has(person.kicker) ? person.kicker : s.kicker,
+    role: has(person.role) ? person.role : s.role,
+    meta: has(person.meta) ? person.meta : s.meta,
+    stats: has(person.stats) ? person.stats : [...s.stats],
+    interviewer: has(person.interviewer) ? person.interviewer : { ...s.interviewer },
+    quote: has(person.quote) ? person.quote : s.quote,
+    quoteBy: has(person.quoteBy)
+      ? person.quoteBy
+      : `${person.name} ／ ${has(person.role) ? person.role : s.role}`,
+    workHead: has(person.workHead) ? person.workHead : s.workHead,
+    work: has(person.work) ? person.work : s.work.map((w) => ({ ...w })),
+    interview: has(person.interview) ? person.interview : s.interview.map((q) => ({ ...q })),
+    profileBand: has(person.profileBand)
+      ? person.profileBand
+      : s.profileBand.map((r) => ({ ...r })),
+    teasHead: has(person.teasHead) ? person.teasHead : s.teasHead,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Elxea Journal (tea-menu journal — akane / sui / sohi themes)
 // ---------------------------------------------------------------------------
 
@@ -207,4 +545,778 @@ export function withSeedJournals<T extends SeedJournal>(
     theme: s.theme,
     summary: s.summary,
   }));
+}
+
+// ---------------------------------------------------------------------------
+// Elxea Journal 詳細【R2: 確定版】(Figma PC 8110:46893 / SP 8110:47043)
+// ---------------------------------------------------------------------------
+
+/** PortableText の素の段落 / 見出しを 1 ブロック作る。 */
+function seedBlock(style: "normal" | "h2", text: string, key: string) {
+  return {
+    _type: "block",
+    _key: key,
+    style,
+    markDefs: [],
+    children: [{ _type: "span", _key: `${key}s`, text, marks: [] }],
+  };
+}
+
+/** 確定版の本文 (見出し 3 本 + 段落) の見本。文言は Figma 正本から写した。 */
+const SEED_JOURNAL_BODY = [
+  seedBlock(
+    "normal",
+    "このページは、一杯を飲み終えるくらいの時間で読み切れる長さにしています。続きを探しに、どこかへ移動する必要はありません。",
+    "b0"
+  ),
+  seedBlock("h2", "霧が、茶葉を遅くする", "b1"),
+  seedBlock(
+    "normal",
+    "霧の多い畑では、日射しが柔らかくなり、葉の育ちが数日ぶん遅れます。その遅れが、旨みの層をひとつ増やす。急がなかった葉は、湯の中でも急ぎません。",
+    "b2"
+  ),
+  seedBlock(
+    "normal",
+    "この号の三種は、その遅さの度合いで選びました。もっとも霧の深い区画のものを一煎目に、風の通る尾根のものを最後に。順番そのものが、この号の編集です。",
+    "b3"
+  ),
+  seedBlock(
+    "normal",
+    "「どれから飲むか」を決めるのは、いつも読み手のほうです。ただ、この号にかぎっては、こちらで順番を決めさせてもらいました。三煎のあいだに季節がひとつ動く、その速さを味わってほしかったからです。",
+    "b4"
+  ),
+  seedBlock("h2", "二杯目の時間", "b5"),
+  seedBlock(
+    "normal",
+    "一煎目を飲み終えて、二煎目を淹れるまでの数分間。急須の中では、まだ葉が開き続けています。この待ち時間のために、読みものの分量を決めました。",
+    "b6"
+  ),
+  seedBlock(
+    "normal",
+    "二煎目の湯を注ぐころ、ちょうどこの節を読み終えるはずです。音は流したままで構いません。ページを閉じずに、そのまま次の段落へ進めるようにしてあります。",
+    "b7"
+  ),
+  seedBlock("h2", "読み終えたら、三杯目を", "b8"),
+  seedBlock(
+    "normal",
+    "この号の読みものは、ここで終わります。続きを探して別のページへ移る必要はありません。もし気が向いたら、下にあるほかの読みものを、このまま開いてください。",
+    "b9"
+  ),
+  seedBlock(
+    "normal",
+    "霧は、朝のあいだだけのものです。この号が手元にある数週間も、たぶん同じくらいの長さでしょう。急がずに、三種を飲み終えるまで置いておいてください。",
+    "b10"
+  ),
+];
+
+/** 確定版の節に必要な欄だけを持つ最小形 (page 側の型と構造だけ合わせる)。 */
+export type SeedJournalDetail = {
+  summary?: string;
+  body?: unknown[];
+  mainImageCaption?: string;
+  author?: { name: string; role?: string };
+  teaMenus?: {
+    _id: string;
+    slug: { current: string };
+    displayName?: string;
+    title?: string;
+    origin?: string;
+    variety?: string;
+  }[];
+  otherReads?: { _id: string; title: string; slug: { current: string } }[];
+  nextReadTags?: { _id: string; title: string; slug: { current: string } }[];
+};
+
+const SEED_JOURNAL_DETAIL = {
+  summary:
+    "この号の茶葉は、霧の多い斜面で育ちました。読みものと音楽を同じ時間から選んでいます。まずは一煎目を淹れて、湯気の向こうで読んでください。",
+  mainImageCaption: "PHOTO — 朝霧の斜面 5:40",
+  author: { name: "高橋 志乃", role: "elxea 茶師 / この号の選茶" },
+  teaMenus: [
+    {
+      title: "霧尾",
+      displayName: "霧尾 — くらしげ農園 2026 一番茶",
+      origin: "静岡・本山 標高620m",
+      variety: "やぶきた",
+      slug: "seed-tea-kirio",
+    },
+  ],
+  otherReads: [
+    { title: "霧が茶をつくる", slug: "seed-read-0" },
+    { title: "湯冷ましという時間", slug: "seed-read-1" },
+    { title: "くらしげ農園の一年", slug: "seed-read-2" },
+  ],
+  nextReadTags: [
+    { title: "霧", slug: "seed-tag-kiri" },
+    { title: "産地のこと", slug: "seed-tag-sanchi" },
+  ],
+} as const;
+
+/**
+ * 未入力の確定版フィールドを見本で埋めた journal ドキュメントを返す。
+ * フラグ未設定なら入力をそのまま返す (production は完全に無影響)。
+ *
+ * production の Sanity dataset の journal は確定版のフィールド
+ * (`author` / `mainImage.caption` / `otherReads` / `nextReadTags`) が未整備で、
+ * 素のままでは該当の節が「データ無し = 非表示」になり実寸計測ができない。
+ */
+export function withSeedJournalDetail<T extends SeedJournalDetail>(journal: T): T {
+  if (!previewSeedEnabled()) return journal;
+
+  const s = SEED_JOURNAL_DETAIL;
+  const has = (v: unknown) => (Array.isArray(v) ? v.length > 0 : Boolean(v));
+
+  return {
+    ...journal,
+    summary: has(journal.summary) ? journal.summary : s.summary,
+    body: has(journal.body) ? journal.body : SEED_JOURNAL_BODY,
+    mainImageCaption: has(journal.mainImageCaption)
+      ? journal.mainImageCaption
+      : s.mainImageCaption,
+    author: has(journal.author) ? journal.author : { ...s.author },
+    teaMenus: has(journal.teaMenus)
+      ? journal.teaMenus
+      : s.teaMenus.map((t, i) => ({
+          _id: `seed-tea-${i}`,
+          slug: { current: t.slug },
+          title: t.title,
+          displayName: t.displayName,
+          origin: t.origin,
+          variety: t.variety,
+        })),
+    otherReads: has(journal.otherReads)
+      ? journal.otherReads
+      : s.otherReads.map((r, i) => ({
+          _id: `seed-read-${i}`,
+          title: r.title,
+          slug: { current: r.slug },
+        })),
+    nextReadTags: has(journal.nextReadTags)
+      ? journal.nextReadTags
+      : s.nextReadTags.map((r, i) => ({
+          _id: `seed-tag-${i}`,
+          title: r.title,
+          slug: { current: r.slug },
+        })),
+  };
+}
+
+/**
+ * `seed-journal-N` (一覧の見本カード) を開いたときに返す見本の詳細。
+ * 実データが引けなかったときだけ使う。フラグ未設定なら常に null。
+ */
+export function seedJournalDetail(slug: string) {
+  if (!previewSeedEnabled()) return null;
+  const match = /^seed-journal-(\d+)$/.exec(slug);
+  if (!match) return null;
+  const index = Number(match[1]);
+  const base = SEED_JOURNALS[index];
+  if (!base) return null;
+
+  return withSeedJournalDetail({
+    _id: `seed-journal-${index}`,
+    title: base.title,
+    slug: { current: slug },
+    theme: base.theme,
+    summary: base.summary,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Cart
+// ---------------------------------------------------------------------------
+
+/**
+ * 見本のカート (計測用)。
+ *
+ * `/ja/cart` は Shopify の cart cookie が無いと常に空カートになるため、確定版の
+ * レイアウト (2 行 = 通常購入 + 定期便 / 小計 / 合計 / 決済ボタン) を実寸で計測
+ * できない。見本は Figma【R2: 確定版】カート 変A の PC フレーム (6684:8698) に
+ * 載っている値をそのまま使う。
+ *
+ * - フラグ未設定時 (= production / Vercel Preview の既定) は `null` を返すので、
+ *   描画は見本導入前と byte-identical
+ * - Shopify へは一切書き込まない (読み取りもしない。純粋なオブジェクトリテラル)
+ * - `checkoutUrl` は Shopify の実 URL ではなく `#` 相当のダミー。見本カートから
+ *   決済に進めないのは意図どおり (注文確定はしない)
+ */
+export function seedCart(): Cart | null {
+  if (!previewSeedEnabled()) return null;
+
+  const jpy = (amount: string) => ({ amount, currencyCode: "JPY" });
+  const product = (handle: string, title: string) => ({
+    id: `${SEED_ID_PREFIX}product-${handle}`,
+    handle,
+    title,
+    featuredImage: {
+      url: previewImageForKey(handle),
+      altText: title,
+      width: 1600,
+      height: 1067,
+    },
+    vendor: "roji",
+  });
+
+  return {
+    id: `${SEED_ID_PREFIX}cart`,
+    checkoutUrl: "#preview-seed-no-checkout",
+    totalQuantity: 3,
+    cost: {
+      subtotalAmount: jpy("6000"),
+      totalAmount: jpy("6000"),
+      totalTaxAmount: null,
+    },
+    lines: [
+      {
+        id: `${SEED_ID_PREFIX}cart-line-1`,
+        quantity: 2,
+        merchandise: {
+          id: `${SEED_ID_PREFIX}variant-akane-100g`,
+          title: "100g",
+          selectedOptions: [{ name: "内容量", value: "100g" }],
+          product: product("sencha-akane", "煎茶 茜 -akane-"),
+          price: jpy("1800"),
+        },
+        cost: { totalAmount: jpy("3600") },
+        sellingPlanAllocation: {
+          sellingPlan: {
+            id: `${SEED_ID_PREFIX}selling-plan-monthly`,
+            name: "毎月1回お届け",
+          },
+        },
+      },
+      {
+        id: `${SEED_ID_PREFIX}cart-line-2`,
+        quantity: 1,
+        merchandise: {
+          id: `${SEED_ID_PREFIX}variant-midori-50g`,
+          title: "50g",
+          selectedOptions: [{ name: "内容量", value: "50g" }],
+          product: product("gyokuro-midori", "玉露 翠 -midori-"),
+          price: jpy("2400"),
+        },
+        cost: { totalAmount: jpy("2400") },
+        sellingPlanAllocation: null,
+      },
+    ],
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Account (マイページ)【R2: 確定版】(Figma 親 8095:731 / PC 8095:733 / SP 8095:792)
+// ---------------------------------------------------------------------------
+
+/**
+ * 見本のマイページ (計測用)。
+ *
+ * `/ja/account` はログイン必須で、ログインしていないとログイン誘導だけが出る。
+ * 確定版の 4 節 (これから / 続き / これまで / お支払い方法) をカードが載った状態で
+ * 実寸計測するには、**セッション無しでも確定版の骨格を描ける見本**が必要になる。
+ * 値は Figma 確定版のフレームに載っている見本文言・見本日付をそのまま写した。
+ *
+ * - フラグ未設定時 (= production / Vercel Preview の既定) は `null` を返すので、
+ *   描画は見本導入前と byte-identical (ログイン誘導のまま)
+ * - Shopify / Firestore には読み書きしない (純粋なオブジェクトリテラル)
+ * - 実在の顧客データは 1 件も含まない。メールは予約ドメイン (example.com) の見本
+ * - 実セッションがあるときは呼ばれない (実データが優先。見本で上書きしない)
+ */
+export function seedAccountView(): AccountView | null {
+  if (!previewSeedEnabled()) return null;
+
+  return {
+    displayName: "結城",
+    email: "yuki@example.com",
+    upcoming: [
+      {
+        id: `${SEED_ID_PREFIX}subscription-1`,
+        kind: "subscription",
+        date: "2026-08-20T00:00:00.000Z",
+        title: "深蒸し煎茶「やまかげ」",
+        href: "/account/subscriptions",
+      },
+      {
+        id: `${SEED_ID_PREFIX}account-event-1`,
+        kind: "event",
+        date: "2026-09-02T00:00:00.000Z",
+        title: "火入れの飲みくらべ会",
+        href: "/events/seed-event-1",
+      },
+      {
+        id: `${SEED_ID_PREFIX}account-event-2`,
+        kind: "event",
+        date: "2026-09-14T00:00:00.000Z",
+        title: "秋のお茶会",
+        href: "/events/seed-event-2",
+      },
+    ],
+    continueItems: [
+      {
+        id: `${SEED_ID_PREFIX}account-favorite-1`,
+        kind: "favorite-article",
+        title: "火入れという時間のかけ方",
+        imageUrl: previewImageAt(0),
+        href: "/journal/seed-journal-0",
+      },
+      {
+        id: `${SEED_ID_PREFIX}account-favorite-2`,
+        kind: "favorite-article",
+        title: "八女、白折の朝",
+        imageUrl: previewImageAt(1),
+        href: "/journal/seed-journal-1",
+      },
+    ],
+    past: [
+      {
+        id: `${SEED_ID_PREFIX}account-order-1`,
+        kind: "order",
+        date: "2026-07-06T00:00:00.000Z",
+        title: "#1042",
+        amount: { value: "4200", currencyCode: "JPY" },
+      },
+      {
+        id: `${SEED_ID_PREFIX}account-order-2`,
+        kind: "order",
+        date: "2026-06-12T00:00:00.000Z",
+        title: "#1031",
+        amount: { value: "6000", currencyCode: "JPY" },
+      },
+      {
+        id: `${SEED_ID_PREFIX}account-order-3`,
+        kind: "order",
+        date: "2026-05-24T00:00:00.000Z",
+        title: "#1018",
+        amount: { value: "2400", currencyCode: "JPY" },
+      },
+    ],
+    // 確定版の「お支払い方法」を計測するために見本のカードを 1 枚だけ持つ。
+    // 実データ経路は無い (アプリ権限 read_customer_payment_methods 未付与) ので、
+    // これは**プレビュー限定の見本**であり実登録カードではない。
+    paymentMethod: { brand: "VISA", last4: "1234" },
+    seeded: true,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Events (detail) — イベント詳細【R2: 確定版】(Figma PC 6657:7932 / SP 6662:8160)
+// ---------------------------------------------------------------------------
+
+/**
+ * 確定版の本文 (Body 6661:13492 / 6664:8170)。
+ *
+ * 1 段落目は **Figma 正本から写した文言そのまま** (節の見え方を Figma と同条件で
+ * 測るため)。2 段落目以降は見本の増量で、実データの長さ (Sanity の PortableText は
+ * 通常もっと長い) に近づけるために足してある。段落が 1 本だけだとページが 1 画面に
+ * 収まり、**SP 追従バー (6664:13496) が出る条件 (登録カードもフッターも視界に
+ * 無い) を満たせず実測できない**ため、計測用の密度としてここで確保する。
+ */
+const SEED_EVENT_BODY = [
+  seedBlock(
+    "normal",
+    "会員の皆さまに向けた、季節のお茶を少人数で楽しむ集まりです。当日の内容や持ち物、参加方法の詳細は、下記の申し込みページよりご確認ください。",
+    "e0",
+  ),
+  seedBlock(
+    "normal",
+    "当日は摘みたての一番茶を三種、湯温を変えながら順にお出しします。同じ葉でも湯の温度で表情が変わることを、飲みくらべながら確かめていただく時間です。急須の扱いに慣れていない方には、淹れ方からご案内します。",
+    "e1",
+  ),
+  seedBlock(
+    "normal",
+    "会場は南青山のアトリエ。定員は 12 名で、席は先着順にお取りしています。開始 10 分前から受付を開けていますので、少し早めにお越しいただけると落ち着いてお座りいただけます。",
+    "e2",
+  ),
+  seedBlock(
+    "normal",
+    "お持ちいただくものはとくにありません。お気に入りの器がある方は、ご持参いただければその器でお出しします。当日のお茶は、後日オンラインでもお求めいただけます。",
+    "e3",
+  ),
+];
+
+export type SeedEventDetail = {
+  _id: string;
+  title: string;
+  slug: { current: string };
+  imageUrl?: string;
+  date: string;
+  endDate?: string;
+  location?: string;
+  memberOnly?: boolean;
+  requiredTier?: "none";
+  externalUrl?: string;
+  description: unknown[];
+};
+
+/**
+ * `seed-event-N` (一覧の見本カード) を開いたときに返す見本の詳細。
+ * 実データが引けなかったときだけ使う。フラグ未設定なら常に null。
+ *
+ * production の Sanity dataset には未来日のイベントが無く、`/ja/events/[slug]`
+ * は素のままでは 404 になるため確定版のレイアウトを実寸計測できない。
+ *
+ * `requiredTier: "none"` を明示しているのは**計測のため**。`memberOnly` だけを
+ * true にすると tier ゲートが閉じ、未ログインの Preview では「詳細・申し込み」節が
+ * MemberGate に置き換わって Body を測れない。見本は「会員限定バッジ + 登録カードの
+ * 注記は出るが、本文は見える」状態 (= Figma のフレームと同じ見た目) にしてある。
+ * 本番データは `requiredTier` を Sanity 側の値でそのまま評価するので影響しない。
+ */
+export function seedEventDetail(slug: string): SeedEventDetail | null {
+  if (!previewSeedEnabled()) return null;
+
+  const base = seedEvents().find((e) => e.slug.current === slug);
+  if (!base) return null;
+
+  return {
+    _id: base._id,
+    title: base.title,
+    slug: base.slug,
+    imageUrl: base.imageUrl,
+    date: base.date,
+    endDate: base.endDate,
+    location: base.location,
+    memberOnly: base.memberOnly,
+    requiredTier: "none",
+    externalUrl: "https://elxea.com/",
+    description: SEED_EVENT_BODY,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 定期便管理【R2: 確定版】(Figma section 6717:14526 / PC 6717:14527 / SP 6723:14747)
+// ---------------------------------------------------------------------------
+
+/**
+ * 見本の定期便契約 3 件 (計測用)。
+ *
+ * `/ja/account/subscriptions` はログイン必須で、さらに Shopify に定期便契約が
+ * 無いと確定版の 3 状態 (契約中 / 一時停止中 / 解約済み) を実寸計測できない。
+ * 値は Figma 確定版のカードに載っている見本文言・見本価格・見本日付をそのまま写した。
+ *
+ * - フラグ未設定時 (= production / Vercel Preview の既定) は `null` を返すので、
+ *   描画は見本導入前と byte-identical (ログイン誘導のまま)
+ * - Shopify には読み書きしない (純粋なオブジェクトリテラル)
+ * - 実在の顧客データ・実在の契約 ID は 1 件も含まない。ID は `seed-` 前置きで、
+ *   Shopify の `gid://shopify/SubscriptionContract/...` 形式では**ない**
+ * - 画面側は見本のとき `preview` を立てて Server Action を 1 度も呼ばない。
+ *   見本から実契約への mutation が飛ぶ経路は作らない
+ * - 実セッションがあるときは呼ばれない (実データが優先)
+ *
+ * `PREVIEW_SEED_SUBSCRIPTIONS_EMPTY=1` を足すと**空配列**を返す。確定版の
+ * 「契約 0 件の表示」(EmptyCard 6720:9378) はログイン済みで契約が 0 件のときだけ
+ * 出る状態で、セッション無しでは到達できないため、計測用にこの入口を用意している
+ * (空配列は truthy なのでログイン誘導ではなく 0 件表示に落ちる)。
+ */
+export function seedSubscriptionContracts(): SubscriptionContract[] | null {
+  if (!previewSeedEnabled()) return null;
+  if (process.env.PREVIEW_SEED_SUBSCRIPTIONS_EMPTY === "1") return [];
+
+  const line = (
+    key: string,
+    title: string,
+    variantTitle: string | null,
+    quantity: number,
+    amount: string
+  ) => ({
+    node: {
+      id: `${SEED_ID_PREFIX}subscription-line-${key}`,
+      title,
+      variantTitle,
+      quantity,
+      currentPrice: { amount, currencyCode: "JPY" },
+      variantImage: null,
+    },
+  });
+
+  return [
+    {
+      // 契約中 (Figma 6717:14573 / SP 6723:14760)
+      id: `${SEED_ID_PREFIX}subscription-contract-active`,
+      status: "ACTIVE",
+      createdAt: "2026-03-15T00:00:00.000Z",
+      nextBillingDate: "2026-06-15T00:00:00.000Z",
+      deliveryPolicy: { interval: "MONTH", intervalCount: { count: 1 } },
+      lines: {
+        edges: [
+          line("coffee", "深煎りブレンド コーヒー豆（200g）", "粉 / 中挽き", 1, "1800"),
+          line("tea", "和紅茶ティーバッグ（12個入）", "標準", 2, "2400"),
+        ],
+      },
+    },
+    {
+      // 一時停止中 (Figma 6718:14888 / SP 6723:14796)
+      id: `${SEED_ID_PREFIX}subscription-contract-paused`,
+      status: "PAUSED",
+      createdAt: "2026-02-02T00:00:00.000Z",
+      nextBillingDate: null,
+      deliveryPolicy: { interval: "WEEK", intervalCount: { count: 2 } },
+      lines: {
+        edges: [line("tea-paused", "和紅茶ティーバッグ（12個入）", "標準", 1, "2400")],
+      },
+    },
+    {
+      // 解約済み (Figma 6718:14906 / SP 6723:14813)
+      id: `${SEED_ID_PREFIX}subscription-contract-cancelled`,
+      status: "CANCELLED",
+      createdAt: "2025-11-08T00:00:00.000Z",
+      nextBillingDate: null,
+      deliveryPolicy: { interval: "MONTH", intervalCount: { count: 1 } },
+      lines: {
+        edges: [
+          line("coffee-cancelled", "深煎りブレンド コーヒー豆（200g）", "粉 / 中挽き", 1, "1800"),
+        ],
+      },
+    },
+  ];
+}
+
+// ---------------------------------------------------------------------------
+// お茶メニュー詳細 (C9-1)
+// ---------------------------------------------------------------------------
+
+export type SeedTeaMenuDetail = {
+  _id: string;
+  displayName: string;
+  slug: { current: string };
+  productNumber: string;
+  category: string;
+  variety: string;
+  origin: string;
+  season: string;
+  netWeight: string;
+  imageUrl?: string;
+  description: string;
+  brewingGuide: { temperature: string; water: string; time: string };
+  relatedArticle?: { title: string; slug: { current: string } };
+  shopifyHandle?: string;
+};
+
+/**
+ * `/ja/tea-menu/[slug]` の見本詳細 (計測用)。
+ *
+ * production の Sanity dataset には `teaMenu` ドキュメントがまだ揃っておらず、
+ * 素のままでは詳細ページが 404 になるため、確定版の節 (お茶の詳細 / 淹れ方ガイド /
+ * 購入 / 関連記事) を実寸計測できない。
+ *
+ * - フラグ未設定時 (= production / Vercel Preview の既定) は `null` を返すので、
+ *   描画は見本導入前と byte-identical (実データが無ければ従来どおり notFound)
+ * - Sanity には読み書きしない (純粋なオブジェクトリテラル)
+ * - 実データが引けたときは**呼ばれない** (呼び出し側が `tea ?? seedTeaMenuDetail(slug)`)
+ * - 文言・数値は変A `6654:13189` の見本表記をそのまま写した
+ *   (品種 やぶきた / 産地 静岡・牧之原 / 一番茶 / 50g / 70℃ / 180ml / 60秒)
+ * - `shopifyHandle` / `relatedArticle` は **production dataset に実在する値**を指す
+ *   (Shopify `tea-ats-g-01` / Sanity 記事 `tea-journey-single-origin-terroir`)。
+ *   見本から 404 に飛ばさないため実在確認済みの値のみ使う。これで購入節・関連記事節も
+ *   実寸計測でき、かつリンクを踏んでも壊れない
+ */
+export function seedTeaMenuDetail(slug: string): SeedTeaMenuDetail | null {
+  if (!previewSeedEnabled()) return null;
+
+  return {
+    _id: `${SEED_ID_PREFIX}tea-menu-${slug}`,
+    displayName: "茜 -akane-",
+    slug: { current: slug },
+    productNumber: "ELX-2026-04",
+    category: "煎茶",
+    variety: "やぶきた",
+    origin: "静岡・牧之原",
+    season: "一番茶（2026年春）",
+    netWeight: "50",
+    imageUrl: previewImageForKey(slug),
+    description:
+      "静岡・牧之原の茶園で育てたやぶきたを、一番茶のみで丁寧に仕上げた煎茶です。",
+    brewingGuide: { temperature: "70℃", water: "180ml", time: "60秒" },
+    shopifyHandle: "tea-ats-g-01",
+    relatedArticle: {
+      title: "シングルオリジンとテロワール — 一杯に土地が出る",
+      slug: { current: "tea-journey-single-origin-terroir" },
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Top page — 一報リスト (SEASONAL / JOURNAL) と VOICES
+// ---------------------------------------------------------------------------
+
+export type SeedNotice = {
+  _id: string;
+  title: string;
+  slug: { current: string };
+  publishedAt?: string;
+};
+
+/** Figma 8110:2505-2513 (SEASONAL) の見本行。 */
+const SEED_NOTICES: ReadonlyArray<{ title: string; publishedAt: string }> = [
+  { title: "新茶のしまい方 — 一番茶を秋まで", publishedAt: "2026-08-04T15:00:00.000Z" },
+  { title: "夏の水出し、はじめました", publishedAt: "2026-07-19T15:00:00.000Z" },
+  { title: "八女・新茶の入荷を開始しました", publishedAt: "2026-06-30T15:00:00.000Z" },
+];
+
+/** Figma 8109:46607-46615 (JOURNAL) の見本行。 */
+const SEED_JOURNAL_ROWS: ReadonlyArray<{ title: string; publishedAt: string }> = [
+  { title: "茶葉の保存は、難しく考えない", publishedAt: "2026-07-27T15:00:00.000Z" },
+  { title: "水出しという選択肢", publishedAt: "2026-07-13T15:00:00.000Z" },
+  { title: "産地を訪ねる — 八女", publishedAt: "2026-06-29T15:00:00.000Z" },
+];
+
+/**
+ * トップの一報リストの見本行。`kind` で SEASONAL / JOURNAL を切り替える。
+ * 詳細ルートを持たない dummy なので `_id` は seed 接頭辞つき (呼び側が
+ * `isSeedId` で判定して一覧へ通す)。
+ */
+export function seedTopNotices(kind: "notice" | "journal" = "notice"): SeedNotice[] {
+  const rows = kind === "journal" ? SEED_JOURNAL_ROWS : SEED_NOTICES;
+  const prefix = kind === "journal" ? "journal-row" : "notice";
+  return rows.map((row, i) => ({
+    _id: `${SEED_ID_PREFIX}${prefix}-${i}`,
+    title: row.title,
+    slug: { current: `${prefix}-${i}` },
+    publishedAt: row.publishedAt,
+  }));
+}
+
+export type SeedFarmerVoice = {
+  _id: string;
+  name: string;
+  slug: { current: string };
+  region?: string;
+  quote: string;
+};
+
+/** Figma 8110:2549-2558 (VOICES) の見本 3 件。 */
+const SEED_FARMER_VOICES: ReadonlyArray<{
+  name: string;
+  region: string;
+  quote: string;
+}> = [
+  {
+    name: "中村",
+    region: "嬉野・釜炒り",
+    quote:
+      "同じ畑でも、摘む日が3日ちがえば別の茶になります。その差を隠さずに送りたいと思っています。",
+  },
+  {
+    name: "川畑",
+    region: "知覧・浅蒸し",
+    quote: "霧が晴れるまで摘まない。待った分だけ、湯を下げたときの甘みが出ます。",
+  },
+  {
+    name: "大石",
+    region: "川根・中蒸し",
+    quote:
+      "渋みは悪者ではありません。食事のあとに飲むなら、むしろ輪郭があるほうがいい。",
+  },
+];
+
+/** トップ VOICES の見本 3 件。詳細ルートは無いので `_id` は seed 接頭辞つき。 */
+export function seedFarmerVoices(): SeedFarmerVoice[] {
+  return SEED_FARMER_VOICES.map((voice, i) => ({
+    _id: `${SEED_ID_PREFIX}farmer-voice-${i}`,
+    name: voice.name,
+    slug: { current: `farmer-voice-${i}` },
+    region: voice.region,
+    quote: voice.quote,
+  }));
+}
+
+// ---------------------------------------------------------------------------
+// テイスティングノート (飲んだ記録) — /ja/tasting-note
+// ---------------------------------------------------------------------------
+
+export type SeedTastingNote = {
+  id: string;
+  date: string;
+  title: string;
+  note: string;
+  mood: "again" | "matched" | "logged";
+  imageUrl: string;
+};
+
+/**
+ * `/ja/tasting-note` の見本記録 (計測用)。
+ *
+ * 飲んだ記録のバックエンドはまだ無い (`lib/` に karte / diary のデータ源が存在しない)。
+ * 素のままでは一覧が空で、確定版の DiaryCard を実寸計測できないため見本を返す。
+ *
+ * - フラグ未設定時 (= production / Vercel Preview の既定) は `null` を返すので、
+ *   描画は見本導入前と同じ (実データが無ければ「まだ記録がありません」の 1 行)
+ * - 文言・日付・手ざわりは R2 確定版 `8105:1125` / `8105:1262` の見本表記を
+ *   そのまま写した (8月26日 焙じ茶 — 秋摘み / 8月19日 水出し煎茶 — 八女 /
+ *   8月11日 白茶 — 月光白 / 8月3日 ほうじ玄米茶)。チップ 3 種
+ *   (また淹れたい / 合っていた / 記録だけ) が 1 画面で全部測れる並びになっている
+ * - `href` は付けない。記録の詳細ルートは R2 に無く、見本から 404 に飛ばさない
+ */
+export function seedTastingNotes(): SeedTastingNote[] | null {
+  if (!previewSeedEnabled()) return null;
+
+  const rows: Omit<SeedTastingNote, "id" | "imageUrl">[] = [
+    {
+      date: "8月26日",
+      title: "焙じ茶 — 秋摘み",
+      note: "夜の読書と。二煎目の甘さが残る",
+      mood: "again",
+    },
+    {
+      date: "8月19日",
+      title: "水出し煎茶 — 八女",
+      note: "素麺のあとに。青い香りが立つ",
+      mood: "matched",
+    },
+    {
+      date: "8月11日",
+      title: "白茶 — 月光白",
+      note: "湯上がりに。何もしない時間の味",
+      mood: "logged",
+    },
+    {
+      date: "8月3日",
+      title: "ほうじ玄米茶",
+      note: "朝の仕事前に。香ばしさで目が覚める",
+      mood: "matched",
+    },
+  ];
+
+  return rows.map((row, i) => ({
+    ...row,
+    id: `${SEED_ID_PREFIX}tasting-note-${i + 1}`,
+    imageUrl: previewImageForKey(`tasting-note-${i + 1}`),
+  }));
+}
+
+// ---------------------------------------------------------------------------
+// 著者ページ (People 詳細テンプレ / C14-1)
+// ---------------------------------------------------------------------------
+
+type SeedAuthorDetail = {
+  role?: string;
+  bio?: string;
+  website?: string;
+};
+
+/**
+ * People 詳細テンプレの Head は 肩書 (role) / 紹介文 (bio) / 外部リンク
+ * (website) の 3 行を持つが、production dataset の author はこの 3 つを
+ * どれも入力していない。フラグが立っているときだけ見本で埋めて、
+ * 確定版の縦リズムを実寸で確認できるようにする。
+ */
+const SEED_AUTHOR_DETAIL = {
+  role: "茶師 ／ roji の畑まわりを担う",
+  bio: "静岡・本山の茶園で育つ。祖父の代から続く手摘みの畑を受け継ぎ、標高と霧が茶葉に何をするのかを毎年書きとめている。roji では本山・川根の便りと、季節ごとの淹れ方を担当。",
+  website: "https://example.invalid/authors/preview",
+} as const;
+
+/**
+ * 未入力の Head フィールドを見本で埋めた著者ドキュメントを返す。
+ * フラグ未設定なら入力をそのまま返す (production は完全に無影響)。
+ */
+export function withSeedAuthorDetail<T extends SeedAuthorDetail & { name: string }>(
+  author: T,
+): T {
+  if (!previewSeedEnabled()) return author;
+
+  const s = SEED_AUTHOR_DETAIL;
+  return {
+    ...author,
+    role: author.role || s.role,
+    bio: author.bio || s.bio,
+    website: author.website || s.website,
+  };
 }

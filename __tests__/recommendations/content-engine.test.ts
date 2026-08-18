@@ -10,7 +10,15 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { scoreArticle, ArticleWithPersona } from "@/lib/recommendations/content-engine";
+import {
+  scoreArticle,
+  getStrategyCell,
+  CONTENT_STRATEGY_MATRIX,
+  SCORE_PERSONA_MATCH,
+  SCORE_DEPTH_MATCH,
+  SCORE_STRATEGY_BONUS,
+  ArticleWithPersona,
+} from "@/lib/recommendations/content-engine";
 
 // Helper to build minimal articles
 function makeArticle(overrides: Partial<ArticleWithPersona> = {}): ArticleWithPersona {
@@ -108,5 +116,66 @@ describe("scoreArticle", () => {
       });
       expect(scoreArticle(article, null, null)).toBe(0);
     });
+
+    // Same expectation as above, but expressed against the exported constants so a
+    // weight change in content-engine.ts is caught even if the literals here drift.
+    it("combined score equals the exported weight constants", () => {
+      const article = makeArticle({
+        contentPersona: ["explorer"],
+        depthLevel: "deep",
+      });
+      expect(scoreArticle(article, "explorer", "deep")).toBe(
+        SCORE_PERSONA_MATCH + SCORE_DEPTH_MATCH + SCORE_STRATEGY_BONUS,
+      );
+    });
+  });
+
+  describe("edge cases", () => {
+    it("scores 0 for an article with all fields absent", () => {
+      expect(scoreArticle(makeArticle(), "serenity", "entry")).toBe(0);
+    });
+
+    it("treats an empty contentPersona array as no persona", () => {
+      const article = makeArticle({ contentPersona: [], depthLevel: "entry" });
+      expect(scoreArticle(article, "serenity", "entry")).toBe(SCORE_DEPTH_MATCH);
+    });
+
+    it("ignores targetLayer even when its value collides with a depthLevel value", () => {
+      // Regression guard for the original bug: targetLayer="entry" used to match
+      // depthLevel="entry". targetLayer values are tea_lover/wellbeing/gourmet.
+      const article = makeArticle({ targetLayer: "entry" as unknown as string[] });
+      expect(scoreArticle(article, null, "entry")).toBe(0);
+    });
+  });
+});
+
+describe("CONTENT_STRATEGY_MATRIX", () => {
+  it("has exactly 9 cells (3 personas x 3 depths)", () => {
+    expect(CONTENT_STRATEGY_MATRIX).toHaveLength(9);
+  });
+
+  it("covers every persona x depth combination with themes and a description", () => {
+    const personas = ["serenity", "explorer", "sensory"] as const;
+    const depths = ["entry", "explore", "deep"] as const;
+
+    for (const persona of personas) {
+      for (const depth of depths) {
+        const cell = getStrategyCell(persona, depth);
+        expect(cell).toBeDefined();
+        expect(cell!.persona).toBe(persona);
+        expect(cell!.depth).toBe(depth);
+        expect(cell!.themes.length).toBeGreaterThan(0);
+        expect(cell!.description).toBeTruthy();
+      }
+    }
+  });
+
+  it("returns undefined for an unknown persona or depth", () => {
+    expect(
+      getStrategyCell("invalid" as Parameters<typeof getStrategyCell>[0], "entry"),
+    ).toBeUndefined();
+    expect(
+      getStrategyCell("serenity", "invalid" as Parameters<typeof getStrategyCell>[1]),
+    ).toBeUndefined();
   });
 });

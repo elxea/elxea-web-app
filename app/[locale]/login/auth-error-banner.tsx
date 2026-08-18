@@ -2,10 +2,14 @@
 
 import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
+import { AuthCardBanner } from "@/components/auth/auth-card";
 
 /**
  * P2-fix: Displays an error banner when `?error=<code>` is present in the URL.
  * Error codes are set by /api/line-callback when authentication fails.
+ *
+ * 見た目は Figma【R2: 確定版】AuthErrorBanner 5344:3 (状態枠 6706:14468) に従う =
+ * カード内・上部・h44 / destructive の細罫 + 同色テキスト。
  */
 
 const ERROR_KEY_MAP: Record<string, string> = {
@@ -28,11 +32,8 @@ export function AuthErrorBanner() {
   const messageKey = ERROR_KEY_MAP[errorCode] ?? "errorUnexpected";
 
   return (
-    <div
-      role="alert"
-      className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-center text-sm text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200"
-    >
+    <AuthCardBanner tone="error" role="alert">
       {t(messageKey)}
-    </div>
+    </AuthCardBanner>
   );
 }

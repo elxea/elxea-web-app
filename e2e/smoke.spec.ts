@@ -13,13 +13,15 @@ test.describe("Smoke tests", () => {
   test("homepage shows key sections", async ({ page }) => {
     await page.goto("/ja");
 
-    // Featured products section
-    await expect(page.getByText("おすすめ商品")).toBeVisible();
-
-    // Latest journal section
-    await expect(page.getByText("最新の記事")).toBeVisible();
-
-    // Upcoming events section is shown only when events exist in Sanity CMS (conditional)
+    /*
+     * 節名は C レーンのトップ再設計で変わった。「おすすめ商品」「最新の記事」は
+     * 存在しない (app/[locale]/page.tsx)。ここでは **無条件に描画される**節だけを
+     * 見る: TEA LEAVES (茶葉) と ELXEA — OVERVIEW (elxea でできること)。
+     * SEASONAL / CATEGORIES / JOURNAL / EVENT / VOICES は Sanity・Shopify の
+     * データ有無で出入りするので smoke では見ない (深さは各 spec が持つ)。
+     */
+    await expect(page.getByText("TEA LEAVES")).toBeVisible();
+    await expect(page.getByText("ELXEA — OVERVIEW")).toBeVisible();
   });
 
   test("root / redirects to /ja", async ({ page }) => {
@@ -40,18 +42,17 @@ test.describe("Smoke tests", () => {
     await expect(page.locator("h1")).toBeVisible();
   });
 
-  test.fixme("journal page loads", async ({ page }) => {
-    // FIXME: Sanity CMS content not available in CI — revisit when staging env has content
+  // Un-fixme'd 2026-08-07: CI does receive NEXT_PUBLIC_SANITY_PROJECT_ID with the
+  // production dataset, so the journal renders. Depth coverage lives in journal.spec.ts.
+  test("journal page loads", async ({ page }) => {
     await page.goto("/ja/journal");
     await expect(page.locator("h1")).toContainText("ジャーナル", {
       timeout: 15000,
     });
   });
 
-  test("farmers page loads", async ({ page }) => {
-    await page.goto("/ja/farmers");
-    await expect(page.locator("h1")).toBeVisible();
-  });
+  // 農家一覧 (/ja/farmers) は 2026-08-14 に廃止。農家詳細 (/ja/farmers/[slug])
+  // は存続するが、slug は Sanity の実データ依存なので smoke には載せない。
 
   test("events page loads", async ({ page }) => {
     await page.goto("/ja/events");
@@ -60,7 +61,10 @@ test.describe("Smoke tests", () => {
 
   test("about page loads", async ({ page }) => {
     await page.goto("/ja/about");
-    await expect(page.locator("h1")).toContainText("elxeaについて");
+    // h1 は節タイトルではなくリード見出し。ページ名「elxeaについて」は
+    // <title> とパンくずにあり、h1 ではない (C レーン確定版)。
+    await expect(page).toHaveTitle(/elxeaについて/);
+    await expect(page.locator("h1")).toContainText("日本各地の、小さな茶園から。");
   });
 
   test("faq page loads", async ({ page }) => {
@@ -75,11 +79,12 @@ test.describe("Navigation", () => {
   }) => {
     await page.goto("/ja");
 
-    // Desktop nav has products, journal, farmers, events links
+    // Desktop nav has products, journal, events links
+    // (農家 は一覧ページ廃止 2026-08-14 に伴い nav からも外した)
     const nav = page.locator("nav").first();
     await expect(nav.getByText("商品一覧")).toBeVisible();
     await expect(nav.getByText("ジャーナル")).toBeVisible();
-    await expect(nav.getByText("農家")).toBeVisible();
+    await expect(nav.getByText("農家")).toHaveCount(0);
     await expect(nav.getByText("イベント")).toBeVisible();
 
     // Click products link and verify navigation
@@ -132,7 +137,8 @@ test.describe("Footer", () => {
 
     await expect(footer.getByText("コンテンツ")).toBeVisible();
     await expect(footer.getByText("ジャーナル")).toBeVisible();
-    await expect(footer.getByText("農家")).toBeVisible();
+    // 農家一覧の廃止 (2026-08-14) でフッターからも外した。
+    await expect(footer.getByText("農家")).toHaveCount(0);
     await expect(footer.getByText("イベント")).toBeVisible();
   });
 

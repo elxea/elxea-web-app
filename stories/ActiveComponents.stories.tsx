@@ -45,9 +45,15 @@ const meta = {
     // Scoped a11y exception — color-contrast stays GLOBALLY ENABLED (.storybook/preview.ts).
     // This overview renders every component (tabs/alert/card/etc.), so it inherits the
     // known, pre-existing out-of-scope contrast violations (foreground on sand, opacity
-    // composites, destructive on sand) — NOT the muted-foreground token, which is fixed.
+    // composites) — NOT the muted-foreground token, which is fixed.
+    // C6-1R update: "destructive on sand" is no longer one of them — the token was
+    // restored to the Figma value #ae4751 and `card` is #f4f3ed (not sand), so
+    // destructive text now measures 4.521:1 on background / 4.944:1 on card.
     // Tracked for a 2nd-round Figma+code fix:
     // https://app.notion.com/p/39c70c9d064c812c86f2ec6b2a255184
+    // Re-verified 2026-08-07: re-enabling this rule still fails (pnpm vitest run --project storybook -> 22 stories fail color-contrast
+    // across these 6 files; e.g. tabs inactive label #969694 on #ebe9e0 = 2.43:1).
+    // The exception is NOT stale residue — do not remove it until the tracked token fix lands.
     a11y: { config: { rules: [{ id: "color-contrast", enabled: false }] } },
   },
   decorators: [

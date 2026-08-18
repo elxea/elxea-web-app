@@ -6,6 +6,14 @@ import { Heart, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
+import {
+  AccountPanelEmpty,
+  AccountPanelList,
+  AccountPanelRow,
+  AccountPanelSection,
+  AccountPanelSkeleton,
+} from "@/components/account/account-panel";
+
 type FavoriteItem = {
   id: string;
   type: "product" | "article";
@@ -52,7 +60,7 @@ export function FavoritesSection({
           setItems(data.favorites ?? []);
         }
       } catch {
-        // Silently fail
+        // Silently fail — empty state is shown
       } finally {
         if (!cancelled) setIsLoading(false);
       }
@@ -93,39 +101,23 @@ export function FavoritesSection({
 
   if (isLoading) {
     return (
-      <section className="mb-12">
-        <h2 className="text-lg mb-6 pb-3 border-b border-border">{title}</h2>
-        <div className="space-y-3">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="flex items-center gap-4 py-3 animate-pulse">
-              <div className="w-14 h-14 bg-muted" />
-              <div className="flex-1 space-y-2">
-                <div className="h-4 bg-muted w-3/4" />
-                <div className="h-3 bg-muted w-1/2" />
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
+      <AccountPanelSection title={title}>
+        <AccountPanelSkeleton rows={3} thumbClassName="w-14 h-14" />
+      </AccountPanelSection>
     );
   }
 
   return (
-    <section className="mb-12">
-      <h2 className="text-lg mb-6 pb-3 border-b border-border">{title}</h2>
-
+    <AccountPanelSection title={title}>
       {items.length === 0 ? (
-        <div className="flex items-center gap-3 text-muted-foreground">
-          <Heart className="size-4" />
-          <p className="text-sm">{emptyMessage}</p>
-        </div>
+        <AccountPanelEmpty
+          icon={<Heart className="size-4" />}
+          message={emptyMessage}
+        />
       ) : (
-        <div className="space-y-1">
+        <AccountPanelList>
           {items.map((item) => (
-            <div
-              key={item.id}
-              className="flex items-center gap-4 py-3 border-b border-border"
-            >
+            <AccountPanelRow key={item.id} divided>
               <a
                 href={`/${locale}${baseUrl}/${item.targetId}`}
                 className="shrink-0"
@@ -168,10 +160,10 @@ export function FavoritesSection({
               >
                 <Trash2 className="size-3.5 text-muted-foreground" />
               </Button>
-            </div>
+            </AccountPanelRow>
           ))}
-        </div>
+        </AccountPanelList>
       )}
-    </section>
+    </AccountPanelSection>
   );
 }

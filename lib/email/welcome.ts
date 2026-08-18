@@ -1,5 +1,5 @@
 import { Resend } from "resend";
-import { getSiteUrl } from "@/lib/env";
+import { siteUrl } from "@/lib/site-url";
 
 let _resend: Resend | null = null;
 
@@ -15,7 +15,7 @@ function getResend(): Resend {
 }
 
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "info@elxea.com";
-const SITE_URL = getSiteUrl();
+const SITE_URL = siteUrl();
 
 type WelcomeEmailData = {
   customerEmail: string;
@@ -44,7 +44,7 @@ Start exploring:
 ${SITE_URL}/en
 
 If you have any questions, please don't hesitate to reach out.
-support@elxea.com
+info@elxea.com
 
 ---
 roji by elxea
@@ -71,7 +71,7 @@ roji は、日本各地の茶農家が丹精込めて育てたスペシャルテ
 ${SITE_URL}/ja
 
 ご不明な点がございましたら、お気軽にお問い合わせください。
-support@elxea.com
+info@elxea.com
 
 ---
 roji by elxea
@@ -97,7 +97,7 @@ function buildHtmlEmail(data: WelcomeEmailData): string {
         ],
         ctaText: "Start Exploring",
         ctaUrl: `${SITE_URL}/en`,
-        footerNote: "Questions? Email us at support@elxea.com",
+        footerNote: "Questions? Email us at info@elxea.com",
       }
     : {
         greeting: `${data.customerName} 様`,
@@ -114,7 +114,7 @@ function buildHtmlEmail(data: WelcomeEmailData): string {
         ctaText: "さっそく見てみる",
         ctaUrl: `${SITE_URL}/ja`,
         footerNote:
-          "ご不明な点は support@elxea.com までお気軽にお問い合わせください。",
+          "ご不明な点は info@elxea.com までお気軽にお問い合わせください。",
       };
 
   const listItems = content.items

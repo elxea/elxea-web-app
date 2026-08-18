@@ -43,9 +43,11 @@ test.describe("Search", () => {
     // Wait for search results to load (SSR may take a moment with Shopify API)
     await page.waitForLoadState("domcontentloaded");
 
-    // Should show either results count, products, or an error message
+    // Should show either results count, products, or an error message.
+    // 期待文言は messages/ja.json `search.results` = "{count} 件のお茶が見つかりました"。
+    // 旧 spec は "件の結果" を待っており実装 (c898d1e の本番コピー) と一致していなかった。
     const hasResultCount = await page
-      .getByText(/件の結果/)
+      .getByText(/件のお茶が見つかりました/)
       .isVisible({ timeout: 10000 })
       .catch(() => false);
     const hasProducts = await page
@@ -69,9 +71,12 @@ test.describe("Search", () => {
     await page.goto("/ja/search?q=xyznonexistent12345");
     await page.waitForLoadState("domcontentloaded");
 
-    // Should show 0 results or an error
+    // Should show the "no results" copy or an error.
+    // 実装は messages/ja.json `search.noResults`
+    // = "「{q}」に合うお茶は見つかりませんでした。…"。旧 spec の "0 件の結果" は
+    // どのロケールにも存在しない文言だった。
     const hasZeroResults = await page
-      .getByText("0 件の結果")
+      .getByText(/見つかりませんでした/)
       .isVisible({ timeout: 10000 })
       .catch(() => false);
     const hasError = await page

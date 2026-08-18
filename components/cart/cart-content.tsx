@@ -1,23 +1,43 @@
 "use client";
 
-import Image from "next/image";
 import { useTranslations } from "next-intl";
+
 import { useCart } from "./cart-context";
-import { formatPrice } from "@/lib/utils";
-import { Link } from "@/i18n/navigation";
+import { CartLine } from "./cart-line";
+import { OrderSummary } from "./order-summary";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
+import { bodySmClass } from "@/components/editorial/rule-list";
+import { Link } from "@/i18n/navigation";
 import { trackBeginCheckout, trackRemoveFromCart } from "@/lib/analytics";
+import { formatPrice, cn } from "@/lib/utils";
+import type { CartItem } from "@/lib/shopify/types";
 import { toast } from "sonner";
 
+/**
+ * CartContent —【R2: 確定版】カート 変A（部品ベース）6679:14041。
+ *
+ * - 商品あり (Figma `CartContent (Module) / State=filled` 6844:124 /
+ *   PC `CartBody` 6684:162 / SP 6686:14185)
+ * - 空カート (Figma `CartContent (Module) / State=empty` 6845:17103)
+ *
+ * 行部品は `CartLine`、サマリー枠は `OrderSummary`、数量ステッパは
+ * `components/ui/quantity-stepper.tsx` に切り出してある (Storybook / 将来の
+ * ミニカートで再利用するため)。本ファイルは Storefront Cart との配線のみを持つ。
+ *
+ * レイアウト (Figma 実測 → 実装):
+ * - PC `CartBody` 横並び gap 48 / items-start   → `lg:flex-row lg:items-start lg:gap-12`
+ * - SP 縦積み、明細 → サマリー gap 40           → `flex-col gap-10`
+ * - 明細は `divide-y divide-border` の 1px 罫線 (Figma `Divider` 6684:143 / 6686:14207)
+ */
 export function CartContent() {
   const t = useTranslations("common");
   const { cart, updateQuantity, removeFromCart, isPending } = useCart();
 
   if (!cart || cart.lines.length === 0) {
+    /* Figma 6845:17103 — 中央寄せ / 上下余白 80 / gap 24 / outline ボタン。 */
     return (
-      <div className="text-center py-20">
-        <p className="text-muted-foreground text-sm mb-6">{t("emptyCart")}</p>
+      <div className="flex flex-col items-center justify-center gap-6 py-20 text-center">
+        <p className={cn(bodySmClass, "text-muted-foreground")}>{t("emptyCart")}</p>
         <Button variant="outline" asChild>
           <Link href="/products">{t("products")}</Link>
         </Button>
@@ -26,171 +46,95 @@ export function CartContent() {
   }
 
   return (
-    <div className="flex flex-col lg:flex-row lg:items-start gap-8 lg:gap-12">
-      {/* Lines — left column */}
-      <div className="flex-1 min-w-0">
-      <div className="divide-y divide-border">
+    <div className="flex flex-col gap-10 lg:flex-row lg:items-start lg:gap-12">
+      <ul data-slot="cart-lines" className="divide-border min-w-0 flex-1 divide-y">
         {cart.lines.map((item) => (
-          <div key={item.id} className="py-6 flex gap-6">
-            {/* Image */}
-            {item.merchandise.product.featuredImage && (
-              <div className="w-20 h-20 bg-muted flex-shrink-0 rounded-md overflow-hidden">
-                <Image
-                  src={item.merchandise.product.featuredImage.url}
-                  alt={
-                    item.merchandise.product.featuredImage.altText ||
-                    item.merchandise.product.title
-                  }
-                  width={80}
-                  height={80}
-                  sizes="80px"
-                  className="w-full h-full object-cover"
-                />
-              </div>
+          <CartLine
+            key={item.id}
+            imageUrl={item.merchandise.product.featuredImage?.url}
+            imageAlt={
+              item.merchandise.product.featuredImage?.altText ||
+              item.merchandise.product.title
+            }
+            title={item.merchandise.product.title}
+            variantLabel={variantLabel(item)}
+            planLabel={
+              item.sellingPlanAllocation
+                ? `${t("subscription")}: ${item.sellingPlanAllocation.sellingPlan.name}`
+                : null
+            }
+            unitPrice={formatPrice(
+              item.merchandise.price.amount,
+              item.merchandise.price.currencyCode,
             )}
-
-            {/* Details */}
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">
-                {item.merchandise.product.title}
-              </p>
-              {item.merchandise.title !== "Default Title" && (
-                <p className="text-sm text-muted-foreground mt-0.5">
-                  {item.merchandise.title}
-                </p>
-              )}
-              {item.sellingPlanAllocation && (
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {item.sellingPlanAllocation.sellingPlan.name}
-                </p>
-              )}
-              <p className="text-sm mt-2">
-                {formatPrice(
-                  item.merchandise.price.amount,
-                  item.merchandise.price.currencyCode
-                )}
-              </p>
-
-              {/* Quantity */}
-              <div className="flex items-center gap-1 mt-3">
-                <Button
-                  variant="outline"
-                  size="icon-xs"
-                  onClick={() =>
-                    updateQuantity(
-                      item.id,
-                      item.merchandise.id,
-                      item.quantity - 1
-                    )
-                  }
-                  disabled={isPending}
-                  aria-label={`${t("quantity")} -1`}
-                >
-                  -
-                </Button>
-                <span className="text-sm w-8 text-center" aria-label={t("quantity")}>
-                  {item.quantity}
-                </span>
-                <Button
-                  variant="outline"
-                  size="icon-xs"
-                  onClick={() =>
-                    updateQuantity(
-                      item.id,
-                      item.merchandise.id,
-                      item.quantity + 1
-                    )
-                  }
-                  disabled={isPending}
-                  aria-label={`${t("quantity")} +1`}
-                >
-                  +
-                </Button>
-              </div>
-            </div>
-
-            {/* Remove + Line total */}
-            <div className="flex flex-col items-end justify-between">
-              <Button
-                variant="link"
-                size="sm"
-                className="text-muted-foreground h-auto p-0"
-                onClick={async () => {
-                  trackRemoveFromCart({
-                    id: item.merchandise.id,
-                    name: item.merchandise.product.title,
-                    price: parseFloat(item.merchandise.price.amount),
-                    currency: item.merchandise.price.currencyCode,
-                    quantity: item.quantity,
-                  });
-                  await removeFromCart(item.id);
-                  toast(t("removedFromCart"));
-                }}
-                disabled={isPending}
-              >
-                {t("remove")}
-              </Button>
-              <p className="text-sm">
-                {formatPrice(
-                  item.cost.totalAmount.amount,
-                  item.cost.totalAmount.currencyCode
-                )}
-              </p>
-            </div>
-          </div>
-        ))}
-      </div>
-      </div>
-
-      {/* Order summary — right column */}
-      <div className="w-full lg:w-[360px] lg:shrink-0">
-      <div className="rounded-lg border border-border bg-card p-6">
-        <h2 className="text-sm font-medium mb-4">{t("orderSummary")}</h2>
-        <div className="flex justify-between mb-3">
-          <p className="text-sm">{t("subtotal")}</p>
-          <p className="text-sm font-medium">
-            {formatPrice(
-              cart.cost.subtotalAmount.amount,
-              cart.cost.subtotalAmount.currencyCode
+            linePrice={formatPrice(
+              item.cost.totalAmount.amount,
+              item.cost.totalAmount.currencyCode,
             )}
-          </p>
-        </div>
-
-        <Separator className="my-3" />
-
-        <div className="flex justify-between mb-6">
-          <p className="text-sm">{t("total")}</p>
-          <p className="text-sm font-medium">
-            {formatPrice(
-              cart.cost.totalAmount.amount,
-              cart.cost.totalAmount.currencyCode
-            )}
-          </p>
-        </div>
-
-        <Button
-          size="lg"
-          className="w-full h-12"
-          asChild
-          onClick={() => {
-            trackBeginCheckout(
-              cart.lines.map((item) => ({
+            quantity={item.quantity}
+            disabled={isPending}
+            quantityLabel={t("quantity")}
+            removeLabel={t("remove")}
+            onQuantityChange={(next) =>
+              updateQuantity(item.id, item.merchandise.id, next)
+            }
+            onRemove={async () => {
+              trackRemoveFromCart({
                 id: item.merchandise.id,
                 name: item.merchandise.product.title,
                 price: parseFloat(item.merchandise.price.amount),
+                currency: item.merchandise.price.currencyCode,
                 quantity: item.quantity,
-              })),
-              cart.cost.subtotalAmount.currencyCode,
-              parseFloat(cart.cost.subtotalAmount.amount)
-            );
-          }}
-        >
-          <a href={cart.checkoutUrl}>
-            {t("checkout")}
-          </a>
-        </Button>
-      </div>
-      </div>
+              });
+              await removeFromCart(item.id);
+              toast(t("removedFromCart"));
+            }}
+          />
+        ))}
+      </ul>
+
+      <OrderSummary
+        heading={t("orderSummary")}
+        subtotalLabel={t("subtotal")}
+        subtotal={formatPrice(
+          cart.cost.subtotalAmount.amount,
+          cart.cost.subtotalAmount.currencyCode,
+        )}
+        totalLabel={t("total")}
+        total={formatPrice(
+          cart.cost.totalAmount.amount,
+          cart.cost.totalAmount.currencyCode,
+        )}
+        checkoutLabel={t("checkout")}
+        checkoutUrl={cart.checkoutUrl}
+        onCheckout={() =>
+          trackBeginCheckout(
+            cart.lines.map((item) => ({
+              id: item.merchandise.id,
+              name: item.merchandise.product.title,
+              price: parseFloat(item.merchandise.price.amount),
+              quantity: item.quantity,
+            })),
+            cart.cost.subtotalAmount.currencyCode,
+            parseFloat(cart.cost.subtotalAmount.amount),
+          )
+        }
+      />
     </div>
   );
+}
+
+/**
+ * Figma の「内容量: 100g」行。Shopify の `selectedOptions` をそのまま
+ * `名前: 値` で並べる (ラベルをコードに焼かない)。単一バリアント商品は
+ * Shopify が `Title / Default Title` を返すので落とす。
+ */
+function variantLabel(item: CartItem): string | null {
+  const options = item.merchandise.selectedOptions.filter(
+    (option) => option.name !== "Title" && option.value !== "Default Title",
+  );
+  if (options.length > 0) {
+    return options.map((option) => `${option.name}: ${option.value}`).join(" / ");
+  }
+  return item.merchandise.title !== "Default Title" ? item.merchandise.title : null;
 }

@@ -39,8 +39,8 @@ stories/
 
 ### Storybook 起動
 ```bash
-pnpm storybook          # dev server (port 6006)
-pnpm build-storybook    # static build
+pnpm design-catalog     # elxea Design System カタログ dev server (port 6006)
+pnpm build:design-catalog    # static build
 ```
 
 ### コンポーネント使用状況の確認
