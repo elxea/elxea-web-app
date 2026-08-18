@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import createMiddleware from "next-intl/middleware";
 import { routing } from "./i18n/routing";
+import {
+  resolveSiteGateMode,
+  SITE_GATE_DENY_BODY,
+  SITE_GATE_DENY_HEADERS,
+  SITE_GATE_DENY_STATUS,
+} from "./lib/site-gate";
 
 const intlMiddleware = createMiddleware(routing);
 
@@ -28,20 +34,6 @@ async function hashSitePasswordEdge(password: string): Promise<string> {
 }
 
 /**
- * Vercel Preview デプロイではサイトパスワード gate を掛けない。
- *
- * Preview URL は Setaka / エージェントのレビュー用テスト環境で、その URL 自体が
- * 推測不能な一意文字列 (Vercel が発行) であることが到達制限になっている。ここで
- * さらにパスワード画面を挟むと、レビューのたびに手動ログインが必要になり
- * 「オーナーに手動操作を求めない」原則に反する。production (`VERCEL_ENV=production`)
- * と、ローカルを含むそれ以外の環境では従来どおり SITE_PASSWORD が効く。
- *
- * env の追加ではなく Vercel が自動注入する `VERCEL_ENV` だけで判定するので、
- * ダッシュボード操作なしにコードだけで完結する。
- */
-const IS_VERCEL_PREVIEW = process.env.VERCEL_ENV === "preview";
-
-/**
  * 本番 (`VERCEL_ENV=production`) かどうか。`/dev/*` を本番だけ閉じるために使う。
  *
  * Preview と同じく Vercel が自動注入する値だけで判定するので、ダッシュボード
@@ -50,13 +42,37 @@ const IS_VERCEL_PREVIEW = process.env.VERCEL_ENV === "preview";
  */
 const IS_VERCEL_PRODUCTION = process.env.VERCEL_ENV === "production";
 
+/**
+ * gate の掛け方は `lib/site-gate.ts` の純関数が決める (判定理由と fail-closed の
+ * 根拠はそちらのコメントを参照)。ここは決まったモードを HTTP に落とすだけ。
+ * `VERCEL_ENV` / `SITE_PASSWORD` はビルド時に埋め込まれる静的な値なので、
+ * モジュール読み込み時に一度だけ解決する。
+ */
+const SITE_GATE_MODE = resolveSiteGateMode({
+  SITE_PASSWORD,
+  VERCEL_ENV: process.env.VERCEL_ENV,
+});
+
 async function checkSitePassword(request: NextRequest): Promise<NextResponse | null> {
-  if (!SITE_PASSWORD) return null;
-  if (IS_VERCEL_PREVIEW) return null;
+  if (SITE_GATE_MODE === "open") return null;
+
+  if (SITE_GATE_MODE === "deny") {
+    // 本番なのに SITE_PASSWORD が無い = 設定事故。以前はここで素通りしていた
+    // ため、env が消えた瞬間に未公開サイト全体が誰でも見られる状態になった。
+    // 免除パス (/liff, /link 等) より手前で閉じる: 設定が壊れているときに
+    // 例外だけ開いても意味が無く、判定を通すほど漏れ口が増えるため。
+    return new NextResponse(SITE_GATE_DENY_BODY, {
+      status: SITE_GATE_DENY_STATUS,
+      headers: SITE_GATE_DENY_HEADERS,
+    });
+  }
+
+  // 以降は "require-password"。ここに来た時点で SITE_PASSWORD は必ず非空。
+  const sitePassword = SITE_PASSWORD as string;
 
   const authCookie = request.cookies.get("site_auth")?.value;
   if (authCookie) {
-    const expectedHash = await hashSitePasswordEdge(SITE_PASSWORD);
+    const expectedHash = await hashSitePasswordEdge(sitePassword);
     if (authCookie === expectedHash) return null;
   }
 
