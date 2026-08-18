@@ -19,17 +19,29 @@
 //                 --meta githubCommitSha=<sha> を付けるので、その meta を読む。
 //                 CLI の `vercel inspect` は meta を落とすため REST API を使う。
 //
-// 判定 (status):
-//   in_sync            本番 SHA == origin/main HEAD
-//   drift              本番 SHA != origin/main HEAD (認識割れ / 未反映 / 手動デプロイ)
-//   rollback_suspected 本番が最新 READY デプロイでない (Vercel ロールバック仕様の疑い)
-//   unknown            SHA を確定できない (token 無し / meta 未付与の旧デプロイ 等)
+// 判定 (status) — 判定ロジックの実体は lib/prod-main-sync-verdict.mjs (純関数):
+//   in_sync            本番 SHA == origin/main HEAD          (verified=true)
+//   drift              本番 SHA != origin/main HEAD          (verified=true)
+//   rollback_suspected 本番が最新 READY デプロイでない        (verified=true)
+//   unverifiable       照合そのものができなかった            (verified=false)
+//
+//   重要: `unverifiable` は「異常なし」ではない。2026-08-18、VERCEL_TOKEN が
+//   無い間この監視は旧 status=unknown を返し、--fail-on-drift 付きでも exit 0 を
+//   返し続けていた。その結果 259 commit 分のズレが誰にも気付かれなかった。
+//   「検証していない」を「検証して問題なかった」と同じ緑で表現しない。
 //
 // 出力:
-//   - stdout に JSON レポート
+//   - stdout に JSON レポート (schema v2: status に加えて verified / unverifiableCause)
+//   - stderr に 1 行の見出し ([OK] / [FAIL] / [SKIP])
 //   - --state-out <path> 指定時、状態ファイルを書き出す
-//     (セッション配布用。既定の配布先は docs 参照。ローカル実行で使う)
-//   - --fail-on-drift 指定時、status が in_sync / unknown 以外なら exit 1 (CI 用)
+//
+// 終了コード:
+//   0  in_sync (照合して一致)                     ※ --fail-on-drift 無しなら常に 0
+//   1  drift / rollback_suspected (照合して異常)
+//   2  スクリプト自体の例外
+//   3  unverifiable (照合できなかった) — fail-closed の既定
+//      --unverifiable-exit <n> で明示的に変更可 (例: 0 にすると従来の緑に戻るが、
+//      その選択はコマンドラインに残り監査できる)
 //
 // 使い方:
 //   node scripts/ops/check-prod-main-sync.mjs
@@ -47,6 +59,14 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { homedir } from 'node:os';
+
+import {
+  EXIT_CODES,
+  classifySync,
+  exitCodeFor,
+  summarizeAhead,
+  verdictBanner,
+} from './lib/prod-main-sync-verdict.mjs';
 
 const args = process.argv.slice(2);
 const getFlag = (name) => args.includes(name);
@@ -91,8 +111,13 @@ function getMainHeadSha() {
 // ---------------------------------------------------------------------------
 // Vercel REST API
 // ---------------------------------------------------------------------------
+// テスト用の seam: 既定は本番 API。VERCEL_API_BASE を差し替えるとローカルの
+// スタブに向けられるので、実際の exit code (正常 / ずれあり / 検証不能) を
+// 本番に触れずに end-to-end で実測できる。CI / 運用では未設定のまま。
+const VERCEL_API_BASE = process.env.VERCEL_API_BASE || 'https://api.vercel.com';
+
 function vercelUrl(path, params = {}) {
-  const u = new URL(`https://api.vercel.com${path}`);
+  const u = new URL(`${VERCEL_API_BASE}${path}`);
   if (VERCEL_ORG_ID) u.searchParams.set('teamId', VERCEL_ORG_ID);
   for (const [k, v] of Object.entries(params)) u.searchParams.set(k, String(v));
   return u.toString();
@@ -144,10 +169,6 @@ async function getProductionState() {
 //
 // 戻り値: { ahead, ignoredOnly, changed } / git で判定不能なら null
 // ---------------------------------------------------------------------------
-function isIgnoredPath(p) {
-  return p.endsWith('.md') || p.startsWith('docs/') || p === 'LICENSE';
-}
-
 function mainAheadState(prodSha, mainSha) {
   try {
     // prod が main の祖先か (= main が prod より進んでいる)
@@ -164,7 +185,7 @@ function mainAheadState(prodSha, mainSha) {
       stdio: ['ignore', 'pipe', 'ignore'],
     }).trim();
     const changed = out ? out.split('\n').filter(Boolean) : [];
-    return { ahead: true, ignoredOnly: changed.length > 0 && changed.every(isIgnoredPath), changed };
+    return summarizeAhead(changed);
   } catch {
     return null;
   }
@@ -191,42 +212,33 @@ async function run() {
 
   const prodSha = prod?.liveSha || null;
 
-  let status;
-  let reason;
-  if (!mainSha) {
-    status = 'unknown';
-    reason = 'could not resolve origin/main HEAD (gh/git unavailable)';
-  } else if (!prodSha) {
-    status = 'unknown';
-    reason = prodError
-      ? `production SHA unavailable: ${prodError}`
-      : 'production deployment has no git SHA meta yet (deploy.yml --meta must land + one deploy)';
-  } else if (prod && prod.isLiveNewest === false) {
-    status = 'rollback_suspected';
-    reason = 'live production deployment is not the newest READY deployment (Vercel rollback turns off auto-assign)';
-  } else if (prodSha === mainSha) {
-    status = 'in_sync';
-    reason = 'production SHA matches origin/main HEAD';
-  } else {
-    // main が prod より進んでいて、その差分が deploy.yml の paths-ignore
-    // (docs/md/LICENSE) だけなら、本番デプロイは意図的にスキップされている =
-    // 正常。false drift を防ぐ。git で判定できないときのみ drift 扱い。
-    const ahead = mainAheadState(prodSha, mainSha);
-    if (ahead && ahead.ignoredOnly) {
-      status = 'in_sync';
-      reason = `main is ahead of production by deploy-ignored paths only (docs/md/LICENSE); no deploy expected. changed=${ahead.changed.length}`;
-    } else {
-      status = 'drift';
-      reason = 'production SHA differs from origin/main HEAD';
-    }
-  }
+  // main が prod より進んでいて、その差分が deploy の paths-ignore
+  // (docs/md/LICENSE) だけなら、本番デプロイは意図的にスキップされている = 正常。
+  // false drift を防ぐ。git で判定できないときは null (= drift 扱い) にする。
+  const aheadState = mainSha && prodSha && prodSha !== mainSha ? mainAheadState(prodSha, mainSha) : null;
+
+  // 判定は純関数へ (scripts/ops/lib/prod-main-sync-verdict.mjs)。
+  // I/O と分離してあるので fixture で 3 パターンを回帰テストできる。
+  const verdict = classifySync({
+    mainSha,
+    prodSha,
+    tokenPresent: Boolean(VERCEL_TOKEN),
+    prodError,
+    liveIsNewest: prod?.isLiveNewest ?? null,
+    aheadState,
+  });
 
   const report = {
-    schema: 'elxea-prod-main-sync/v1',
+    // v2: `unknown` を廃止し `unverifiable` + `verified` に分離した。
+    // v1 の消費側は status==='unknown' を見ていたので schema を上げて気付かせる。
+    schema: 'elxea-prod-main-sync/v2',
     checkedAt: now,
     repo: GH_REPO,
-    status,
-    reason,
+    status: verdict.status,
+    // 「照合を実際に行ったか」。false のとき status は正常判定ではなく「不明」。
+    verified: verdict.verified,
+    unverifiableCause: verdict.unverifiableCause,
+    reason: verdict.reason,
     mainHeadSha: mainSha,
     productionSha: prodSha,
     productionDeploymentId: prod?.liveId || null,
@@ -234,13 +246,12 @@ async function run() {
     liveIsNewest: prod?.isLiveNewest ?? null,
     // SoT / runbook: docs/ops/production-source-of-truth.md
     sourceOfTruth: 'main',
-    remediation:
-      status === 'in_sync' || status === 'unknown'
-        ? null
-        : 'docs/ops/production-source-of-truth.md — 24h 以内に是正 (再デプロイ or Undo)。Boss へエスカレ',
+    // 検証不能にも必ず remediation が付く (v1 は null だったので放置されていた)。
+    remediation: verdict.remediation,
   };
 
   console.log(JSON.stringify(report, null, 2));
+  console.error(verdictBanner(verdict));
 
   const stateOut = getOpt('--state-out', null);
   if (stateOut) {
@@ -250,12 +261,22 @@ async function run() {
     console.error(`state written: ${p}`);
   }
 
-  if (getFlag('--fail-on-drift') && status !== 'in_sync' && status !== 'unknown') {
-    process.exitCode = 1;
-  }
+  // ゲート実行 (--fail-on-drift) では検証不能を緑にしない = fail-closed。
+  // 恒久的に武装できない環境で赤を出し続けたい場合だけ、呼び出し側が
+  // --unverifiable-exit 0 を明示する (その判断がコマンドラインに残る)。
+  const rawUnverifiableExit = getOpt('--unverifiable-exit', null);
+  const unverifiableExit =
+    rawUnverifiableExit !== null && /^\d+$/.test(rawUnverifiableExit)
+      ? Number(rawUnverifiableExit)
+      : EXIT_CODES.UNVERIFIABLE;
+
+  process.exitCode = exitCodeFor(verdict, {
+    failOnDrift: getFlag('--fail-on-drift'),
+    unverifiableExit,
+  });
 }
 
 run().catch((e) => {
   console.error('check-prod-main-sync failed:', e);
-  process.exitCode = 2;
+  process.exitCode = EXIT_CODES.CRASH;
 });
