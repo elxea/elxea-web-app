@@ -1,8 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import createMiddleware from "next-intl/middleware";
 import { routing } from "./i18n/routing";
+import { defaultLocale, disabledLocales } from "./i18n/config";
 
 const intlMiddleware = createMiddleware(routing);
+
+/**
+ * 公開を止めている locale の接頭辞にだけ当たる正規表現。`disabledLocales` が
+ * 空 (= 全 locale 公開) のときは `null` にする。空配列から素朴に
+ * `^/(?:)(?=/|$)` を組むと**全 path に一致**して全ページを既定 locale へ
+ * 飛ばしてしまうため、正規表現そのものを作らない。
+ */
+const DISABLED_LOCALE_PREFIX =
+  disabledLocales.length > 0
+    ? new RegExp(`^/(?:${disabledLocales.join("|")})(?=/|$)`)
+    : null;
 
 const SITE_PASSWORD = process.env.SITE_PASSWORD;
 
@@ -129,12 +141,23 @@ export default async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Redirect /en/* to /ja/* (English content not ready yet)
-  if (pathname.startsWith("/en")) {
-    const jaPath = pathname.replace(/^\/en/, "/ja") || "/ja";
-    const redirectUrl = new URL(jaPath, request.url);
-    redirectUrl.search = request.nextUrl.search;
-    return NextResponse.redirect(redirectUrl, 301);
+  // 公開を止めている locale (`i18n/config.ts` の `enabledLocales` が正本) を
+  // 既定 locale へ 301 で寄せる。主系は `next.config.ts` の `redirects()` で、
+  // こちらは多層防御。
+  //
+  // 旧実装は `pathname.startsWith("/en")` だったが、これは `/entry` のような
+  // **`en` で始まるだけの path** まで巻き込んで `/jatry` へ飛ばす。セグメント
+  // 境界 (`/` か終端) を見るようにして塞いだ。
+  if (DISABLED_LOCALE_PREFIX) {
+    const match = pathname.match(DISABLED_LOCALE_PREFIX);
+    if (match) {
+      const redirectUrl = new URL(
+        pathname.replace(DISABLED_LOCALE_PREFIX, `/${defaultLocale}`),
+        request.url,
+      );
+      redirectUrl.search = request.nextUrl.search;
+      return NextResponse.redirect(redirectUrl, 301);
+    }
   }
 
   // Check if this is an /account route that needs auth
