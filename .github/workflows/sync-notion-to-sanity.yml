@@ -74,6 +74,14 @@ jobs:
     name: sync
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      # 秘密ではない (deploy-production / prod-main-sync と同値。.vercel/project.json 由来)。
+      VERCEL_ORG_ID: team_6ut7roUVtRU2EGbPVR9DNTy6
+      VERCEL_PROJECT_ID: prj_sVwjaJwPAKxRcKu3wVejiqGPt5o6
+      # 既存のデプロイ経路と同じバージョンに固定 (CLI の patch で挙動が変わる事故を避ける)。
+      VERCEL_CLI_VERSION: "58.9.4"
+      # 既に登録済みの 1 本。これ以外の新規登録は不要。
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
     outputs:
       outcome: ${{ steps.run.outputs.outcome }}
       summary: ${{ steps.run.outputs.summary }}
@@ -93,9 +101,67 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # ── 認証情報の出どころ ──────────────────────────────────────────────────
+      # この workflow が要る 4 つの値 (NOTION_API_KEY / NOTION_CONTENT_HUB_DB_ID /
+      # NEXT_PUBLIC_SANITY_PROJECT_ID / SANITY_API_WRITE_TOKEN) は、**本番サイトが
+      # 動いている以上 Vercel の production 環境変数に既にある**。にもかかわらず
+      # GitHub Secrets にも同じものを登録させていたので、オーナーの手作業なしには
+      # 一度も動かせなかった。
+      #
+      # そこで既存の VERCEL_TOKEN (deploy と prod-main-sync が既に使っている
+      # 1 本) で Vercel から引く。**新しく登録してもらう秘密はゼロ**。
+      # エージェントは値に触れない — 引いた先はランナー上の一時ファイルで、
+      # 中身はログにも argv にも出さない (下でマスクする)。
+      - name: Install Vercel CLI
+        run: npm install --global "vercel@${VERCEL_CLI_VERSION}"
+
+      - name: Report which credentials exist where (names only)
+        # 値は出さない。名前と有無だけ。これで「あと何件オーナー登録が要るか」が
+        # 実行するだけで分かる (推測しない)。
+        run: |
+          {
+            echo "## 認証情報の所在 (名前のみ・値は出さない)"
+            echo ""
+            if [ -z "${VERCEL_TOKEN}" ]; then
+              echo "- VERCEL_TOKEN: **未登録** — Vercel から引けないため GitHub Secrets が必要"
+            else
+              echo "- VERCEL_TOKEN: 登録済み"
+              echo ""
+              echo '### Vercel (production) にある環境変数名'
+              echo '```'
+              vercel env ls production 2>&1 | sed -E 's/[[:space:]]{2,}/ /g' || echo "(取得失敗)"
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Pull credentials from Vercel (production)
+        if: env.VERCEL_TOKEN != ''
+        env:
+          SYNC_ENV_FILE: ${{ runner.temp }}/vercel-production.env
+        # `vercel env pull` はランナー上の一時ファイルへ dotenv 形式で書き出す。
+        # 書き出した値は即座に ::add-mask:: へ渡し、以降ログに出ても伏せ字になる。
+        # 値を変数展開してコマンドラインに置くことはしない。
+        run: |
+          set -euo pipefail
+          vercel env pull "$SYNC_ENV_FILE" --environment=production --yes
+          chmod 600 "$SYNC_ENV_FILE"
+          # 値をマスク登録する (この echo だけが値に触れる。GitHub が以後伏せる)
+          while IFS= read -r line; do
+            case "$line" in ''|'#'*) continue ;; esac
+            value="${line#*=}"
+            value="${value%\"}"
+            value="${value#\"}"
+            [ -n "$value" ] && echo "::add-mask::$value"
+          done < "$SYNC_ENV_FILE"
+          echo "pulled $(grep -cE '^[A-Za-z_][A-Za-z0-9_]*=' "$SYNC_ENV_FILE" || true) variables from Vercel production"
+
       - name: Run sync
         id: run
         env:
+          # 優先順位: GitHub Secrets (登録されていれば) > Vercel から引いた値。
+          # 未登録の secret は空文字になり、scripts/lib/sync-env.ts が空を
+          # 「未設定」とみなして SYNC_ENV_FILE 側へフォールバックする。
+          SYNC_ENV_FILE: ${{ runner.temp }}/vercel-production.env
           # 値は GitHub Secrets にのみ存在する。ここには名前しか書かない。
           NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
           NOTION_CONTENT_HUB_DB_ID: ${{ secrets.NOTION_CONTENT_HUB_DB_ID }}

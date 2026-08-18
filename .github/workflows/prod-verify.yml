@@ -1,0 +1,108 @@
+name: prod-verify
+
+# 本番で「何が配信されているか」を、サイトパスワードなしで確かめる。
+#
+# 既存の prod-main-sync.yml との違い:
+#   - prod-main-sync は **Vercel の API** が持つデプロイのメタ情報を見る
+#     (「Vercel はこの SHA をデプロイしたと言っている」)
+#   - こちらは **公開ドメインが実際に返すもの** を見る
+#     (「elxea.com が今この SHA を配信している」)
+#   両方あって初めて、alias のずれ・ロールバック・古い面が生き残る事故を捕まえられる。
+#
+# 認証情報は一切要らない (`/api/version` は認証なしで状態だけを返す)。
+# サイトパスワードは触っていない — このワークフローは中身を一切取得しない。
+
+on:
+  # 本番デプロイは CI ワークフローの deploy-production job で行われる。
+  # その run が終わったら、配信面が本当に入れ替わったかを確かめる。
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+  # エージェント / 人がいつでも叩ける口 (gh workflow run prod-verify.yml)
+  workflow_dispatch:
+    inputs:
+      expect_sha:
+        description: "期待する commit SHA (空なら origin/main HEAD)"
+        type: string
+        default: ""
+  schedule:
+    # JST 09:40 / 21:40。デプロイと無関係に「古いまま生きている」状態を拾う。
+    - cron: "40 0,12 * * *"
+
+concurrency:
+  group: prod-verify
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: verify-production
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # workflow_run 起点でも「そのとき main にあった SHA」を解決したいので全履歴。
+          fetch-depth: 0
+          ref: main
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Resolve expected SHA
+        id: expected
+        run: |
+          if [ -n "${{ inputs.expect_sha }}" ]; then
+            sha="${{ inputs.expect_sha }}"
+          elif [ -n "${{ github.event.workflow_run.head_sha }}" ]; then
+            sha="${{ github.event.workflow_run.head_sha }}"
+          else
+            sha="$(git rev-parse origin/main)"
+          fi
+          echo "sha=${sha}" >> "$GITHUB_OUTPUT"
+          echo "expected: ${sha}"
+
+      - name: Verify what production is actually serving
+        id: verify
+        # デプロイ完了直後は配信面の入れ替わりに数十秒かかることがある。
+        # 「一度見て違ったから赤」ではなく、猶予を持って収束を待つ。
+        # 収束しなければ最後の結果で失敗する (握りつぶさない)。
+        run: |
+          set +e
+          attempt=0
+          max_attempts=10
+          while [ "$attempt" -lt "$max_attempts" ]; do
+            attempt=$((attempt + 1))
+            node scripts/ops/verify-production.mjs \
+              --expect-sha "${{ steps.expected.outputs.sha }}" \
+              --json > verify-report.json
+            code=$?
+            if [ "$code" -eq 0 ]; then
+              echo "converged on attempt ${attempt}"
+              break
+            fi
+            echo "attempt ${attempt}/${max_attempts} not converged (exit ${code})"
+            [ "$attempt" -lt "$max_attempts" ] && sleep 30
+          done
+          cat verify-report.json
+          echo "exit_code=${code}" >> "$GITHUB_OUTPUT"
+          exit "$code"
+
+      - name: Summarize
+        if: always()
+        run: |
+          {
+            echo "## prod verify (何が配信されているか)"
+            echo ""
+            echo "expected SHA: \`${{ steps.expected.outputs.sha }}\`"
+            echo ""
+            echo '```json'
+            cat verify-report.json 2>/dev/null || echo "(no report)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import createMiddleware from "next-intl/middleware";
 import { routing } from "./i18n/routing";
+import { BUILD_HEADER, BUILD_SHA_SHORT } from "./lib/build-info";
 
 const intlMiddleware = createMiddleware(routing);
 
@@ -87,7 +88,23 @@ async function checkSitePassword(request: NextRequest): Promise<NextResponse | n
   return NextResponse.redirect(passwordUrl);
 }
 
+/**
+ * 全レスポンスに「どのビルドが応答したか」を刻む。
+ *
+ * 本番はサイトパスワードで守られているため、ページ本体は認証なしでは 307 しか
+ * 返らない。その 307 にもこのヘッダーが乗るので、**中身を一切見せずに**
+ * 「主要ルートが応答している」ことと「それがどのビルドか」を同時に確認できる。
+ * これが無いと「200 (や 307) は返るが中身は 14 時間前のデプロイ」を検知できない。
+ *
+ * 出す値は短縮 SHA だけ (`/api/version` が返すものと同一)。中身・データは含まない。
+ */
 export default async function middleware(request: NextRequest) {
+  const response = await route(request);
+  response.headers.set(BUILD_HEADER, BUILD_SHA_SHORT);
+  return response;
+}
+
+async function route(request: NextRequest): Promise<NextResponse> {
   const { pathname } = request.nextUrl;
 
   // Site-wide password protection (staging/preview)

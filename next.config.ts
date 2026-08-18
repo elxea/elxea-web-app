@@ -1,10 +1,57 @@
+import { execSync } from "node:child_process";
 import { withSentryConfig } from "@sentry/nextjs";
 import type { NextConfig } from "next";
 import createNextIntlPlugin from "next-intl/plugin";
 
 const withNextIntl = createNextIntlPlugin("./i18n/request.ts");
 
+/**
+ * 配信中のビルドを特定するための値を、**ビルド時に**焼き込む。
+ *
+ * なぜ実行時の環境変数ではなくビルド時なのか: 本番は Vercel 上でソースから
+ * ビルドされる。実行時に読める値だけに頼ると「どのコミットのコードが動いているか」
+ * を後から確定できない。ここで文字列として埋め込めば、そのビルドの事実が
+ * コードと一緒に配信される (`lib/build-info.ts` 参照)。
+ *
+ * SHA の解決順序 (先に見つかったものを採用):
+ *   1. VERCEL_GIT_COMMIT_SHA — Vercel が git メタデータから注入する
+ *   2. GITHUB_SHA           — GitHub Actions のランナー上でビルドする場合
+ *   3. `git rev-parse HEAD` — ローカル開発
+ *   4. "unknown"            — 上のどれも取れないとき
+ *
+ * 4 を握りつぶさないこと。検証側 (`scripts/ops/verify-production.mjs`) は
+ * "unknown" を成功ではなく **検証不能 (fail-closed)** として扱う。
+ */
+function resolveBuildSha(): string {
+  const fromEnv =
+    process.env.VERCEL_GIT_COMMIT_SHA?.trim() || process.env.GITHUB_SHA?.trim();
+  if (fromEnv) return fromEnv;
+
+  try {
+    return execSync("git rev-parse HEAD", {
+      encoding: "utf-8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+  } catch {
+    return "unknown";
+  }
+}
+
+const BUILD_SHA = resolveBuildSha();
+const BUILD_TIME = new Date().toISOString();
+const BUILD_ENV =
+  process.env.VERCEL_ENV ||
+  (process.env.NODE_ENV === "production" ? "production" : "development");
+const BUILD_DEPLOYMENT_ID = process.env.VERCEL_DEPLOYMENT_ID || "unknown";
+
 const nextConfig: NextConfig = {
+  // 公開してよい「状態」だけ。秘密は絶対に足さないこと (ブラウザにも配信される)。
+  env: {
+    NEXT_PUBLIC_BUILD_SHA: BUILD_SHA,
+    NEXT_PUBLIC_BUILD_TIME: BUILD_TIME,
+    NEXT_PUBLIC_BUILD_ENV: BUILD_ENV,
+    NEXT_PUBLIC_BUILD_DEPLOYMENT_ID: BUILD_DEPLOYMENT_ID,
+  },
   /* Ring 2 (auth-flow e2e) runs the dev server behind a *fake apex*
    * `www.elxea.test` so that the production cookie-Domain branch
    * (`resolveCookieDomain()` → `.elxea.test`) actually executes. Chromium maps

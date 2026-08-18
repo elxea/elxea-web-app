@@ -25,13 +25,20 @@ import { join } from "path";
  * - A missing file is not an error: on a runner there is no `.env` at all.
  * - Skipped entirely when `CI` is set, so CI can never accidentally depend on
  *   a checked-in or leftover file.
+ * - **Exception**: when `SYNC_ENV_FILE` names a file explicitly, it is read even
+ *   under CI. That is not a loophole back to the Mac-only behaviour — it is how
+ *   the runner consumes the env file that `vercel env pull` writes, so the
+ *   credentials come from Vercel (where they already exist for production)
+ *   instead of having to be re-registered by hand in GitHub Secrets.
+ *   The path is always explicit, never a stray `.env` that happened to be
+ *   lying around, and the values still land in `process.env` like any other.
  *
  * Returns the number of keys it injected (0 when skipped), for logging only.
  */
 export function loadDotEnvIntoProcessEnv(
-  file = join(process.cwd(), ".env")
+  file = process.env.SYNC_ENV_FILE || join(process.cwd(), ".env")
 ): number {
-  if (process.env.CI) return 0;
+  if (process.env.CI && !process.env.SYNC_ENV_FILE) return 0;
 
   let raw: string;
   try {
@@ -46,7 +53,10 @@ export function loadDotEnvIntoProcessEnv(
     if (!match) continue;
 
     const key = match[1];
-    if (process.env[key] !== undefined) continue;
+    // 空文字は「未設定」として扱う。GitHub Actions では未登録の secret も
+    // `FOO: ${{ secrets.FOO }}` と書いた時点で空文字として定義されてしまうため、
+    // `!== undefined` で判定すると Vercel 側の値へフォールバックできなくなる。
+    if (process.env[key]) continue;
 
     let value = match[2].trim();
     // Strip one layer of matching quotes, if present.
