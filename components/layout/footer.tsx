@@ -129,6 +129,23 @@ export function Footer({ groups: externalGroups }: FooterProps) {
                       {t("common.events")}
                     </Link>
                   </li>
+                  {/* みんなの気配 (/signs) — サイト内で唯一の入口。
+                      「買う」導線ではなく「今週この場所で何が起きたかを眺める」面
+                      なので、ヘッダーの主要ナビ (商品一覧 / 定期便 / ジャーナル /
+                      お茶メニュー / プレイリスト / イベント = いずれも複数件を
+                      たどる一覧) には並べず、読みもの系をまとめたこの
+                      「コンテンツ」列の末尾に置く。ラベルはページ側の見出しと
+                      同じ `signs.title` を引き、名前がずれないようにする。
+                      この行が消えると /signs は再びサイト内から到達不能になるため、
+                      `__tests__/route-reachability.test.ts` が回帰を赤で止める。 */}
+                  <li>
+                    <Link
+                      href="/signs"
+                      className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {t("signs.title")}
+                    </Link>
+                  </li>
                 </ul>
               </div>
 

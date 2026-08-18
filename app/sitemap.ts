@@ -17,6 +17,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const entries: MetadataRoute.Sitemap = [];
 
   // Static pages
+  //
+  // `/signs` (みんなの気配) はここに **入れていない**。ページ自体は完成していて
+  // フッターの「コンテンツ」列から入れるが、今週の集計 (杯数・人数) と一言は
+  // まだ API 未配線で、`app/[locale]/signs/page.tsx` の PLACEHOLDER 定数
+  // (Figma の見本値) をそのまま出している。サイトマップは検索エンジンに
+  // 「この URL を拾ってほしい」と申告する面なので、実データでない数字を
+  // 公開流通に乗せる入口をここで作らない。
+  // 入れる条件: 集計と一言が実データに差し替わったとき (= PLACEHOLDER 定数の削除と同時)。
   const staticPages = [
     // 農家一覧 (/farmers) は廃止 (2026-08-14)。農家詳細 (/farmers/[slug]) は
     // 下の Sanity ループで個別に載せる。
