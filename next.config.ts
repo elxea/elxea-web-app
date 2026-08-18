@@ -2,7 +2,40 @@ import { withSentryConfig } from "@sentry/nextjs";
 import type { NextConfig } from "next";
 import createNextIntlPlugin from "next-intl/plugin";
 
+import { defaultLocale, disabledLocales } from "./i18n/config";
+
 const withNextIntl = createNextIntlPlugin("./i18n/request.ts");
+
+/**
+ * 公開を止めている locale (`i18n/config.ts` の `enabledLocales` から派生) を
+ * 既定 locale へ恒久リダイレクトする。**ここが到達不能化の主系**。
+ *
+ * middleware ではなく `redirects()` に置くのが要点で、middleware の
+ * `config.matcher` は静的ファイルを避けるために `.*\..*` (ドットを含む path) を
+ * 除外しており、`/en/journal/foo.bar` のように **セグメントにドットが入る URL が
+ * middleware を素通りして英語ページを 200 で返してしまう** (2026-08-18 実測)。
+ * `redirects()` は middleware より前段で全 path に効くのでこの穴が無い。
+ * 併せて middleware 側にも同じ判定を残してある (多層防御)。
+ *
+ * 404 ではなく恒久リダイレクトにしている理由:
+ * - `/en/*` は sitemap 掲載期間があり外部にリンク・インデックスが残りうる。
+ *   恒久移動として日本語版へ寄せた方が被リンクを捨てずに済む
+ * - すでに本番が `/en/*` → `/ja/*` の恒久リダイレクトを返しており、挙動を変えない
+ * - このリポジトリの URL 統廃合 (会員制度廃止・Webflow 移行) は一貫して
+ *   `redirects()` の恒久リダイレクトで処理する流儀
+ */
+const disabledLocaleRedirects = disabledLocales.flatMap((locale) => [
+  {
+    source: `/${locale}`,
+    destination: `/${defaultLocale}`,
+    permanent: true,
+  },
+  {
+    source: `/${locale}/:path*`,
+    destination: `/${defaultLocale}/:path*`,
+    permanent: true,
+  },
+]);
 
 const nextConfig: NextConfig = {
   /* Ring 2 (auth-flow e2e) runs the dev server behind a *fake apex*
@@ -53,6 +86,9 @@ const nextConfig: NextConfig = {
   // MS10.4: Webflow → Next.js redirects (old site URL structure → new)
   async redirects() {
     return [
+      // 公開を止めている locale を最優先で既定 locale へ寄せる。以降のルールに
+      // `/:locale(ja|en)` を取るものがあるため、先頭に置いて二段リダイレクトを防ぐ。
+      ...disabledLocaleRedirects,
       // C10-1: 法人お問い合わせページの廃止 (R2 確定版で 1 ページに統合)。
       // Figma【R2: 確定版】お問い合わせ `8109:46652` は「Common 静的 1 ページ」で、
       // 法人・取材は `お問い合わせの種類` の選択肢 (`8109:46695`) に吸収された。
