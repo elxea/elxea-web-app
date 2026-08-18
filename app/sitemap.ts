@@ -1,17 +1,21 @@
 import type { MetadataRoute } from "next";
 import { isFictionalSlug } from "@/lib/fictional-content";
 import { siteUrl } from "@/lib/site-url";
+import { enabledLocales } from "@/i18n/config";
 
 // 環境変数に混ざった改行・末尾スラッシュを落としてから使う。生の値をそのまま
 // 連結していたため、本番の <loc> が全件 "https://elxea.com\n/ja/..." になり、
 // sitemap のエントリ 172 件がまるごと不正な URL になっていた。
 const BASE_URL = siteUrl();
 
-// 出すのは ja だけ。`middleware.ts` が /en/* を /ja/* へ 301 で恒久リダイレクト
-// する (英語コンテンツが未完のため) ので、en の URL を載せるとリダイレクト先
-// でしか到達できない URL を sitemap に並べることになる。実体のある URL だけを
-// 載せる。英語を出す判断がついた時点でここに "en" を戻す。
-const locales = ["ja"];
+// 載せるのは公開中の locale だけ。公開を止めた locale は `/ja/*` へ恒久
+// リダイレクトされるので、載せるとリダイレクト先でしか到達できない URL を
+// sitemap に並べることになる。実体のある URL だけを載せる。
+//
+// **ここに locale をベタ書きしないこと。** 対応言語の正本は `i18n/config.ts` の
+// `enabledLocales` 1 箇所で、英語を出す判断がついたらそこに "en" を戻せば
+// sitemap・リダイレクト・言語切替 UI がまとめて追従する。
+const locales = enabledLocales;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const entries: MetadataRoute.Sitemap = [];
