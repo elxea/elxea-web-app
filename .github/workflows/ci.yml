@@ -449,16 +449,24 @@ jobs:
     name: staging-smoke
     # 出荷しているブランチを見る。ここが `main` に留まっていたため、この監視は
     # **一度も走っていなかった**: main は出荷ブランチより ~205 commit 遅れていて
-    # push が来ないので、ref が一致せず毎回 skip される。skip された job は
-    # Actions の一覧で成功と見分けがつかないため、無音のまま「監視あり」と
-    # 見做されていた (下の deploy-production が DEPLOY_BRANCH で直したのと同じ
-    # 誤り)。デプロイ判定 (DEPLOY_ENABLED) には触らない — これは監視の対象を
-    # 実際に出荷する側へ向け直すだけ。
+    # push が来ないので、ref が一致せず毎回 skip されていた (下の
+    # deploy-production が DEPLOY_BRANCH で直したのと同じ誤り)。デプロイ判定
+    # (DEPLOY_ENABLED) には触らない — これは監視の対象を実際に出荷する側へ
+    # 向け直すだけ。
     #
-    # !! DEPLOY_BRANCH を変えるときは、この行も一緒に変える。!!
+    # !! 出荷ブランチ (ship-gate の DEPLOY_BRANCH) を変えるときは、この行も
+    #    一緒に変える。!!
     # 2026-08-17: 一本化で出荷ブランチが main になったため main に合わせた。
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    needs: [unit-tests, e2e-tests]
+    #
+    # 2026-08-18: `STAGING_URL` 未設定時の扱いを step 内の `exit 0` から
+    # **job を skip** に変えた。旧実装は「Playwright を入れて何も検証せず緑」
+    # を返すため、deploy-production と同じ「実行していないのに success」だった
+    # (下の ship-gate のコメント参照)。skip なら一覧で灰色になり、監視が無い
+    # ことが見て分かる。CI は赤くならない (失敗ではなく未設定なので)。
+    if: >-
+      github.ref == 'refs/heads/main' && github.event_name == 'push'
+      && needs.ship-gate.outputs.staging_configured == 'true'
+    needs: [unit-tests, e2e-tests, ship-gate]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -481,20 +489,131 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium
 
       - name: Run staging smoke tests
-        # Graceful skip when STAGING_URL secret is not configured.
-        # Without this guard the spec falls through to its localhost:3000
-        # default and the job fails every main push with ERR_CONNECTION_REFUSED
-        # because the CI runner has no dev server. Once a dedicated staging
-        # domain is provisioned, set `STAGING_URL` in repo secrets to enable.
+        # STAGING_URL が未設定のケースはこの job の `if:` (ship-gate 経由) で
+        # 弾いているので、ここに来た時点で BASE_URL は必ず入っている。
+        # 空のまま走ると spec が localhost:3000 に落ちて ERR_CONNECTION_REFUSED
+        # で落ちるだけなので、保険として明示的に失敗させる (無言で 0 件成功に
+        # しない)。
         run: |
           if [ -z "$BASE_URL" ]; then
-            echo "STAGING_URL secret not configured — skipping staging smoke tests."
-            exit 0
+            echo "::error title=BASE_URL is empty::staging-smoke ran without STAGING_URL. The ship-gate condition and this job are out of sync."
+            exit 1
           fi
           pnpm exec playwright test --config e2e/playwright-staging.config.ts
         env:
           BASE_URL: ${{ secrets.STAGING_URL }}
           CI: true
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Ship gate — says, in the job list, whether anything actually ships
+  # ─────────────────────────────────────────────────────────────────────────
+  #
+  # 2026-08-18: この job を新設した理由。
+  #   `deploy-production` は「本番に出す/出さない」の判定を **step レベル**の
+  #   ゲートで行っていた。判定が false のとき job は全 step を skip して 5 秒で
+  #   **success (緑)** を返す。Actions の一覧では本当にデプロイした緑と区別が
+  #   つかず、実際に「deploy-production が success = 本番反映済み」と誤読した
+  #   事故が起きた (2026-08-18: 40f9615 は一度も Vercel に出ていないのに
+  #   「本番反映完了」と報告された)。ログの `::notice` は読み飛ばされた。
+  #
+  # 直し方: 判定をこの独立 job に出し、`deploy-production` は
+  # `needs.ship-gate.outputs.armed == 'true'` でのみ起動する。結果として
+  #   - 未武装のとき `deploy-production` は **skipped (灰)** になり、緑と一目で
+  #     区別できる (性質 1)
+  #   - この job 自身は success のまま = CI は赤くならない (性質 2)
+  #   - この job の **表示名** が「ARMED / NOT ARMED」を名乗り、さらに run 冒頭の
+  #     Summary に同じ結論を書くので、ログを開かなくても分かる (性質 3)
+  #   - 武装時は従来どおり deploy-production が起動し、中身は変えていない (性質 4)
+  #
+  # 「skip された job は needs グラフが壊れたのと見分けがつかない」という旧
+  # コメントの懸念は、この job が常に走って理由を名乗ることで解消される
+  # (deploy-production が灰 && ship-gate が「NOT ARMED」= 意図した不発、
+  #  deploy-production が灰 && ship-gate も灰/赤 = 配線側の異常)。
+  ship-gate:
+    # 表示名がそのまま結論になる。`vars` は job name の式で使える (`secrets` は
+    # 使えないので、staging 側の結論は Summary と skipped 表示で伝える)。
+    # NOTE: 継続行は 1 行目と同じインデントに揃えること。深くすると YAML の
+    # folded scalar が改行を保持してしまい、式が壊れる。
+    name: >-
+      ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main')
+      && (vars.DEPLOY_ENABLED == 'true'
+      && 'ship-gate: ARMED — this run WILL deploy to production'
+      || 'ship-gate: NOT ARMED — nothing is deployed (DEPLOY_ENABLED is not true)')
+      || 'ship-gate: no deploy — not a push to main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      armed: ${{ steps.arm.outputs.armed }}
+      staging_configured: ${{ steps.arm.outputs.staging_configured }}
+    steps:
+      - name: Decide what ships, and say so on the run summary
+        # ── KILL SWITCH ────────────────────────────────────────────────────
+        # 本番が動くのは、リポジトリ変数 DEPLOY_ENABLED がちょうど "true" の
+        # ときだけ:
+        #     gh variable set DEPLOY_ENABLED --body true   --repo <owner>/elxea-web-app
+        #     gh variable set DEPLOY_ENABLED --body false  --repo <owner>/elxea-web-app
+        #
+        # 意図的に ENABLED (opt in) であって DISABLED (opt out) ではない。
+        # DISABLED 方式だと、未設定・綴り間違い・うっかり削除がすべて「本番に
+        # 出す」を意味してしまう。ENABLED ならそれら全部が「何もしない」になる。
+        # 変数は現在 UNSET なので、この配線は不活性で着地し、最初の本番デプロイ
+        # は必ず意図的な一手になる。
+        #
+        # ── DEPLOY_BRANCH ──────────────────────────────────────────────────
+        # 出荷ブランチを決める行はここ 1 箇所だけ (`ci.yml` 内で他に持たない)。
+        # 2026-08-17 の一本化で `feat/c1-ds-foundation` → `main`。
+        # 本番の正本は main (docs/ops/production-source-of-truth.md)。
+        # ここが「もう push されないブランチ」に留まると auto-deploy は無言で
+        # 死ぬので、正本の宣言と必ず一致させること。
+        id: arm
+        env:
+          # 値そのものは使わない。設定されているかどうかだけを見る。
+          STAGING_URL: ${{ secrets.STAGING_URL }}
+        run: |
+          set -euo pipefail
+
+          is_prod_push=false
+          if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            is_prod_push=true
+          fi
+
+          armed=false
+          if [ "${is_prod_push}" = "true" ] && [ "${{ vars.DEPLOY_ENABLED }}" = "true" ]; then
+            armed=true
+          fi
+
+          staging_configured=false
+          if [ -n "${STAGING_URL}" ]; then
+            staging_configured=true
+          fi
+
+          echo "armed=${armed}" >> "$GITHUB_OUTPUT"
+          echo "staging_configured=${staging_configured}" >> "$GITHUB_OUTPUT"
+
+          # Run のトップページに出る要約。ログを開かなくても結論が読める。
+          {
+            echo "## Does this run ship anything?"
+            echo
+            if [ "${armed}" = "true" ]; then
+              echo "- **Production deploy: ARMED** — \`deploy-production\` will run and deploy \`${GITHUB_SHA}\`."
+            elif [ "${is_prod_push}" = "true" ]; then
+              echo "- **Production deploy: NOT ARMED — NOTHING IS DEPLOYED.**"
+              echo "  \`DEPLOY_ENABLED\` is not \`true\`, so \`deploy-production\` is **skipped**, not run."
+              echo "  All gates passed; this commit is deployable. A green run here does **not** mean production changed."
+              echo "  Enable with: \`gh variable set DEPLOY_ENABLED --body true\`"
+            else
+              echo "- **Production deploy: not applicable** — this is not a push to \`main\`, so nothing is deployed."
+            fi
+            if [ "${staging_configured}" = "true" ]; then
+              echo "- **Staging smoke: configured** — \`staging-smoke\` will run against the staging URL."
+            else
+              echo "- **Staging smoke: NOT configured — NOT RUN.** The \`STAGING_URL\` secret is unset, so \`staging-smoke\` is **skipped**, not run. There is no staging verification on this run."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "${armed}" != "true" ] && [ "${is_prod_push}" = "true" ]; then
+            echo "::notice title=Nothing was deployed::DEPLOY_ENABLED is not 'true', so deploy-production is skipped and production is unchanged."
+          fi
 
   # ─────────────────────────────────────────────────────────────────────────
   # Production deploy (moved here from .github/workflows/deploy.yml, 2026-08-12)
@@ -529,18 +648,13 @@ jobs:
   # depending on a skipped job would skip this one too.
   deploy-production:
     name: deploy-production
-    # ── DEPLOY_BRANCH ──────────────────────────────────────────────────────
-    # The single line that decides which branch reaches production.
-    #
-    # 2026-08-17: main 一本化にあわせて `feat/c1-ds-foundation` から `main` に
-    # 変更した。ここが「もう push されないブランチ」に留まると auto-deploy は
-    # 無言で死ぬ (ref が一致しなくなり毎回この job が skip されるだけで、どこも
-    # エラーを出さない。skip された job は Actions 一覧で成功と見分けがつかない)。
-    #
-    # 本番の正本は main (docs/ops/production-source-of-truth.md)。この行と
-    # その宣言は必ず一致させる。
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [static-checks, unit-tests, coverage, build, storybook-tests, e2e-tests]
+    # 出荷ブランチ (DEPLOY_BRANCH) と武装スイッチ (DEPLOY_ENABLED) の判定は
+    # `ship-gate` job に集約した。ここは「武装しているときだけ起動する」だけ。
+    # 未武装なら **この job は起動せず skipped (灰) になる** ので、Actions の
+    # 一覧で「デプロイした緑」と混同されない。判定を変えるときは ship-gate 側を
+    # 触ること (このファイルで出荷ブランチを書いているのは ship-gate だけ)。
+    if: needs.ship-gate.outputs.armed == 'true'
+    needs: [static-checks, unit-tests, coverage, build, storybook-tests, e2e-tests, ship-gate]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     # Second layer of serialisation, for the cross-workflow case: the workflow
@@ -581,36 +695,7 @@ jobs:
           fi
           echo "VERCEL_TOKEN is present."
 
-      - name: Arming switch — is auto-deploy enabled?
-        # ── KILL SWITCH ────────────────────────────────────────────────────
-        # Production only changes when the repository variable DEPLOY_ENABLED is
-        # the exact string "true":
-        #     gh variable set DEPLOY_ENABLED --body true   --repo <owner>/elxea-web-app
-        #     gh variable set DEPLOY_ENABLED --body false  --repo <owner>/elxea-web-app
-        #
-        # The switch is deliberately phrased as ENABLED (opt in) and not DISABLED
-        # (opt out), because only opt-in fails safe. With a DISABLED flag, an
-        # unset, misspelled, or accidentally deleted variable silently means
-        # "deploy to production"; with ENABLED, every one of those cases means
-        # "do nothing". The variable is currently UNSET, so this wiring lands
-        # inert and the first real deploy is a deliberate act.
-        #
-        # This is a STEP-level gate, not a job-level `if:`, on purpose: the job
-        # still runs, so every run shows on the record that the chain reached the
-        # deploy and that the gate is what stopped it. A skipped job would be
-        # indistinguishable from a broken `needs:` graph.
-        id: arm
-        run: |
-          if [ "${{ vars.DEPLOY_ENABLED }}" = "true" ]; then
-            echo "armed=true" >> "$GITHUB_OUTPUT"
-            echo "DEPLOY_ENABLED=true — proceeding to deploy ${GITHUB_SHA}."
-          else
-            echo "armed=false" >> "$GITHUB_OUTPUT"
-            echo "::notice title=Auto-deploy is disabled::DEPLOY_ENABLED is not 'true', so no deployment was created. All gates passed; this commit is deployable. Enable with: gh variable set DEPLOY_ENABLED --body true"
-          fi
-
       - name: Checkout
-        if: steps.arm.outputs.armed == 'true'
         uses: actions/checkout@v4
 
       - name: Setup Node.js
@@ -618,13 +703,11 @@ jobs:
         # and no `pnpm install` in this job any more: the build happens on
         # Vercel's infrastructure now (see the deploy step), so the runner never
         # needs the dependency tree.
-        if: steps.arm.outputs.armed == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Install Vercel CLI
-        if: steps.arm.outputs.armed == 'true'
         run: npm install --global "vercel@${VERCEL_CLI_VERSION}"
 
       - name: Verify Vercel credentials
@@ -633,7 +716,6 @@ jobs:
         # the production environment (including secret values) onto the runner's
         # disk, and now that Vercel does the building we have no use for it. Same
         # early-failure benefit, no secret materialised.
-        if: steps.arm.outputs.armed == 'true'
         run: vercel whoami
 
       - name: Deploy to production
@@ -660,7 +742,6 @@ jobs:
         #   https://vercel.com/docs/cli/deploy#when-not-to-use---prebuilt
         # Nothing is lost by not building here — the `build` job above already
         # fails this workflow before the deploy on any build break.
-        if: steps.arm.outputs.armed == 'true'
         id: deploy
         run: |
           # --meta attaches the source git SHA + ref to the Vercel deployment
@@ -692,7 +773,6 @@ jobs:
         # This does NOT roll back; it only reports. Rolling back unattended is a
         # riskier action, and Vercel keeps the previous deployment available for
         # an instant manual rollback.
-        if: steps.arm.outputs.armed == 'true'
         env:
           DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment_url }}
         run: |

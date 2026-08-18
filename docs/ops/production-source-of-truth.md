@@ -13,8 +13,18 @@
 
 配信経路の事実 (2026-08時点):
 
-- 本番デプロイはGitHub Actions `.github/workflows/deploy.yml` が `push: main` で起動し、Vercel CLI (`vercel pull → build → deploy --prebuilt --prod`) でproductionに配信する。VercelネイティブGit連携は使っていない (org所有のprivate repoでは有料プラン必須のため)。
-- したがって「本番 = `main`」はVercel設定ではなく **このdeploy.yml + 本監視**で担保する。
+- 本番デプロイはGitHub Actions `.github/workflows/ci.yml` の **`deploy-production` job** が `push: main` で起動し、Vercel CLI (`vercel deploy --prod`、ソースからのビルド) でproductionに配信する。VercelネイティブGit連携は使っていない (org所有のprivate repoでは有料プラン必須のため)。
+  - **`.github/workflows/deploy.yml` はもう存在しない** (2026-08-12にci.ymlへ統合)。ローカル作業コピーに残っている同名ファイルは古い残骸であり、これを根拠に判断すると誤る。
+- したがって「本番 = `main`」はVercel設定ではなく **このci.yml + 本監視**で担保する。
+
+### 「デプロイした」の判定 (重要 — ここを間違えて事故が起きた)
+
+- **`deploy-production` が緑であることは、本番に出た証拠ではない。** リポジトリ変数 `DEPLOY_ENABLED` が `true` でないあいだ、このjobは **skipped (灰)** になる。skippedはGitHubの仕様上「成功」として集計されるため、run全体のチェックマークだけを見ると配信済みと読めてしまう。
+  - 2026-08-18: 実際にこの誤読が起き、Vercelに一度も出ていないコミットが「本番反映完了」と報告された (当時はstepゲートで **success(緑)** を返していた。現在はjobごとskippedになり、同じrunの `ship-gate` jobが表示名で `NOT ARMED — nothing is deployed` と名乗る)。
+- 本番に出たかどうかは、次のいずれかで **Vercel側を見て**判定する:
+  1. 同じrunの `ship-gate` jobの表示名 / Summaryが `ARMED` であり、かつ `deploy-production` が実際に走って緑であること。
+  2. `vercel ls --prod` の最新production deploymentの作成時刻がマージ時刻より後で、`vercel inspect` のAliasesに `elxea.com` が載っていること。
+  3. 監視 `check-prod-main-sync.mjs` が `in_sync` を返すこと (REST APIの `meta.githubCommitSha` 比較)。
 
 ## 2. なぜ静かにズレるか (Vercelロールバック仕様)
 
