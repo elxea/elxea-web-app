@@ -224,6 +224,19 @@ export function TerroirOverviewMap({ data, label, className }: TerroirOverviewMa
     // eslint-disable-next-line react-hooks/exhaustive-deps -- dataKey が data の内容を代表する
   }, [dataKey]);
 
+  /* maplibre は自分の canvas に `role="region" aria-label="Map"` を固定で付ける
+     (`Map.Title` の既定文言)。器の div は既に `role="img" aria-label={label}` を
+     持っているので、同じ地図が 2 つのアクセシブルな要素として現れるうえ、
+     地図を複数並べると **全部が同名の region** になって landmark-unique (axe) に
+     触れる (2026-08-18 の CI で実測。見本ページが 3 枚並べているため出た)。
+     canvas 側にも実際のラベルを載せて区別できるようにする。読み上げの内容と
+     しても "Map" より正確になる。
+     `dataKey` を依存に含めるのは、地図が組み直された後に付け直すため。 */
+  useEffect(() => {
+    const canvas = mapRef.current?.getCanvas();
+    if (canvas) canvas.setAttribute("aria-label", label);
+  }, [label, dataKey]);
+
   return (
     <div data-slot="terroir-overview" className={cn("flex flex-col gap-3", className)}>
       <div
