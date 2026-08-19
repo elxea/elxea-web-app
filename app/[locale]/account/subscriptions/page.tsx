@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { getLocale, getTranslations } from "next-intl/server";
 
 import {
@@ -20,6 +21,7 @@ import {
 import { captionClass } from "@/components/editorial/rule-list";
 import { Button } from "@/components/ui/button";
 import { Link } from "@/i18n/navigation";
+import { isSignedIn, type AccountAuth } from "@/lib/account-capabilities";
 import { seedSubscriptionContracts } from "@/lib/preview-seed";
 import { getCustomerFromSession, getSubscriptionsFromSession } from "@/lib/shopify/auth";
 import type { SubscriptionContract } from "@/lib/shopify/customer";
@@ -79,6 +81,46 @@ export default async function SubscriptionsPage() {
   const seeded = customer ? null : seedSubscriptionContracts();
 
   if (!customer && !seeded) {
+    /* LINE だけでログインしている人もここに来る。`middleware.ts` の /account
+     * ガードは `line_session` があれば通すので、この画面に到達すること自体は正しい。
+     * ところが定期便は Shopify の顧客トークンが無いと引けず、LINE ログインでは
+     * そのトークンが発行されない (外部 IdP から Shopify セッションを作る正規手段は
+     * Multipass だけで、Plus + legacy 会員に限られる)。
+     *
+     * つまりこの人は「ログインしていない」のではなく「メールアドレスが連携されて
+     * いない」。ログイン済みの人に「ログインが必要です」と出して /login へ送り返すと、
+     * LINE で入り直しても同じ画面に戻る堂々巡りになる。案内を出し分ける。
+     *
+     * どの認証状態で何が使えるかの正本は `lib/account-capabilities.ts`。 */
+    const auth: AccountAuth = {
+      shopify: false,
+      line: (await cookies()).has("line_session"),
+    };
+
+    if (isSignedIn(auth)) {
+      return (
+        <div className="flex min-h-[70vh] items-center justify-center px-4 py-24">
+          <div className="max-w-sm text-center">
+            <h1 className="page-title mb-4 text-foreground">{t("subscriptions")}</h1>
+            <p className={cn(captionClass, "mb-3 text-foreground")}>
+              {t("subscriptionsEmailRequired")}
+            </p>
+            <p className={cn(captionClass, "mb-8 text-muted-foreground")}>
+              {t("emailRequiredReason")}
+            </p>
+            <Button variant="outline" asChild>
+              <a href={`/api/auth/login?locale=${locale}`}>{t("connectShopifyButton")}</a>
+            </Button>
+            <div className="mt-6">
+              <Button variant="link" className="h-auto p-0 text-muted-foreground" asChild>
+                <Link href="/account">{t("backToAccountLink")}</Link>
+              </Button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="flex min-h-[70vh] items-center justify-center px-4 py-24">
         <div className="max-w-sm text-center">
