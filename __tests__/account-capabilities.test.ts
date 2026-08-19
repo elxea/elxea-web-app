@@ -93,11 +93,14 @@ describe("マイページの項目カタログ", () => {
   });
 
   it("文言キーはすべて messages/ja.json と en.json の account 配下に実在する", () => {
-    const keys = ACCOUNT_ITEMS.flatMap((item) =>
-      [item.lockedTitleKey, item.lockedReasonKey, item.lockedActionKey].filter(
-        (key): key is string => key !== null
-      )
-    );
+    const keys: string[] = ACCOUNT_ITEMS.flatMap((item) => {
+      const candidates: (string | null)[] = [
+        item.lockedTitleKey,
+        item.lockedReasonKey,
+        item.lockedActionKey,
+      ];
+      return candidates.filter((key): key is string => key !== null);
+    });
 
     for (const locale of ["ja", "en"] as const) {
       const account = JSON.parse(read(`messages/${locale}.json`)).account as Record<
