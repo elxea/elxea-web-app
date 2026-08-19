@@ -299,6 +299,55 @@ export function AccountExpCard({
 }
 
 /* -------------------------------------------------------------------------- */
+/* AccountLockedCard — 今は使えない項目の枠 (項目を消さずグレーで残す)           */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * 使えない項目を **その場所に残したまま** グレーで見せるカード。
+ *
+ * ログイン経路によって画面ごと差し替えると、どの項目が存在するのか自体が
+ * 見えなくなり、片方の画面に項目を足し忘れる (実際そうなった)。だから項目は
+ * 常に同じ位置に置き、使えないものはここで理由と次の行動を出す。
+ *
+ * 寸法は AccountRecordCard と揃える (同じ列に混ざって並ぶため)。面は `bg-card`
+ * のままで、文字と枠線の彩度を落として「今は触れない」ことを示す。
+ * `aria-disabled` は付けない — カード自体は操作対象ではなく、中の行動リンクは
+ * 押せるべきだから。
+ */
+export function AccountLockedCard({
+  title,
+  reason,
+  action,
+}: {
+  title: React.ReactNode;
+  reason: React.ReactNode;
+  /** 次の行動 (例: メールアドレスを連携する)。無い項目もある。 */
+  action?: { label: React.ReactNode; href: string };
+}) {
+  return (
+    <div
+      data-slot="account-locked-card"
+      className="flex flex-col gap-2 rounded-sm border border-dashed border-border bg-card/60 p-4 lg:p-5"
+    >
+      <p className={cn(bodySmClass, "text-muted-foreground")}>{title}</p>
+      <p className={cn(captionClass, "text-muted-foreground")}>{reason}</p>
+      {action ? (
+        <a
+          data-slot="account-locked-action"
+          className={cn(
+            captionClass,
+            "mt-1 self-start text-foreground underline underline-offset-4 transition-colors hover:text-muted-foreground"
+          )}
+          href={action.href}
+        >
+          {action.label}
+        </a>
+      ) : null}
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
 /* AccountPaymentMethodCard — ご登録のカード (PC 8144:1252 / SP 8145:1252)       */
 /* 変更操作の UI は持たない (確定版は節見出しの外部リンク 1 本だけ)。            */
 /* -------------------------------------------------------------------------- */
