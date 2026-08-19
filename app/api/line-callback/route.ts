@@ -8,6 +8,10 @@ import {
   isSecure,
   resolveCookieDomain,
 } from "@/lib/auth/cookies";
+import {
+  AUTO_LOGIN_FAILED_PARAM,
+  AUTO_LOGIN_FAILED_VALUE,
+} from "@/lib/line/auto-login";
 
 /**
  * LINE Login OAuth 2.0 callback endpoint.
@@ -81,8 +85,21 @@ export async function GET(request: NextRequest) {
   const savedState = cookieStore.get("line_oauth_state")?.value;
 
   if (!savedState || savedState !== state) {
+    /* A mismatch has two possible causes and LINE says they are indistinguishable:
+     * a CSRF attempt, or an auto login that failed (LINE still redirects here,
+     * but with an unusable `code` and a `state` that does not match). We keep
+     * treating it as a hard failure — nothing below this point runs — and only
+     * add a hint to the redirect so the login screen can offer a retry with
+     * `disable_auto_login=true`. Without it the user re-enters the same failing
+     * auto login and loops.
+     *
+     * The hint carries no authority: it never relaxes a check, it only changes
+     * which authorize URL the next attempt builds.
+     * https://developers.line.biz/en/docs/line-login/how-to-handle-auto-login-failure/ */
     console.error("[line-callback] State mismatch");
-    return NextResponse.redirect(new URL(`/${locale}/login?error=StateMismatch`, requestOrigin));
+    const retryUrl = new URL(`/${locale}/login?error=StateMismatch`, requestOrigin);
+    retryUrl.searchParams.set(AUTO_LOGIN_FAILED_PARAM, AUTO_LOGIN_FAILED_VALUE);
+    return NextResponse.redirect(retryUrl);
   }
 
   const baseUrl = getBaseUrl(request);

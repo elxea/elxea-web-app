@@ -17,9 +17,23 @@
  *
  * Asserting them in the same file is the point: someone deleting the LINE
  * `prompt` must see, in the same breath, that the Shopify one is load-bearing.
+ *
+ * The same file now also pins LINE's auto login, because that is the reason the
+ * LINE `prompt` omission matters at all. Auto login is the only path by which a
+ * phone opens the LINE app instead of the access.line.me email/QR screen; it is
+ * on by default, no parameter can force it, and exactly two things switch it
+ * off — `prompt=login` and `disable_auto_login=true`. So "send no prompt" and
+ * "send no disable_auto_login" are one decision under two names, and they belong
+ * in one file. Sources are collected in lib/line/auto-login.ts.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { NextRequest } from "next/server";
+import {
+  AUTO_LOGIN_FAILED_PARAM,
+  AUTO_LOGIN_FAILED_VALUE,
+  autoLoginFailedInSearch,
+  wantsAutoLoginDisabled,
+} from "@/lib/line/auto-login";
 
 const cookieStore = {
   get: vi.fn(() => undefined),
@@ -76,6 +90,102 @@ describe("LINE authorize URL carries no prompt", () => {
     expect(url.host).toBe("access.line.me");
     expect(url.searchParams.has("prompt")).toBe(false);
     expect(url.searchParams.get("state")).toBeTruthy();
+  });
+});
+
+describe("LINE auto login is left enabled on the normal path", () => {
+  /* The observed bug (iOS Safari, 2026-08-20) was landing on the
+   * access.line.me email/QR screen instead of the LINE app. Either parameter
+   * below reproduces that landing on every device, so their absence is the
+   * feature, not an oversight. */
+  it("POST /api/line-login/init sends nothing that disables auto login", async () => {
+    const { POST } = await import("@/app/api/line-login/init/route");
+    const res = await POST(request("https://www.elxea.com/api/line-login/init"));
+    const { authUrl } = (await res.json()) as { authUrl: string };
+
+    const url = new URL(authUrl);
+    expect(url.searchParams.has("disable_auto_login")).toBe(false);
+    expect(url.searchParams.has("disable_ios_auto_login")).toBe(false);
+  });
+
+  it("GET /api/line-login sends nothing that disables auto login", async () => {
+    const { GET } = await import("@/app/api/line-login/route");
+    const res = await GET(request("https://www.elxea.com/api/line-login"));
+
+    const url = new URL(res.headers.get("location")!);
+    expect(url.searchParams.has("disable_auto_login")).toBe(false);
+    expect(url.searchParams.has("disable_ios_auto_login")).toBe(false);
+  });
+});
+
+describe("auto login is disabled only on an explicit retry", () => {
+  it("POST /api/line-login/init?disable_auto_login=1", async () => {
+    const { POST } = await import("@/app/api/line-login/init/route");
+    const res = await POST(
+      request("https://www.elxea.com/api/line-login/init?disable_auto_login=1"),
+    );
+    const { authUrl } = (await res.json()) as { authUrl: string };
+
+    const url = new URL(authUrl);
+    expect(url.searchParams.get("disable_auto_login")).toBe("true");
+    // The retry must still be a complete, valid authorization request.
+    expect(url.searchParams.get("response_type")).toBe("code");
+    expect(url.searchParams.get("state")).toBeTruthy();
+    expect(url.searchParams.get("scope")).toBe("profile openid email");
+  });
+
+  it("GET /api/line-login?disable_auto_login=true", async () => {
+    const { GET } = await import("@/app/api/line-login/route");
+    const res = await GET(
+      request("https://www.elxea.com/api/line-login?disable_auto_login=true"),
+    );
+
+    const url = new URL(res.headers.get("location")!);
+    expect(url.searchParams.get("disable_auto_login")).toBe("true");
+  });
+
+  it("treats anything but an explicit opt-in as 'keep auto login'", () => {
+    for (const raw of ["0", "false", "yes", "", "TRUE"]) {
+      const req = request(
+        `https://www.elxea.com/api/line-login?disable_auto_login=${encodeURIComponent(raw)}`,
+      );
+      expect(wantsAutoLoginDisabled(req)).toBe(false);
+    }
+    expect(
+      wantsAutoLoginDisabled(request("https://www.elxea.com/api/line-login")),
+    ).toBe(false);
+  });
+});
+
+describe("the failed-auto-login round trip is wired end to end", () => {
+  it("a state mismatch still fails closed, and carries the retry hint", async () => {
+    /* No `line_oauth_state` cookie → mismatch. LINE documents that this is
+     * indistinguishable from CSRF, so the hint must never relax the check. */
+    cookieStore.get.mockReturnValue(undefined);
+
+    const { GET } = await import("@/app/api/line-callback/route");
+    const res = await GET(
+      request("https://www.elxea.com/api/line-callback?code=abc&state=whatever"),
+    );
+
+    const location = new URL(res.headers.get("location")!);
+    expect(location.pathname).toBe("/ja/login");
+    expect(location.searchParams.get("error")).toBe("StateMismatch");
+    expect(location.searchParams.get(AUTO_LOGIN_FAILED_PARAM)).toBe(
+      AUTO_LOGIN_FAILED_VALUE,
+    );
+  });
+
+  it("the login screen reads the flag the callback writes", () => {
+    /* Pins the two halves together: rename the parameter on one side only and
+     * the retry silently stops happening, leaving the user looping on the
+     * email screen with no visible error. */
+    const written = new URL("https://www.elxea.com/ja/login?error=StateMismatch");
+    written.searchParams.set(AUTO_LOGIN_FAILED_PARAM, AUTO_LOGIN_FAILED_VALUE);
+
+    expect(autoLoginFailedInSearch(written.search)).toBe(true);
+    expect(autoLoginFailedInSearch("?error=StateMismatch")).toBe(false);
+    expect(autoLoginFailedInSearch("")).toBe(false);
   });
 });
 
