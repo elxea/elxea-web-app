@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import crypto from "crypto";
 import { getBaseUrl, getRequestHostname, isTrustedAuthHost } from "@/lib/base-url";
 import { getCookieSpec, isSecure, resolveCookieDomain } from "@/lib/auth/cookies";
+import { wantsAutoLoginDisabled } from "@/lib/line/auto-login";
 
 /**
  * LINE Login state initialization endpoint.
@@ -98,7 +99,15 @@ export async function POST(request: NextRequest) {
    * (shared devices / account switching) and is a different parameter on a
    * different IdP. `__tests__/authorize-url-prompt.test.ts` asserts both facts
    * together so that removing one is never mistaken for licence to remove the
-   * other. */
+   * other.
+   *
+   * Not sending `prompt` is also half of what makes the phone open the LINE app
+   * instead of the access.line.me email/QR screen: `prompt=login` disables LINE's
+   * auto login, and auto login is the only documented path into the app. The
+   * other half is that the button navigates on a real `<a>` tap. There is no
+   * parameter that forces the app hand-off, so those two omissions ARE the
+   * feature. See `lib/line/auto-login.ts` for the sources and for the retry that
+   * catches the case where the OS refuses to honour the Universal Link. */
   const params = new URLSearchParams({
     response_type: "code",
     client_id: channelId,
@@ -106,6 +115,10 @@ export async function POST(request: NextRequest) {
     state,
     scope: "profile openid email",
   });
+
+  if (wantsAutoLoginDisabled(request)) {
+    params.set("disable_auto_login", "true");
+  }
 
   const authUrl = `https://access.line.me/oauth2/v2.1/authorize?${params.toString()}`;
 

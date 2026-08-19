@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { buildChatSessionCookie } from "@/lib/chat/session-cookie";
+import { autoLoginFailedInSearch } from "@/lib/line/auto-login";
 
 /**
  * LINE Login button — Direct OAuth 2.0 via <a href> to access.line.me.
@@ -32,6 +33,15 @@ import { buildChatSessionCookie } from "@/lib/chat/session-cookie";
  * 5. The button is disabled until the init fetch resolves. The fetch is fast
  *    (single HTTP round-trip, no external I/O), typically <100ms on good
  *    networks, so users almost never see the disabled state.
+ *
+ * 6. Rules 1, 3 and 4 are not stylistic — they are the whole mechanism by which
+ *    a phone opens the LINE app instead of the access.line.me email/QR screen.
+ *    That hand-off is LINE's "auto login", which is on by default and rides on
+ *    iOS Universal Links / Android App Links; LINE documents that a JavaScript
+ *    redirect or a typed URL will not fire it, and that the fix is to let the
+ *    user tap a link. No parameter can force it. When the OS refuses anyway, the
+ *    callback flags it and this component retries with auto login disabled so
+ *    the user does not loop. See lib/line/auto-login.ts.
  */
 export function LineLoginButton({ children }: { children: React.ReactNode }) {
   const t = useTranslations("login");
@@ -56,10 +66,21 @@ export function LineLoginButton({ children }: { children: React.ReactNode }) {
       // localStorage not available
     }
 
-    fetch("/api/line-login/init", {
-      method: "POST",
-      credentials: "same-origin",
-    })
+    /* If we arrived here because auto login just failed, ask for an authorize
+     * URL that skips auto login. Otherwise auto login is left on — it is the
+     * only documented path into the LINE app, and it is on by default.
+     * See lib/line/auto-login.ts. */
+    const retryWithoutAutoLogin = autoLoginFailedInSearch(window.location.search);
+
+    fetch(
+      retryWithoutAutoLogin
+        ? "/api/line-login/init?disable_auto_login=1"
+        : "/api/line-login/init",
+      {
+        method: "POST",
+        credentials: "same-origin",
+      },
+    )
       .then((res) => (res.ok ? res.json() : Promise.reject(res.status)))
       .then((data: { authUrl?: string }) => {
         if (!cancelled && data.authUrl) setAuthUrl(data.authUrl);
