@@ -287,7 +287,13 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Install Playwright browsers
-        run: pnpm exec playwright install --with-deps chromium
+        # `playwright install --with-deps` を直接叩かない。内部の apt が
+        # ミラー障害で無限にストールし、job が timeout-minutes 上限まで
+        # ハングして cancelled になる (run 32275002652)。スクリプト側で
+        # apt 部分とダウンロード部分を分離し、hard timeout + リトライで
+        # 囲んでいる。詳細は scripts/ci/install-playwright.sh のヘッダ。
+        timeout-minutes: 10
+        run: bash scripts/ci/install-playwright.sh chromium
 
       - name: Run Storybook tests (a11y + interaction)
         # Stories run as vitest browser tests. Accessibility violations FAIL
@@ -318,7 +324,13 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Install Playwright browsers
-        run: pnpm exec playwright install --with-deps chromium
+        # `playwright install --with-deps` を直接叩かない。内部の apt が
+        # ミラー障害で無限にストールし、job が timeout-minutes 上限まで
+        # ハングして cancelled になる (run 32275002652)。スクリプト側で
+        # apt 部分とダウンロード部分を分離し、hard timeout + リトライで
+        # 囲んでいる。詳細は scripts/ci/install-playwright.sh のヘッダ。
+        timeout-minutes: 10
+        run: bash scripts/ci/install-playwright.sh chromium
 
       - name: Run E2E tests (with retries for flaky tests)
         # Reporters now come from playwright.config.ts (list + html + json +
@@ -486,7 +498,19 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Install Playwright browsers
-        run: pnpm exec playwright install --with-deps chromium
+        # `playwright install --with-deps` を直接叩かない。内部の apt が
+        # ミラー障害で無限にストールし、job が timeout-minutes 上限まで
+        # ハングして cancelled になる (run 32275002652)。スクリプト側で
+        # apt 部分とダウンロード部分を分離し、hard timeout + リトライで
+        # 囲んでいる。詳細は scripts/ci/install-playwright.sh のヘッダ。
+        #
+        # この job の timeout-minutes は 5 なので、ステップ側の上限は 3 に
+        # 絞る (10 にしても job 上限が先に来て意味がない)。リトライ予算も
+        # 1 回に落とし、smoke 全体が 5 分に収まるようにする。
+        timeout-minutes: 3
+        env:
+          PW_INSTALL_ATTEMPTS: "1"
+        run: bash scripts/ci/install-playwright.sh chromium
 
       - name: Run staging smoke tests
         # STAGING_URL が未設定のケースはこの job の `if:` (ship-gate 経由) で
