@@ -21,6 +21,10 @@ import { captionClass } from "@/components/editorial/rule-list";
 import { Button } from "@/components/ui/button";
 import { customerAccountPortalUrl } from "@/lib/account-links";
 import {
+  fetchLineLinkageStatus,
+  UNKNOWN_LINE_LINKAGE,
+} from "@/lib/line/linkage-status";
+import {
   ACCOUNT_SECTION_ORDER,
   isAvailable,
   isSignedIn,
@@ -136,6 +140,14 @@ export default async function AccountPage() {
   const view: AccountView = customer
     ? await loadAccountView(customer)
     : (seeded ?? (await loadLineOnlyAccountView(getLineDisplayName(cookieStore.get("line_user")?.value))));
+
+  /* LINE 連携状態 (P1)。顧客 ID は **サーバセッション由来の customer.id だけ** を使う
+     (URL パラメータ等からは受けない — 他人の連携状態を覗ける穴になる)。
+     PREVIEW_SEED の見本表示では実セッションが無いので問い合わせず「不明」のままにする。
+     読み取りは never throw で、失敗しても linked=null になるだけ (マイページは落ちない)。 */
+  const lineLinkage = customer
+    ? await fetchLineLinkageStatus(customer.id)
+    : UNKNOWN_LINE_LINKAGE;
 
   /* Shopify 顧客アカウントポータルへの外部リンク。LINE だけの人はポータルの
      セッションを持たないので出さない (押しても入れない導線を置かない)。 */
@@ -361,12 +373,12 @@ export default async function AccountPage() {
         ) : null}
       </AccountOpsBand>
 
-      {/* LINE 連携エントリ (Web 側導線 / Phase 2)。Shopify セッションを前提にした
-          導線なので、メールで入っている人にだけ出す。NEXT_PUBLIC_LIFF_ID 未設定なら
-          コンポーネント側で描かれない。 */}
+      {/* LINE 連携エントリ (Web 側導線 / Phase 2 + 連携状態表示 / P1)。Shopify セッションを
+          前提にした導線なので、メールで入っている人にだけ出す。連携済みなら状態を出し、
+          未連携・不明なら従来どおり連携ボタンを出す (出し分けはコンポーネント側)。 */}
       {auth.shopify ? (
         <div className="page-container">
-          <LineLinkageEntry locale={locale} />
+          <LineLinkageEntry locale={locale} status={lineLinkage} />
         </div>
       ) : null}
     </>
