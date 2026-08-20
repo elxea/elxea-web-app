@@ -1,0 +1,219 @@
+import crypto from "crypto";
+
+import { encryptToken, decryptToken } from "@/lib/shopify/customer";
+
+/**
+ * Web 発 LINE 連携フロー（P2）の state 束縛。
+ *
+ * ## 何を解いているか
+ *
+ * これまで Web マイページの「LINEと連携する」は LIFF permanent link
+ * （`https://liff.line.me/...`）だった。LIFF は **LINE アプリ / LINE 内ブラウザへ離脱する**
+ * ので、押した瞬間に Chrome から Safari（や LINE 内ブラウザ）へ移り、そこには Shopify の
+ * ログインセッションが無い。だから 1 回目は「誰か分からない」で失敗し、成功しても
+ * 「トークに戻る」しか出口が無くマイページに帰れなかった。
+ *
+ * P2 は LIFF を経由せず、**押したブラウザのまま** LINE の認可へ行き、同じブラウザの
+ * マイページへ 302 で戻す。そのために必要なのが「行きと帰りを結ぶ state」で、本モジュールは
+ * その封緘と検証だけを担う（HTTP も cookie もここでは触らない。route 側の責務）。
+ *
+ * ## なぜ nonce だけでは足りないか（QA 要件 5 / login-CSRF）
+ *
+ * 素朴な OAuth state は「ランダム値を cookie に置き、戻ってきた state と一致するか」だけを
+ * 見る。それだと **攻撃者が自分の LINE で得た認可 code を含む callback URL を被害者に踏ませ、
+ * 被害者の Shopify アカウントに攻撃者の LINE を連携させる**経路（login-CSRF）を、原理的には
+ * 塞げるが「誰のために始めた連携か」は塞げない。連携は「今ログインしている顧客」と不可分な
+ * 操作なので、state に **開始時点の顧客 ID** を封じ込め、callback でその場のセッションと
+ * 一致することまで確かめる。
+ *
+ * したがって callback が連携を成立させてよいのは、次の 4 つが **すべて**満たされたときだけ:
+ *
+ *   1. cookie が復号できる（= 我々が発行したもの。SESSION_SECRET を知らないと作れない）
+ *   2. cookie 内 nonce と URL の `state` が一致する（timing-safe 比較）
+ *   3. cookie 内 customerId と、その場の `requireAuth()` の customerId が一致する
+ *   4. 発行から `STATE_TTL_MS` 以内である
+ *
+ * どれか 1 つでも欠けたら連携しない（fail-closed）。「たぶん本人だろう」で通さない。
+ *
+ * ## 暗号化であって署名ではない理由
+ *
+ * 中身に顧客 ID が入るため、Base64 で誰でも読める形にはしない。`encryptToken` は
+ * AES-256-GCM（認証付き暗号）なので、機密性と改竄検知を同時に得られる。署名だけだと
+ * 顧客 ID が平文で cookie に載る。
+ */
+
+/** state cookie の名前。`lib/auth/cookies.ts` のレジストリにも登録すること（未登録は test で落ちる）。 */
+export const LINE_LINK_STATE_COOKIE = "line_link_state";
+
+/**
+ * state の有効期間。LINE 認可の往復に必要な時間だけを与える。
+ *
+ * 10 分は既存の `line_oauth_state`（maxAge 600）と揃えた値。長くするほど
+ * 「開始したまま放置された state」を攻撃者が拾える窓が広がる。
+ */
+export const STATE_TTL_MS = 10 * 60 * 1000;
+
+/** マイページに結果を伝えるクエリキー。完了画面は作らない（要件 4）ので、これが唯一の通知路。 */
+export const LINK_RESULT_PARAM = "line_link";
+
+/**
+ * 連携結果。`success` 以外はすべて「連携していない」。
+ *
+ * 失敗理由を細かく URL に出さないのは、外から state 検証の内訳を推測させないため。
+ * 詳細はサーバログにだけ残す。
+ */
+export type LinkResult = "success" | "error";
+
+/** cookie に封じる中身。キーを 1 文字にしているのは cookie サイズを抑えるため。 */
+type SealedState = {
+  /** nonce（URL の `state` と突き合わせる値）。 */
+  n: string;
+  /** 連携を始めた時点の、サーバ確定 Shopify 顧客 ID。 */
+  c: string;
+  /** 完了後に戻す先（同一オリジン相対パス）。 */
+  r: string;
+  /** 発行時刻（epoch ms）。 */
+  t: number;
+};
+
+export type SealedStateInput = {
+  customerId: string;
+  returnTo: string;
+};
+
+export type StateEnvelope = {
+  /** URL の `state` パラメータに載せる値。 */
+  state: string;
+  /** cookie に入れる暗号文。 */
+  cookieValue: string;
+};
+
+/**
+ * nonce を作り、顧客 ID と復帰先を封じた cookie 値を返す。
+ */
+export function sealLinkState(input: SealedStateInput, now = Date.now()): StateEnvelope {
+  const state = crypto.randomBytes(32).toString("hex");
+  const payload: SealedState = {
+    n: state,
+    c: input.customerId,
+    r: input.returnTo,
+    t: now,
+  };
+  return { state, cookieValue: encryptToken(JSON.stringify(payload)) };
+}
+
+export type OpenStateResult =
+  | { ok: true; returnTo: string }
+  | { ok: false; reason: string };
+
+/**
+ * cookie を開き、上記 4 条件を検査する。
+ *
+ * @param cookieValue  `line_link_state` の値（無ければ undefined）
+ * @param stateParam   callback URL の `state`
+ * @param customerId   その場の `requireAuth()` が確定した顧客 ID
+ *
+ * 返す `returnTo` は封じた時点の値。**callback は URL から復帰先を受け取ってはならない**
+ * （受け取れる形にした瞬間、この endpoint が任意 URL へのリダイレクタになる）。
+ */
+export function openLinkState(
+  cookieValue: string | undefined | null,
+  stateParam: string | undefined | null,
+  customerId: string,
+  now = Date.now(),
+): OpenStateResult {
+  if (!cookieValue) return { ok: false, reason: "state_cookie_missing" };
+  if (!stateParam) return { ok: false, reason: "state_param_missing" };
+
+  const decrypted = decryptToken(cookieValue);
+  if (!decrypted) return { ok: false, reason: "state_undecryptable" };
+
+  let payload: SealedState;
+  try {
+    payload = JSON.parse(decrypted) as SealedState;
+  } catch {
+    return { ok: false, reason: "state_malformed" };
+  }
+
+  if (
+    typeof payload?.n !== "string" ||
+    typeof payload?.c !== "string" ||
+    typeof payload?.r !== "string" ||
+    typeof payload?.t !== "number"
+  ) {
+    return { ok: false, reason: "state_malformed" };
+  }
+
+  if (!timingSafeEqualStrings(payload.n, stateParam)) {
+    return { ok: false, reason: "state_mismatch" };
+  }
+
+  /* セッション束縛。ここが「攻撃者の LINE を被害者のアカウントに繋ぐ」経路の栓。
+   * 開始したときの顧客と、戻ってきたときの顧客が違うなら、それはもう別の操作。 */
+  if (!timingSafeEqualStrings(payload.c, customerId)) {
+    return { ok: false, reason: "customer_mismatch" };
+  }
+
+  if (now - payload.t > STATE_TTL_MS || now < payload.t - 60_000) {
+    /* 未来日付も弾く（サーバ時計のずれは 1 分だけ許容）。 */
+    return { ok: false, reason: "state_expired" };
+  }
+
+  /* 封じた時点で検証済みだが、cookie は 10 分間ブラウザに残る。その間に
+   * `sanitizeReturnTo` の規則を厳しくした場合、古い cookie が旧規則の値を運んでくる。
+   * 出口でもう一度通すことで、規則の変更が即座に効く。 */
+  return { ok: true, returnTo: sanitizeReturnTo(payload.r, defaultReturnTo("ja")) };
+}
+
+/**
+ * 復帰先の既定値。
+ */
+export function defaultReturnTo(locale: string): string {
+  const safe = /^[a-z]{2}$/.test(locale) ? locale : "ja";
+  return `/${safe}/account`;
+}
+
+/**
+ * 復帰先を「自サイト内の相対パス」に限定する。
+ *
+ * 落とすもの（すべてオープンリダイレクタの材料）:
+ *   - `https://evil.example`  … スキーム付き絶対 URL
+ *   - `//evil.example`        … プロトコル相対 URL。ブラウザは外部ホストとして解決する
+ *   - `/\evil.example`        … 一部ブラウザが `//` と同一視するバックスラッシュ変種
+ *   - `evil` のような相対断片 … `/` 始まりでないものは受けない（解決先が文脈依存になる）
+ *
+ * 通すのはパス + クエリ + フラグメントのみ。判定が少しでも曖昧なら既定値に倒す。
+ */
+export function sanitizeReturnTo(raw: string | undefined | null, fallback: string): string {
+  if (typeof raw !== "string" || raw.length === 0 || raw.length > 512) return fallback;
+  if (!raw.startsWith("/")) return fallback;
+  if (raw.startsWith("//") || raw.startsWith("/\\")) return fallback;
+  /* 制御文字・改行はヘッダー分割の材料になるので拒否。 */
+  if (/[\u0000-\u001f\u007f]/.test(raw)) return fallback;
+  if (raw.includes("\\")) return fallback;
+  return raw;
+}
+
+/** 結果クエリを付けた復帰 URL（相対）を組み立てる。 */
+export function returnUrlWithResult(returnTo: string, result: LinkResult): string {
+  const [path, hash = ""] = splitHash(returnTo);
+  const separator = path.includes("?") ? "&" : "?";
+  return `${path}${separator}${LINK_RESULT_PARAM}=${result}${hash ? `#${hash}` : ""}`;
+}
+
+function splitHash(value: string): [string, string?] {
+  const i = value.indexOf("#");
+  if (i === -1) return [value];
+  return [value.slice(0, i), value.slice(i + 1)];
+}
+
+/**
+ * 長さ差を先に見てから `timingSafeEqual`。`crypto.timingSafeEqual` は長さが違うと
+ * 例外を投げるため、素で呼ぶと「長さが違う」ことだけが例外の有無で漏れる。
+ */
+function timingSafeEqualStrings(a: string, b: string): boolean {
+  const bufA = Buffer.from(a, "utf8");
+  const bufB = Buffer.from(b, "utf8");
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
+}

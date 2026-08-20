@@ -24,6 +24,7 @@ import {
   fetchLineLinkageStatus,
   UNKNOWN_LINE_LINKAGE,
 } from "@/lib/line/linkage-status";
+import { LINK_RESULT_PARAM } from "@/lib/line/link-flow";
 import {
   ACCOUNT_SECTION_ORDER,
   isAvailable,
@@ -87,7 +88,13 @@ export async function generateMetadata(): Promise<Metadata> {
  * お届け先・お支払い方法・注文明細は Shopify の顧客アカウントポータルへ 1 本の
  * 外部リンクで送る設計 (AccountOpsBand 8095:788 の本文がそう言っている)。
  */
-export default async function AccountPage() {
+export default async function AccountPage({
+  searchParams,
+}: {
+  /* Next 15+ では searchParams は Promise。連携フローからの復帰結果
+     (`?line_link=success|error`) を受け取るためだけに使う。 */
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const t = await getTranslations("account");
   const tCommon = await getTranslations("common");
   const locale = await getLocale();
@@ -148,6 +155,13 @@ export default async function AccountPage() {
   const lineLinkage = customer
     ? await fetchLineLinkageStatus(customer.id)
     : UNKNOWN_LINE_LINKAGE;
+
+  /* 連携フロー (P2) から戻ってきた直後の結果。値は 2 つだけを許し、それ以外は無視する
+     (任意の文字列を画面の分岐に持ち込ませない)。表示は LineLinkageEntry の中に閉じ、
+     専用の完了画面は作らない。 */
+  const rawLineLink = (await searchParams)?.[LINK_RESULT_PARAM];
+  const lineLinkResult =
+    rawLineLink === "success" || rawLineLink === "error" ? rawLineLink : undefined;
 
   /* Shopify 顧客アカウントポータルへの外部リンク。LINE だけの人はポータルの
      セッションを持たないので出さない (押しても入れない導線を置かない)。 */
@@ -378,7 +392,11 @@ export default async function AccountPage() {
           未連携・不明なら従来どおり連携ボタンを出す (出し分けはコンポーネント側)。 */}
       {auth.shopify ? (
         <div className="page-container">
-          <LineLinkageEntry locale={locale} status={lineLinkage} />
+          <LineLinkageEntry
+            locale={locale}
+            status={lineLinkage}
+            result={lineLinkResult}
+          />
         </div>
       ) : null}
     </>
