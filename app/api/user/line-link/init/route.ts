@@ -10,6 +10,7 @@ import {
   LINE_LINK_STATE_COOKIE,
   STATE_TTL_MS,
   defaultReturnTo,
+  resolveLinkChannelSecret,
   sanitizeReturnTo,
   sealLinkState,
 } from "@/lib/line/link-flow";
@@ -66,7 +67,11 @@ export async function POST(request: NextRequest) {
   if (limited) return limited;
 
   const channelId = process.env.LINE_LIFF_CHANNEL_ID;
-  const channelSecret = process.env.LINE_LIFF_CHANNEL_SECRET;
+  /* secret は LINE_LIFF_CHANNEL_SECRET を優先し、未設定なら既存の LINE_LOGIN_CHANNEL_SECRET に
+   * フォールバックする。LINE_LIFF_CHANNEL_ID と LINE_LOGIN_CHANNEL_ID は同一 Login チャネル
+   * (2009473839) を指すため両 secret は同値。どちらか一方でも設定済みなら「設定済み」と判定する
+   * （本番 Vercel に新規シークレットを追加せず既存 env で連携導線を開くため）。 */
+  const channelSecret = resolveLinkChannelSecret();
   if (!channelId || !channelSecret) {
     /* 503（500 ではない）。壊れているのではなく、このデプロイに連携の資格情報が無いだけ。
      * secret まで見るのは、init だけ通って callback で必ず失敗する状態を作らないため
