@@ -173,6 +173,11 @@ export const COOKIE_REGISTRY: readonly CookieSpec[] = [
    * production `NODE_ENV === "production"`, so the emitted attribute is
    * unchanged. */
   { name: "line_oauth_state", group: "transient", scope: "shared-domain", secure: "prod-only" },
+  /* Web 発 LINE 連携 (P2) の state。`line_oauth_state` と同じ理由で shared-domain /
+   * prod-only だが、**別 cookie にしてある**。ログインと連携は別のチャネル・別の意図で、
+   * 片方の往復がもう片方の state を踏み潰すと、途中まで進んでいたほうが静かに壊れる。
+   * 中身は暗号文 (顧客 ID を封じるため。lib/line/link-flow.ts)。 */
+  { name: "line_link_state", group: "transient", scope: "shared-domain", secure: "prod-only" },
   /* Name verified against lib/line/account-link.ts:22 — it is `acct_link_tk`,
    * not the longer form the design assumed. */
   { name: "acct_link_tk", group: "transient", scope: "host-only", secure: "prod-only" },
@@ -226,6 +231,7 @@ export const COOKIE_NAME = {
   lineUid: "line_uid",
   lineSession: "line_session",
   lineOauthState: "line_oauth_state",
+  lineLinkState: "line_link_state",
   accountLinkToken: "acct_link_tk",
 } as const;
 

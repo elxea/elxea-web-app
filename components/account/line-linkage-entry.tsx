@@ -1,6 +1,5 @@
-import { Button } from "@/components/ui/button";
-
 import { AccountPanelSection } from "@/components/account/account-panel";
+import { LineLinkageCta } from "@/components/account/line-linkage-cta";
 import {
   formatLinkedDate,
   isLinkedForDisplay,
@@ -11,15 +10,26 @@ import {
  * Web 側の LINE 連携エントリ（案A 第2弾 / Phase 2）。
  *
  * Shopify（Customer Account）にログイン済みのユーザーが、web の account ページから
- * LINE 連携フローに入るための導線。LINE 側（リッチメニュー「定期便」/ キーワード →
- * emitLinkageButton → LIFF）と同じ LIFF ページ（/liff/link）を、同じ LIFF permanent link
- * 経由で開く。押すと LINE アプリ内ブラウザ（またはブラウザ内 LINE ログイン）で LIFF が起動し、
- * liff.getIDToken() → /api/user/line-link-liff（Shopify セッション認証必須）→ cx-agent
- * link-liff（customer_linkages upsert + カルテ carryover）へと繋がる。
+ * LINE 連携フローに入るための導線。
  *
- * env 前提（staging のみ・prod は別ゲート S2）:
- *   NEXT_PUBLIC_LIFF_ID … LIFF アプリ ID（公開値・build 時にインライン）。
- *   未設定なら導線を出さない（graceful hide）。設定漏れの環境で壊れたリンクを見せない。
+ * ## P2 で変わったこと（LIFF permanent link をやめた）
+ *
+ * ここは以前 `https://liff.line.me/{NEXT_PUBLIC_LIFF_ID}` へのリンクだった。LIFF は
+ * **LINE アプリ / LINE 内ブラウザへ離脱する**ため、Chrome で押した人は Safari に移され、
+ * そこには Shopify のログインが無い。1 回目は「誰か分からない」で失敗し、成功しても
+ * 「トークに戻る」しか出口が無くマイページへ帰れなかった。
+ *
+ * P2 の導線は LIFF を通らない。同じブラウザのまま LINE の認可へ行き、同じブラウザの
+ * マイページへ 302 で戻る（`/api/user/line-link/init` → access.line.me →
+ * `/api/user/line-link/callback` → cx-agent link-liff → マイページ）。
+ * ボタンの実体は `LineLinkageCta`（client component）。
+ *
+ * LINE 側の入口（リッチメニュー / キーワード → LIFF）は従来どおり `/liff/link` を使う。
+ * 連携の登録先（cx-agent の customer_linkages）は両者で同一。
+ *
+ * 導線を出せるかどうかは **サーバが決める**（init が 503 を返すデプロイでは CTA を畳む）。
+ * `NEXT_PUBLIC_LIFF_ID` の有無で判断していた旧方式はもう使わない — 連携に要る資格情報は
+ * すべてサーバ側にあり、公開 env の有無は連携可否と一致しないため。
  *
  * 文言方針: 静かで丁寧・絵文字なし・押し売りなし（liff-link-client と同じ体験原則）。
  * このコンポーネント内に JA/EN を内包する（本機能の他ページと同じインライン COPY 方式）。
@@ -38,6 +48,11 @@ const COPY = {
     /** 連携済みだが日付が取れないとき。日付を言い切らない。 */
     linkedNoDate:
       "LINE と連携しています。あなたの好みに合わせたご案内を LINE のトークでお届けしています。",
+    /** 連携から戻ってきた直後に一度だけ出す確認。連携完了「画面」は作らない（要件 4）。 */
+    noticeSuccess: "LINE との連携が完了しました。",
+    /** 失敗して戻ってきたとき。原因は伏せる（外に検証内訳を出さない）が、黙って戻さない。 */
+    noticeError:
+      "連携を完了できませんでした。お手数ですが、もう一度お試しください。",
   },
   en: {
     heading: "Link with LINE",
@@ -49,19 +64,12 @@ const COPY = {
       "Linked with LINE since {date}. We send suggestions tailored to your taste in the LINE chat.",
     linkedNoDate:
       "Linked with LINE. We send suggestions tailored to your taste in the LINE chat.",
+    noticeSuccess: "Your LINE account is now linked.",
+    noticeError: "We could not complete the link. Please try again.",
   },
 } as const;
 
 type Locale = keyof typeof COPY;
-
-/**
- * LIFF permanent link を組み立てる。NEXT_PUBLIC_LIFF_ID が無ければ null（＝導線を出さない）。
- */
-function liffLinkageUrl(): string | null {
-  const liffId = process.env.NEXT_PUBLIC_LIFF_ID;
-  if (!liffId) return null;
-  return `https://liff.line.me/${liffId}`;
-}
 
 /**
  * @param status 連携状態（P1）。`linked` は 3 値。
@@ -76,48 +84,64 @@ function liffLinkageUrl(): string | null {
  *   ⚠ 連携済みでも**解除の導線は出さない**。解除が行削除か旗立てかという状態遷移が
  *   まだ確定しておらず（P1b で決める）、押せる解除ボタンを先に置くと定義が実装に
  *   引きずられる。ここに解除ボタンを足す前に、必ずその判断を先に済ませること。
+ *
+ * @param result 連携フローから戻ってきた直後の結果（`?line_link=success|error`）。
+ *   一度きりの確認をこの節の中に出すためだけに使う。**専用の完了画面は作らない**
+ *   （旧 LIFF 導線が連携済みの人にも毎回「連携完了」を見せていた問題の再発防止）。
+ *   `error` を黙って捨てないのは、失敗して戻ってきた人が「何も起きなかった」と
+ *   受け取るのが、まさに P2 で直している体験だから。
  */
 export function LineLinkageEntry({
   locale,
   status,
+  result,
 }: {
   locale: string;
   status?: LineLinkageStatus;
+  result?: "success" | "error";
 }) {
   const t = COPY[(locale as Locale) in COPY ? (locale as Locale) : "ja"];
 
-  // 連携済み: 状態を伝えるだけ。LIFF 未設定でもこの表示は出す（既に繋がっている
-  // 事実は設定の有無と関係ないため。連携導線だけが env に依存する）。
+  const notice = result ? (
+    <p
+      className="text-sm text-foreground leading-relaxed"
+      data-testid={`line-linkage-notice-${result}`}
+      role="status"
+    >
+      {result === "success" ? t.noticeSuccess : t.noticeError}
+    </p>
+  ) : null;
+
+  // 連携済み: 状態を伝えるだけ。
   if (isLinkedForDisplay(status)) {
     const date = formatLinkedDate(status.linkedAt, locale);
     return (
       <AccountPanelSection title={t.linkedHeading} testId="line-linkage-entry">
-        <p
-          className="text-sm text-muted-foreground leading-relaxed"
-          data-testid="line-linkage-linked"
-        >
-          {date ? t.linkedWithDate.replace("{date}", date) : t.linkedNoDate}
-        </p>
+        <div className="space-y-2">
+          {notice}
+          <p
+            className="text-sm text-muted-foreground leading-relaxed"
+            data-testid="line-linkage-linked"
+          >
+            {date ? t.linkedWithDate.replace("{date}", date) : t.linkedNoDate}
+          </p>
+        </div>
       </AccountPanelSection>
     );
   }
 
-  // 未連携 / 不明: 従来どおり連携導線を出す。
-  const url = liffLinkageUrl();
-  if (!url) return null; // 設定未了（prod 未カットオーバー等）は静かに非表示
-
+  /* 未連携 / 不明: 連携導線を出す。押せるかどうか（＝このデプロイに連携の設定があるか）は
+     CTA が init に問い合わせて決める。ここでは公開 env を見ない。 */
   return (
     <AccountPanelSection title={t.heading} testId="line-linkage-entry">
-      <div className="flex items-start justify-between gap-6">
-        <p className="text-sm text-muted-foreground leading-relaxed">
-          {t.description}
-        </p>
-        <Button variant="outline" size="sm" className="shrink-0" asChild>
-          {/* LIFF permanent link。LINE アプリ内ブラウザ / ブラウザ内 LINE ログインで /liff/link を開く。 */}
-          <a href={url} rel="noopener noreferrer" data-testid="line-linkage-cta">
-            {t.button}
-          </a>
-        </Button>
+      <div className="space-y-2">
+        {notice}
+        <div className="flex items-start justify-between gap-6">
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            {t.description}
+          </p>
+          <LineLinkageCta label={t.button} />
+        </div>
       </div>
     </AccountPanelSection>
   );

@@ -1,0 +1,176 @@
+import { NextRequest, NextResponse } from "next/server";
+import { cookies } from "next/headers";
+
+import { requireAuth } from "@/lib/firebase/auth-guard";
+import { getBaseUrl } from "@/lib/base-url";
+import { getCookieSpec, resolveCookieDomain } from "@/lib/auth/cookies";
+import { CX_AGENT_BASE_URL } from "@/lib/chat/proxy";
+import { verifyLiffIdToken } from "@/lib/line/verify-liff-token";
+import {
+  LINE_LINK_STATE_COOKIE,
+  defaultReturnTo,
+  openLinkState,
+  returnUrlWithResult,
+} from "@/lib/line/link-flow";
+
+/**
+ * GET /api/user/line-link/callback — Web 発 LINE 連携の帰り道（P2）。
+ *
+ * ## この route が果たす約束
+ *
+ * **必ずマイページに戻す。** 成功でも失敗でも、行き止まりの画面を出さない。旧 LIFF 導線は
+ * 完了後に「トークに戻る」しか出口が無く、元のブラウザのマイページへ帰れなかった。それが
+ * P2 で直したい体験そのものなので、ここは常に `returnTo`（= 開始時に封じた自サイト内パス）
+ * への 302 で終わる。連携完了画面は作らない。結果は `?line_link=success|error` で伝え、
+ * 実際の状態表示は P1 の読み取り（`fetchLineLinkageStatus`）が担う。
+ *
+ * ## 連携を成立させる条件（fail-closed）
+ *
+ * 1. `openLinkState` の 4 条件（復号可 / nonce 一致 / **顧客一致** / 期限内）
+ * 2. LINE の token 交換が成功し、`id_token` がある
+ * 3. `verifyLiffIdToken` が LINE の verify API で通る（aud / iss / exp / sub 形式）
+ * 4. `SYNC_API_SECRET` があり、cx-agent の upsert が 2xx を返す
+ *
+ * どれか 1 つでも欠けたら `?line_link=error` で戻す。「たぶん成功した」で成功を名乗らない。
+ *
+ * ## なぜ `verifyLiffIdToken` を使い回すのか
+ *
+ * 名前は LIFF だが、実体は「この Login チャネルが発行した id_token を LINE に検証させ、
+ * `sub`（= 同一プロバイダーなら Messaging userId）を取り出す」関数で、認可の入口が
+ * LIFF か Web かには依存しない。同じ検証を 2 つ書くと、片方だけ緩む日が必ず来る。
+ *
+ * ## 秘密の扱い
+ *
+ * token 交換の client_secret も cx-agent の `SYNC_API_SECRET` も **サーバ環境変数のみ**。
+ * ブラウザには一切出さない。LINE の userId もクエリや cookie に出さない（P1 の最小開示と同じ）。
+ */
+export async function GET(request: NextRequest) {
+  const locale = resolveLocale(request);
+  const fallbackReturn = defaultReturnTo(locale);
+
+  const cookieStore = await cookies();
+  const stateCookie = cookieStore.get(LINE_LINK_STATE_COOKIE)?.value;
+
+  /* state cookie は、この先どの経路を通っても必ず捨てる（使い捨て）。残しておくと
+   * 同じ state で二度目の callback を踏ませる余地が生まれる。Domain は発行時と同じ
+   * 導出（`resolveCookieDomain`）でなければ delete が黙って何もしないので注意。 */
+  const clearState = () => {
+    const spec = getCookieSpec(LINE_LINK_STATE_COOKIE)!;
+    const domain = spec.scope === "shared-domain" ? resolveCookieDomain(request) : undefined;
+    cookieStore.delete({
+      name: LINE_LINK_STATE_COOKIE,
+      path: "/",
+      ...(domain ? { domain } : {}),
+    });
+  };
+
+  const fail = (returnTo: string, reason: string) => {
+    console.warn(`[line-link/callback] ${reason}`);
+    clearState();
+    return NextResponse.redirect(new URL(returnUrlWithResult(returnTo, "error"), request.url));
+  };
+
+  /* 顧客 ID はここでも **その場のセッション**から取り直す。cookie に封じた値を
+   * そのまま信じないのは、往復中にログアウト・別アカウントへの切替が起こりうるため。
+   * 一致しなければ連携しない（それが state 束縛の 3 番目の条件）。 */
+  const auth = await requireAuth();
+  if (!auth.authenticated) {
+    return fail(fallbackReturn, "no shopify session on return");
+  }
+
+  const opened = openLinkState(
+    stateCookie,
+    request.nextUrl.searchParams.get("state"),
+    auth.customerId,
+  );
+  if (!opened.ok) {
+    return fail(fallbackReturn, `state rejected: ${opened.reason}`);
+  }
+  const returnTo = opened.returnTo;
+
+  const lineError = request.nextUrl.searchParams.get("error");
+  if (lineError) {
+    /* ユーザーが LINE 側で「キャンセル」した場合もここに来る。異常ではないので
+     * 静かにマイページへ戻す（結果は error = 連携していない、で正しい）。 */
+    return fail(returnTo, `line returned error: ${lineError}`);
+  }
+
+  const code = request.nextUrl.searchParams.get("code");
+  if (!code) return fail(returnTo, "no authorization code");
+
+  const channelId = process.env.LINE_LIFF_CHANNEL_ID;
+  const channelSecret = process.env.LINE_LIFF_CHANNEL_SECRET;
+  if (!channelId || !channelSecret) {
+    return fail(returnTo, "LINE_LIFF_CHANNEL_ID / _SECRET not configured");
+  }
+
+  const syncSecret = process.env.SYNC_API_SECRET;
+  if (!syncSecret) {
+    /* fail-closed。秘密が無ければ cx-agent は 401 を返すので、無駄打ちもしない。 */
+    return fail(returnTo, "SYNC_API_SECRET not set; cannot link");
+  }
+
+  let idToken: string | undefined;
+  try {
+    const tokenRes = await fetch("https://api.line.me/oauth2/v2.1/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        grant_type: "authorization_code",
+        code,
+        /* 認可時と **完全一致**の redirect_uri でなければ LINE は交換を拒む。
+         * 両方 `getBaseUrl(request)` から作ることで、apex / www の食い違いを生まない。 */
+        redirect_uri: `${getBaseUrl(request)}/api/user/line-link/callback`,
+        client_id: channelId,
+        client_secret: channelSecret,
+      }),
+    });
+    if (!tokenRes.ok) {
+      return fail(returnTo, `token exchange failed: ${tokenRes.status}`);
+    }
+    const tokens = (await tokenRes.json()) as { id_token?: string };
+    idToken = tokens.id_token;
+  } catch (err) {
+    return fail(returnTo, `token exchange threw: ${String(err)}`);
+  }
+
+  if (!idToken) return fail(returnTo, "no id_token in token response");
+
+  /* LINE 自身に検証させて `sub` を得る。ブラウザ経由で来た値は何一つ信じない。 */
+  const verified = await verifyLiffIdToken(idToken, channelId);
+  if (!verified.ok) {
+    return fail(returnTo, `id_token verification failed: ${verified.reason}`);
+  }
+
+  try {
+    const upstream = await fetch(`${CX_AGENT_BASE_URL}/api/identity/link-liff`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-API-Key": syncSecret,
+      },
+      body: JSON.stringify({
+        line_messaging_user_id: verified.messagingUserId,
+        /* 連携キーの顧客側は **サーバ確定 customerId**。ブラウザ由来の値は使わない。 */
+        shopify_customer_id: auth.customerId,
+        shopify_email: verified.email,
+      }),
+    });
+    if (!upstream.ok) {
+      const detail = await upstream.text().catch(() => "");
+      return fail(returnTo, `cx-agent returned ${upstream.status}: ${detail}`);
+    }
+  } catch (err) {
+    return fail(returnTo, `cx-agent unreachable: ${String(err)}`);
+  }
+
+  clearState();
+  return NextResponse.redirect(new URL(returnUrlWithResult(returnTo, "success"), request.url));
+}
+
+/** 失敗時の戻り先を決めるための locale。next-intl の cookie → accept-language → ja。 */
+function resolveLocale(request: NextRequest): string {
+  const cookieLocale = request.cookies.get("NEXT_LOCALE")?.value;
+  if (cookieLocale && /^[a-z]{2}$/.test(cookieLocale)) return cookieLocale;
+  return request.headers.get("accept-language")?.startsWith("en") ? "en" : "ja";
+}
