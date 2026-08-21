@@ -570,7 +570,9 @@
     "errorProfileFailed": "LINE プロフィールの取得に失敗しました。もう一度お試しください。",
     "errorNotConfigured": "LINE ログインが設定されていません。管理者にお問い合わせください。",
     "errorMissingParams": "認証パラメータが不足しています。もう一度お試しください。",
-    "errorUnexpected": "予期しないエラーが発生しました。もう一度お試しください。"
+    "errorUnexpected": "予期しないエラーが発生しました。もう一度お試しください。",
+    "errorInvalidIdToken": "認証を確認できませんでした。お手数ですが、もう一度ログインしてください。",
+    "errorVerificationUnavailable": "現在、認証の確認ができません。少し時間をおいて、もう一度お試しください。"
   },
   "loginComplete": {
     "title": "連携完了",

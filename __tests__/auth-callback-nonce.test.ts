@@ -65,6 +65,11 @@ vi.mock("@sentry/nextjs", () => ({
 
 import { GET } from "@/app/api/auth/callback/route";
 import { __resetShopifyJwksCacheForTests } from "@/lib/shopify/id-token";
+import {
+  ERROR_KEY_MAP,
+  FALLBACK_ERROR_MESSAGE_KEY,
+  resolveAuthErrorMessageKey,
+} from "@/app/[locale]/login/auth-error-keys";
 
 // --- Helpers ----------------------------------------------------------------
 
@@ -171,7 +176,7 @@ describe("GET /api/auth/callback id_token enforcement", () => {
     const response = await GET(callbackRequest(HAPPY_COOKIES));
 
     expect(response.headers.get("location")).toBe(
-      "https://www.elxea.com/ja/account?error=invalid_nonce",
+      "https://www.elxea.com/ja/login?error=InvalidIdToken",
     );
     expect(captureMessageMock).toHaveBeenCalledWith(
       "Shopify id_token verification failed",
@@ -189,7 +194,7 @@ describe("GET /api/auth/callback id_token enforcement", () => {
 
     const response = await GET(callbackRequest(HAPPY_COOKIES));
 
-    expect(response.headers.get("location")).toContain("error=invalid_nonce");
+    expect(response.headers.get("location")).toContain("/ja/login?error=InvalidIdToken");
     const setCookie = response.headers.getSetCookie().join("\n");
     expect(setCookie).not.toContain("shop_at=enc(");
   });
@@ -201,7 +206,7 @@ describe("GET /api/auth/callback id_token enforcement", () => {
 
     const response = await GET(callbackRequest(HAPPY_COOKIES));
 
-    expect(response.headers.get("location")).toContain("error=invalid_nonce");
+    expect(response.headers.get("location")).toContain("/ja/login?error=InvalidIdToken");
   });
 
   it("establishes no session at all when the token is rejected", async () => {
@@ -240,7 +245,7 @@ describe("GET /api/auth/callback id_token enforcement", () => {
 
     const response = await GET(callbackRequest(HAPPY_COOKIES));
 
-    expect(response.headers.get("location")).toContain("error=invalid_nonce");
+    expect(response.headers.get("location")).toContain("/ja/login?error=InvalidIdToken");
   });
 
   it("rejects when the browser presents no shop_nonce cookie", async () => {
@@ -249,18 +254,58 @@ describe("GET /api/auth/callback id_token enforcement", () => {
 
     const response = await GET(callbackRequest(withoutNonce));
 
-    expect(response.headers.get("location")).toContain("error=invalid_nonce");
+    expect(response.headers.get("location")).toContain("/ja/login?error=InvalidIdToken");
   });
 
   it("rejects the login when Shopify's key set cannot be reached", async () => {
     /* Fail-closed on an unverifiable token. Logging the user in "because the
-     * JWKS was down" would restore exactly the behaviour being removed. */
+     * JWKS was down" would restore exactly the behaviour being removed.
+     *
+     * Distinct key from the token-invalid case on purpose: this is a server-side
+     * condition the user cannot fix by retrying immediately, and it is not
+     * attacker-controlled, so naming it leaks nothing. */
     globalThis.fetch = makeJwksFetch([keypair.jwk], { failAfter: 0 });
     exchangeTokenMock.mockResolvedValue(tokenResponse(goodToken()));
 
     const response = await GET(callbackRequest(HAPPY_COOKIES));
 
-    expect(response.headers.get("location")).toContain("error=invalid_nonce");
+    expect(response.headers.get("location")).toContain("/ja/login?error=VerificationUnavailable");
+  });
+
+  it("sends the user to a page that actually shows the error", async () => {
+    /* The regression this pins: the rejection used to redirect to
+     * `/{locale}/account?error=invalid_nonce`. Nothing reads `error` on the account
+     * page, and the rejection has just cleared the session cookies — so middleware
+     * bounces the request to `/{locale}/login` and DROPS the query string on the
+     * way. The user saw a bare login form and no explanation.
+     *
+     * Two properties are required, and neither alone is enough:
+     *   1. the destination is the login page (where the banner lives)
+     *   2. the `error` value is a key the banner can resolve */
+    exchangeTokenMock.mockResolvedValue(
+      tokenResponse(signIdToken(keypair, validClaims("attacker-controlled-nonce"))),
+    );
+
+    const response = await GET(callbackRequest(HAPPY_COOKIES));
+
+    const location = new URL(response.headers.get("location")!);
+    expect(location.pathname).toBe("/ja/login");
+    const errorCode = location.searchParams.get("error")!;
+    expect(ERROR_KEY_MAP[errorCode]).toBeDefined();
+    // ...and it must not fall through to the generic "something went wrong".
+    expect(resolveAuthErrorMessageKey(errorCode)).not.toBe(FALLBACK_ERROR_MESSAGE_KEY);
+  });
+
+  it("keeps the locale of the attempt in the rejection redirect", async () => {
+    exchangeTokenMock.mockResolvedValue(
+      tokenResponse(signIdToken(keypair, validClaims("attacker-controlled-nonce"))),
+    );
+
+    const response = await GET(
+      callbackRequest({ ...HAPPY_COOKIES, shop_locale: "en" }),
+    );
+
+    expect(new URL(response.headers.get("location")!).pathname).toBe("/en/login");
   });
 
   it("does not leak which check failed into the redirect", async () => {

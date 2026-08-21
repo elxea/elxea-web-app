@@ -73,12 +73,38 @@ export async function GET(request: NextRequest) {
         tags: { subsystem: "shopify-oauth" },
         extra: { reason: verified.reason },
       });
-      /* The query value stays `invalid_nonce` for every rejection reason. The
-       * account page already maps it to a "start over" message, and telling the
-       * outside world *which* of signature / iss / aud / exp / nonce failed hands
-       * an attacker a free oracle. The precise reason goes to the log and Sentry. */
+      /* Send the user somewhere that can actually TELL them what happened.
+       *
+       * This used to redirect to `/{locale}/account?error=invalid_nonce`, which
+       * showed nothing at all: no code reads `error` on the account page, and the
+       * rejection has just cleared the session cookies — so `middleware.ts` sees an
+       * unauthenticated `/account` request and redirects to `/{locale}/login`
+       * **without carrying the query string**. The parameter was dropped one hop
+       * before anything could have read it. A user whose login was refused landed
+       * on a bare login form with no explanation, which is indistinguishable from
+       * having mis-tapped.
+       *
+       * `/{locale}/login` is where `AuthErrorBanner` lives, and it resolves
+       * `?error=<key>` through its own map — so the key has to be one of ITS keys,
+       * not a snake_case string invented here.
+       *
+       * Two buckets, deliberately:
+       *
+       *   - `VerificationUnavailable` — we could not perform the check at all
+       *     (JWKS unreachable, client id not configured). Server-side conditions,
+       *     not attacker-controlled, so naming them leaks nothing and "try again
+       *     shortly" is the honest advice.
+       *   - `InvalidIdToken` — everything about the token itself: signature, nonce,
+       *     iss, aud, exp, sub. These stay **indistinguishable from each other**.
+       *     Telling the outside world which one failed hands an attacker a free
+       *     oracle for probing the verifier. The precise reason goes to the log and
+       *     to Sentry, where only we can read it. */
+      const userFacingKey =
+        verified.reason === "jwks_unavailable" || verified.reason === "client_id_not_configured"
+          ? "VerificationUnavailable"
+          : "InvalidIdToken";
       const rejected = NextResponse.redirect(
-        `${origin}/${locale}/account?error=invalid_nonce`,
+        `${origin}/${locale}/login?error=${userFacingKey}`,
       );
       // One-shot values: a rejected attempt must not leave anything reusable.
       for (const name of ["shop_cv", "shop_state", "shop_nonce", "shop_locale", "shop_return_to"]) {

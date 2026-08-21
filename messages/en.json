@@ -570,7 +570,9 @@
     "errorProfileFailed": "Could not load your LINE profile. Please try again.",
     "errorNotConfigured": "LINE sign-in is not configured. Please contact the administrator.",
     "errorMissingParams": "Authentication parameters were missing. Please try again.",
-    "errorUnexpected": "An unexpected error occurred. Please try again."
+    "errorUnexpected": "An unexpected error occurred. Please try again.",
+    "errorInvalidIdToken": "We could not verify your sign-in. Please sign in again.",
+    "errorVerificationUnavailable": "Sign-in verification is unavailable right now. Please try again in a few minutes."
   },
   "loginComplete": {
     "title": "Account Linked",
