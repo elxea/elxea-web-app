@@ -64,6 +64,24 @@ export const LINK_RESULT_PARAM = "line_link";
  */
 export type LinkResult = "success" | "error";
 
+/**
+ * 連携（P2）の token 交換と存在ゲートに使う Channel Secret を解決する。
+ *
+ * `LINE_LIFF_CHANNEL_ID` と `LINE_LOGIN_CHANNEL_ID` は同一 Login チャネル (2009473839) を指すため、
+ * その Channel Secret は `LINE_LOGIN_CHANNEL_SECRET` と同値である。P2 は `LINE_LIFF_CHANNEL_SECRET`
+ * を優先し、未設定時は既存の `LINE_LOGIN_CHANNEL_SECRET` にフォールバックする。
+ *
+ * 狙いは **Vercel 本番に新しいシークレットを入れさせないこと**。本番には既に
+ * `LINE_LOGIN_CHANNEL_SECRET`（Web ログイン用 / 同一チャネル）が設定済みで、
+ * `LINE_LIFF_CHANNEL_SECRET` は未設定でも、このフォールバックで連携の code→token 交換が通る。
+ *
+ * どちらも未設定なら `undefined` を返し、呼び出し側は「このデプロイでは連携できない」
+ * （init は 503 / callback は fail-closed）として扱う。
+ */
+export function resolveLinkChannelSecret(): string | undefined {
+  return process.env.LINE_LIFF_CHANNEL_SECRET ?? process.env.LINE_LOGIN_CHANNEL_SECRET;
+}
+
 /** cookie に封じる中身。キーを 1 文字にしているのは cookie サイズを抑えるため。 */
 type SealedState = {
   /** nonce（URL の `state` と突き合わせる値）。 */

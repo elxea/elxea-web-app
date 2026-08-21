@@ -252,6 +252,9 @@ function callbackRequest(params: Record<string, string>) {
 beforeEach(() => {
   cookieJar.clear();
   process.env.LINE_LIFF_CHANNEL_SECRET = "test-channel-secret";
+  /* フォールバック先は既定で未設定にしておく（他テストからの漏れを断つ）。
+   * フォールバックを検証するケースだけが明示的に設定する。 */
+  delete process.env.LINE_LOGIN_CHANNEL_SECRET;
   process.env.NEXTAUTH_URL = "https://www.elxea.com";
   process.env.AUTH_LINE_ID = "login-channel-DO-NOT-USE-FOR-LINKING";
   linkageStatusMock.mockResolvedValue({ linked: false, linkedAt: null });
@@ -533,5 +536,86 @@ describe("GET /api/user/line-link/callback", () => {
     expect(res.status).toBe(307);
     expect(new URL(res.headers.get("location")!).pathname).toBe("/ja/account");
     expect(outbound).not.toHaveBeenCalled();
+  });
+});
+
+/* =========================================================================
+ * P2 — client_secret の env フォールバック（LINE_LIFF → LINE_LOGIN_CHANNEL_SECRET）
+ *
+ * LINE_LIFF_CHANNEL_ID と LINE_LOGIN_CHANNEL_ID は同一 Login チャネル (2009473839) を指すため、
+ * その Channel Secret は LINE_LOGIN_CHANNEL_SECRET と同値。本番 Vercel は後者だけ設定済みで
+ * 前者は未設定なので、フォールバックが無いと init は 503・callback は fail-closed で連携が回らない。
+ * ここでは (a) LIFF のみ (b) LOGIN のみ (c) 両方未設定 の 3 状態を固定する。
+ * ========================================================================= */
+describe("P2 client_secret env フォールバック", () => {
+  it("(a) LIFF secret のみ設定 → 連携導線を開く（init 200 authUrl）", async () => {
+    requireAuthMock.mockResolvedValue({ authenticated: true, customerId: OWNER });
+    process.env.LINE_LIFF_CHANNEL_SECRET = "liff-secret";
+    delete process.env.LINE_LOGIN_CHANNEL_SECRET;
+    const { POST: init } = await import("@/app/api/user/line-link/init/route");
+
+    const res = await init(initRequest());
+    expect(res.status).toBe(200);
+    const { authUrl } = (await res.json()) as { authUrl?: string };
+    expect(authUrl).toBeTruthy();
+  });
+
+  it("(b) LOGIN secret のみ設定（LIFF 未設定）→ フォールバックで連携導線を開く（init 200 authUrl）", async () => {
+    requireAuthMock.mockResolvedValue({ authenticated: true, customerId: OWNER });
+    delete process.env.LINE_LIFF_CHANNEL_SECRET;
+    process.env.LINE_LOGIN_CHANNEL_SECRET = "login-secret";
+    const { POST: init } = await import("@/app/api/user/line-link/init/route");
+
+    const res = await init(initRequest());
+    expect(res.status).toBe(200);
+    const { authUrl } = (await res.json()) as { authUrl?: string };
+    expect(authUrl).toBeTruthy();
+  });
+
+  it("(b) callback は LIFF 未設定でも LINE_LOGIN_CHANNEL_SECRET で code→token 交換する", async () => {
+    requireAuthMock.mockResolvedValue({ authenticated: true, customerId: OWNER });
+    verifyLiffIdTokenMock.mockResolvedValue({ ok: true, messagingUserId: VALID_SUB, email: null });
+    delete process.env.LINE_LIFF_CHANNEL_SECRET;
+    process.env.LINE_LOGIN_CHANNEL_SECRET = "login-secret";
+    const outbound = stubLineThenCxAgent();
+
+    const { state, cookieValue } = sealLinkState({ customerId: OWNER, returnTo: "/ja/account" });
+    cookieJar.set(LINE_LINK_STATE_COOKIE, cookieValue);
+
+    const { GET: callback } = await import("@/app/api/user/line-link/callback/route");
+    const res = await callback(callbackRequest({ code: "auth-code", state }));
+
+    expect(res.status).toBe(307);
+    // 1 回目 = LINE token 交換。client_secret がフォールバック値・client_id は LIFF チャネルであること。
+    const [tokenUrl, tokenInit] = outbound.mock.calls[0] as unknown as [string, RequestInit];
+    expect(tokenUrl).toBe("https://api.line.me/oauth2/v2.1/token");
+    const body = new URLSearchParams(String(tokenInit.body));
+    expect(body.get("client_secret")).toBe("login-secret");
+    expect(body.get("client_id")).toBe(process.env.LINE_LIFF_CHANNEL_ID);
+  });
+
+  it("(c) 両方未設定 → init 503（押せるのに必ず失敗するボタンを出さない）", async () => {
+    requireAuthMock.mockResolvedValue({ authenticated: true, customerId: OWNER });
+    delete process.env.LINE_LIFF_CHANNEL_SECRET;
+    delete process.env.LINE_LOGIN_CHANNEL_SECRET;
+    const { POST: init } = await import("@/app/api/user/line-link/init/route");
+
+    const res = await init(initRequest());
+    expect(res.status).toBe(503);
+    expect(cookieJar.has(LINE_LINK_STATE_COOKIE)).toBe(false);
+  });
+
+  it("resolveLinkChannelSecret: LIFF を優先し、無ければ LOGIN、両方無ければ undefined", async () => {
+    const { resolveLinkChannelSecret } = await import("@/lib/line/link-flow");
+
+    process.env.LINE_LIFF_CHANNEL_SECRET = "liff";
+    process.env.LINE_LOGIN_CHANNEL_SECRET = "login";
+    expect(resolveLinkChannelSecret()).toBe("liff");
+
+    delete process.env.LINE_LIFF_CHANNEL_SECRET;
+    expect(resolveLinkChannelSecret()).toBe("login");
+
+    delete process.env.LINE_LOGIN_CHANNEL_SECRET;
+    expect(resolveLinkChannelSecret()).toBeUndefined();
   });
 });
