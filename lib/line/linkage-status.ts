@@ -185,6 +185,31 @@ type CacheEntry = { value: ResolvedShopifyCustomer; expiresAt: number };
  */
 const reverseCache = new Map<string, CacheEntry>();
 
+/**
+ * キャッシュの上限件数。
+ *
+ * TTL だけだと、長寿命プロセス（serverless でない実行環境）で訪問者が増え続けたときに
+ * Map が単調に膨らむ。上限に達したら期限切れを掃除し、それでも空かなければ最も古い
+ * 挿入から捨てる（Map は挿入順を保つ）。**正しさには影響しない** — 捨てられた人は
+ * 次の読み取りで台帳を引き直すだけ。
+ */
+const REVERSE_CACHE_MAX_ENTRIES = 5000;
+
+function evictIfNeeded(now: number): void {
+  if (reverseCache.size < REVERSE_CACHE_MAX_ENTRIES) return;
+
+  for (const [key, entry] of reverseCache) {
+    if (entry.expiresAt <= now) reverseCache.delete(key);
+  }
+
+  // 期限切れだけで足りなければ、古いものから落とす。
+  while (reverseCache.size >= REVERSE_CACHE_MAX_ENTRIES) {
+    const oldest = reverseCache.keys().next();
+    if (oldest.done) break;
+    reverseCache.delete(oldest.value);
+  }
+}
+
 /** テスト用。プロセス内キャッシュを空にする。 */
 export function __clearLinkageCacheForTest(): void {
   reverseCache.clear();
@@ -269,6 +294,7 @@ export async function fetchShopifyCustomerIdForLineUser(
   }
 
   // 確定した答え（連携先 or 未連携）だけを短時間キャッシュする。
+  evictIfNeeded(now);
   reverseCache.set(lineUserId, {
     value: resolved,
     expiresAt: now + LINKAGE_CACHE_TTL_MS,

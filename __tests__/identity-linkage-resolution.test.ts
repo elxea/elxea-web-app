@@ -224,6 +224,20 @@ describe("fetchShopifyCustomerIdForLineUser / 解除の反映（生存検証）"
     expect(afterTtl).toBe(false);
   });
 
+  it("キャッシュは無制限に増えない（長寿命プロセスで漏れない）", async () => {
+    stubUpstream({ linked: false, shopify_customer_id: null });
+    const t0 = 4_000_000;
+
+    // 上限を超える数の別々の LINE userId を引く。
+    for (let i = 0; i < 5100; i++) {
+      const id = `U${i.toString(16).padStart(32, "0")}`;
+      await fetchShopifyCustomerIdForLineUser(id, t0);
+    }
+
+    // 正しさは変わらない（捨てられた人は次回引き直すだけ）。
+    expect(await fetchShopifyCustomerIdForLineUser(LINE_USER_ID, t0)).toBe(false);
+  });
+
   it("解除は 60 秒以内に本人解決へ効く（TTL 上限での遮断）", async () => {
     const t0 = 2_000_000;
     stubUpstream({ linked: true, shopify_customer_id: SHOPIFY_CUSTOMER_ID });
