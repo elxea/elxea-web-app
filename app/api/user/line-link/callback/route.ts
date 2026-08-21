@@ -132,7 +132,13 @@ export async function GET(request: NextRequest) {
       }),
     });
     if (!tokenRes.ok) {
-      return fail(returnTo, `token exchange failed: ${tokenRes.status}`);
+      /* ステータスコードだけでは「なぜ落ちたか」が分からない。LINE は 400 に
+       * `error` / `error_description` を載せてくるので、その 2 つだけを読む
+       * (`invalid_grant` = redirect_uri 不一致 / code 期限切れ、`invalid_client`
+       *  = client_id と secret の組み合わせ違い、等)。**本文全体は出さない** —
+       * 交換に成功していれば access_token / id_token が同じ JSON に入るため、
+       * 丸ごとログに流すと秘密をログに置くことになる。 */
+      return fail(returnTo, `token exchange failed: ${tokenRes.status} ${await describeLineError(tokenRes)}`);
     }
     const tokens = (await tokenRes.json()) as { id_token?: string };
     idToken = tokens.id_token;
@@ -172,6 +178,30 @@ export async function GET(request: NextRequest) {
 
   clearState();
   return NextResponse.redirect(new URL(returnUrlWithResult(returnTo, "success"), request.url));
+}
+
+/**
+ * LINE のエラーレスポンスから `error` / `error_description` だけを取り出す。
+ *
+ * 許可リスト方式なのは意図的。本文をそのまま文字列化すると、将来 LINE が返す
+ * フィールドが増えたときに何がログに出るかを此処で制御できなくなる。抽出できな
+ * ければ `(no error body)` を返し、ログの行そのものは必ず出す（「静かに失敗した」
+ * を作らない）。
+ */
+async function describeLineError(res: Response): Promise<string> {
+  try {
+    const body = (await res.json()) as unknown;
+    if (!body || typeof body !== "object") return "(no error body)";
+    const record = body as Record<string, unknown>;
+    const parts: string[] = [];
+    if (typeof record.error === "string") parts.push(`error=${record.error}`);
+    if (typeof record.error_description === "string") {
+      parts.push(`error_description=${record.error_description}`);
+    }
+    return parts.length > 0 ? parts.join(" ") : "(no error body)";
+  } catch {
+    return "(unparseable error body)";
+  }
 }
 
 /** 失敗時の戻り先を決めるための locale。next-intl の cookie → accept-language → ja。 */

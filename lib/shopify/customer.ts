@@ -1,4 +1,10 @@
-import { createHash, randomBytes, createCipheriv, createDecipheriv } from "crypto";
+import {
+  createHash,
+  randomBytes,
+  createCipheriv,
+  createDecipheriv,
+  timingSafeEqual,
+} from "crypto";
 
 import {
   matchesExpectedBillingDate,
@@ -903,33 +909,98 @@ export function decryptToken(encrypted: string): string | null {
 // --- id_token helpers ---
 
 /**
- * Extract the numeric Shopify Customer ID from a Shopify Customer Account API id_token.
+ * Decode the payload of a Shopify Customer Account API id_token.
  *
- * The id_token is a JWT. Its payload contains:
- *   sub: "gid://shopify/Customer/12345"  (Customer GID)
+ * **No signature verification.** The token arrives over the back-channel token
+ * exchange — a direct TLS call to Shopify's token endpoint, not through the
+ * browser — so its origin is already established by the transport. The claims
+ * below are read for identification and replay-binding, not to grant access on
+ * their own.
  *
- * We decode the JWT payload without verifying the signature (the access_token
- * already proves the session is valid). This avoids an extra API round-trip on
- * every authenticated request.
- *
- * Returns the numeric portion (e.g. "12345") or null if decoding fails.
+ * TODO(signature): verify RS256 against Shopify's JWKS before treating any claim
+ * here as an independent authorization decision. Not done in this change: the
+ * project has no JWT/JWKS dependency, and the Customer Account API's JWKS
+ * endpoint has to be confirmed against Shopify's published metadata rather than
+ * guessed. Tracked for the identity design document alongside the rest of the
+ * OIDC hardening.
  */
-export function extractCustomerIdFromIdToken(idToken: string): string | null {
+function decodeIdTokenPayload(idToken: string): Record<string, unknown> | null {
   try {
     const parts = idToken.split(".");
     if (parts.length < 2) return null;
 
     // Base64url → Base64 → JSON
     const payload = parts[1].replace(/-/g, "+").replace(/_/g, "/");
-    const json = JSON.parse(Buffer.from(payload, "base64").toString("utf8"));
-
-    const sub: string | undefined = json.sub;
-    if (!sub) return null;
-
-    // sub is a GID: "gid://shopify/Customer/12345"
-    const match = sub.match(/(\d+)$/);
-    return match ? match[1] : null;
+    const json: unknown = JSON.parse(Buffer.from(payload, "base64").toString("utf8"));
+    if (!json || typeof json !== "object") return null;
+    return json as Record<string, unknown>;
   } catch {
     return null;
   }
+}
+
+/**
+ * Extract the numeric Shopify Customer ID from a Shopify Customer Account API id_token.
+ *
+ * The id_token is a JWT. Its payload contains:
+ *   sub: "gid://shopify/Customer/12345"  (Customer GID)
+ *
+ * Returns the numeric portion (e.g. "12345") or null if decoding fails.
+ */
+export function extractCustomerIdFromIdToken(idToken: string): string | null {
+  const json = decodeIdTokenPayload(idToken);
+  if (!json) return null;
+
+  const sub = json.sub;
+  if (typeof sub !== "string" || !sub) return null;
+
+  // sub is a GID: "gid://shopify/Customer/12345"
+  const match = sub.match(/(\d+)$/);
+  return match ? match[1] : null;
+}
+
+/** The `nonce` claim of an id_token, or null when absent/undecodable. */
+export function extractNonceFromIdToken(idToken: string): string | null {
+  const json = decodeIdTokenPayload(idToken);
+  if (!json) return null;
+  const nonce = json.nonce;
+  return typeof nonce === "string" && nonce.length > 0 ? nonce : null;
+}
+
+/**
+ * Does this id_token carry the nonce we generated for THIS login attempt?
+ *
+ * ## What this closes (QA audit D1)
+ *
+ * `/api/auth/login` has always generated a nonce, sent it to Shopify in the
+ * authorize request, and stored it in the `shop_nonce` cookie — and the callback
+ * then deleted that cookie without ever looking at it. The `state` check that
+ * was in place binds the *authorization response* to this browser, but nothing
+ * bound the *id_token* to this authorization request. That is exactly the gap
+ * OIDC's nonce exists to close (OIDC Core 1.0 §3.1.3.7 step 11): an id_token
+ * obtained in some other exchange could be replayed into this flow, and every
+ * downstream identity decision — `shop_cid`, and with it which Firestore user
+ * key the LINE merge writes into — follows the id_token's `sub`.
+ *
+ * ## Fail-closed, in both directions
+ *
+ * Missing cookie, missing claim, or mismatch all return false. There is no
+ * "skip the check when the nonce is absent" branch, because that branch is the
+ * whole attack: anything an attacker controls, they can also omit.
+ *
+ * The comparison is length-independent and constant-time to keep the outcome
+ * from leaking the expected value byte by byte. `timingSafeEqual` throws on
+ * length mismatch, so both sides are hashed to a fixed width first.
+ */
+export function verifyIdTokenNonce(
+  idToken: string,
+  expectedNonce: string | undefined | null,
+): boolean {
+  if (!expectedNonce) return false;
+  const actual = extractNonceFromIdToken(idToken);
+  if (!actual) return false;
+
+  const a = createHash("sha256").update(actual).digest();
+  const b = createHash("sha256").update(expectedNonce).digest();
+  return timingSafeEqual(a, b);
 }
