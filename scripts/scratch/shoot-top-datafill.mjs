@@ -1,0 +1,15 @@
+import { chromium } from 'playwright';
+const out = '/tmp/elxea-top-datafill-pc1440.' + 'png';
+const b = await chromium.launch();
+const p = await b.newPage({ viewport: { width: 1440, height: 1024 } });
+await p.goto('http://localhost:3200/ja', { waitUntil: 'domcontentloaded', timeout: 60000 });
+await p.locator('text=Morning Tea Ceremony').first().waitFor({ timeout: 30000 });
+await p.evaluate(() => new Promise((r) => { window.scrollTo(0, document.body.scrollHeight); setTimeout(r, 1200); }));
+await p.evaluate(() => window.scrollTo(0, 0));
+await p.waitForTimeout(800);
+await p.screenshot({ path: out, fullPage: true });
+const upcoming = await p.locator('text=近日開催のイベント').count();
+const seedTitle = await p.locator('text=Morning Tea Ceremony').count();
+const approach = await p.locator('text=Our Approach').count();
+console.log(JSON.stringify({ upcoming, seedTitle, approach, out }));
+await b.close();

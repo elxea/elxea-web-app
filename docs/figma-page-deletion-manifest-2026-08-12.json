@@ -1,0 +1,1063 @@
+{
+  "generated_at_jst": "2026-08-12T22:53:17",
+  "file_key": "AWLnI0XF07e8rScuxPYPc7",
+  "purpose": "Phase 2 削除実行の削除前記録 (Setaka 承認 2026-08-12)",
+  "total_pages_before": 111,
+  "pages": [
+    {
+      "page_id": "5006:2",
+      "page_name_actual": "elxea / Layouts",
+      "page_name_expected": "elxea / Layouts",
+      "name_match": true,
+      "direct_children_count": 0,
+      "total_nodes_including_page": 1,
+      "direct_children": []
+    },
+    {
+      "page_id": "7435:2",
+      "page_name_actual": "roji / Layouts",
+      "page_name_expected": "roji / Layouts",
+      "name_match": true,
+      "direct_children_count": 0,
+      "total_nodes_including_page": 1,
+      "direct_children": []
+    },
+    {
+      "page_id": "7268:124",
+      "page_name_actual": "roji / Proposals",
+      "page_name_expected": "roji / Proposals",
+      "name_match": true,
+      "direct_children_count": 1,
+      "total_nodes_including_page": 323,
+      "direct_children": [
+        {
+          "id": "7268:125",
+          "name": "2026-07-20 roji ページ (今月号) UI v1",
+          "type": "FRAME"
+        }
+      ]
+    },
+    {
+      "page_id": "7153:20315",
+      "page_name_actual": "z / References — roji 定期便 LP (重複退避 2026-07-17 / 正本=Structure Boards)",
+      "page_name_expected": "z / References — roji 定期便 LP (重複退避 2026-07-17 / 正本=Structure Boards)",
+      "name_match": true,
+      "direct_children_count": 95,
+      "total_nodes_including_page": 96,
+      "direct_children": [
+        {
+          "id": "7153:20316",
+          "name": "roji 定期便 LP — デザイン参考ボード（フィードバック用・コメントピンで良い/悪いを指示）",
+          "type": "TEXT"
+        },
+        {
+          "id": "7153:20317",
+          "name": "棚: LP / EC / オウンドメディア / ブランドサイト ｜ 各画像は原寸1440px幅・縦フルページ ｜ ★=本命（Minimal ADDICT CLUB） ｜ 未撮影: Aesop(Cloudflare bot検知) / d&department(Instagram専用)",
+          "type": "TEXT"
+        },
+        {
+          "id": "7153:20318",
+          "name": "REFIMG::lp1_minimal_cac",
+          "type": "RECTANGLE"
+        },
+        {
+          "id": "7153:20319",
+          "name": "LABEL::lp1_minimal_cac",
+          "type": "TEXT"
+        },
+        {
+          "id": "7153:20320",
+          "name": "REFIMG::lp2_nicetea",
+          "type": "RECTANGLE"
+        },
+        {
+          "id": "7153:20321",
+          "name": "LABEL::lp2_nicetea",
+          "type": "TEXT"
+        },
+        {
+          "id": "7153:20322",
+          "name": "REFIMG::lp3_ttj_senchado",
+          "type": "RECTANGLE"
+        },
+        {
+          "id": "7153:20323",
+          "name": "LABEL::lp3_ttj_senchado",
+          "type": "TEXT"
+        },
+        {
+          "id": "7153:20324",
+          "name": "REFIMG::lp4_aardvark",
+          "type": "RECTANGLE"
+        },
+        {
+          "id": "7153:20325",
+          "name": "LABEL::lp4_aardvark",
+          "type": "TEXT"
+        },
+        {
+          "id": "7153:20326",
+          "name": "REFIMG::ec1_tealeaves",
+          "type": "RECTANGLE"
+        },
+        {
+          "id": "7153:20327",
+          "name": "LABEL::ec1_tealeaves",
+          "type": "TEXT"
+        },
+        {
+          "id": "7153:20328",
+          "name": "REFIMG::ec3_ippodo",
+          "type": "RECTANGLE"
+        },
+        {
+          "id": "7153:20329",
+          "name": "LABEL::ec3_ippodo",
+          "type": "TEXT"
+        },
+        {
+          "id": "7153:20330",
+          "name": "REFIMG::ec4_minimal_top",
+          "type": "RECTANGLE"
+        },
+        {
+          "id": "7153:20331",
+          "name": "LABEL::ec4_minimal_top",
+          "type": "TEXT"
+        },
+        {
+          "id": "7153:20332",
+          "name": "REFIMG::ec5_tearoom",
+          "type": "RECTANGLE"
+        },
+        {
+          "id": "7153:20333",
+          "name": "LABEL::ec5_tearoom",
+          "type": "TEXT"
+        },
+        {
+          "id": "7153:20334",
+          "name": "REFIMG::om1_senchado_yomimono",
+          "type": "RECTANGLE"
+        },
+        {
+          "id": "7153:20335",
+          "name": "LABEL::om1_senchado_yomimono",
+          "type": "TEXT"
+        },
+        {
+          "id": "7153:20336",
+          "name": "REFIMG::om2_hokuohkurashi",
+          "type": "RECTANGLE"
+        },
+        {
+          "id": "7153:20337",
+          "name": "LABEL::om2_hokuohkurashi",
+          "type": "TEXT"
+        },
+        {
+          "id": "7153:20338",
+          "name": "REFIMG::om3_digthetea_jikonka",
+          "type": "RECTANGLE"
+        },
+        {
+          "id": "7153:20339",
+          "name": "LABEL::om3_digthetea_jikonka",
+          "type": "TEXT"
+        },
+        {
+          "id": "7153:20340",
+          "name": "REFIMG::om4_teafolks_blog",
+          "type": "RECTANGLE"
+        },
+        {
+          "id": "7153:20341",
+          "name": "LABEL::om4_teafolks_blog",
+          "type": "TEXT"
+        },
+        {
+          "id": "7153:20342",
+          "name": "REFIMG::om5_tealeaves_whatis",
+          "type": "RECTANGLE"
+        },
+        {
+          "id": "7153:20343",
+          "name": "LABEL::om5_tealeaves_whatis",
+          "type": "TEXT"
+        },
+        {
+          "id": "7153:20344",
+          "name": "REFIMG::br1_entea",
+          "type": "RECTANGLE"
+        },
+        {
+          "id": "7153:20345",
+          "name": "LABEL::br1_entea",
+          "type": "TEXT"
+        },
+        {
+          "id": "7153:20346",
+          "name": "REFIMG::br2_spirittea",
+          "type": "RECTANGLE"
+        },
+        {
+          "id": "7153:20347",
+          "name": "LABEL::br2_spirittea",
+          "type": "TEXT"
+        },
+        {
+          "id": "7153:20348",
+          "name": "REFIMG::br3_fareast",
+          "type": "RECTANGLE"
+        },
+        {
+          "id": "7153:20349",
+          "name": "LABEL::br3_fareast",
+          "type": "TEXT"
+        },
+        {
+          "id": "7153:20350",
+          "name": "LP（申込 / 販売ページ）",
+          "type": "TEXT"
+        },
+        {
+          "id": "7153:20351",
+          "name": "EC（商品一覧・詳細・購入導線）",
+          "type": "TEXT"
+        },
+        {
+          "id": "7153:20352",
+          "name": "オウンドメディア（記事・ジャーナル）",
+          "type": "TEXT"
+        },
+        {
+          "id": "7153:20353",
+          "name": "ブランドサイト（世界観・About・Story）",
+          "type": "TEXT"
+        },
+        {
+          "id": "7176:128",
+          "name": "① Minimal — CHOCOLATE ADDICT CLUB ★本命",
+          "type": "TEXT"
+        },
+        {
+          "id": "7176:129",
+          "name": "https://mini-mal.tokyo/pages/chocolate-addict-club",
+          "type": "TEXT"
+        },
+        {
+          "id": "7176:130",
+          "name": "REF/LP/lp1_minimal_cac/t0",
+          "type": "RECTANGLE"
+        },
+        {
+          "id": "7176:131",
+          "name": "REF/LP/lp1_minimal_cac/t1",
+          "type": "RECTANGLE"
+        },
+        {
+          "id": "7176:132",
+          "name": "REF/LP/lp1_minimal_cac/t2",
+          "type": "RECTANGLE"
+        },
+        {
+          "id": "7176:133",
+          "name": "REF/LP/lp1_minimal_cac/t3",
+          "type": "RECTANGLE"
+        },
+        {
+          "id": "7176:134",
+          "name": "REF/LP/lp1_minimal_cac/t4",
+          "type": "RECTANGLE"
+        },
+        {
+          "id": "7176:135",
+          "name": "REF/LP/lp1_minimal_cac/t5",
+          "type": "RECTANGLE"
+        },
+        {
+          "id": "7176:136",
+          "name": "REF/LP/lp1_minimal_cac/t6",
+          "type": "RECTANGLE"
+        },
+        {
+          "id": "7176:137",
+          "name": "REF/LP/lp1_minimal_cac/t7",
+          "type": "RECTANGLE"
+        },
+        {
+          "id": "7176:138",
+          "name": "REF/LP/lp1_minimal_cac/t8",
+          "type": "RECTANGLE"
+        },
+        {
+          "id": "7176:139",
+          "name": "② TOKYO TEA JOURNAL (煎茶堂東京)",
+          "type": "TEXT"
+        },
+        {
+          "id": "7176:140",
+          "name": "https://shop.senchado.jp/pages/ttj",
+          "type": "TEXT"
+        },
+        {
+          "id": "7176:141",
+          "name": "REF/LP/lp3_ttj_senchado/t0",
+          "type": "RECTANGLE"
+        },
+        {
+          "id": "7176:142",
+          "name": "REF/LP/lp3_ttj_senchado/t1",
+          "type": "RECTANGLE"
+        },
+        {
+          "id": "7176:143",
+          "name": "REF/LP/lp3_ttj_senchado/t2",
+          "type": "RECTANGLE"
+        },
+        {
+          "id": "7176:144",
+          "name": "REF/LP/lp3_ttj_senchado/t3",
+          "type": "RECTANGLE"
+        },
+        {
+          "id": "7176:147",
+          "name": "① TEALEAVES (商品一覧)",
+          "type": "TEXT"
+        },
+        {
+          "id": "7176:148",
+          "name": "https://www.tealeaves.com/collections/all",
+          "type": "TEXT"
+        },
+        {
+          "id": "7176:149",
+          "name": "REF/EC/ec1_tealeaves/t0",
+          "type": "RECTANGLE"
+        },
+        {
+          "id": "7176:153",
+          "name": "③ Spirit Tea",
+          "type": "TEXT"
+        },
+        {
+          "id": "7176:154",
+          "name": "https://spirittea.co/",
+          "type": "TEXT"
+        },
+        {
+          "id": "7176:155",
+          "name": "REF/EC/ecspirit_spirittea/t0",
+          "type": "RECTANGLE"
+        },
+        {
+          "id": "7176:156",
+          "name": "REF/EC/ecspirit_spirittea/t1",
+          "type": "RECTANGLE"
+        },
+        {
+          "id": "7176:157",
+          "name": "④ Minimal — トップ",
+          "type": "TEXT"
+        },
+        {
+          "id": "7176:158",
+          "name": "https://mini-mal.tokyo/",
+          "type": "TEXT"
+        },
+        {
+          "id": "7176:159",
+          "name": "REF/EC/ec4_minimal_top/t0",
+          "type": "RECTANGLE"
+        },
+        {
+          "id": "7176:160",
+          "name": "REF/EC/ec4_minimal_top/t1",
+          "type": "RECTANGLE"
+        },
+        {
+          "id": "7176:161",
+          "name": "REF/EC/ec4_minimal_top/t2",
+          "type": "RECTANGLE"
+        },
+        {
+          "id": "7176:164",
+          "name": "① 煎茶堂東京 — 読みもの",
+          "type": "TEXT"
+        },
+        {
+          "id": "7176:165",
+          "name": "https://shop.senchado.jp/pages/contents",
+          "type": "TEXT"
+        },
+        {
+          "id": "7176:166",
+          "name": "REF/OWNED/om1_senchado_yomimono/t0",
+          "type": "RECTANGLE"
+        },
+        {
+          "id": "7176:167",
+          "name": "REF/OWNED/om1_senchado_yomimono/t1",
+          "type": "RECTANGLE"
+        },
+        {
+          "id": "7176:168",
+          "name": "REF/OWNED/om1_senchado_yomimono/t2",
+          "type": "RECTANGLE"
+        },
+        {
+          "id": "7176:169",
+          "name": "② TEALEAVES — What is tea",
+          "type": "TEXT"
+        },
+        {
+          "id": "7176:170",
+          "name": "https://www.tealeaves.com/pages/what-is-tea",
+          "type": "TEXT"
+        },
+        {
+          "id": "7176:171",
+          "name": "REF/OWNED/om5_tealeaves_whatis/t0",
+          "type": "RECTANGLE"
+        },
+        {
+          "id": "7176:172",
+          "name": "③ Dig the Tea — 而今禾 Jikonka",
+          "type": "TEXT"
+        },
+        {
+          "id": "7176:173",
+          "name": "https://digthetea.com/2024/07/jikonka/",
+          "type": "TEXT"
+        },
+        {
+          "id": "7176:174",
+          "name": "REF/OWNED/om3_digthetea_jikonka/t0",
+          "type": "RECTANGLE"
+        },
+        {
+          "id": "7176:175",
+          "name": "REF/OWNED/om3_digthetea_jikonka/t1",
+          "type": "RECTANGLE"
+        },
+        {
+          "id": "7176:176",
+          "name": "REF/OWNED/om3_digthetea_jikonka/t2",
+          "type": "RECTANGLE"
+        },
+        {
+          "id": "7176:177",
+          "name": "REF/OWNED/om3_digthetea_jikonka/t3",
+          "type": "RECTANGLE"
+        },
+        {
+          "id": "7176:178",
+          "name": "REF/OWNED/om3_digthetea_jikonka/t4",
+          "type": "RECTANGLE"
+        },
+        {
+          "id": "7176:179",
+          "name": "REF/OWNED/om3_digthetea_jikonka/t5",
+          "type": "RECTANGLE"
+        },
+        {
+          "id": "7176:180",
+          "name": "REF/OWNED/om3_digthetea_jikonka/t6",
+          "type": "RECTANGLE"
+        },
+        {
+          "id": "7176:183",
+          "name": "① EN TEA — 世界観トップ",
+          "type": "TEXT"
+        },
+        {
+          "id": "7176:184",
+          "name": "https://en-tea.com/",
+          "type": "TEXT"
+        },
+        {
+          "id": "7176:185",
+          "name": "REF/BRAND/br1_entea/t0",
+          "type": "RECTANGLE"
+        },
+        {
+          "id": "7176:186",
+          "name": "REF/BRAND/br1_entea/t1",
+          "type": "RECTANGLE"
+        },
+        {
+          "id": "7176:187",
+          "name": "REF/BRAND/br1_entea/t2",
+          "type": "RECTANGLE"
+        },
+        {
+          "id": "7176:188",
+          "name": "REF/BRAND/br1_entea/t3",
+          "type": "RECTANGLE"
+        },
+        {
+          "id": "7176:189",
+          "name": "② Spirit Tea",
+          "type": "TEXT"
+        },
+        {
+          "id": "7176:190",
+          "name": "https://spirittea.co/",
+          "type": "TEXT"
+        },
+        {
+          "id": "7176:191",
+          "name": "REF/BRAND/br2_spirittea/t0",
+          "type": "RECTANGLE"
+        },
+        {
+          "id": "7176:192",
+          "name": "REF/BRAND/br2_spirittea/t1",
+          "type": "RECTANGLE"
+        },
+        {
+          "id": "7186:124",
+          "name": "▼ 旧版（棚別レイアウト）アーカイブ — 内容はすべて上部のブランド別ボードと重複しています。コメントピン保全のため削除せず下方へ退避しました。参照・ピン打ちは上部の最新ボードを使用してください。",
+          "type": "TEXT"
+        }
+      ]
+    },
+    {
+      "page_id": "6054:15",
+      "page_name_actual": "elxea / Proposals",
+      "page_name_expected": "elxea / Proposals",
+      "name_match": true,
+      "direct_children_count": 78,
+      "total_nodes_including_page": 20625,
+      "direct_children": [
+        {
+          "id": "6606:6260",
+          "name": "トップ 変A（部品ベース・DS準拠）— PC @/ja",
+          "type": "SECTION"
+        },
+        {
+          "id": "6618:6786",
+          "name": "商品一覧 変A（部品ベース）— PC/SP @/ja/products",
+          "type": "SECTION"
+        },
+        {
+          "id": "6623:6786",
+          "name": "コレクション一覧 変A（部品ベース）— PC/SP @/ja/collections",
+          "type": "SECTION"
+        },
+        {
+          "id": "6625:12270",
+          "name": "商品詳細 変A（部品ベース）— PC/SP @/ja/products/[handle]",
+          "type": "SECTION"
+        },
+        {
+          "id": "6628:7131",
+          "name": "About 変A（部品ベース）— PC/SP @/ja/about",
+          "type": "SECTION"
+        },
+        {
+          "id": "6639:7029",
+          "name": "農家一覧 変A（部品ベース）— PC/SP @/ja/farmers",
+          "type": "SECTION"
+        },
+        {
+          "id": "6639:12999",
+          "name": "お茶メニュー 変A（部品ベース）— PC/SP @/ja/tea-menu",
+          "type": "SECTION"
+        },
+        {
+          "id": "6639:13009",
+          "name": "イベント一覧 変A（部品ベース）— PC/SP @/ja/events",
+          "type": "SECTION"
+        },
+        {
+          "id": "6639:13052",
+          "name": "ジャーナル一覧 変A（部品ベース）— PC/SP @/ja/journal",
+          "type": "SECTION"
+        },
+        {
+          "id": "6647:7525",
+          "name": "コレクション詳細 変A（部品ベース）— PC/SP @/ja/collections/[handle]",
+          "type": "SECTION"
+        },
+        {
+          "id": "6650:13404",
+          "name": "ジャーナル詳細 変A（部品ベース）— PC/SP @/ja/journal/[slug]",
+          "type": "SECTION"
+        },
+        {
+          "id": "6654:13189",
+          "name": "お茶メニュー詳細 変A（部品ベース）— PC/SP @/ja/tea-menu/[slug]",
+          "type": "SECTION"
+        },
+        {
+          "id": "6657:7931",
+          "name": "イベント詳細 変A（部品ベース）— PC/SP @/ja/events/[slug]",
+          "type": "SECTION"
+        },
+        {
+          "id": "6677:8077",
+          "name": "検索 変A（部品ベース）— PC/SP @/ja/search",
+          "type": "SECTION"
+        },
+        {
+          "id": "6679:8112",
+          "name": "定期便LP 変A（部品ベース）— PC/SP @/ja/subscription",
+          "type": "SECTION"
+        },
+        {
+          "id": "6679:14041",
+          "name": "カート 変A（部品ベース）— PC/SP @/ja/cart",
+          "type": "SECTION"
+        },
+        {
+          "id": "6679:14042",
+          "name": "メンバーシップ 変A（部品ベース）— PC/SP @/ja/membership",
+          "type": "SECTION"
+        },
+        {
+          "id": "6697:8695",
+          "name": "アカウント 変A（部品ベース）— PC/SP @/ja/account",
+          "type": "SECTION"
+        },
+        {
+          "id": "6697:14065",
+          "name": "農家詳細 変A（部品ベース）— PC/SP @/ja/farmers/[slug]",
+          "type": "SECTION"
+        },
+        {
+          "id": "6702:8970",
+          "name": "ログイン 変A（部品ベース）— PC/SP @/ja/login",
+          "type": "SECTION"
+        },
+        {
+          "id": "6703:14332",
+          "name": "People詳細 変A（部品ベース）— PC/SP @/ja/people/[slug]",
+          "type": "SECTION"
+        },
+        {
+          "id": "6717:9158",
+          "name": "プレイリスト 変A（部品ベース）— PC/SP @/ja/playlists",
+          "type": "SECTION"
+        },
+        {
+          "id": "6717:14526",
+          "name": "アカウント:定期便 変A（部品ベース）— PC/SP @/ja/account/subscriptions",
+          "type": "SECTION"
+        },
+        {
+          "id": "6718:9263",
+          "name": "プレイリスト詳細 変A（部品ベース）— PC/SP @/ja/playlists/[slug]",
+          "type": "SECTION"
+        },
+        {
+          "id": "6723:14827",
+          "name": "トップ 変A SP（部品ベース）",
+          "type": "SECTION"
+        },
+        {
+          "id": "6728:120",
+          "name": "テイスティングノート 変A（部品ベース）— PC/SP @/ja/tasting-note",
+          "type": "SECTION"
+        },
+        {
+          "id": "6732:9672",
+          "name": "ジャーナル:カテゴリ 変A（部品ベース）— PC/SP @/ja/journal/category/[slug]",
+          "type": "SECTION"
+        },
+        {
+          "id": "6733:9873",
+          "name": "ジャーナル:著者 変A（部品ベース）— PC/SP @/ja/journal/author/[slug]",
+          "type": "SECTION"
+        },
+        {
+          "id": "6736:15398",
+          "name": "ジャーナル:タグ 変A（部品ベース）— PC/SP @/ja/journal/tag/[slug]",
+          "type": "SECTION"
+        },
+        {
+          "id": "6749:10277",
+          "name": "ログイン完了 変A（部品ベース）— PC/SP @/ja/login/complete",
+          "type": "SECTION"
+        },
+        {
+          "id": "6749:15679",
+          "name": "プライバシーポリシー 変A（部品ベース）— PC/SP @/ja/legal/privacy",
+          "type": "SECTION"
+        },
+        {
+          "id": "6750:15711",
+          "name": "お問い合わせ:法人 変A（部品ベース）— PC/SP @/ja/contact/business",
+          "type": "SECTION"
+        },
+        {
+          "id": "6750:15903",
+          "name": "汎用ページ 変A（部品ベース）— PC/SP @/ja/pages/[slug]",
+          "type": "SECTION"
+        },
+        {
+          "id": "6750:16069",
+          "name": "特商法 変A（部品ベース）— PC/SP @/ja/legal/tokushoho",
+          "type": "SECTION"
+        },
+        {
+          "id": "6750:16300",
+          "name": "返品ポリシー 変A（部品ベース）— PC/SP @/ja/legal/returns",
+          "type": "SECTION"
+        },
+        {
+          "id": "6750:16486",
+          "name": "利用規約 変A（部品ベース）— PC/SP @/ja/legal/terms",
+          "type": "SECTION"
+        },
+        {
+          "id": "6750:16647",
+          "name": "配送情報 変A（部品ベース）— PC/SP @/ja/shipping",
+          "type": "SECTION"
+        },
+        {
+          "id": "6750:16663",
+          "name": "サイトパスワード 変A（部品ベース）— PC/SP @/password",
+          "type": "SECTION"
+        },
+        {
+          "id": "6750:16786",
+          "name": "お問い合わせ 変A（部品ベース）— PC/SP @/ja/contact",
+          "type": "SECTION"
+        },
+        {
+          "id": "6750:16941",
+          "name": "FAQ 変A（部品ベース）— PC/SP @/ja/faq",
+          "type": "SECTION"
+        },
+        {
+          "id": "6761:11127",
+          "name": "ジャーナル一覧（elxea Journal /ja/elxea-journal）変A（部品ベース）— PC/SP @/ja/elxea-journal",
+          "type": "SECTION"
+        },
+        {
+          "id": "6760:120",
+          "name": "elxea Journal 詳細 変A（部品ベース・editorial 余白型）— PC/SP @/ja/elxea-journal/[slug]",
+          "type": "SECTION"
+        },
+        {
+          "id": "6783:120",
+          "name": "__ROW-LABEL__ バッチ1  ノード帯 6606-6657",
+          "type": "TEXT"
+        },
+        {
+          "id": "6783:121",
+          "name": "__ROW-LABEL__ バッチ2  ノード帯 6677-6679",
+          "type": "TEXT"
+        },
+        {
+          "id": "6783:122",
+          "name": "__ROW-LABEL__ バッチ3  ノード帯 6697-6703",
+          "type": "TEXT"
+        },
+        {
+          "id": "6783:123",
+          "name": "__ROW-LABEL__ バッチ4  ノード帯 6717-6736",
+          "type": "TEXT"
+        },
+        {
+          "id": "6783:124",
+          "name": "__ROW-LABEL__ 2026-07-07  本日 13件",
+          "type": "TEXT"
+        },
+        {
+          "id": "6783:125",
+          "name": "__ROW-LABEL__ 旧 / その他 （未整理・非デリバラブル 68件）",
+          "type": "TEXT"
+        },
+        {
+          "id": "7053:18192",
+          "name": "InArticleCTA (Proposed) — elxea/Journal",
+          "type": "COMPONENT_SET"
+        },
+        {
+          "id": "7065:6382",
+          "name": "③ ProductCard 提案 — 正しいテキスト構造（商品名=見出し / 種類・産地タグ / 内容量 / 価格）",
+          "type": "FRAME"
+        },
+        {
+          "id": "7070:6408",
+          "name": "⑤ 商品詳細 追加3セクション提案（スペック下に挿入）",
+          "type": "FRAME"
+        },
+        {
+          "id": "7146:6606",
+          "name": "2026-07-17 roji 定期便LP — Stage 1: 構造ワイヤー（A/B/C 差別化の合意用）",
+          "type": "FRAME"
+        },
+        {
+          "id": "7222:6606",
+          "name": "2026-07-18 roji 定期便LP — 構造ワイヤー v2（オフグリッド作り直し / ピン7件反映）",
+          "type": "FRAME"
+        },
+        {
+          "id": "7383:6504",
+          "name": "トップ / R2-A: 変A 正統進化 — PC 1440",
+          "type": "SECTION"
+        },
+        {
+          "id": "7383:6562",
+          "name": "トップ / R2-A: 変A 正統進化 — SP 390",
+          "type": "SECTION"
+        },
+        {
+          "id": "7383:6634",
+          "name": "トップ / R2-B: 編集寄り — PC 1440",
+          "type": "SECTION"
+        },
+        {
+          "id": "7383:6692",
+          "name": "トップ / R2-B: 編集寄り — SP 390",
+          "type": "SECTION"
+        },
+        {
+          "id": "7383:6764",
+          "name": "トップ / R2-C: 明朝見出し検証 — PC 1440",
+          "type": "SECTION"
+        },
+        {
+          "id": "7383:6822",
+          "name": "トップ / R2-C: 明朝見出し検証 — SP 390",
+          "type": "SECTION"
+        },
+        {
+          "id": "7383:6894",
+          "name": "__ROW-LABEL__ R2 トップ磨き込み 2026-07-31",
+          "type": "TEXT"
+        },
+        {
+          "id": "7393:7737",
+          "name": "商品一覧 / R1 — 初回提案（変A 系・トップ R2-A の作法を適用）",
+          "type": "SECTION"
+        },
+        {
+          "id": "7413:8973",
+          "name": "商品詳細 / R1 — 初回提案（変A 系・商品一覧 R1 の作法を適用）",
+          "type": "SECTION"
+        },
+        {
+          "id": "7551:23427",
+          "name": "商品一覧 / R2 — 軸: カード内情報項目数（2 / 4 / 7）— A/B/C × PC/SP",
+          "type": "SECTION"
+        },
+        {
+          "id": "7551:23428",
+          "name": "__ROW-LABEL__ R2 商品一覧 3案 2026-08-04 軸=カード内情報項目数",
+          "type": "TEXT"
+        },
+        {
+          "id": "7552:23575",
+          "name": "__ROW-LABEL__ 定期便 LP / R1 — 3案（軸: CTA到達までに出す数値項目の数）2026-08-04",
+          "type": "TEXT"
+        },
+        {
+          "id": "7552:23576",
+          "name": "定期便LP / R1-A: 実物提示型（数値項目1）— PC 1440",
+          "type": "SECTION"
+        },
+        {
+          "id": "7552:23578",
+          "name": "定期便LP / R1-A: 実物提示型（数値項目1）— SP 390",
+          "type": "SECTION"
+        },
+        {
+          "id": "7552:23580",
+          "name": "定期便LP / R1-B: 中間（数値項目3）— PC 1440",
+          "type": "SECTION"
+        },
+        {
+          "id": "7552:23582",
+          "name": "定期便LP / R1-B: 中間（数値項目3）— SP 390",
+          "type": "SECTION"
+        },
+        {
+          "id": "7552:23584",
+          "name": "定期便LP / R1-C: 条件開示型（数値項目12+）— PC 1440",
+          "type": "SECTION"
+        },
+        {
+          "id": "7552:23586",
+          "name": "定期便LP / R1-C: 条件開示型（数値項目12+）— SP 390",
+          "type": "SECTION"
+        },
+        {
+          "id": "7555:9925",
+          "name": "__ROW-LABEL__ ジャーナル詳細 R1 2026-08-04",
+          "type": "TEXT"
+        },
+        {
+          "id": "7555:9926",
+          "name": "ジャーナル詳細 / R1-A: 文字が主役（本文カラム44%・見出し1.3倍）— PC 1440",
+          "type": "SECTION"
+        },
+        {
+          "id": "7557:10200",
+          "name": "ジャーナル詳細 / R1-B: 記事も写真も（本文カラム60%・見出し2.0倍・写真±40px）— PC 1440",
+          "type": "SECTION"
+        },
+        {
+          "id": "7557:10358",
+          "name": "ジャーナル詳細 / R1-C: 写真が主役（本文カラム50%・見出し3.6倍・写真100%）— PC 1440",
+          "type": "SECTION"
+        },
+        {
+          "id": "7558:10505",
+          "name": "ジャーナル詳細 / R1-A: 文字が主役（本文カラム79%・見出し1.3倍）— SP 390",
+          "type": "SECTION"
+        },
+        {
+          "id": "7558:10606",
+          "name": "ジャーナル詳細 / R1-B: 記事も写真も（本文カラム90%・見出し2.0倍・写真は全幅へ抜ける）— SP 390",
+          "type": "SECTION"
+        },
+        {
+          "id": "7558:10715",
+          "name": "ジャーナル詳細 / R1-C: 写真が主役（本文カラム90%・見出し3.6倍・写真100%）— SP 390",
+          "type": "SECTION"
+        }
+      ]
+    }
+  ],
+  "design_map_referenced_nodes_in_elxea_proposals": {
+    "count": 26,
+    "resolved_count": 26,
+    "note": "worktree .wt-qa-fix-8e6d74f 側 design-map.json が参照。削除により dangling 化する (Setaka 承認済みの既知影響)。後日この 26 件を現行ページの等価ノードへ張り替える手がかりとして記録する。",
+    "nodes": [
+      {
+        "node_id": "6679:14041",
+        "name": "カート 変A（部品ベース）— PC/SP @/ja/cart",
+        "found_in_elxea_proposals": true
+      },
+      {
+        "node_id": "6684:120",
+        "name": "CartHeader",
+        "found_in_elxea_proposals": true
+      },
+      {
+        "node_id": "6684:124",
+        "name": "CartLine",
+        "found_in_elxea_proposals": true
+      },
+      {
+        "node_id": "6684:163",
+        "name": "OrderSummary",
+        "found_in_elxea_proposals": true
+      },
+      {
+        "node_id": "6702:9009",
+        "name": "Auth Card",
+        "found_in_elxea_proposals": true
+      },
+      {
+        "node_id": "6702:9018",
+        "name": "Separator",
+        "found_in_elxea_proposals": true
+      },
+      {
+        "node_id": "6750:10383",
+        "name": "Complete Card",
+        "found_in_elxea_proposals": true
+      },
+      {
+        "node_id": "6750:10384",
+        "name": "Check Circle",
+        "found_in_elxea_proposals": true
+      },
+      {
+        "node_id": "6657:13352",
+        "name": "Event Header",
+        "found_in_elxea_proposals": true
+      },
+      {
+        "node_id": "6658:13324",
+        "name": "日時・開催地 card",
+        "found_in_elxea_proposals": true
+      },
+      {
+        "node_id": "6659:8002",
+        "name": "Hero (ImageWithFallback)",
+        "found_in_elxea_proposals": true
+      },
+      {
+        "node_id": "6660:8002",
+        "name": "Registration (EventRegisterButton + MemberGate)",
+        "found_in_elxea_proposals": true
+      },
+      {
+        "node_id": "6660:8003",
+        "name": "EventRegisterButton",
+        "found_in_elxea_proposals": true
+      },
+      {
+        "node_id": "6661:13493",
+        "name": "詳細リンク (event.detailsLink → externalUrl)",
+        "found_in_elxea_proposals": true
+      },
+      {
+        "node_id": "6664:13496",
+        "name": "Sticky Register Bar (追従)",
+        "found_in_elxea_proposals": true
+      },
+      {
+        "node_id": "6717:14526",
+        "name": "アカウント:定期便 変A（部品ベース）— PC/SP @/ja/account/subscriptions",
+        "found_in_elxea_proposals": true
+      },
+      {
+        "node_id": "6717:14566",
+        "name": "Page Header",
+        "found_in_elxea_proposals": true
+      },
+      {
+        "node_id": "6717:14570",
+        "name": "定期便一覧",
+        "found_in_elxea_proposals": true
+      },
+      {
+        "node_id": "6718:14888",
+        "name": "SubscriptionCard (native 一時停止中)",
+        "found_in_elxea_proposals": true
+      },
+      {
+        "node_id": "6718:14894",
+        "name": "Product Row",
+        "found_in_elxea_proposals": true
+      },
+      {
+        "node_id": "6719:14705",
+        "name": "Panel",
+        "found_in_elxea_proposals": true
+      },
+      {
+        "node_id": "6719:14723",
+        "name": "Panel",
+        "found_in_elxea_proposals": true
+      },
+      {
+        "node_id": "6720:9378",
+        "name": "EmptyCard",
+        "found_in_elxea_proposals": true
+      },
+      {
+        "node_id": "6639:7029",
+        "name": "農家一覧 変A（部品ベース）— PC/SP @/ja/farmers",
+        "found_in_elxea_proposals": true
+      },
+      {
+        "node_id": "6654:13189",
+        "name": "お茶メニュー詳細 変A（部品ベース）— PC/SP @/ja/tea-menu/[slug]",
+        "found_in_elxea_proposals": true
+      },
+      {
+        "node_id": "6647:7525",
+        "name": "コレクション詳細 変A（部品ベース）— PC/SP @/ja/collections/[handle]",
+        "found_in_elxea_proposals": true
+      }
+    ]
+  }
+}
