@@ -58,6 +58,10 @@ export async function POST(request: NextRequest) {
   }
 
   const state = crypto.randomBytes(32).toString("hex");
+  /* OIDC `nonce`（D11）。state とは別に発行する — state は認可応答をこのブラウザに束縛し、
+   * nonce は戻ってきた id_token をこの認可要求に束縛する（OIDC Core §3.1.3.7 step 11）。
+   * 同じ値を使い回すと、URL に露出する state から nonce も知れてしまう。 */
+  const nonce = crypto.randomBytes(32).toString("hex");
 
   /* The cookie must be readable on both elxea.com and www.elxea.com. This POST
    * may land on either host (whichever the user opened), but the callback always
@@ -73,10 +77,22 @@ export async function POST(request: NextRequest) {
   const cookieDomain = resolveCookieDomain(request);
   const stateSpec = getCookieSpec("line_oauth_state")!;
 
+  const nonceSpec = getCookieSpec("line_oauth_nonce")!;
+
   const cookieStore = await cookies();
   cookieStore.set("line_oauth_state", state, {
     httpOnly: true,
     secure: isSecure(stateSpec),
+    sameSite: "lax",
+    maxAge: 600,
+    path: "/",
+    ...(cookieDomain ? { domain: cookieDomain } : {}),
+  });
+  /* nonce cookie は state cookie と同じ scope・同じ寿命で出す。片方だけが届く状態
+   * （= 検証できない状態）を作らないため、条件分岐なしで必ず両方を出す。 */
+  cookieStore.set("line_oauth_nonce", nonce, {
+    httpOnly: true,
+    secure: isSecure(nonceSpec),
     sameSite: "lax",
     maxAge: 600,
     path: "/",
@@ -113,6 +129,7 @@ export async function POST(request: NextRequest) {
     client_id: channelId,
     redirect_uri: redirectUri,
     state,
+    nonce,
     scope: "profile openid email",
   });
 

@@ -3,7 +3,7 @@ import { z } from "zod";
 import { requireAuth } from "@/lib/firebase/auth-guard";
 import { parseJsonBody } from "@/lib/validation/zod-helpers";
 import { enforceRateLimit, limiters } from "@/lib/ratelimit";
-import { verifyLiffIdToken } from "@/lib/line/verify-liff-token";
+import { verifyLineIdToken } from "@/lib/line/verify-liff-token";
 import { CX_AGENT_BASE_URL } from "@/lib/chat/proxy";
 
 /**
@@ -51,9 +51,15 @@ export async function POST(request: NextRequest) {
     const parsed = await parseJsonBody(request, LinkLiffSchema);
     if (!parsed.ok) return parsed.response;
 
-    // 2. LIFF id_token をサーバで検証 → Messaging userId（sub）を取り出す
+    /* 2. LIFF id_token をサーバで検証 → Messaging userId（sub）を取り出す
+     *
+     * ここだけ `expectedNonce` を渡さない。LIFF のトークンは LINE アプリが発行し、
+     * こちら側は認可 URL を組み立てていないので nonce を仕込む余地が無い（仕込めない値を
+     * 「必須」にすると LIFF 連携が全滅する）。この経路のリプレイ束縛は
+     * requireAuth（サーバ確定の Shopify セッション）+ サーバ側 verify が担う。
+     * 認可 URL を自分で作る Web 発の経路（/api/user/line-link/callback）では必ず渡す。 */
     const channelId = process.env.LINE_LIFF_CHANNEL_ID;
-    const verified = await verifyLiffIdToken(parsed.data.idToken, channelId);
+    const verified = await verifyLineIdToken(parsed.data.idToken, channelId);
     if (!verified.ok) {
       console.warn("[line-link-liff] id_token verification failed:", verified.reason);
       return NextResponse.json(

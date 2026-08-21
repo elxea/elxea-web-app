@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
     defaultReturnTo(locale),
   );
 
-  const { state, cookieValue } = sealLinkState({
+  const { state, nonce, cookieValue } = sealLinkState({
     customerId: auth.customerId,
     returnTo,
   });
@@ -123,11 +123,16 @@ export async function POST(request: NextRequest) {
    * 任意（LIFF 経路でも null が来うる）。一方 `email` は LINE の申請が通っているチャネルで
    * しか要求できず、未承認のチャネルに投げると **認可そのものが失敗する**。得るものが
    * 無いのに全体を落としうる要求はしない。 */
+  /* `nonce` は state と**別の値**を送る（D11）。state は認可応答をこのブラウザに束縛し、
+   * nonce は戻ってきた id_token をこの認可要求に束縛する。同じ値を使い回すと、URL に出た
+   * state を見た者が nonce も知ることになり、id_token 側の束縛が名ばかりになる。
+   * 検証は callback の `verifyLiffIdToken({ expectedNonce })`。 */
   const params = new URLSearchParams({
     response_type: "code",
     client_id: channelId,
     redirect_uri: `${baseUrl}/api/user/line-link/callback`,
     state,
+    nonce,
     scope: "profile openid",
   });
 

@@ -5,7 +5,7 @@ import { requireAuth } from "@/lib/firebase/auth-guard";
 import { getBaseUrl } from "@/lib/base-url";
 import { getCookieSpec, resolveCookieDomain } from "@/lib/auth/cookies";
 import { CX_AGENT_BASE_URL } from "@/lib/chat/proxy";
-import { verifyLiffIdToken } from "@/lib/line/verify-liff-token";
+import { verifyLineIdToken } from "@/lib/line/verify-liff-token";
 import {
   LINE_LINK_STATE_COOKIE,
   defaultReturnTo,
@@ -27,14 +27,14 @@ import {
  *
  * ## 連携を成立させる条件（fail-closed）
  *
- * 1. `openLinkState` の 4 条件（復号可 / nonce 一致 / **顧客一致** / 期限内）
+ * 1. `openLinkState` の 4 条件（復号可 / state 一致 / **顧客一致** / 期限内）
  * 2. LINE の token 交換が成功し、`id_token` がある
- * 3. `verifyLiffIdToken` が LINE の verify API で通る（aud / iss / exp / sub 形式）
+ * 3. `verifyLineIdToken` が LINE の verify API で通る（aud / iss / exp / **nonce** / sub 形式）
  * 4. `SYNC_API_SECRET` があり、cx-agent の upsert が 2xx を返す
  *
  * どれか 1 つでも欠けたら `?line_link=error` で戻す。「たぶん成功した」で成功を名乗らない。
  *
- * ## なぜ `verifyLiffIdToken` を使い回すのか
+ * ## なぜ `verifyLineIdToken` を使い回すのか
  *
  * 名前は LIFF だが、実体は「この Login チャネルが発行した id_token を LINE に検証させ、
  * `sub`（= 同一プロバイダーなら Messaging userId）を取り出す」関数で、認可の入口が
@@ -88,6 +88,8 @@ export async function GET(request: NextRequest) {
     return fail(fallbackReturn, `state rejected: ${opened.reason}`);
   }
   const returnTo = opened.returnTo;
+  /* 認可開始時に封じた nonce。id_token 検証にそのまま渡す（D11）。 */
+  const expectedNonce = opened.nonce;
 
   const lineError = request.nextUrl.searchParams.get("error");
   if (lineError) {
@@ -148,8 +150,12 @@ export async function GET(request: NextRequest) {
 
   if (!idToken) return fail(returnTo, "no id_token in token response");
 
-  /* LINE 自身に検証させて `sub` を得る。ブラウザ経由で来た値は何一つ信じない。 */
-  const verified = await verifyLiffIdToken(idToken, channelId);
+  /* LINE 自身に検証させて `sub` を得る。ブラウザ経由で来た値は何一つ信じない。
+   *
+   * `expectedNonce` を渡すことで、検証は「LINE が署名した有効なトークンか」から
+   * 「**この認可要求で発行された**トークンか」に上がる（D11）。state が守るのは応答の
+   * 宛先だけで、id_token そのものの出所は nonce でしか縛れない。 */
+  const verified = await verifyLineIdToken(idToken, channelId, { expectedNonce });
   if (!verified.ok) {
     return fail(returnTo, `id_token verification failed: ${verified.reason}`);
   }

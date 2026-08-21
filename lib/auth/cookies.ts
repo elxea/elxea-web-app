@@ -173,6 +173,11 @@ export const COOKIE_REGISTRY: readonly CookieSpec[] = [
    * production `NODE_ENV === "production"`, so the emitted attribute is
    * unchanged. */
   { name: "line_oauth_state", group: "transient", scope: "shared-domain", secure: "prod-only" },
+  /* LINE Login の OIDC `nonce`（D11）。`line_oauth_state` と同じ scope / secure 規則で発行し、
+   * 同じ往復で使い捨てる。**別 cookie にしてある**のは役割が違うため: state は認可応答を
+   * このブラウザに束縛し、nonce は戻ってきた id_token をこの認可要求に束縛する。値を共有すると
+   * URL に出る state から nonce が観測でき、id_token 側の束縛が名ばかりになる。 */
+  { name: "line_oauth_nonce", group: "transient", scope: "shared-domain", secure: "prod-only" },
   /* Web 発 LINE 連携 (P2) の state。`line_oauth_state` と同じ理由で shared-domain /
    * prod-only だが、**別 cookie にしてある**。ログインと連携は別のチャネル・別の意図で、
    * 片方の往復がもう片方の state を踏み潰すと、途中まで進んでいたほうが静かに壊れる。

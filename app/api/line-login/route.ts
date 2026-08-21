@@ -49,6 +49,11 @@ export async function GET(request: NextRequest) {
 
   // Generate state for CSRF protection
   const state = crypto.randomBytes(32).toString("hex");
+  /* OIDC nonce (D11). Issued here too, not only in /init: the callback verifies the
+   * id_token's nonce unconditionally, so a login started through this legacy
+   * redirect would fail closed if it did not carry one. Same value rules as /init
+   * — a separate random value from `state`, same cookie scope and lifetime. */
+  const nonce = crypto.randomBytes(32).toString("hex");
 
   /* Store state in a cookie for verification in the callback.
    *
@@ -64,6 +69,15 @@ export async function GET(request: NextRequest) {
   cookieStore.set("line_oauth_state", state, {
     httpOnly: true,
     secure: isSecure(stateSpec),
+    sameSite: "lax",
+    maxAge: 600, // 10 minutes
+    path: "/",
+    ...(cookieDomain ? { domain: cookieDomain } : {}),
+  });
+  const nonceSpec = getCookieSpec("line_oauth_nonce")!;
+  cookieStore.set("line_oauth_nonce", nonce, {
+    httpOnly: true,
+    secure: isSecure(nonceSpec),
     sameSite: "lax",
     maxAge: 600, // 10 minutes
     path: "/",
@@ -87,6 +101,7 @@ export async function GET(request: NextRequest) {
     client_id: channelId,
     redirect_uri: redirectUri,
     state: state,
+    nonce,
     scope: "profile openid email",
   });
 
