@@ -202,30 +202,81 @@ describe("Shopify authorize URL keeps prompt=login", () => {
 });
 
 describe("both state cookies are issued through the same scope rule", () => {
+  /* Look cookies up BY NAME rather than by position. Both routes now set two
+   * flow cookies (`line_oauth_state` and `line_oauth_nonce`), so "the last call"
+   * silently became a different cookie the moment the nonce was added. */
+  const callFor = (name: string) =>
+    cookieStore.set.mock.calls.find((call: unknown[]) => call[0] === name);
+
+  const optionsOf = (call: unknown[] | undefined) => {
+    const opts = (call?.[2] ?? {}) as Record<string, unknown>;
+    return { domain: opts.domain, path: opts.path, secure: opts.secure, httpOnly: opts.httpOnly };
+  };
+
   it("init and the legacy route agree on the line_oauth_state scope", async () => {
     const { POST } = await import("@/app/api/line-login/init/route");
     await POST(request("https://www.elxea.com/api/line-login/init"));
-    const fromInit = cookieStore.set.mock.calls.at(-1);
+    const fromInit = callFor("line_oauth_state");
 
     cookieStore.set.mockClear();
 
     const { GET } = await import("@/app/api/line-login/route");
     await GET(request("https://www.elxea.com/api/line-login"));
-    const fromLegacy = cookieStore.set.mock.calls.at(-1);
+    const fromLegacy = callFor("line_oauth_state");
 
     /* These two routes used to disagree: init scoped the state cookie to the
      * apex while the legacy route set it host-only, so a state issued by one
      * was invisible to a callback that expected the other. Compare the options,
      * not the random state value. */
-    const optionsOf = (call: unknown[] | undefined) => {
-      const opts = (call?.[2] ?? {}) as Record<string, unknown>;
-      return { domain: opts.domain, path: opts.path, secure: opts.secure, httpOnly: opts.httpOnly };
-    };
-
     expect(fromInit?.[0]).toBe("line_oauth_state");
     expect(fromLegacy?.[0]).toBe("line_oauth_state");
     expect(optionsOf(fromLegacy)).toEqual(optionsOf(fromInit));
     expect(optionsOf(fromInit).domain).toBe(".elxea.com");
+  });
+
+  it("issues the nonce cookie at the same scope as the state cookie (D11)", async () => {
+    /* The callback fails closed without a nonce cookie, so if the two cookies
+     * were scoped differently, a round trip that crossed apex/www would lose the
+     * nonce while keeping the state — and every such login would break. Same
+     * class of bug the state cookie already had; pinned so it cannot recur on the
+     * new cookie. */
+    for (const [label, run] of [
+      [
+        "init",
+        async () => {
+          const { POST } = await import("@/app/api/line-login/init/route");
+          await POST(request("https://www.elxea.com/api/line-login/init"));
+        },
+      ],
+      [
+        "legacy",
+        async () => {
+          const { GET } = await import("@/app/api/line-login/route");
+          await GET(request("https://www.elxea.com/api/line-login"));
+        },
+      ],
+    ] as const) {
+      cookieStore.set.mockClear();
+      await run();
+
+      const state = callFor("line_oauth_state");
+      const nonce = callFor("line_oauth_nonce");
+
+      expect(nonce, `${label} must issue a nonce cookie`).toBeDefined();
+      expect(optionsOf(nonce)).toEqual(optionsOf(state));
+      // Distinct random values: sharing one would expose the nonce through the URL.
+      expect(nonce?.[1]).not.toBe(state?.[1]);
+    }
+  });
+
+  it("puts a nonce on the authorize URL, separate from state", async () => {
+    const { POST } = await import("@/app/api/line-login/init/route");
+    const response = await POST(request("https://www.elxea.com/api/line-login/init"));
+    const { authUrl } = (await response.json()) as { authUrl: string };
+
+    const url = new URL(authUrl);
+    expect(url.searchParams.get("nonce")).toBeTruthy();
+    expect(url.searchParams.get("nonce")).not.toBe(url.searchParams.get("state"));
   });
 });
 

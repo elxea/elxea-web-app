@@ -12,6 +12,7 @@ import {
   AUTO_LOGIN_FAILED_PARAM,
   AUTO_LOGIN_FAILED_VALUE,
 } from "@/lib/line/auto-login";
+import { verifyLineIdToken } from "@/lib/line/verify-liff-token";
 
 /**
  * LINE Login OAuth 2.0 callback endpoint.
@@ -121,6 +122,9 @@ export async function GET(request: NextRequest) {
    * strand a state cookie that a later attempt would compare against. */
   const clearState = <T extends NextResponse>(res: T): T => {
     clearFlowCookie(res, "line_oauth_state");
+    /* nonce も同じ往復の使い捨て値。state だけ消して nonce を残すと、次の試行が
+     * 前回の nonce と突き合わせられる状態が生まれる。必ず一緒に落とす。 */
+    clearFlowCookie(res, "line_oauth_nonce");
     return res;
   };
 
@@ -167,28 +171,56 @@ export async function GET(request: NextRequest) {
     const lineUserId = profile.userId;
     const displayName = profile.displayName;
 
-    // I1: Verify id_token via LINE verify API before extracting claims
-    let email: string | null = null;
-    if (tokens.id_token) {
-      try {
-        const verifyRes = await fetch(`${LINE_API_BASE}/oauth2/v2.1/verify`, {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: new URLSearchParams({
-            id_token: tokens.id_token,
-            client_id: channelId,
-          }),
-        });
-        if (verifyRes.ok) {
-          const verified = await verifyRes.json();
-          email = verified.email || null;
-        } else {
-          console.warn("[line-callback] id_token verification failed:", await verifyRes.text());
-        }
-      } catch {
-        // id_token verification failed, continue without email
-      }
+    /* Verify the id_token, and bind it to THIS authorization request (D11).
+     *
+     * What changed and why it is now fatal:
+     *
+     * The previous shape asked LINE to verify the token, then used the result only
+     * to read `email` — and on any failure it fell through with `email = null` and
+     * carried on logging the user in. That made the verification decorative: a
+     * token that failed every check produced the same session as one that passed.
+     * Worse, nothing checked `nonce` at all, so an id_token minted for a different
+     * authorization request could be presented here and the flow would not notice
+     * (OIDC Core §3.1.3.7 step 11 — the gap the design doc tracks as D11).
+     *
+     * It is now a gate. `verifyLineIdToken` checks signature-equivalent validity
+     * via LINE's verify endpoint plus aud / iss / exp / **nonce** locally, and a
+     * failure aborts the login before any session cookie is written. The cost of
+     * fail-closed here is one retry for a user; the cost of fail-open is a session
+     * established from a token we never established the provenance of.
+     *
+     * A missing `line_oauth_nonce` cookie is a failure, not a reason to skip the
+     * check — anything an attacker can supply, they can also omit. Both init
+     * routes issue the cookie alongside `line_oauth_state`, which has the same
+     * 10-minute lifetime, so the only users who meet this are ones mid-flight
+     * across the deploy; they land on the login screen and start again. */
+    const rejectIdToken = (reason: string) => {
+      console.warn(`[line-callback] id_token rejected: ${reason}`);
+      return clearState(
+        NextResponse.redirect(new URL(`/${locale}/login?error=InvalidIdToken`, requestOrigin)),
+      );
+    };
+
+    const savedNonce = cookieStore.get("line_oauth_nonce")?.value;
+    if (!savedNonce) return rejectIdToken("no nonce cookie for this round trip");
+
+    const verified = await verifyLineIdToken(tokens.id_token, channelId, {
+      expectedNonce: savedNonce,
+    });
+    if (!verified.ok) return rejectIdToken(verified.reason);
+
+    /* Cross-check the two sources of "who is this". `lineUserId` came from the
+     * profile API (authenticated by the access token); `sub` came from the
+     * id_token we just verified. They describe the same LINE user and must agree.
+     * They are separate values from separate calls, so a disagreement means one of
+     * the two responses does not belong to this exchange — which is precisely the
+     * confusion an attacker would need to engineer. Cheap check, and it fails
+     * closed. */
+    if (lineUserId !== verified.payload.sub) {
+      return rejectIdToken("profile userId does not match id_token sub");
     }
+
+    const email: string | null = verified.email;
 
     // Link LINE userId to cx-agent identity
     const chatApiBase = (

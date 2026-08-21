@@ -21,11 +21,21 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { NextRequest } from "next/server";
 
 const STATE = "state-value-for-test";
+/* The callback now also requires the OIDC nonce it issued at authorize time and
+ * checks it against the id_token's claim (D11), so the browser fixture has to
+ * carry both flow cookies — a real browser gets both from the init route. */
+const NONCE = "nonce-value-for-test";
+/* Must be a real Messaging userId shape (U + 32 hex): the verifier rejects
+ * anything else, and the route additionally requires `sub` and the profile's
+ * `userId` to agree. */
+const LINE_USER_ID = "U0123456789abcdef0123456789abcdef";
 
 const cookieStore = {
-  get: vi.fn((name: string) =>
-    name === "line_oauth_state" ? { name, value: STATE } : undefined,
-  ),
+  get: vi.fn((name: string) => {
+    if (name === "line_oauth_state") return { name, value: STATE };
+    if (name === "line_oauth_nonce") return { name, value: NONCE };
+    return undefined;
+  }),
   set: vi.fn(),
   delete: vi.fn(),
   has: vi.fn(() => false),
@@ -61,15 +71,25 @@ beforeEach(() => {
       }
       if (url.includes("v2/profile")) {
         return new Response(
-          JSON.stringify({ userId: "U-test-user", displayName: "テスト太郎" }),
+          JSON.stringify({ userId: LINE_USER_ID, displayName: "テスト太郎" }),
           { status: 200, headers: { "content-type": "application/json" } },
         );
       }
       if (url.includes("oauth2/v2.1/verify")) {
-        return new Response(JSON.stringify({ email: "t@example.com" }), {
-          status: 200,
-          headers: { "content-type": "application/json" },
-        });
+        /* A full verify payload, not just `email`. The route used to read only
+         * the email out of this response and log the user in regardless of the
+         * rest; now the whole payload is a gate (aud / iss / exp / nonce / sub). */
+        return new Response(
+          JSON.stringify({
+            sub: LINE_USER_ID,
+            aud: process.env.AUTH_LINE_ID,
+            iss: "https://access.line.me",
+            exp: Math.floor(Date.now() / 1000) + 3600,
+            nonce: NONCE,
+            email: "t@example.com",
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
       }
       // cx-agent identity link
       return new Response("{}", { status: 200 });

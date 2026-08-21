@@ -13,7 +13,7 @@
  *      積んでも無視され、outbound は常にサーバ確定 customerId。未認証なら body に email/id が
  *      あっても 401（email 等値経路は存在しない）。
  *
- * verifyLiffIdToken / requireAuth / rate limit / cx-agent base URL は mock。fetch はスタブして
+ * verifyLineIdToken / requireAuth / rate limit / cx-agent base URL は mock。fetch はスタブして
  * outbound を観測する。
  *
  * ---
@@ -41,9 +41,9 @@ vi.mock("@/lib/firebase/auth-guard", () => ({
   requireAuth: () => requireAuthMock(),
 }));
 
-const verifyLiffIdTokenMock = vi.fn();
+const verifyLineIdTokenMock = vi.fn();
 vi.mock("@/lib/line/verify-liff-token", () => ({
-  verifyLiffIdToken: (...args: unknown[]) => verifyLiffIdTokenMock(...args),
+  verifyLineIdToken: (...args: unknown[]) => verifyLineIdTokenMock(...args),
 }));
 
 vi.mock("@/lib/ratelimit", () => ({
@@ -119,7 +119,7 @@ describe("POST /api/user/line-link-liff", () => {
 
   it("Shopify ログイン済み → cx-agent へ server 確定 customerId で 1 回 upsert（X-API-Key 付き）", async () => {
     requireAuthMock.mockResolvedValue({ authenticated: true, customerId: "555" });
-    verifyLiffIdTokenMock.mockResolvedValue({
+    verifyLineIdTokenMock.mockResolvedValue({
       ok: true,
       messagingUserId: VALID_SUB,
       email: "buyer@example.test",
@@ -146,7 +146,7 @@ describe("POST /api/user/line-link-liff", () => {
 
   it("email-only では連携できない: body の攻撃者 shopify_customer_id / email は無視される", async () => {
     requireAuthMock.mockResolvedValue({ authenticated: true, customerId: "555" });
-    verifyLiffIdTokenMock.mockResolvedValue({
+    verifyLineIdTokenMock.mockResolvedValue({
       ok: true,
       messagingUserId: VALID_SUB,
       email: "buyer@example.test",
@@ -184,7 +184,7 @@ describe("POST /api/user/line-link-liff", () => {
 
   it("id_token 検証失敗 → 401 line_verification_failed・cx-agent を呼ばない", async () => {
     requireAuthMock.mockResolvedValue({ authenticated: true, customerId: "555" });
-    verifyLiffIdTokenMock.mockResolvedValue({ ok: false, reason: "aud_mismatch" });
+    verifyLineIdTokenMock.mockResolvedValue({ ok: false, reason: "aud_mismatch" });
 
     const res = await POST(makeRequest({ idToken: VALID_ID_TOKEN }));
     expect(res.status).toBe(401);
@@ -429,7 +429,7 @@ describe("POST /api/user/line-link/init", () => {
 describe("GET /api/user/line-link/callback", () => {
   it("成功 → cx-agent へサーバ確定 customerId で upsert し、マイページへ 302 復帰", async () => {
     requireAuthMock.mockResolvedValue({ authenticated: true, customerId: OWNER });
-    verifyLiffIdTokenMock.mockResolvedValue({
+    verifyLineIdTokenMock.mockResolvedValue({
       ok: true,
       messagingUserId: VALID_SUB,
       email: null,
@@ -470,7 +470,7 @@ describe("GET /api/user/line-link/callback", () => {
   it("login-CSRF: 別顧客が始めた state では連携しない（cx-agent を呼ばない）", async () => {
     // 被害者のセッションで、攻撃者が始めた state / code を踏まされる状況。
     requireAuthMock.mockResolvedValue({ authenticated: true, customerId: OWNER });
-    verifyLiffIdTokenMock.mockResolvedValue({
+    verifyLineIdTokenMock.mockResolvedValue({
       ok: true,
       messagingUserId: VALID_SUB,
       email: null,
@@ -507,7 +507,7 @@ describe("GET /api/user/line-link/callback", () => {
 
   it("id_token 検証に失敗したら連携しない（cx-agent を呼ばない）", async () => {
     requireAuthMock.mockResolvedValue({ authenticated: true, customerId: OWNER });
-    verifyLiffIdTokenMock.mockResolvedValue({ ok: false, reason: "aud_mismatch" });
+    verifyLineIdTokenMock.mockResolvedValue({ ok: false, reason: "aud_mismatch" });
     const outbound = stubLineThenCxAgent();
 
     const { state, cookieValue } = sealLinkState({ customerId: OWNER, returnTo: "/ja/account" });
@@ -574,7 +574,7 @@ describe("P2 client_secret env フォールバック", () => {
 
   it("(b) callback は LIFF 未設定でも LINE_LOGIN_CHANNEL_SECRET で code→token 交換する", async () => {
     requireAuthMock.mockResolvedValue({ authenticated: true, customerId: OWNER });
-    verifyLiffIdTokenMock.mockResolvedValue({ ok: true, messagingUserId: VALID_SUB, email: null });
+    verifyLineIdTokenMock.mockResolvedValue({ ok: true, messagingUserId: VALID_SUB, email: null });
     delete process.env.LINE_LIFF_CHANNEL_SECRET;
     process.env.LINE_LOGIN_CHANNEL_SECRET = "login-secret";
     const outbound = stubLineThenCxAgent();

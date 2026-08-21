@@ -26,14 +26,20 @@ import { encryptToken, decryptToken } from "@/lib/shopify/customer";
  * 操作なので、state に **開始時点の顧客 ID** を封じ込め、callback でその場のセッションと
  * 一致することまで確かめる。
  *
- * したがって callback が連携を成立させてよいのは、次の 4 つが **すべて**満たされたときだけ:
+ * したがって callback が連携を成立させてよいのは、次の 5 つが **すべて**満たされたときだけ:
  *
  *   1. cookie が復号できる（= 我々が発行したもの。SESSION_SECRET を知らないと作れない）
- *   2. cookie 内 nonce と URL の `state` が一致する（timing-safe 比較）
+ *   2. cookie 内 state と URL の `state` が一致する（timing-safe 比較）
  *   3. cookie 内 customerId と、その場の `requireAuth()` の customerId が一致する
  *   4. 発行から `STATE_TTL_MS` 以内である
+ *   5. cookie 内 nonce と、戻ってきた id_token の `nonce` claim が一致する（D11・下記）
  *
  * どれか 1 つでも欠けたら連携しない（fail-closed）。「たぶん本人だろう」で通さない。
+ *
+ * 5 番目が要るのは、1〜4 が見ているのが**認可応答**（code と state）だけだからである。
+ * 交換して得た **id_token 自体**が「この認可要求で発行されたもの」かどうかは、そこに
+ * 焼き込まれた nonce でしか確かめられない。検証は `verifyLiffIdToken` の `expectedNonce`
+ * に渡して行う（OIDC Core §3.1.3.7 step 11 / 設計書 v1.2 の D11）。
  *
  * ## 暗号化であって署名ではない理由
  *
@@ -84,7 +90,7 @@ export function resolveLinkChannelSecret(): string | undefined {
 
 /** cookie に封じる中身。キーを 1 文字にしているのは cookie サイズを抑えるため。 */
 type SealedState = {
-  /** nonce（URL の `state` と突き合わせる値）。 */
+  /** state（URL の `state` と突き合わせる値）。 */
   n: string;
   /** 連携を始めた時点の、サーバ確定 Shopify 顧客 ID。 */
   c: string;
@@ -92,6 +98,16 @@ type SealedState = {
   r: string;
   /** 発行時刻（epoch ms）。 */
   t: number;
+  /**
+   * OIDC `nonce`（D11）。認可 URL に載せ、戻ってきた id_token の `nonce` claim と照合する。
+   *
+   * `n`（state）とは役割が違う。state は「この**応答**が、このブラウザが始めた往復のものか」
+   * を見る。nonce は「この**id_token** が、その認可要求で発行されたものか」を見る。前者だけだと、
+   * 別の認可要求で得た id_token をこの往復に差し込む余地が残る（OIDC Core §3.1.3.7 step 11）。
+   * 値を分けているのは、片方が URL に出る（state）のに対しもう片方は id_token の中でしか
+   * 突き合わせない（nonce）ためで、同じ値を使い回すと nonce が URL 経由で観測可能になる。
+   */
+  o: string;
 };
 
 export type SealedStateInput = {
@@ -102,26 +118,30 @@ export type SealedStateInput = {
 export type StateEnvelope = {
   /** URL の `state` パラメータに載せる値。 */
   state: string;
+  /** 認可 URL の `nonce` パラメータに載せる値。 */
+  nonce: string;
   /** cookie に入れる暗号文。 */
   cookieValue: string;
 };
 
 /**
- * nonce を作り、顧客 ID と復帰先を封じた cookie 値を返す。
+ * state と nonce を作り、顧客 ID と復帰先とともに封じた cookie 値を返す。
  */
 export function sealLinkState(input: SealedStateInput, now = Date.now()): StateEnvelope {
   const state = crypto.randomBytes(32).toString("hex");
+  const nonce = crypto.randomBytes(32).toString("hex");
   const payload: SealedState = {
     n: state,
     c: input.customerId,
     r: input.returnTo,
     t: now,
+    o: nonce,
   };
-  return { state, cookieValue: encryptToken(JSON.stringify(payload)) };
+  return { state, nonce, cookieValue: encryptToken(JSON.stringify(payload)) };
 }
 
 export type OpenStateResult =
-  | { ok: true; returnTo: string }
+  | { ok: true; returnTo: string; nonce: string }
   | { ok: false; reason: string };
 
 /**
@@ -153,11 +173,17 @@ export function openLinkState(
     return { ok: false, reason: "state_malformed" };
   }
 
+  /* `o`（nonce）が無い cookie は、nonce 導入**前**に発行されたもの。通さない。
+   * 「古い形式なら nonce 検証を飛ばす」互換分岐を置くと、攻撃者は cookie を旧形式に
+   * 見せかけるだけで検証を外せる。TTL は 10 分なので、デプロイ直後にこれを踏んだ人は
+   * マイページに戻ってもう一度押せばよい（連携は起きていないのでデータは変化しない）。 */
   if (
     typeof payload?.n !== "string" ||
     typeof payload?.c !== "string" ||
     typeof payload?.r !== "string" ||
-    typeof payload?.t !== "number"
+    typeof payload?.t !== "number" ||
+    typeof payload?.o !== "string" ||
+    payload.o.length === 0
   ) {
     return { ok: false, reason: "state_malformed" };
   }
@@ -180,7 +206,11 @@ export function openLinkState(
   /* 封じた時点で検証済みだが、cookie は 10 分間ブラウザに残る。その間に
    * `sanitizeReturnTo` の規則を厳しくした場合、古い cookie が旧規則の値を運んでくる。
    * 出口でもう一度通すことで、規則の変更が即座に効く。 */
-  return { ok: true, returnTo: sanitizeReturnTo(payload.r, defaultReturnTo("ja")) };
+  return {
+    ok: true,
+    returnTo: sanitizeReturnTo(payload.r, defaultReturnTo("ja")),
+    nonce: payload.o,
+  };
 }
 
 /**

@@ -5,9 +5,8 @@ import {
   encryptToken,
   decryptToken,
   getCustomer,
-  extractCustomerIdFromIdToken,
-  verifyIdTokenNonce,
 } from "@/lib/shopify/customer";
+import { verifyShopifyIdToken } from "@/lib/shopify/id-token";
 import { sendWelcomeEmail } from "@/lib/email/welcome";
 import { sanitizeReturnTo } from "@/lib/auth/return-to";
 import { clearAuthCookies } from "@/lib/auth/cookies";
@@ -41,27 +40,43 @@ export async function GET(request: NextRequest) {
     const redirectUri = `${origin}/api/auth/callback`;
     const tokens = await exchangeToken(code, codeVerifier, redirectUri);
 
-    /* Bind the id_token to THIS login attempt (QA audit D1).
+    /* Verify the id_token itself — signature, issuer, audience, expiry, and the
+     * nonce that binds it to THIS login attempt (QA audit D1 + D11 / 設計書 1-0b).
      *
-     * `/api/auth/login` already generated a nonce, sent it to Shopify, and saved
-     * it in `shop_nonce` — and this route used to delete that cookie a few lines
-     * below without ever comparing it. The `state` check above binds the
-     * authorization *response* to this browser; only the nonce binds the
-     * *id_token* to the request we made. Everything identity-shaped downstream
-     * hangs off this token — `shop_cid`, `id_token_hint` at logout, and the
-     * Firestore user key the LINE merge writes into — so a token accepted here
-     * without that binding decides who the session is.
+     * Two separate gaps were closed here, and they are not the same gap:
      *
-     * Fail-closed and BEFORE any session cookie is written: a rejected token
-     * must not leave a half-established session behind. `verifyIdTokenNonce`
-     * treats a missing cookie and a missing claim as failures, not as reasons to
-     * skip the check. */
-    if (!verifyIdTokenNonce(tokens.id_token, savedNonce)) {
-      console.warn("[Auth Callback] id_token nonce mismatch; rejecting login");
-      Sentry.captureMessage("Shopify id_token nonce verification failed", {
+     *   - **nonce** (#90): `/api/auth/login` generated a nonce, sent it to
+     *     Shopify, and stored it in `shop_nonce` — and this route used to delete
+     *     that cookie without ever comparing it. `state` binds the authorization
+     *     *response* to this browser; only the nonce binds the *id_token* to the
+     *     request we made.
+     *   - **signature**: even with the nonce compared, the token was being
+     *     opened with a plain Base64 decode. The claim that "the back-channel
+     *     TLS call already proves the origin" holds for the exchange itself, but
+     *     the value read out of it then travels much further — `shop_cid`
+     *     decides the Firestore user key the LINE merge writes into, and
+     *     `shop_it` comes back at logout as `id_token_hint`. OIDC Core §3.1.3.7
+     *     asks for the token to be verified, not the pipe it arrived through.
+     *
+     * `verifyShopifyIdToken` does both, plus iss/aud/exp, against Shopify's
+     * published JWKS (discovered, not hard-coded). Fail-closed and BEFORE any
+     * session cookie is written: a rejected token must not leave a
+     * half-established session behind. A missing cookie or a missing claim are
+     * failures, never reasons to skip a check. */
+    const verified = await verifyShopifyIdToken(tokens.id_token, {
+      expectedNonce: savedNonce,
+    });
+    if (!verified.ok) {
+      console.warn(`[Auth Callback] id_token rejected: ${verified.reason}`);
+      Sentry.captureMessage("Shopify id_token verification failed", {
         level: "warning",
         tags: { subsystem: "shopify-oauth" },
+        extra: { reason: verified.reason },
       });
+      /* The query value stays `invalid_nonce` for every rejection reason. The
+       * account page already maps it to a "start over" message, and telling the
+       * outside world *which* of signature / iss / aud / exp / nonce failed hands
+       * an attacker a free oracle. The precise reason goes to the log and Sentry. */
       const rejected = NextResponse.redirect(
         `${origin}/${locale}/account?error=invalid_nonce`,
       );
@@ -122,16 +137,15 @@ export async function GET(request: NextRequest) {
       maxAge: 60 * 60 * 24 * 30, // 30 days (must outlive access token)
     });
 
-    // Cache the Shopify Customer ID extracted from the id_token JWT.
-    // This avoids an extra Shopify Customer API call on every authenticated request.
-    // The numeric customer ID (e.g. "7654321") is encrypted and stored as shop_cid.
-    const customerId = extractCustomerIdFromIdToken(tokens.id_token);
-    if (customerId) {
-      response.cookies.set("shop_cid", encryptToken(customerId), {
-        ...cookieOptions,
-        maxAge: 60 * 60 * 24 * 30, // 30 days (same as refresh token)
-      });
-    }
+    /* Cache the Shopify Customer ID. It comes from the **verified** claims above
+     * (`sub` = `gid://shopify/Customer/<id>`), not from a second unchecked decode
+     * of the same string — so `shop_cid` can only ever hold an id that survived
+     * signature + nonce verification. Saves a Customer API call per request. */
+    const customerId = verified.customerId;
+    response.cookies.set("shop_cid", encryptToken(customerId), {
+      ...cookieOptions,
+      maxAge: 60 * 60 * 24 * 30, // 30 days (same as refresh token)
+    });
 
     // Clean up PKCE cookies
     response.cookies.delete("shop_cv");

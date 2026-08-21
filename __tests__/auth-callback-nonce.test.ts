@@ -1,19 +1,34 @@
 /**
- * Tests for the Shopify OAuth nonce check — QA audit D1.
+ * Tests for the Shopify OAuth callback's id_token gate — QA audit D1 + 1-0b.
  *
- * `/api/auth/login` has always generated a nonce, sent it to Shopify, and stored
- * it in `shop_nonce`; the callback deleted that cookie without ever comparing
- * it. So nothing bound the returned `id_token` to the authorization request we
- * made, while every identity decision downstream (`shop_cid`, `id_token_hint`,
- * and the Firestore user key the LINE merge writes into) reads from that token.
+ * Two defects are pinned here, and they are different from each other:
  *
- * Two layers are pinned here:
- *   - `verifyIdTokenNonce` as a predicate, including every fail-closed case.
- *   - The route: a mismatch must be rejected BEFORE any session cookie exists,
- *     and a match must still log in exactly as before.
+ *   - **nonce (D1)**: `/api/auth/login` has always generated a nonce, sent it to
+ *     Shopify, and stored it in `shop_nonce`; the callback deleted that cookie
+ *     without ever comparing it. Nothing bound the returned `id_token` to the
+ *     authorization request we made.
+ *   - **signature (1-0b)**: even once the nonce was compared, the token was read
+ *     with a plain Base64 decode. A token nobody signed produced a session, and
+ *     every identity decision downstream (`shop_cid`, `id_token_hint`, the
+ *     Firestore user key the LINE merge writes into) reads from that token.
+ *
+ * The tokens here are really signed against a throwaway keypair whose JWKS is
+ * served by a stubbed fetch, so a regression to "just decode it" fails instead of
+ * passing. `verifyShopifyIdToken` itself is covered case-by-case in
+ * `shopify-id-token.test.ts`; this file is about the ROUTE — specifically that a
+ * rejection happens before any session cookie exists.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
+
+import {
+  TEST_CLIENT_ID,
+  TEST_DISCOVERY_URL,
+  makeJwksFetch,
+  makeKeypair,
+  signIdToken,
+  validClaims,
+} from "./helpers/shopify-oidc-fixtures";
 
 // --- Mocks ------------------------------------------------------------------
 
@@ -26,9 +41,6 @@ vi.mock("@/lib/shopify/customer", async () => {
   );
   return {
     ...actual,
-    // Real: these are what is under test.
-    verifyIdTokenNonce: actual.verifyIdTokenNonce,
-    extractCustomerIdFromIdToken: actual.extractCustomerIdFromIdToken,
     // Mocked: network, and crypto that needs a real SESSION_SECRET.
     exchangeToken: (...args: unknown[]) => exchangeTokenMock(...args),
     getCustomer: (...args: unknown[]) => getCustomerMock(...args),
@@ -52,21 +64,12 @@ vi.mock("@sentry/nextjs", () => ({
 }));
 
 import { GET } from "@/app/api/auth/callback/route";
-import { verifyIdTokenNonce, extractNonceFromIdToken } from "@/lib/shopify/customer";
+import { __resetShopifyJwksCacheForTests } from "@/lib/shopify/id-token";
 
 // --- Helpers ----------------------------------------------------------------
 
-const b64url = (value: string) => Buffer.from(value, "utf8").toString("base64url");
-
-/** An unsigned JWT with the given payload. Only the payload is ever read. */
-function idTokenWith(payload: Record<string, unknown>): string {
-  return `${b64url(JSON.stringify({ alg: "RS256", typ: "JWT" }))}.${b64url(
-    JSON.stringify(payload),
-  )}.signature-not-verified`;
-}
-
 const NONCE = "b6cf1d2e4a7f8091b6cf1d2e4a7f8091";
-const CUSTOMER_GID = "gid://shopify/Customer/7654321";
+const keypair = makeKeypair();
 
 function callbackRequest(cookies: Record<string, string>): NextRequest {
   const request = new NextRequest("https://www.elxea.com/api/auth/callback?code=CODE&state=STATE", {
@@ -85,72 +88,60 @@ const HAPPY_COOKIES = {
   shop_locale: "ja",
 };
 
-function tokenResponse(nonce: string | undefined) {
+function tokenResponse(idToken: string) {
   return {
     access_token: "at",
     refresh_token: "rt",
     expires_in: 3600,
     token_type: "Bearer",
-    id_token: idTokenWith({ sub: CUSTOMER_GID, ...(nonce === undefined ? {} : { nonce }) }),
+    id_token: idToken,
   };
 }
 
-const SAVED_HOSTS = process.env.LINE_ALLOWED_CALLBACK_HOSTS;
+/** A token that passes every check — the baseline each test deviates from. */
+const goodToken = () => signIdToken(keypair, validClaims(NONCE));
+
+const SAVED = {
+  hosts: process.env.LINE_ALLOWED_CALLBACK_HOSTS,
+  clientId: process.env.SHOPIFY_CUSTOMER_ACCOUNT_CLIENT_ID,
+  discovery: process.env.SHOPIFY_CUSTOMER_ACCOUNT_DISCOVERY_URL,
+};
+
+let realFetch: typeof fetch;
 
 beforeEach(() => {
   vi.clearAllMocks();
+  __resetShopifyJwksCacheForTests();
   process.env.LINE_ALLOWED_CALLBACK_HOSTS = "elxea.com,www.elxea.com";
+  process.env.SHOPIFY_CUSTOMER_ACCOUNT_CLIENT_ID = TEST_CLIENT_ID;
+  process.env.SHOPIFY_CUSTOMER_ACCOUNT_DISCOVERY_URL = TEST_DISCOVERY_URL;
   getCustomerMock.mockResolvedValue(null);
   vi.spyOn(console, "warn").mockImplementation(() => {});
+  /* The route calls `verifyShopifyIdToken` without a fetch override, so the JWKS
+   * has to be served through the global. */
+  realFetch = globalThis.fetch;
+  globalThis.fetch = makeJwksFetch([keypair.jwk]);
 });
 
 afterEach(() => {
   vi.restoreAllMocks();
-  if (SAVED_HOSTS === undefined) delete process.env.LINE_ALLOWED_CALLBACK_HOSTS;
-  else process.env.LINE_ALLOWED_CALLBACK_HOSTS = SAVED_HOSTS;
-});
-
-// --- The predicate ----------------------------------------------------------
-
-describe("verifyIdTokenNonce", () => {
-  it("accepts a token carrying the nonce we issued", () => {
-    expect(verifyIdTokenNonce(idTokenWith({ nonce: NONCE }), NONCE)).toBe(true);
-  });
-
-  it("rejects a token carrying a different nonce", () => {
-    expect(verifyIdTokenNonce(idTokenWith({ nonce: "some-other-nonce" }), NONCE)).toBe(false);
-  });
-
-  it("rejects when the token has no nonce claim at all", () => {
-    expect(verifyIdTokenNonce(idTokenWith({ sub: CUSTOMER_GID }), NONCE)).toBe(false);
-  });
-
-  it("rejects when we have no saved nonce to compare against", () => {
-    // Fail-closed: an absent cookie must not become an exemption.
-    expect(verifyIdTokenNonce(idTokenWith({ nonce: NONCE }), undefined)).toBe(false);
-    expect(verifyIdTokenNonce(idTokenWith({ nonce: NONCE }), "")).toBe(false);
-  });
-
-  it("rejects a malformed token instead of throwing", () => {
-    expect(verifyIdTokenNonce("not-a-jwt", NONCE)).toBe(false);
-    expect(verifyIdTokenNonce("a.!!!not-base64-json!!!.c", NONCE)).toBe(false);
-  });
-
-  it("rejects a nonce that is a prefix of the expected one", () => {
-    expect(verifyIdTokenNonce(idTokenWith({ nonce: NONCE.slice(0, -1) }), NONCE)).toBe(false);
-  });
-
-  it("does not confuse a non-string nonce claim for a match", () => {
-    expect(extractNonceFromIdToken(idTokenWith({ nonce: 12345 }))).toBeNull();
-    expect(verifyIdTokenNonce(idTokenWith({ nonce: 12345 }), NONCE)).toBe(false);
-  });
+  __resetShopifyJwksCacheForTests();
+  globalThis.fetch = realFetch;
+  for (const [key, value] of [
+    ["LINE_ALLOWED_CALLBACK_HOSTS", SAVED.hosts],
+    ["SHOPIFY_CUSTOMER_ACCOUNT_CLIENT_ID", SAVED.clientId],
+    ["SHOPIFY_CUSTOMER_ACCOUNT_DISCOVERY_URL", SAVED.discovery],
+  ] as const) {
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  }
 });
 
 // --- The route --------------------------------------------------------------
 
-describe("GET /api/auth/callback nonce enforcement", () => {
-  it("completes the login when the nonce matches", async () => {
-    exchangeTokenMock.mockResolvedValue(tokenResponse(NONCE));
+describe("GET /api/auth/callback id_token enforcement", () => {
+  it("completes the login when the token is signed and carries our nonce", async () => {
+    exchangeTokenMock.mockResolvedValue(tokenResponse(goodToken()));
 
     const response = await GET(callbackRequest(HAPPY_COOKIES));
 
@@ -161,8 +152,21 @@ describe("GET /api/auth/callback nonce enforcement", () => {
     expect(setCookie).toContain("shop_cid=");
   });
 
+  it("stores the customer id taken from the verified claims", async () => {
+    exchangeTokenMock.mockResolvedValue(tokenResponse(goodToken()));
+
+    const response = await GET(callbackRequest(HAPPY_COOKIES));
+
+    /* `encryptToken` is stubbed to `enc(...)`, so this asserts the exact value
+     * that reached the cookie — i.e. that it came from `sub` after verification
+     * and not from a second, unchecked decode of the same string. */
+    expect(response.cookies.get("shop_cid")?.value).toBe("enc(7654321)");
+  });
+
   it("rejects the login when the nonce does not match", async () => {
-    exchangeTokenMock.mockResolvedValue(tokenResponse("attacker-controlled-nonce"));
+    exchangeTokenMock.mockResolvedValue(
+      tokenResponse(signIdToken(keypair, validClaims("attacker-controlled-nonce"))),
+    );
 
     const response = await GET(callbackRequest(HAPPY_COOKIES));
 
@@ -170,13 +174,40 @@ describe("GET /api/auth/callback nonce enforcement", () => {
       "https://www.elxea.com/ja/account?error=invalid_nonce",
     );
     expect(captureMessageMock).toHaveBeenCalledWith(
-      "Shopify id_token nonce verification failed",
+      "Shopify id_token verification failed",
       expect.objectContaining({ level: "warning" }),
     );
   });
 
-  it("establishes no session at all on a nonce mismatch", async () => {
-    exchangeTokenMock.mockResolvedValue(tokenResponse("attacker-controlled-nonce"));
+  it("rejects a token signed by a key that is not Shopify's", async () => {
+    /* The case the old decode-only implementation could not see at all: every
+     * claim is correct, including the nonce; only the signature is wrong. */
+    const attacker = makeKeypair();
+    exchangeTokenMock.mockResolvedValue(
+      tokenResponse(signIdToken(attacker, validClaims(NONCE))),
+    );
+
+    const response = await GET(callbackRequest(HAPPY_COOKIES));
+
+    expect(response.headers.get("location")).toContain("error=invalid_nonce");
+    const setCookie = response.headers.getSetCookie().join("\n");
+    expect(setCookie).not.toContain("shop_at=enc(");
+  });
+
+  it("rejects an unsigned (alg=none) token", async () => {
+    exchangeTokenMock.mockResolvedValue(
+      tokenResponse(signIdToken(keypair, validClaims(NONCE), { header: { alg: "none" } })),
+    );
+
+    const response = await GET(callbackRequest(HAPPY_COOKIES));
+
+    expect(response.headers.get("location")).toContain("error=invalid_nonce");
+  });
+
+  it("establishes no session at all when the token is rejected", async () => {
+    exchangeTokenMock.mockResolvedValue(
+      tokenResponse(signIdToken(keypair, validClaims("attacker-controlled-nonce"))),
+    );
 
     const response = await GET(callbackRequest(HAPPY_COOKIES));
 
@@ -190,7 +221,9 @@ describe("GET /api/auth/callback nonce enforcement", () => {
   });
 
   it("clears the one-shot PKCE cookies on a rejected attempt", async () => {
-    exchangeTokenMock.mockResolvedValue(tokenResponse("attacker-controlled-nonce"));
+    exchangeTokenMock.mockResolvedValue(
+      tokenResponse(signIdToken(keypair, validClaims("attacker-controlled-nonce"))),
+    );
 
     const response = await GET(callbackRequest(HAPPY_COOKIES));
 
@@ -201,7 +234,9 @@ describe("GET /api/auth/callback nonce enforcement", () => {
   });
 
   it("rejects a token with no nonce claim", async () => {
-    exchangeTokenMock.mockResolvedValue(tokenResponse(undefined));
+    const claims = validClaims(NONCE);
+    delete claims.nonce;
+    exchangeTokenMock.mockResolvedValue(tokenResponse(signIdToken(keypair, claims)));
 
     const response = await GET(callbackRequest(HAPPY_COOKIES));
 
@@ -209,12 +244,36 @@ describe("GET /api/auth/callback nonce enforcement", () => {
   });
 
   it("rejects when the browser presents no shop_nonce cookie", async () => {
-    exchangeTokenMock.mockResolvedValue(tokenResponse(NONCE));
+    exchangeTokenMock.mockResolvedValue(tokenResponse(goodToken()));
     const { shop_nonce: _dropped, ...withoutNonce } = HAPPY_COOKIES;
 
     const response = await GET(callbackRequest(withoutNonce));
 
     expect(response.headers.get("location")).toContain("error=invalid_nonce");
+  });
+
+  it("rejects the login when Shopify's key set cannot be reached", async () => {
+    /* Fail-closed on an unverifiable token. Logging the user in "because the
+     * JWKS was down" would restore exactly the behaviour being removed. */
+    globalThis.fetch = makeJwksFetch([keypair.jwk], { failAfter: 0 });
+    exchangeTokenMock.mockResolvedValue(tokenResponse(goodToken()));
+
+    const response = await GET(callbackRequest(HAPPY_COOKIES));
+
+    expect(response.headers.get("location")).toContain("error=invalid_nonce");
+  });
+
+  it("does not leak which check failed into the redirect", async () => {
+    /* Signature failure and nonce failure must be indistinguishable from outside;
+     * the specific reason goes to the log and Sentry only. */
+    const attacker = makeKeypair();
+    exchangeTokenMock.mockResolvedValue(tokenResponse(signIdToken(attacker, validClaims(NONCE))));
+    const signatureFailure = await GET(callbackRequest(HAPPY_COOKIES));
+
+    exchangeTokenMock.mockResolvedValue(tokenResponse(signIdToken(keypair, validClaims("other"))));
+    const nonceFailure = await GET(callbackRequest(HAPPY_COOKIES));
+
+    expect(signatureFailure.headers.get("location")).toBe(nonceFailure.headers.get("location"));
   });
 
   it("still rejects a bad state before the token exchange is attempted", async () => {
