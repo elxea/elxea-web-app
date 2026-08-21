@@ -6,127 +6,13 @@ import {
   decryptToken,
   getCustomer,
   extractCustomerIdFromIdToken,
+  verifyIdTokenNonce,
 } from "@/lib/shopify/customer";
 import { sendWelcomeEmail } from "@/lib/email/welcome";
-import { getAdminFirestore } from "@/lib/firebase/admin";
 import { sanitizeReturnTo } from "@/lib/auth/return-to";
 import { clearAuthCookies } from "@/lib/auth/cookies";
 import { getRequestOrigin } from "@/lib/base-url";
-import {
-  favoritesCol,
-  followsCol,
-  eventRegistrationsCol,
-} from "@/lib/firebase/collections";
-
-/**
- * Phase 1/2 identity merge.
- *
- * If the user already interacted with the site while authenticated via LINE
- * only (collecting favorites / follows / event registrations under
- * `users/line:{userId}/`), move that data under the Shopify `userKey`
- * (`users/{shopifyNumericId}/`) at the moment they finish Shopify OAuth.
- *
- * Dedupe rules mirror the corresponding `addFavorite` / `followFarmer` /
- * `registerForEvent` helpers so a user who already favorited the same item
- * on both sides does not end up with duplicates.
- *
- * This is best-effort and MUST NOT block login: any failure is swallowed
- * after logging to console + Sentry.
- */
-async function mergeLineIdentityIntoShopify(
-  lineUserId: string,
-  shopifyCustomerId: string,
-): Promise<void> {
-  const lineUserKey = `line:${lineUserId}`;
-  if (lineUserKey === shopifyCustomerId) return;
-
-  const db = getAdminFirestore();
-
-  const merged = { favorites: 0, follows: 0, eventRegistrations: 0 };
-
-  // Favorites — dedupe by (type, targetId).
-  {
-    const srcPath = favoritesCol(lineUserKey);
-    const dstPath = favoritesCol(shopifyCustomerId);
-    const srcSnap = await db.collection(srcPath).get();
-    for (const doc of srcSnap.docs) {
-      const data = doc.data();
-      const type = data.type as string | undefined;
-      const targetId = data.targetId as string | undefined;
-      if (type && targetId) {
-        const dupe = await db
-          .collection(dstPath)
-          .where("type", "==", type)
-          .where("targetId", "==", targetId)
-          .limit(1)
-          .get();
-        if (dupe.empty) {
-          await db.collection(dstPath).add(data);
-          merged.favorites += 1;
-        }
-      }
-      await doc.ref.delete();
-    }
-  }
-
-  // Follows — dedupe by farmerSlug.
-  {
-    const srcPath = followsCol(lineUserKey);
-    const dstPath = followsCol(shopifyCustomerId);
-    const srcSnap = await db.collection(srcPath).get();
-    for (const doc of srcSnap.docs) {
-      const data = doc.data();
-      const farmerSlug = data.farmerSlug as string | undefined;
-      if (farmerSlug) {
-        const dupe = await db
-          .collection(dstPath)
-          .where("farmerSlug", "==", farmerSlug)
-          .limit(1)
-          .get();
-        if (dupe.empty) {
-          await db.collection(dstPath).add(data);
-          merged.follows += 1;
-        }
-      }
-      await doc.ref.delete();
-    }
-  }
-
-  // Event registrations — dedupe by eventSlug.
-  {
-    const srcPath = eventRegistrationsCol(lineUserKey);
-    const dstPath = eventRegistrationsCol(shopifyCustomerId);
-    const srcSnap = await db.collection(srcPath).get();
-    for (const doc of srcSnap.docs) {
-      const data = doc.data();
-      const eventSlug = data.eventSlug as string | undefined;
-      if (eventSlug) {
-        const dupe = await db
-          .collection(dstPath)
-          .where("eventSlug", "==", eventSlug)
-          .limit(1)
-          .get();
-        if (dupe.empty) {
-          await db.collection(dstPath).add(data);
-          merged.eventRegistrations += 1;
-        }
-      }
-      await doc.ref.delete();
-    }
-  }
-
-  Sentry.addBreadcrumb({
-    category: "identity-merge",
-    level: "info",
-    message: "Merged LINE identity into Shopify user",
-    data: {
-      subsystem: "identity-merge",
-      lineUserKey,
-      shopifyCustomerId,
-      ...merged,
-    },
-  });
-}
+import { mergeLineIdentityIntoShopify } from "@/lib/auth/identity-merge";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
@@ -141,6 +27,7 @@ export async function GET(request: NextRequest) {
 
   const codeVerifier = request.cookies.get("shop_cv")?.value;
   const savedState = request.cookies.get("shop_state")?.value;
+  const savedNonce = request.cookies.get("shop_nonce")?.value;
   const locale = request.cookies.get("shop_locale")?.value || "ja";
 
   // Validate state
@@ -153,6 +40,37 @@ export async function GET(request: NextRequest) {
   try {
     const redirectUri = `${origin}/api/auth/callback`;
     const tokens = await exchangeToken(code, codeVerifier, redirectUri);
+
+    /* Bind the id_token to THIS login attempt (QA audit D1).
+     *
+     * `/api/auth/login` already generated a nonce, sent it to Shopify, and saved
+     * it in `shop_nonce` — and this route used to delete that cookie a few lines
+     * below without ever comparing it. The `state` check above binds the
+     * authorization *response* to this browser; only the nonce binds the
+     * *id_token* to the request we made. Everything identity-shaped downstream
+     * hangs off this token — `shop_cid`, `id_token_hint` at logout, and the
+     * Firestore user key the LINE merge writes into — so a token accepted here
+     * without that binding decides who the session is.
+     *
+     * Fail-closed and BEFORE any session cookie is written: a rejected token
+     * must not leave a half-established session behind. `verifyIdTokenNonce`
+     * treats a missing cookie and a missing claim as failures, not as reasons to
+     * skip the check. */
+    if (!verifyIdTokenNonce(tokens.id_token, savedNonce)) {
+      console.warn("[Auth Callback] id_token nonce mismatch; rejecting login");
+      Sentry.captureMessage("Shopify id_token nonce verification failed", {
+        level: "warning",
+        tags: { subsystem: "shopify-oauth" },
+      });
+      const rejected = NextResponse.redirect(
+        `${origin}/${locale}/account?error=invalid_nonce`,
+      );
+      // One-shot values: a rejected attempt must not leave anything reusable.
+      for (const name of ["shop_cv", "shop_state", "shop_nonce", "shop_locale", "shop_return_to"]) {
+        rejected.cookies.delete(name);
+      }
+      return rejected;
+    }
 
     // Post-login destination. Defaults to /{locale}/account (previous fixed
     // behaviour); a flow that needs to resume after login (LINE account linking
@@ -224,9 +142,16 @@ export async function GET(request: NextRequest) {
     // into the next login.
     response.cookies.delete("shop_return_to");
 
-    // Phase 1/2: if this user completed Shopify OAuth while already holding a
-    // LINE session, merge their LINE-only Firestore data into the Shopify
-    // userKey. Non-blocking: never fails the login flow.
+    /* Phase 1/2: if this user completed Shopify OAuth while already holding a
+     * LINE session, merge their LINE-only Firestore data into the Shopify
+     * userKey.
+     *
+     * Still non-blocking — a merge problem must not cost the user their login —
+     * but no longer silent. `mergeLineIdentityIntoShopify` reports its own
+     * partial failures (see `lib/auth/identity-merge.ts`) and leaves anything it
+     * could not confirm in place, so a later login retries it. The catch here
+     * now only covers a hard throw (e.g. Firestore unreachable), and that is
+     * logged as an error rather than dropped. */
     const lineUidEnc = request.cookies.get("line_uid")?.value;
     if (lineUidEnc && customerId) {
       const lineUserId = decryptToken(lineUidEnc);
