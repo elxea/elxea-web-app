@@ -54,14 +54,18 @@ vi.mock("@/lib/chat/proxy", () => ({
 
 import { resolveIdentity } from "@/lib/firebase/auth-guard";
 import {
+  fetchLineLinkageStatusForLineUser,
   fetchShopifyCustomerIdForLineUser,
+  invalidateReverseLinkage,
   __clearLinkageCacheForTest,
   LINKAGE_CACHE_TTL_MS,
+  UNKNOWN_LINE_LINKAGE,
 } from "@/lib/line/linkage-status";
 import { requestCxUnlink } from "@/lib/line/unlink";
 
 const LINE_USER_ID = "U0123456789abcdef0123456789abcdef";
 const SHOPIFY_CUSTOMER_ID = "900800400001";
+const LINKED_AT = "2026-08-19T21:13:00.000Z";
 const SECRET_ENV = "SYNC_API_SECRET";
 
 let fetchMock: ReturnType<typeof vi.fn>;
@@ -365,5 +369,111 @@ describe("requestCxUnlink / 解除要求", () => {
       ok: true,
       clearedCount: 0,
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// (e) LINE セッション本人の連携状態（マイページの解除導線 / A 案・2026-08-22）
+//
+// LINE で入っている人にも「連携済み」と解除ボタンを出すには、顧客 ID を持たないまま
+// 連携状態を知る必要がある。逆引きは linked / linkedAt / shopify_customer_id を
+// 一度に返すので、**顧客 ID の引き方と状態の引き方で HTTP を 2 回叩かない**。
+// ---------------------------------------------------------------------------
+
+describe("fetchLineLinkageStatusForLineUser（LINE セッションの連携状態）", () => {
+  it("連携済み → linked=true と連携日を返す", async () => {
+    stubUpstream({
+      linked: true,
+      linkedAt: LINKED_AT,
+      shopify_customer_id: SHOPIFY_CUSTOMER_ID,
+    });
+
+    await expect(
+      fetchLineLinkageStatusForLineUser(LINE_USER_ID),
+    ).resolves.toEqual({ linked: true, linkedAt: LINKED_AT });
+  });
+
+  it("未連携 → linked=false（不明に化けさせない）", async () => {
+    stubUpstream({ linked: false, shopify_customer_id: null });
+
+    await expect(
+      fetchLineLinkageStatusForLineUser(LINE_USER_ID),
+    ).resolves.toEqual({ linked: false, linkedAt: null });
+  });
+
+  it("読めない → 不明（未連携と言い切らない）", async () => {
+    stubUpstream({}, false, 500);
+
+    await expect(
+      fetchLineLinkageStatusForLineUser(LINE_USER_ID),
+    ).resolves.toEqual(UNKNOWN_LINE_LINKAGE);
+  });
+
+  it("連携日が壊れていても連携の有無は落とさない", async () => {
+    stubUpstream({
+      linked: true,
+      linkedAt: 12345,
+      shopify_customer_id: SHOPIFY_CUSTOMER_ID,
+    });
+
+    await expect(
+      fetchLineLinkageStatusForLineUser(LINE_USER_ID),
+    ).resolves.toEqual({ linked: true, linkedAt: null });
+  });
+
+  it("顧客 ID の引き方と状態の引き方でキャッシュを共有する（往復を増やさない）", async () => {
+    const t0 = 5_000_000;
+    stubUpstream({
+      linked: true,
+      linkedAt: LINKED_AT,
+      shopify_customer_id: SHOPIFY_CUSTOMER_ID,
+    });
+
+    expect(await fetchShopifyCustomerIdForLineUser(LINE_USER_ID, t0)).toBe(
+      SHOPIFY_CUSTOMER_ID,
+    );
+    await expect(
+      fetchLineLinkageStatusForLineUser(LINE_USER_ID, t0 + 1_000),
+    ).resolves.toEqual({ linked: true, linkedAt: LINKED_AT });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("invalidateReverseLinkage（解除直後の見え方）", () => {
+  it("捨てたら次の読み取りで台帳を引き直す（解除後に「連携済み」が残らない）", async () => {
+    const t0 = 6_000_000;
+    stubUpstream({
+      linked: true,
+      linkedAt: LINKED_AT,
+      shopify_customer_id: SHOPIFY_CUSTOMER_ID,
+    });
+    await fetchShopifyCustomerIdForLineUser(LINE_USER_ID, t0);
+
+    // 解除された。TTL 内でもキャッシュを捨てれば即座に反映される。
+    invalidateReverseLinkage(LINE_USER_ID);
+    stubUpstream({ linked: false, shopify_customer_id: null });
+
+    await expect(
+      fetchLineLinkageStatusForLineUser(LINE_USER_ID, t0 + 1_000),
+    ).resolves.toEqual({ linked: false, linkedAt: null });
+  });
+
+  it("他人のキャッシュは捨てない（巻き添えで往復を増やさない）", async () => {
+    const t0 = 7_000_000;
+    const OTHER_LINE_USER_ID = "Ufedcba9876543210fedcba9876543210";
+    stubUpstream({
+      linked: true,
+      linkedAt: LINKED_AT,
+      shopify_customer_id: SHOPIFY_CUSTOMER_ID,
+    });
+    await fetchShopifyCustomerIdForLineUser(OTHER_LINE_USER_ID, t0);
+
+    invalidateReverseLinkage(LINE_USER_ID);
+
+    expect(
+      await fetchShopifyCustomerIdForLineUser(OTHER_LINE_USER_ID, t0 + 1_000),
+    ).toBe(SHOPIFY_CUSTOMER_ID);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
