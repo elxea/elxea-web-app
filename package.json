@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "prepare": "bash scripts/git-guard/install-hooks.sh",
     "dev": "node ./scripts/copy-maplibre-worker.mjs && next dev",
     "build": "node ./scripts/copy-maplibre-worker.mjs && node sd.config.mjs && npx tsx scripts/check-placeholders.ts && next build",
     "start": "next start",
