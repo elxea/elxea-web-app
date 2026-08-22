@@ -35,6 +35,7 @@ import {
   fetchLineLinkageStatus,
   formatLinkedDate,
   isLinkedForDisplay,
+  resolveLineLinkageEntryMode,
   UNKNOWN_LINE_LINKAGE,
 } from "@/lib/line/linkage-status";
 
@@ -245,5 +246,60 @@ describe("formatLinkedDate（連携日の表示）", () => {
 
   it("壊れた文字列 → 日付を言わない（Invalid Date を画面に出さない）", () => {
     expect(formatLinkedDate("not-a-date", "ja")).toBeNull();
+  });
+});
+
+/* -------------------------------------------------------------------------
+ * マイページの連携節をどう出すか（A 案・2026-08-22）
+ *
+ * 以前は節そのものが `auth.shopify` でしか描かれず、**LINE で入っている人は連携済みでも
+ * 解除に到達できなかった**。連携フローに入れるか（canLink）と、解除を出すか（連携済みか）は
+ * 別の軸なので、ここで固定する。
+ * ----------------------------------------------------------------------- */
+describe("resolveLineLinkageEntryMode（連携節の出し分け）", () => {
+  const LINKED = { linked: true, linkedAt: LINKED_AT } as const;
+  const NOT_LINKED = { linked: false, linkedAt: null } as const;
+
+  it("連携済みなら、連携フローに入れなくても状態と解除を出す（本 PR の主旨）", () => {
+    expect(resolveLineLinkageEntryMode({ canLink: false, status: LINKED })).toBe(
+      "linked",
+    );
+  });
+
+  it("メールでログイン中も従来どおり連携済み表示", () => {
+    expect(resolveLineLinkageEntryMode({ canLink: true, status: LINKED })).toBe(
+      "linked",
+    );
+  });
+
+  it("メールでログイン中の未連携・不明は、従来どおり連携ボタン", () => {
+    expect(resolveLineLinkageEntryMode({ canLink: true, status: NOT_LINKED })).toBe(
+      "link-cta",
+    );
+    expect(
+      resolveLineLinkageEntryMode({ canLink: true, status: UNKNOWN_LINE_LINKAGE }),
+    ).toBe("link-cta");
+  });
+
+  it("LINE ログイン中の未連携は節ごと出さない（押せない連携ボタンを置かない）", () => {
+    expect(resolveLineLinkageEntryMode({ canLink: false, status: NOT_LINKED })).toBe(
+      "hidden",
+    );
+  });
+
+  it("LINE ログイン中に状態が読めなかったら黙って消さない（連携済みの人が誤解する）", () => {
+    expect(
+      resolveLineLinkageEntryMode({ canLink: false, status: UNKNOWN_LINE_LINKAGE }),
+    ).toBe("status-only");
+  });
+
+  it("連携フローから戻ってきた結果があるときは、未連携でも黙って捨てない", () => {
+    expect(
+      resolveLineLinkageEntryMode({
+        canLink: false,
+        status: NOT_LINKED,
+        hasResult: true,
+      }),
+    ).toBe("status-only");
   });
 });

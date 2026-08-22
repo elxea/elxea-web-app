@@ -130,6 +130,55 @@ export function isLinkedForDisplay(
   return status?.linked === true;
 }
 
+/**
+ * マイページの「LINE 連携」節をどう出すか。
+ *
+ * `canLink` は **この画面から連携フローに入れるか**（＝ Shopify セッションがあるか）。
+ * LINE だけでログインしている人は `/api/user/line-link/init` に必要な Shopify の
+ * 顧客セッションを持たないので、押しても入口で弾かれる連携ボタンを出さない。
+ * 一方で **解除は LINE セッションでもできる**（解除の対象は台帳の自分の行だから）ので、
+ * 連携済みなら状態と解除の導線を出す。ここが出ていなかったのが「LINE でログインすると
+ * 連携を解除できない」の正体で、本関数はその出し分けを 1 か所に固定する。
+ *
+ *   - `linked`      … 連携済み。状態 + 解除の導線（`canLink` に関係なく出す）
+ *   - `link-cta`    … 未連携 / 不明 かつ連携フローに入れる。従来どおり連携ボタン
+ *   - `status-only` … 連携フローに入れないが、黙って消してはいけないとき
+ *                     （状態が読めなかった / 連携フローから戻ってきた結果がある）
+ *   - `hidden`      … LINE セッションで未連携。出す用は無い（連携の入口は
+ *                     「メールアドレスを連携する」の既存導線が持っている）
+ *
+ * 画面の JSX に直接この分岐を書かないのは `isLinkedForDisplay` と同じ理由
+ * （3 値が `!!` に化けて不明が連携済みに倒れる事故を型と関数で止める）。
+ */
+export type LineLinkageEntryMode =
+  | "linked"
+  | "link-cta"
+  | "status-only"
+  | "hidden";
+
+export function resolveLineLinkageEntryMode({
+  canLink,
+  status,
+  hasResult = false,
+}: {
+  /** この画面から連携フローに入れるか（Shopify の顧客セッションがあるか）。 */
+  canLink: boolean;
+  status?: LineLinkageStatus;
+  /** 連携フローから戻ってきた結果（`?line_link=...`）を出す必要があるか。 */
+  hasResult?: boolean;
+}): LineLinkageEntryMode {
+  /* 「状態が読めなかった」かを先に determine する。`isLinkedForDisplay` は型述語
+     （`status is LineLinkageStatus`）なので、あとに置くと else 側で status が never に
+     狭まり `status?.linked` を読めなくなる。 */
+  const statusUnknown = status?.linked === null;
+
+  if (isLinkedForDisplay(status)) return "linked";
+  if (canLink) return "link-cta";
+  // 不明を黙って消さない（連携済みの人が「解除は要らない」と誤解する）。
+  if (statusUnknown || hasResult) return "status-only";
+  return "hidden";
+}
+
 /* ---------------------------------------------------------------------------
  * 逆引き（LINE userId → Shopify 顧客）: マイページ分裂の根因を塞ぐ読み取り口
  * ------------------------------------------------------------------------- */
@@ -175,7 +224,19 @@ export type ResolvedShopifyCustomer = string | false | null;
  */
 export const LINKAGE_CACHE_TTL_MS = 60_000;
 
-type CacheEntry = { value: ResolvedShopifyCustomer; expiresAt: number };
+/**
+ * 逆引きで分かること。**1 回の往復で全部返ってくる**（cx-agent の逆引きは
+ * `linked` / `linkedAt` / `shopify_customer_id` を一緒に返す）ので、顧客 ID だけの
+ * 引き方と連携状態の引き方で HTTP を 2 回叩かない（キャッシュも 1 つに保つ）。
+ */
+type ReverseLinkage = {
+  /** 連携先の顧客 ID / 未連携 (`false`) / 読めなかった (`null`)。 */
+  customer: ResolvedShopifyCustomer;
+  /** 連携済みのとき、いつからか（ISO 8601）。分からなければ null。 */
+  linkedAt: string | null;
+};
+
+type CacheEntry = { value: ReverseLinkage; expiresAt: number };
 
 /**
  * プロセス内キャッシュ。
@@ -216,6 +277,18 @@ export function __clearLinkageCacheForTest(): void {
 }
 
 /**
+ * この LINE userId の逆引きキャッシュを捨てる。
+ *
+ * 解除（`DELETE /api/user/line-link`）の直後に呼ぶ。呼ばないと、解除した本人が
+ * `router.refresh()` で引き直したマイページに **最大 60 秒間「連携済み」が出たまま**
+ * になり、「解除できていないのでは」と受け取られる（この機能で直している嘘の親戚）。
+ * 台帳の側はもう外れているので、捨てるだけで次の読み取りが正しい答えを取ってくる。
+ */
+export function invalidateReverseLinkage(lineUserId: string): void {
+  if (lineUserId) reverseCache.delete(lineUserId);
+}
+
+/**
  * サーバ検証済みの LINE userId から、連携先の Shopify 顧客 ID を引く。
  *
  * @param lineUserId **サーバ側で検証済み**の LINE userId のみを渡すこと
@@ -229,10 +302,47 @@ export async function fetchShopifyCustomerIdForLineUser(
   lineUserId: string,
   now: number = Date.now(),
 ): Promise<ResolvedShopifyCustomer> {
-  if (!lineUserId) return false;
+  return (await fetchReverseLinkage(lineUserId, now)).customer;
+}
+
+/**
+ * サーバ検証済みの LINE userId から、**その人自身の連携状態**を引く。
+ *
+ * 順引き（`fetchLineLinkageStatus`）と戻り値の型を揃えてあるのは、マイページが
+ * ログイン経路によらず同じ 1 つの節を描くため。Shopify セッションがあるときは
+ * 顧客 ID で順引きし、LINE だけのときはここで逆引きする — 画面から見れば
+ * どちらも「連携済み / 未連携 / 不明」の 3 値でしかない。
+ *
+ * @returns 連携状態。**決して throw しない**（読めなければ `UNKNOWN_LINE_LINKAGE`）。
+ */
+export async function fetchLineLinkageStatusForLineUser(
+  lineUserId: string,
+  now: number = Date.now(),
+): Promise<LineLinkageStatus> {
+  const reverse = await fetchReverseLinkage(lineUserId, now);
+
+  if (reverse.customer === null) return UNKNOWN_LINE_LINKAGE;
+  if (reverse.customer === false) return { linked: false, linkedAt: null };
+  return { linked: true, linkedAt: reverse.linkedAt };
+}
+
+/**
+ * 逆引きの実体（顧客 ID と連携日をまとめて取り、キャッシュする）。
+ *
+ * `fetchShopifyCustomerIdForLineUser` と `fetchLineLinkageStatusForLineUser` の
+ * 共通の下地。連携の「読み方」をここ 1 か所に閉じてあるので、2 つの呼び口が
+ * 別々に cx-agent を叩いたり、fail-soft の倒し方がずれたりしない。
+ */
+async function fetchReverseLinkage(
+  lineUserId: string,
+  now: number,
+): Promise<ReverseLinkage> {
+  if (!lineUserId) return { customer: false, linkedAt: null };
 
   const cached = reverseCache.get(lineUserId);
   if (cached && cached.expiresAt > now) return cached.value;
+
+  const unknown: ReverseLinkage = { customer: null, linkedAt: null };
 
   const secret = process.env.SYNC_API_SECRET;
   if (!secret) {
@@ -241,14 +351,14 @@ export async function fetchShopifyCustomerIdForLineUser(
     console.warn(
       "[line-linkage-status] SYNC_API_SECRET not set; reverse linkage unknown.",
     );
-    return null;
+    return unknown;
   }
 
   const url = `${CX_AGENT_BASE_URL}/api/identity/linkage-status?line_user_id=${encodeURIComponent(
     lineUserId,
   )}`;
 
-  let resolved: ResolvedShopifyCustomer;
+  let resolved: ReverseLinkage;
   try {
     const upstream = await fetch(url, {
       method: "GET",
@@ -262,35 +372,40 @@ export async function fetchShopifyCustomerIdForLineUser(
       console.warn(
         `[line-linkage-status] reverse lookup returned ${upstream.status}`,
       );
-      return null;
+      return unknown;
     }
 
     const data = (await upstream.json()) as {
       linked?: unknown;
+      linkedAt?: unknown;
       shopify_customer_id?: unknown;
     };
 
     if (data.linked !== true) {
       // 明示的に「連携が無い」と言われた。従来どおり LINE 単独の人格。
-      resolved = false;
+      resolved = { customer: false, linkedAt: null };
     } else if (
       typeof data.shopify_customer_id === "string" &&
       data.shopify_customer_id !== ""
     ) {
-      resolved = data.shopify_customer_id;
+      resolved = {
+        customer: data.shopify_customer_id,
+        // 日付は「取れたら出す」。壊れていても連携の有無までは落とさない。
+        linkedAt: typeof data.linkedAt === "string" ? data.linkedAt : null,
+      };
     } else {
       // linked=true なのに顧客 ID が無い＝応答が壊れている。棚を推測しない。
       console.warn(
         "[line-linkage-status] reverse lookup: linked without customer id",
       );
-      return null;
+      return unknown;
     }
   } catch (err) {
     console.warn(
       "[line-linkage-status] reverse lookup unreachable:",
       err instanceof Error ? err.message : err,
     );
-    return null;
+    return unknown;
   }
 
   // 確定した答え（連携先 or 未連携）だけを短時間キャッシュする。

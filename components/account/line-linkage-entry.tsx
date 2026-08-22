@@ -3,7 +3,7 @@ import { LineLinkageCta } from "@/components/account/line-linkage-cta";
 import { LineUnlinkControl } from "@/components/account/line-unlink-control";
 import {
   formatLinkedDate,
-  isLinkedForDisplay,
+  resolveLineLinkageEntryMode,
   type LineLinkageStatus,
 } from "@/lib/line/linkage-status";
 
@@ -57,6 +57,11 @@ const COPY = {
     /** 状態が読めなかったとき。「未連携」と言い切らない（3 値表示）。 */
     statusUnknown:
       "ただいま連携の状態を確認できませんでした。すでに連携がお済みの場合、あらためて連携していただいても二重にはなりません。",
+    /** LINE でログイン中の見出し（この画面から新たに連携する導線は無いので、動詞にしない）。 */
+    statusHeading: "LINEとの連携",
+    /** LINE でログイン中に状態が読めなかったとき。連携ボタンが無いので促し方を変える。 */
+    statusUnknownNoCta:
+      "ただいま連携の状態を確認できませんでした。お手数ですが、少し時間をおいてからもう一度ご覧ください。",
   },
   en: {
     heading: "Link with LINE",
@@ -72,6 +77,9 @@ const COPY = {
     noticeError: "We could not complete the link. Please try again.",
     statusUnknown:
       "We could not check your link status just now. If you are already linked, linking again will not create a duplicate.",
+    statusHeading: "LINE linkage",
+    statusUnknownNoCta:
+      "We could not check your link status just now. Please take a look again in a little while.",
   },
 } as const;
 
@@ -103,21 +111,37 @@ type Locale = keyof typeof COPY;
  *   （旧 LIFF 導線が連携済みの人にも毎回「連携完了」を見せていた問題の再発防止）。
  *   `error` を黙って捨てないのは、失敗して戻ってきた人が「何も起きなかった」と
  *   受け取るのが、まさに P2 で直している体験だから。
+ *
+ * @param canLink この画面から連携フローに入れるか（＝ Shopify の顧客セッションがあるか）。
+ *   既定 `true`（従来の呼び出し方＝メールでログインしている人）。
+ *
+ *   LINE だけでログインしている人には `false` を渡す。`/api/user/line-link/init` は
+ *   Shopify セッションを要求するので、押しても入口で弾かれる連携ボタンを出さないため。
+ *   **解除は別**で、連携済みなら `canLink` に関係なく状態と解除の導線を出す
+ *   （解除の対象は台帳の自分の行なので、LINE セッションでも指定できる）。ここが
+ *   出ていなかったのが「LINE でログインすると連携を解除できない」の正体。
+ *   出し分けの決定は `resolveLineLinkageEntryMode` に置いてテストで縛る。
  */
 export function LineLinkageEntry({
   locale,
   status,
   result,
+  canLink = true,
 }: {
   locale: string;
   status?: LineLinkageStatus;
   result?: "success" | "error";
+  canLink?: boolean;
 }) {
   const t = COPY[(locale as Locale) in COPY ? (locale as Locale) : "ja"];
 
-  /* 「状態が読めなかった」かどうかは、下の isLinkedForDisplay より **前**に determine する。
-     isLinkedForDisplay は型述語（`status is LineLinkageStatus`）なので、else 側で
-     status が never に狭まり `status?.linked` を読めなくなるため。 */
+  const mode = resolveLineLinkageEntryMode({
+    canLink,
+    status,
+    hasResult: Boolean(result),
+  });
+
+  /* 「状態が読めなかった」かどうか（3 値の null）。連携済みかどうかとは別の軸。 */
   const statusUnknown = status?.linked === null;
 
   const notice = result ? (
@@ -130,9 +154,9 @@ export function LineLinkageEntry({
     </p>
   ) : null;
 
-  // 連携済み: 状態を伝え、解除の導線を出す。
-  if (isLinkedForDisplay(status)) {
-    const date = formatLinkedDate(status.linkedAt, locale);
+  // 連携済み: 状態を伝え、解除の導線を出す（ログイン経路によらず同じ）。
+  if (mode === "linked") {
+    const date = formatLinkedDate(status?.linkedAt ?? null, locale);
     return (
       <AccountPanelSection title={t.linkedHeading} testId="line-linkage-entry">
         <div className="space-y-2">
@@ -146,6 +170,32 @@ export function LineLinkageEntry({
             </p>
             <LineUnlinkControl locale={locale} />
           </div>
+        </div>
+      </AccountPanelSection>
+    );
+  }
+
+  /* 連携フローに入れない（LINE だけでログインしている）ときは、連携ボタンを出さない。
+     未連携なら節ごと出さず（連携の入口は「メールアドレスを連携する」の既存導線が持つ）、
+     状態が読めなかったときと連携から戻ってきた直後だけ、その事実を静かに置く。
+     不明を黙って消さないのは、連携済みの人が「未連携」と読んで解除が要らないと
+     誤解するのを防ぐため（3 値表示の原則は経路が変わっても同じ）。 */
+  if (mode === "hidden") return null;
+
+  if (mode === "status-only") {
+    return (
+      <AccountPanelSection title={t.statusHeading} testId="line-linkage-entry">
+        <div className="space-y-2">
+          {notice}
+          {statusUnknown ? (
+            <p
+              className="text-sm text-foreground leading-relaxed"
+              data-testid="line-linkage-status-unknown"
+              role="status"
+            >
+              {t.statusUnknownNoCta}
+            </p>
+          ) : null}
         </div>
       </AccountPanelSection>
     );
