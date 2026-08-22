@@ -3,18 +3,23 @@
  *
  * The contract this guards — it is a production-exposure guard, so every one of
  * these assertions goes red the moment a dummy stops being blocked:
- *   1. Every seed document confirmed to exist in the production Sanity dataset
- *      is blocked by BOTH its `_id` and its slug (list views have the `_id`,
- *      detail routes and the sitemap only have the slug).
- *   2. Real documents are never blocked: unknown ids/slugs, and the two farmers
- *      that are NOT seeds, pass through untouched.
- *   3. The farmer entries are unchanged from the former lib/fictional-farmers.ts
- *      (that module was folded into this one; farmer behaviour must not move).
- *   4. `author` seed docs are deliberately NOT in the deny-list — "setaka" may
+ *   1. Every fictional document confirmed to exist in the production Sanity
+ *      dataset is blocked by BOTH its `_id` and its slug (list views have the
+ *      `_id`, detail routes and the sitemap only have the slug).
+ *   2. Real documents are never blocked: unknown ids/slugs pass through
+ *      untouched, and the deny-list stays a fixed list rather than a rule that
+ *      could swallow a genuine farmer added later.
+ *   3. `author` seed docs are deliberately NOT in the deny-list — "setaka" may
  *      be a real person, so that call is Setaka's, not the code's.
- *   5. Every read path that renders or lists these types actually consults the
- *      deny-list (source-level assertion, so a new page cannot silently ship an
- *      unfiltered fetch of a denied type).
+ *   4. Every read path that renders, lists, or emails about these types actually
+ *      consults the deny-list (source-level assertion, so a new page cannot
+ *      silently ship an unfiltered fetch of a denied type).
+ *
+ * On `farmer` specifically: all four farmer docs in production are fictional.
+ * Three come from seed scripts; 山田 健一 / 佐藤 美咲 were hand-created on
+ * 2026-03-07 and were left visible pending confirmation. Setaka confirmed them
+ * fictional on 2026-08-22, so they are blocked too and the old "does NOT block
+ * the real (non-seed) farmers" assertion is gone — it asserted the opposite.
  */
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -31,8 +36,10 @@ import {
 const REPO_ROOT = path.resolve(__dirname, "..");
 
 /**
- * The seed documents observed in the production dataset, keyed by `_type`.
- * Sources: scripts/seed-farmers.ts and scripts/seed-dummy-content.ts.
+ * The fictional documents observed in the production dataset, keyed by `_type`.
+ * Sources: scripts/seed-farmers.ts, scripts/seed-dummy-content.ts, and — for the
+ * last two farmers — a live GROQ query against the production dataset
+ * (`*[_type=="farmer"]{_id,name,"slug":slug.current}`, 2026-08-22).
  */
 const MUST_BLOCK: Record<FictionalDocType, Array<[id: string, slug: string]>> = {
   farmer: [
@@ -41,6 +48,10 @@ const MUST_BLOCK: Record<FictionalDocType, Array<[id: string, slug: string]>> = 
     ["farmer-rajan-mehta", "rajan-mehta"],
     ["farmer-yamada", "yamada-farm"],
     ["farmer-tanaka", "tanaka-tea-garden"],
+    // 山田 健一 / 佐藤 美咲 — hand-created 2026-03-07, confirmed fictional
+    // by Setaka 2026-08-22. Sanity auto-generated the ids.
+    ["ChPy2hTrLaycRwOtl4DGV5", "yamada-kenichi"],
+    ["ChPy2hTrLaycRwOtl4DGZd", "sato-misaki"],
   ],
   teaMenu: [
     ["tea-sencha-spring", "spring-sencha"],
@@ -106,14 +117,26 @@ describe("fictional-content deny-list", () => {
     expect(isFictionalSlug("farmer", "spring-sencha")).toBe(false);
   });
 
-  it("does NOT block the real (non-seed) farmers", () => {
-    // Sanity farmer docs created 2026-03-07 — pending Setaka's confirmation but
-    // never seed output, so they must keep rendering.
-    const realFarmers = [
-      { _id: "farmer-yamada-kenichi-real", slug: { current: "yamada-kenichi" } },
-      { _id: "farmer-sato-misaki", slug: { current: "sato-misaki" } },
+  it("blocks every farmer doc currently in the production dataset", () => {
+    // Live GROQ against production on 2026-08-22 returned exactly these four,
+    // and Setaka confirmed elxea has no real published producer profiles yet.
+    // So the whole set must be denied — if a genuine producer is published
+    // later it will carry a new _id/slug and pass straight through.
+    const production = [
+      { _id: "ChPy2hTrLaycRwOtl4DGV5", slug: { current: "yamada-kenichi" } },
+      { _id: "ChPy2hTrLaycRwOtl4DGZd", slug: { current: "sato-misaki" } },
+      { _id: "farmer-yamada", slug: { current: "yamada-farm" } },
+      { _id: "farmer-tanaka", slug: { current: "tanaka-tea-garden" } },
     ];
-    expect(filterOutFictional("farmer", realFarmers)).toEqual(realFarmers);
+    expect(filterOutFictional("farmer", production)).toEqual([]);
+  });
+
+  it("still lets a future, genuinely-real farmer through", () => {
+    // The deny-list must stay a fixed list, not "hide all farmers".
+    const realFarmer = [
+      { _id: "a-brand-new-sanity-id", slug: { current: "a-real-producer" } },
+    ];
+    expect(filterOutFictional("farmer", realFarmer)).toEqual(realFarmer);
   });
 
   it("does NOT block author docs (Setaka's call, not the code's)", () => {
@@ -152,6 +175,10 @@ describe("read paths consult the deny-list", () => {
     ["app/[locale]/(reading)/playlists/page.tsx", "filterOutFictional", "playlist"],
     ["app/[locale]/events/page.tsx", "filterOutFictional", "event"],
     ["app/[locale]/page.tsx", "filterOutFictional", "event"],
+    // トップの VOICES 節 (TOP_FARMER_VOICES_QUERY)。引くのは `quote` のある農家だけ
+    // なので現時点では架空 4 件とも釣れないが、Studio で一言が入った瞬間に
+    // トップの一等地へ出てしまう。ほかの farmer 経路と同じくガードを通す。
+    ["app/[locale]/page.tsx", "filterOutFictional", "farmer"],
     // detail routes
     ["app/[locale]/(reading)/farmers/[slug]/page.tsx", "isFictionalSlug", "farmer"],
     ["app/[locale]/(reading)/tea-menu/[slug]/page.tsx", "isFictionalSlug", "teaMenu"],
@@ -160,6 +187,9 @@ describe("read paths consult the deny-list", () => {
     // journal issues must not link to fictional tea / playlists
     ["app/[locale]/(reading)/elxea-journal/[slug]/page.tsx", "filterOutFictional", "teaMenu"],
     ["app/[locale]/(reading)/elxea-journal/[slug]/page.tsx", "isFictionalSlug", "playlist"],
+    // フォロワー向けメール。公開ページではないが、架空の生産者名を実在の顧客に
+    // 断言したうえリンク先は 404 になるので、遮断の必要はむしろ強い。
+    ["app/api/cron/farmer-notification/route.ts", "filterOutFictional", "farmer"],
   ];
 
   it.each(cases)("%s guards with %s(%s)", (file, fn, type) => {

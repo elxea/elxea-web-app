@@ -7,6 +7,7 @@ import {
   type FarmerNotificationItem,
 } from "@/lib/email/farmer-notification";
 import { siteUrl } from "@/lib/site-url";
+import { filterOutFictional } from "@/lib/fictional-content";
 
 /**
  * Cron job: Notify followers of new articles/products from followed farmers.
@@ -101,8 +102,20 @@ async function fetchFarmersWithNewContent(
       "name": name
     }
   `;
-  const farmers: Array<{ slug: string; name: string }> =
+  const fetchedFarmers: Array<{ slug: string; name: string }> =
     await sanityClient.fetch(farmersQuery, { slugs: involvedSlugs });
+
+  /**
+   * 架空の農家についてはメールを組み立てない。この経路は公開ページではなく
+   * フォロワーの受信箱に届くぶん、遮断の必要はむしろ強い — 架空の生産者名を
+   * 実在の顧客に断言したうえ、本文のリンク先 `/farmers/{slug}` は deny-list 側で
+   * 404 になるので、届いた時点で壊れている。`filterOutFictional` は `slug.current`
+   * を見るので、この射影 (`"slug": slug.current`) に合わせて形を渡す。
+   */
+  const farmers = filterOutFictional(
+    "farmer",
+    fetchedFarmers.map((f) => ({ ...f, slug: { current: f.slug } })),
+  ).map((f) => ({ ...f, slug: f.slug.current }));
 
   return farmers.map((f) => ({
     farmerSlug: f.slug,
