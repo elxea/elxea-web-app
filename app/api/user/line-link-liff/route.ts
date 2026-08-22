@@ -4,6 +4,7 @@ import { requireAuth } from "@/lib/firebase/auth-guard";
 import { parseJsonBody } from "@/lib/validation/zod-helpers";
 import { enforceRateLimit, limiters } from "@/lib/ratelimit";
 import { verifyLineIdToken } from "@/lib/line/verify-liff-token";
+import { resolveLinkChannelId } from "@/lib/line/link-flow";
 import { CX_AGENT_BASE_URL } from "@/lib/chat/proxy";
 
 /**
@@ -58,7 +59,9 @@ export async function POST(request: NextRequest) {
      * 「必須」にすると LIFF 連携が全滅する）。この経路のリプレイ束縛は
      * requireAuth（サーバ確定の Shopify セッション）+ サーバ側 verify が担う。
      * 認可 URL を自分で作る Web 発の経路（/api/user/line-link/callback）では必ず渡す。 */
-    const channelId = process.env.LINE_LIFF_CHANNEL_ID;
+    /* Web 発の経路と同じ読み取り（trim 付き）。ここで読んだ値は id_token の `aud` と
+     * 等値比較されるので、末尾改行が 1 文字混じるだけで検証が必ず外れる。 */
+    const channelId = resolveLinkChannelId();
     const verified = await verifyLineIdToken(parsed.data.idToken, channelId);
     if (!verified.ok) {
       console.warn("[line-link-liff] id_token verification failed:", verified.reason);

@@ -10,6 +10,7 @@ import {
   LINE_LINK_STATE_COOKIE,
   defaultReturnTo,
   openLinkState,
+  resolveLinkChannelId,
   resolveLinkChannelSecret,
   returnUrlWithResult,
 } from "@/lib/line/link-flow";
@@ -101,12 +102,17 @@ export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get("code");
   if (!code) return fail(returnTo, "no authorization code");
 
-  const channelId = process.env.LINE_LIFF_CHANNEL_ID;
+  const channelId = resolveLinkChannelId();
   /* client_secret は LINE_LIFF_CHANNEL_SECRET を優先し、未設定なら既存の
    * LINE_LOGIN_CHANNEL_SECRET にフォールバックする。LINE_LIFF_CHANNEL_ID と
    * LINE_LOGIN_CHANNEL_ID は同一 Login チャネル (2009473839) を指すため、その Channel Secret は
    * LINE_LOGIN_CHANNEL_SECRET と同値であり、client_id (= LINE_LIFF_CHANNEL_ID) と整合する。
-   * 本番 Vercel に新規シークレットを追加せず既存 env で連携を成立させるための措置。 */
+   * 本番 Vercel に新規シークレットを追加せず既存 env で連携を成立させるための措置。
+   *
+   * **どちらも env の値をそのまま使わず trim する。** ここが 2026-08-22 の本番障害の現場で、
+   * 保存時に紛れ込んだ末尾改行 1 文字のせいで下の token 交換が毎回
+   * `400 invalid_client / invalid client_secret` を返していた。詳細と再発防止の考え方は
+   * `resolveLinkChannelSecret` の doc を読むこと。 */
   const channelSecret = resolveLinkChannelSecret();
   if (!channelId || !channelSecret) {
     return fail(returnTo, "LINE_LIFF_CHANNEL_ID / _SECRET not configured");

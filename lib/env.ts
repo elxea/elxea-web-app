@@ -40,6 +40,37 @@ export function readUrlEnvTrimmed(raw: string | undefined, fallback: string): st
   return readEnvTrimmed(raw, fallback).replace(/\/+$/, "");
 }
 
+/**
+ * Same trimming rule as {@link readEnvTrimmed}, but for values that must never
+ * be substituted — credentials, channel ids, shared secrets.
+ *
+ * Returns `undefined` (not a fallback string) when the variable is unset or
+ * trims down to nothing, so callers are forced to decide what "not configured"
+ * means instead of quietly sending an empty or placeholder credential upstream.
+ *
+ * ## Why a credential needs trimming at all
+ *
+ * The stdin-pipe defect described at the top of this file lands on secrets too,
+ * and there it is much harder to see: a Channel Secret with a trailing newline
+ * is still 32 correct characters followed by one invisible one. It renders
+ * identically in the Vercel dashboard and nothing warns you. It surfaces only
+ * at the far end, as the provider's generic rejection.
+ *
+ * That is how the Web LINE linking flow broke in production on 2026-08-22.
+ * `LINE_LOGIN_CHANNEL_SECRET` was stored as 32 chars + `\n`, so
+ * `POST https://api.line.me/oauth2/v2.1/token` answered
+ * `400 error=invalid_client error_description=invalid client_secret` on every
+ * attempt and the customer was bounced back to the account page with
+ * "連携を完了できませんでした". Email login kept working throughout, because it reads
+ * a different (clean) variable for the same channel — which is why the failure
+ * looked like a linking bug rather than a configuration one.
+ */
+export function readSecretEnvTrimmed(raw: string | undefined): string | undefined {
+  if (typeof raw !== "string") return undefined;
+  const trimmed = raw.trim();
+  return trimmed === "" ? undefined : trimmed;
+}
+
 /** Canonical public origin of the site, with no trailing slash. */
 export const SITE_URL_FALLBACK = "https://elxea.com";
 

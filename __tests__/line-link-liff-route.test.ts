@@ -619,3 +619,116 @@ describe("P2 client_secret env フォールバック", () => {
     expect(resolveLinkChannelSecret()).toBeUndefined();
   });
 });
+
+/* =========================================================================
+ * P2 — env の末尾改行で連携が全滅した本番障害（2026-08-22）の回帰テスト
+ *
+ * 症状: マイページ →「LINEと連携する」→ LINE の認可は通り、マイページに戻ってきて
+ *       「連携を完了できませんでした」。Vercel runtime log は毎回
+ *         [line-link/callback] token exchange failed: 400
+ *           error=invalid_client error_description=invalid client_secret
+ *
+ * 原因: 本番の LINE_LOGIN_CHANNEL_SECRET が「正しい 32 文字 + 改行」で保存されていた
+ *       (`vercel env add ... < file` のように stdin から入れると末尾の改行まで値になる)。
+ *       同じチャネル (2009473839) でもメールログインが読む AUTH_LINE_SECRET は改行なしで
+ *       保存されていたため、ログインだけは通り続け、連携の不具合に見えていた。
+ *
+ * 直し方の方針: 本番の値を掃除するだけでは同じ入れ方でまた再発する。**コードを不感にする**
+ *       (`readSecretEnvTrimmed` を通す) ことを、ここで契約として固定する。
+ *
+ * したがって以下のテストは「trim しているか」ではなく「汚れた env でも LINE に送る値が
+ * 正しいか」を見る。実装の内部関数ではなく、外に出ていく HTTP の中身を検査する。
+ * ========================================================================= */
+describe("P2 env に紛れ込んだ末尾改行（本番障害 2026-08-22 の回帰）", () => {
+  /** 本番に実在した形。32 文字の正しい秘密の後ろに改行が 1 文字だけ付いている。 */
+  const POLLUTED_SECRET = `${"0".repeat(32)}\n`;
+  const CLEAN_SECRET = "0".repeat(32);
+
+  it("callback: 末尾改行つきの LOGIN secret でも、LINE には改行なしの client_secret を送る", async () => {
+    requireAuthMock.mockResolvedValue({ authenticated: true, customerId: OWNER });
+    verifyLineIdTokenMock.mockResolvedValue({ ok: true, messagingUserId: VALID_SUB, email: null });
+    delete process.env.LINE_LIFF_CHANNEL_SECRET;
+    process.env.LINE_LOGIN_CHANNEL_SECRET = POLLUTED_SECRET;
+    const outbound = stubLineThenCxAgent();
+
+    const { state, cookieValue } = sealLinkState({ customerId: OWNER, returnTo: "/ja/account" });
+    cookieJar.set(LINE_LINK_STATE_COOKIE, cookieValue);
+
+    const { GET: callback } = await import("@/app/api/user/line-link/callback/route");
+    const res = await callback(callbackRequest({ code: "auth-code", state }));
+
+    const [tokenUrl, tokenInit] = outbound.mock.calls[0] as unknown as [string, RequestInit];
+    expect(tokenUrl).toBe("https://api.line.me/oauth2/v2.1/token");
+    const body = new URLSearchParams(String(tokenInit.body));
+    // これが本番で LINE に弾かれていた値。改行が 1 文字でも残ると invalid_client になる。
+    expect(body.get("client_secret")).toBe(CLEAN_SECRET);
+    expect(body.get("client_secret")).not.toContain("\n");
+    // 交換が通るので、行き先は成功（= マイページに ?line_link=success で戻る）。
+    expect(res.status).toBe(307);
+    expect(res.headers.get("location")).toContain(`${LINK_RESULT_PARAM}=success`);
+  });
+
+  it("callback: 末尾改行つきの LIFF_CHANNEL_ID でも、client_id は改行なしで送る", async () => {
+    requireAuthMock.mockResolvedValue({ authenticated: true, customerId: OWNER });
+    verifyLineIdTokenMock.mockResolvedValue({ ok: true, messagingUserId: VALID_SUB, email: null });
+    process.env.LINE_LIFF_CHANNEL_ID = "2000000001\n";
+    process.env.LINE_LIFF_CHANNEL_SECRET = CLEAN_SECRET;
+    const outbound = stubLineThenCxAgent();
+
+    const { state, cookieValue } = sealLinkState({ customerId: OWNER, returnTo: "/ja/account" });
+    cookieJar.set(LINE_LINK_STATE_COOKIE, cookieValue);
+
+    const { GET: callback } = await import("@/app/api/user/line-link/callback/route");
+    await callback(callbackRequest({ code: "auth-code", state }));
+
+    const [, tokenInit] = outbound.mock.calls[0] as unknown as [string, RequestInit];
+    expect(new URLSearchParams(String(tokenInit.body)).get("client_id")).toBe("2000000001");
+    /* id_token 検証にも同じ綺麗な値が渡ること。ここは LINE が返す `aud` と等値比較されるので、
+     * 改行が残ると「署名は通ったのに aud 不一致」という辿りにくい失敗になる。 */
+    expect(verifyLineIdTokenMock.mock.calls[0][1]).toBe("2000000001");
+  });
+
+  it("init: 末尾改行つきの CHANNEL_ID でも、認可 URL の client_id は改行なし", async () => {
+    requireAuthMock.mockResolvedValue({ authenticated: true, customerId: OWNER });
+    process.env.LINE_LIFF_CHANNEL_ID = "2000000001\n";
+    process.env.LINE_LIFF_CHANNEL_SECRET = POLLUTED_SECRET;
+    const { POST: init } = await import("@/app/api/user/line-link/init/route");
+
+    const res = await init(initRequest());
+    expect(res.status).toBe(200);
+    const { authUrl } = (await res.json()) as { authUrl: string };
+    expect(new URL(authUrl).searchParams.get("client_id")).toBe("2000000001");
+  });
+
+  it("空白だけの secret は「設定済み」と数えない（init 503 / 押せて必ず失敗するボタンを出さない）", async () => {
+    requireAuthMock.mockResolvedValue({ authenticated: true, customerId: OWNER });
+    process.env.LINE_LIFF_CHANNEL_SECRET = "   \n";
+    process.env.LINE_LOGIN_CHANNEL_SECRET = "\t\r\n";
+    const { POST: init } = await import("@/app/api/user/line-link/init/route");
+
+    const res = await init(initRequest());
+    expect(res.status).toBe(503);
+    expect(cookieJar.has(LINE_LINK_STATE_COOKIE)).toBe(false);
+  });
+
+  it("空白だけの LIFF secret は LOGIN secret へフォールバックする（空値で上書きしない）", async () => {
+    const { resolveLinkChannelSecret } = await import("@/lib/line/link-flow");
+
+    process.env.LINE_LIFF_CHANNEL_SECRET = "  \n";
+    process.env.LINE_LOGIN_CHANNEL_SECRET = POLLUTED_SECRET;
+    expect(resolveLinkChannelSecret()).toBe(CLEAN_SECRET);
+  });
+
+  it("resolveLinkChannelId: 改行を落とし、空なら undefined", async () => {
+    const { resolveLinkChannelId } = await import("@/lib/line/link-flow");
+
+    process.env.LINE_LIFF_CHANNEL_ID = " 2009473839\r\n";
+    expect(resolveLinkChannelId()).toBe("2009473839");
+
+    process.env.LINE_LIFF_CHANNEL_ID = "   ";
+    expect(resolveLinkChannelId()).toBeUndefined();
+
+    delete process.env.LINE_LIFF_CHANNEL_ID;
+    expect(resolveLinkChannelId()).toBeUndefined();
+  });
+});

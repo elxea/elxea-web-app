@@ -10,6 +10,7 @@ import {
   LINE_LINK_STATE_COOKIE,
   STATE_TTL_MS,
   defaultReturnTo,
+  resolveLinkChannelId,
   resolveLinkChannelSecret,
   sanitizeReturnTo,
   sealLinkState,
@@ -66,11 +67,15 @@ export async function POST(request: NextRequest) {
   const limited = await enforceRateLimit(request, limiters.authedUser, auth.customerId);
   if (limited) return limited;
 
-  const channelId = process.env.LINE_LIFF_CHANNEL_ID;
+  const channelId = resolveLinkChannelId();
   /* secret は LINE_LIFF_CHANNEL_SECRET を優先し、未設定なら既存の LINE_LOGIN_CHANNEL_SECRET に
    * フォールバックする。LINE_LIFF_CHANNEL_ID と LINE_LOGIN_CHANNEL_ID は同一 Login チャネル
    * (2009473839) を指すため両 secret は同値。どちらか一方でも設定済みなら「設定済み」と判定する
-   * （本番 Vercel に新規シークレットを追加せず既存 env で連携導線を開くため）。 */
+   * （本番 Vercel に新規シークレットを追加せず既存 env で連携導線を開くため）。
+   *
+   * 両方とも **必ず trim を通して読む**。env に紛れ込んだ末尾改行が client_secret に載ると
+   * LINE は `invalid_client` で交換を拒み、連携は callback まで来て必ず落ちる
+   * （2026-08-22 本番障害）。詳細は `resolveLinkChannelSecret` の doc。 */
   const channelSecret = resolveLinkChannelSecret();
   if (!channelId || !channelSecret) {
     /* 503（500 ではない）。壊れているのではなく、このデプロイに連携の資格情報が無いだけ。
