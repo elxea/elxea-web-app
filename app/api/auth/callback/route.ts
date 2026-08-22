@@ -163,15 +163,23 @@ export async function GET(request: NextRequest) {
       maxAge: 60 * 60 * 24 * 30, // 30 days (must outlive access token)
     });
 
-    /* Cache the Shopify Customer ID. It comes from the **verified** claims above
-     * (`sub` = `gid://shopify/Customer/<id>`), not from a second unchecked decode
-     * of the same string — so `shop_cid` can only ever hold an id that survived
-     * signature + nonce verification. Saves a Customer API call per request. */
+    /* Cache the Shopify Customer ID. It comes from the **verified** claims above,
+     * not from a second unchecked decode of the same string — so `shop_cid` can
+     * only ever hold an id that survived signature + nonce verification. Saves a
+     * Customer API call per request.
+     *
+     * It is OPTIONAL. When `sub` does not carry an id we recognise, the cookie is
+     * simply not written and `requireAuth` falls back to its Customer API path —
+     * a slower request, not a failed login. Making this mandatory is what broke
+     * every email login in production on 2026-08-22 (`sub_missing`); see
+     * `extractCustomerId` in `lib/shopify/id-token.ts`. */
     const customerId = verified.customerId;
-    response.cookies.set("shop_cid", encryptToken(customerId), {
-      ...cookieOptions,
-      maxAge: 60 * 60 * 24 * 30, // 30 days (same as refresh token)
-    });
+    if (customerId) {
+      response.cookies.set("shop_cid", encryptToken(customerId), {
+        ...cookieOptions,
+        maxAge: 60 * 60 * 24 * 30, // 30 days (same as refresh token)
+      });
+    }
 
     // Clean up PKCE cookies
     response.cookies.delete("shop_cv");
