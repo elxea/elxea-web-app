@@ -14,7 +14,15 @@ on:
   schedule:
     # 毎日 00:20 UTC (JST 09:20)
     - cron: "20 0 * * *"
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      self_test_exit_code:
+        description: >-
+          配線セルフテスト。値を入れると本物の監査ではなく「指定コードで終了する
+          スタブ」を同じ `| tee` 経路で走らせる。step が本当に赤くなるか (終了
+          コードが tee に吸われていないか) を実測するための口。空なら通常の監査。
+        required: false
+        default: ""
 
 concurrency:
   group: branch-divergence
@@ -43,17 +51,49 @@ jobs:
           node-version: "22"
 
       - name: Audit branch divergence
+        id: audit
+        # `shell: bash` は GitHub 既定の `bash -e {0}` と違い
+        # `bash --noprofile --norc -eo pipefail {0}` で起動する。既定シェルには
+        # pipefail が無いため、`node ... | tee` ではスクリプトの終了コードが tee の
+        # 終了コード (常に 0) に吸われ、監査スクリプトがクラッシュしても step は
+        # 緑のままだった (= 何も見ていないのに緑)。明示 shell + `set -euo pipefail`
+        # の二重で塞ぐ。PR #80 (prod-main-sync.yml) と同じ手法。
+        #
+        # 注意: この workflow は「可視化」であり乖離そのものでは fail させない
+        # (--fail-on-stop を渡していない)。ここで捕まえたいのは *スクリプトの異常終了*
+        # であって、乖離の検出ではない。
+        shell: bash
+        env:
+          SELF_TEST_EXIT_CODE: ${{ inputs.self_test_exit_code }}
         run: |
-          node scripts/ops/check-branch-divergence.mjs | tee divergence.json
+          set -euo pipefail
+          if [ -n "${SELF_TEST_EXIT_CODE:-}" ]; then
+            echo "::warning::self-test mode: 監査をスタブに差し替え exit ${SELF_TEST_EXIT_CODE} を模擬します (本番監査は実行されません)"
+            node -e 'const c=Number(process.env.SELF_TEST_EXIT_CODE);console.log(JSON.stringify({selfTest:true,simulatedExitCode:c},null,2));process.exit(c)' | tee divergence.json
+          else
+            node scripts/ops/check-branch-divergence.mjs | tee divergence.json
+          fi
 
       - name: Annotate and summarize
         if: always()
+        shell: bash
         run: |
+          set -euo pipefail
           node -e '
             const fs = require("fs");
             let j;
             try { j = JSON.parse(fs.readFileSync("divergence.json","utf8")); }
-            catch { console.log("no report"); process.exit(0); }
+            catch (e) {
+              // レポートが無い / 壊れている = 監査が成立していない。
+              // 以前はここで exit 0 していたため「何も見ていないのに緑」だった。
+              console.log("::error title=divergence report missing::divergence.json を読めませんでした (" + e.message + ")。監査は成立していません");
+              process.exit(1);
+            }
+            if (j.selfTest) { console.log("self-test report; skipping summary"); process.exit(0); }
+            if (!j.counts || !Array.isArray(j.branches)) {
+              console.log("::error title=divergence report malformed::counts / branches が無い形の JSON でした。監査は成立していません");
+              process.exit(1);
+            }
             const lines = ["## branch divergence audit",
               `total unmerged: ${j.counts.total} / warn: ${j.counts.warn} / stop: ${j.counts.stop}`,
               "", "| level | branch | behind | ahead | ageDays |", "|---|---|---|---|---|"];
