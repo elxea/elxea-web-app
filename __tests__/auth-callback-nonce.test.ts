@@ -49,9 +49,16 @@ vi.mock("@/lib/shopify/customer", async () => {
   };
 });
 
-const mergeMock = vi.fn();
-vi.mock("@/lib/auth/identity-merge", () => ({
-  mergeLineIdentityIntoShopify: (...args: unknown[]) => mergeMock(...args),
+/* 合体の入口。route はもう `mergeLineIdentityIntoShopify` を直接は呼ばず、
+   台帳の本人一致確認と合体を対で行う `completeLineLinkage` を通す。**観測点は
+   route が実際に呼ぶ関数に合わせる** — ここを identity-merge のままにしておくと、
+   下の「棄却された試行では合体が走らない」が、何も呼ばれない mock を見るだけの
+   常に通る主張に化ける。 */
+const completeLinkageMock = vi.fn<
+  (args: unknown) => Promise<{ outcome: "merged"; merge: null }>
+>(async () => ({ outcome: "merged", merge: null }));
+vi.mock("@/lib/auth/identity-link", () => ({
+  completeLineLinkage: (args: unknown) => completeLinkageMock(args),
 }));
 
 vi.mock("@/lib/email/welcome", () => ({ sendWelcomeEmail: vi.fn() }));
@@ -222,7 +229,42 @@ describe("GET /api/auth/callback id_token enforcement", () => {
       expect(response.cookies.get(name)).toBeUndefined();
     }
     // ...and the merge never runs, so it cannot be pointed at another user's key.
-    expect(mergeMock).not.toHaveBeenCalled();
+    expect(completeLinkageMock).not.toHaveBeenCalled();
+  });
+
+  it("棄却された試行では、LINE セッションが同居していても合体に進まない", async () => {
+    /* 上の `not.toHaveBeenCalled()` は、`line_uid` cookie が無ければ合体の入口に
+       そもそも入らないので常に通ってしまう。合体が動きうる条件（LINE セッション
+       が同居している）を実際に揃えたうえで、**それでも動かない**ことを見る。
+       ここが崩れると、署名検証に落ちた試行が他人の棚を触れることになる。 */
+    exchangeTokenMock.mockResolvedValue(
+      tokenResponse(signIdToken(keypair, validClaims("attacker-controlled-nonce"))),
+    );
+
+    const response = await GET(
+      callbackRequest({ ...HAPPY_COOKIES, line_uid: "enc(U0123456789abcdef)" }),
+    );
+
+    expect(response.headers.get("location")).toContain("error=InvalidIdToken");
+    expect(completeLinkageMock).not.toHaveBeenCalled();
+  });
+
+  it("検証を通った試行では、同居する LINE セッションで合体の入口に進む", async () => {
+    /* 逆向きの担保。これが無いと上の 2 つは「どんな入力でも呼ばれない」だけの
+       主張になり、route が合体をやめても落ちない。渡す顧客 ID は **検証済み
+       クレーム由来**で、ブラウザ由来の値ではない。 */
+    exchangeTokenMock.mockResolvedValue(
+      tokenResponse(signIdToken(keypair, validClaims(NONCE))),
+    );
+
+    await GET(callbackRequest({ ...HAPPY_COOKIES, line_uid: "enc(U0123456789abcdef)" }));
+
+    expect(completeLinkageMock).toHaveBeenCalledTimes(1);
+    expect(completeLinkageMock).toHaveBeenCalledWith({
+      lineUserId: "U0123456789abcdef",
+      shopifyCustomerId: "7654321", // 検証済みクレーム `sub` の数値部分
+      source: "auth-callback",
+    });
   });
 
   it("clears the one-shot PKCE cookies on a rejected attempt", async () => {
