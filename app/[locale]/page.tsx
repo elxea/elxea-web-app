@@ -507,7 +507,17 @@ async function VoicesSection() {
   try {
     voices = previewSeedEnabled()
       ? seedFarmerVoices()
-      : await getClient().fetch(TOP_FARMER_VOICES_QUERY, { language: locale });
+      : // 架空の農家プロフィールはこの節にも出さない。TOP_FARMER_VOICES_QUERY は
+        // `quote` の入った農家だけを引くので、いま本番にいる架空 4 件は quote 未入力の
+        // ぶん一件も釣れない — が、Studio で一言が入った瞬間にトップの一等地へ出て
+        // しまう。ほかの farmer 経路 (about / farmers/[slug] / sitemap) と同じく
+        // deny-list を通しておく。
+        filterOutFictional(
+          "farmer",
+          await getClient().fetch<FarmerVoice[]>(TOP_FARMER_VOICES_QUERY, {
+            language: locale,
+          }),
+        );
   } catch {
     return null;
   }

@@ -9,6 +9,11 @@
  *   - scripts/seed-farmers.ts       farmer  (青山 修一 / 陳 玉芬 / ラジャン・メータ)
  *   - scripts/seed-dummy-content.ts farmer  (山田農園 / 田中茶園)
  *                                   teaMenu (春の煎茶 / 宇治玉露 / 加賀ほうじ茶)
+ *
+ * Two further `farmer` docs (山田 健一 / 佐藤 美咲, created 2026-03-07) are not
+ * seed-script output but are equally invented — Setaka confirmed on 2026-08-22
+ * that elxea has no real producer profiles published yet, so every farmer doc
+ * currently in production is fictional. They are listed below too.
  *                                   playlist (Morning Forest / Rain on Tea Leaves —
  *                                             tracks point at a placeholder bgm.mp3
  *                                             titled "テスト音源")
@@ -32,9 +37,11 @@
  *     these are left visible pending Setaka's confirmation.
  *   - `article` / `journal` seed docs: not confirmed fictional by observation.
  *
- * This module replaces the former `lib/fictional-farmers.ts`; the farmer
- * entries below are byte-identical to the ones it carried, so farmer behaviour
- * is unchanged (guarded by __tests__/fictional-content.test.ts).
+ * This module replaces the former `lib/fictional-farmers.ts`. It started out
+ * byte-identical for `farmer`; the two 2026-03-07 docs above are the only
+ * additions since. Every entry is guarded by
+ * __tests__/fictional-content.test.ts, which also asserts — at source level —
+ * that each read path still consults this list.
  */
 
 /** Sanity `_type`s that currently have known fictional seed documents. */
@@ -57,6 +64,10 @@ const FICTIONAL_DOCS: Readonly<Record<FictionalDocType, DenyEntry>> = {
       // scripts/seed-dummy-content.ts
       "farmer-yamada",
       "farmer-tanaka",
+      // Hand-created 2026-03-07, confirmed fictional by Setaka 2026-08-22.
+      // Auto-generated Sanity ids, so the name is spelled out here.
+      "ChPy2hTrLaycRwOtl4DGV5", // 山田 健一
+      "ChPy2hTrLaycRwOtl4DGZd", // 佐藤 美咲
     ],
     slugs: [
       // scripts/seed-farmers.ts
@@ -66,6 +77,9 @@ const FICTIONAL_DOCS: Readonly<Record<FictionalDocType, DenyEntry>> = {
       // scripts/seed-dummy-content.ts
       "yamada-farm",
       "tanaka-tea-garden",
+      // Hand-created 2026-03-07, confirmed fictional by Setaka 2026-08-22.
+      "yamada-kenichi",
+      "sato-misaki",
     ],
   },
   teaMenu: {
