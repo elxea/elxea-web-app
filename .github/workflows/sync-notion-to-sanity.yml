@@ -59,7 +59,7 @@ on:
         default: ""
 
 concurrency:
-  # 同期は冪等 (createOrReplace) だが、同時実行は無駄なので直列化する。
+  # 同期は冪等 (createIfNotExists + patch) だが、同時実行は無駄なので直列化する。
   # 走っている run は落とさない (cancel-in-progress: false) — 途中で切ると
   # 一部だけ書き込まれた状態になる。
   group: sync-notion-to-sanity

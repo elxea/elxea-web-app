@@ -48,6 +48,7 @@ import {
   reportSyncResult,
   type SyncOutcome,
 } from "./lib/sync-notify";
+import { upsertFromNotion } from "./lib/sanity-upsert";
 
 // ─── Config ──────────────────────────────────────────────────
 
@@ -551,13 +552,13 @@ async function ensureSanityCategory(
   if (dryRun) {
     console.log(`  [dry-run] would create category: "${title}" (${sanityId})`);
   } else {
-    await client.createOrReplace({
+    await upsertFromNotion(client, {
       _id: sanityId,
       _type: "category",
       title,
       slug: { _type: "slug", current: slug },
     });
-    console.log(`  -> created category: "${title}" (${sanityId})`);
+    console.log(`  -> upserted category: "${title}" (${sanityId})`);
   }
 
   categoryMap.set(title, sanityId);
@@ -578,13 +579,13 @@ async function ensureSanityTag(
   if (dryRun) {
     console.log(`  [dry-run] would create tag: "${title}" (${sanityId})`);
   } else {
-    await client.createOrReplace({
+    await upsertFromNotion(client, {
       _id: sanityId,
       _type: "tag",
       title,
       slug: { _type: "slug", current: slug },
     });
-    console.log(`  -> created tag: "${title}" (${sanityId})`);
+    console.log(`  -> upserted tag: "${title}" (${sanityId})`);
   }
 
   tagMap.set(title, sanityId);
@@ -605,13 +606,13 @@ async function ensureSanityAuthor(
   if (dryRun) {
     console.log(`  [dry-run] would create author: "${name}" (${sanityId})`);
   } else {
-    await client.createOrReplace({
+    await upsertFromNotion(client, {
       _id: sanityId,
       _type: "author",
       name,
       slug: { _type: "slug", current: slug },
     });
-    console.log(`  -> created author: "${name}" (${sanityId})`);
+    console.log(`  -> upserted author: "${name}" (${sanityId})`);
   }
 
   authorMap.set(name, sanityId);
@@ -918,10 +919,10 @@ async function syncPageContent(
 
       if (DRY_RUN) {
         console.log(
-          `  [dry-run] would createOrReplace page: ${sanityId} (${contentFields.length} fields)`
+          `  [dry-run] would upsert page: ${sanityId} (${contentFields.length} fields)`
         );
       } else {
-        await sanity.createOrReplace(doc);
+        await upsertFromNotion(sanity, doc);
         console.log(
           `  -> synced page: ${sanityId} (${contentFields.length} fields)`
         );
@@ -1200,7 +1201,7 @@ async function sync(): Promise<SyncCounts> {
 
       // 3e. Build Sanity document
       const sanityId = `notion-${entry.slug}`;
-      const doc: Record<string, unknown> = {
+      const doc: Record<string, unknown> & { _id: string; _type: string } = {
         _id: sanityId,
         _type: "article",
         title: entry.title,
@@ -1229,7 +1230,7 @@ async function sync(): Promise<SyncCounts> {
       };
 
       if (DRY_RUN) {
-        console.log(`  [dry-run] would createOrReplace: ${sanityId}`);
+        console.log(`  [dry-run] would upsert: ${sanityId}`);
         console.log(`    title: ${entry.title}`);
         console.log(`    slug: ${entry.slug}`);
         console.log(`    body blocks: ${body.length}`);
@@ -1246,7 +1247,7 @@ async function sync(): Promise<SyncCounts> {
           `    thumbnail: ${entry.thumbnailImageUrl ? "yes" : "none"} (source: ${entry.thumbnailImageSource})`
         );
       } else {
-        await sanity.createOrReplace(doc);
+        await upsertFromNotion(sanity, doc);
         console.log(`  -> synced to Sanity: ${sanityId}`);
       }
 
