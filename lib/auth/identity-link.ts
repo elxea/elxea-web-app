@@ -5,6 +5,8 @@ import {
   mergeLineIdentityIntoShopify,
   type IdentityMergeResult,
 } from "@/lib/auth/identity-merge";
+import { getAdminFirestore } from "@/lib/firebase/admin";
+import { userDoc } from "@/lib/firebase/collections";
 import { extractCustomerId } from "@/lib/firebase/types";
 import {
   fetchShopifyCustomerIdForLineUser,
@@ -188,7 +190,19 @@ export async function completeLineLinkage({
       return none("linked-elsewhere");
     }
 
-    // 3) 本人一致が取れた。ここで初めて合体する。
+    /* 3) 顧客ドキュメントの写し（`users/{customerId}.lineUserId`）を揃える。
+     *
+     * Web / LIFF から連携した人には、この写しが**一度も書かれていなかった**（写しを
+     * 書くのは旧 `POST /api/user/line-link` だけで、Web の連携導線はそこを通らない）。
+     * その結果、解除の応答が写しだけを見て `not_linked` を返し、**台帳からは実際に
+     * 外れているのに画面には「連携していませんでした」と出る**という食い違いが起きる。
+     * 本番の連携済み 2 件とも、この写しが欠けていた。
+     *
+     * 台帳が本人一致を認めた**あと**に書くので、写しが台帳を追い越すことはない。
+     * 失敗しても連携も合体も止めない（写しは台帳の従属物であって、正本ではない）。 */
+    await mirrorLineUserId(lineUserId, shopifyCustomerId, source, db);
+
+    // 4) 本人一致が取れた。ここで初めて合体する。
     const merge = await mergeLineIdentityIntoShopify(
       lineUserId,
       shopifyCustomerId,
@@ -204,5 +218,38 @@ export async function completeLineLinkage({
       tags: { subsystem: "identity-link", source },
     });
     return none("merge-failed");
+  }
+}
+
+/**
+ * `users/{customerId}.lineUserId` に写しを置く（冪等・失敗しても呼び出し元を止めない）。
+ *
+ * この写しは**正本ではない**。連携の正本は cx-agent の `customer_linkages` で、ここは
+ * 「この顧客に LINE が繋がっている」ことを Firestore 側から見えるようにするためだけの
+ * 従属データ。だから台帳の確認を通ったあとにしか書かないし、書けなくても連携は成立
+ * させたままにする。
+ *
+ * `merge: true` で既存フィールドを消さない（この直後に走る合体が `users/line:*` の
+ * フィールドを畳んでくるので、上書き set は取り違えの元になる）。
+ */
+async function mirrorLineUserId(
+  lineUserId: string,
+  shopifyCustomerId: string,
+  source: LinkageSource,
+  db?: Firestore,
+): Promise<void> {
+  try {
+    const firestore = db ?? getAdminFirestore();
+    await firestore.doc(userDoc(shopifyCustomerId)).set(
+      { lineUserId, lastActiveAt: new Date() },
+      { merge: true },
+    );
+  } catch (err) {
+    /* 写しが書けなかっただけ。台帳は成立しており、次のログインでこの関数を
+       もう一度通るので自然に埋まる。連携の成否は変えない。 */
+    console.warn(
+      `[identity-link] failed to mirror lineUserId onto customer doc (source=${source}):`,
+      err instanceof Error ? err.message : err,
+    );
   }
 }

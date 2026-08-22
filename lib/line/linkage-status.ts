@@ -1,4 +1,5 @@
 import { CX_AGENT_BASE_URL } from "@/lib/chat/proxy";
+import { extractCustomerId } from "@/lib/firebase/types";
 
 /**
  * LINE 連携状態の読み取り（P1: マイページに「連携済み / 未連携」を表示する）。
@@ -208,10 +209,16 @@ export function resolveLineLinkageEntryMode({
  *
  * ## 解除が即座に効くこと（生存検証）
  *
- * cx-agent 側は `shopify_customer_id IS NOT NULL` かつ `unfollowed_at IS NULL` の行しか
- * 返さない。解除（`clearCustomerLinkage`）は `shopify_customer_id` を null にするので、
- * 解除された連携はここで自動的にヒットしなくなる。つまり **読み取りのたびに生存を
- * 確かめている**。キャッシュはそれを最大 60 秒だけ遅らせる（下記）。
+ * cx-agent 側は `shopify_customer_id IS NOT NULL` の行を返す。解除
+ * （`clearCustomerLinkage`）は `shopify_customer_id` を null にするので、解除された連携は
+ * ここで自動的にヒットしなくなる。つまり **読み取りのたびに生存を確かめている**。
+ * キャッシュはそれを最大 60 秒だけ遅らせる（下記）。
+ *
+ * ⚠ **友だち解除（ブロック）では連携は切れない**（cx-agent P4 / 2026-08-22）。以前は
+ *   cx-agent が `unfollowed_at IS NULL` も条件に入れていたため、LINE 公式アカウントを
+ *   ブロックしただけのお客さまがここで `false`（＝未連携）になり、`resolveIdentity` が
+ *   空の `line:` 棚を返していた。ブロックは配信の意思表示であって連携の取り消しではない。
+ *   連携が切れる操作は解除だけ。
  */
 export type ResolvedShopifyCustomer = string | false | null;
 
@@ -286,6 +293,49 @@ export function __clearLinkageCacheForTest(): void {
  */
 export function invalidateReverseLinkage(lineUserId: string): void {
   if (lineUserId) reverseCache.delete(lineUserId);
+}
+
+/**
+ * この Shopify 顧客に紐付いていた逆引きキャッシュを **LINE userId を知らずに** 捨てる。
+ *
+ * ## なぜ ID 無しで捨てられる必要があるのか
+ *
+ * 解除には 2 つの入口がある。
+ *   - LINE セッションから … 自分の LINE userId が分かるので `invalidateReverseLinkage` で足りる
+ *   - **メール（Shopify）セッションから** … 顧客 ID しか分からない
+ *
+ * 後者では捨てる鍵が分からず、キャッシュに「連携済み」が最大 60 秒残っていた。
+ * その窓の中でこの人が LINE 側から画面を開くと、**解除したはずの顧客の棚が見える**。
+ * 解除は「もう結び付けないでほしい」という操作なので、ここに窓があってはいけない。
+ *
+ * ## なぜ cx-agent に LINE userId を返させないのか
+ *
+ * 解除 API に「外した line_user_id」を返させれば鍵は分かるが、それは
+ * **web-app が知る必要の無い LINE の生 ID を新たに渡す**ことになる（順引きが
+ * `line_user_id` を返さない最小開示の約束を、解除のためだけに崩す）。
+ * キャッシュは `lineUserId → 連携先顧客` の対応をこちら側で持っているので、
+ * **値の側から引いて消せば足りる**。API も応答も変えずに窓が閉じる。
+ *
+ * 走査は解除のときだけで、対象は上限 5000 件のプロセス内 Map。実質ゼロコスト。
+ *
+ * ⚠ 消えるのは **このプロセスのキャッシュだけ**。serverless で別インスタンスが
+ *   同じ人を抱えていれば、そちらは最大 60 秒古いままになる。これは解除 API に
+ *   ID を返させても変わらない（他インスタンスには届かない）ので、本関数の
+ *   選択によって生まれた制約ではない。TTL がその上限を保証している。
+ *
+ * @param shopifyCustomerId GID / 数値どちらでもよい（内部で数値部分に正規化して比較する）。
+ */
+export function invalidateReverseLinkageForCustomer(
+  shopifyCustomerId: string,
+): void {
+  if (!shopifyCustomerId) return;
+  const target = extractCustomerId(shopifyCustomerId);
+
+  for (const [lineUserId, entry] of reverseCache) {
+    const customer = entry.value.customer;
+    if (typeof customer !== "string") continue;
+    if (extractCustomerId(customer) === target) reverseCache.delete(lineUserId);
+  }
 }
 
 /**

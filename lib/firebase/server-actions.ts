@@ -480,45 +480,18 @@ export async function getBehaviorEventCount(customerId: string): Promise<number>
 // ---------------------------------------------------------------------------
 
 /**
- * Link a LINE user ID to the customer's Firestore user document.
- * Called from the LIFF page after successful LINE authentication.
+ * 顧客ドキュメントから LINE の写しを外す。
  *
- * @param customerId Shopify numeric customer ID
- * @param lineUserId LINE user ID obtained via liff.getProfile()
- */
-export async function linkLineUser(
-  customerId: string,
-  lineUserId: string
-): Promise<{ success: boolean; action: "linked" | "already_linked" }> {
-  const db = getAdminFirestore();
-  const docPath = userDoc(customerId);
-  const docRef = db.doc(docPath);
-
-  const snapshot = await docRef.get();
-
-  if (snapshot.exists) {
-    const existing = snapshot.data()?.lineUserId;
-    if (existing === lineUserId) {
-      return { success: true, action: "already_linked" };
-    }
-    await docRef.update({ lineUserId, lastActiveAt: new Date() });
-  } else {
-    // Create the user document if it doesn't exist yet
-    await docRef.set({ lineUserId, createdAt: new Date(), lastActiveAt: new Date() });
-  }
-
-  return { success: true, action: "linked" };
-}
-
-/**
- * Undo `linkLineUser`: remove the LINE user ID from the customer's Firestore
- * user document so the customer can link a (different) LINE account again.
+ * ⚠ 対になる**書き込み**はここには無い (2026-08-22 / P10)。写しを書くのは
+ *   `lib/auth/identity-link.ts` の `completeLineLinkage` だけで、そこは
+ *   **cx-agent の台帳が本人一致を認めたあと**にしか書かない。かつてここにあった
+ *   `linkLineUser` は「ブラウザが送ってきた LINE userId をそのまま書く」実装で、
+ *   LINE に何も検証させていなかったため、廃止した POST もろとも削除した。
  *
  * 「解除 → 再連携」が成立するために、**フィールドを空文字や null で上書きせず
- * `FieldValue.delete()` で消す**。`linkLineUser` は既存値との一致で
- * `already_linked` を返す実装なので、消し残り (`lineUserId: null` 等) があると
- * 再連携時の分岐が残った値に引っぱられる。フィールドごと消せば、再連携は必ず
- * 「未連携からの新規連携」と同じ経路 (`action: "linked"`) を通る。
+ * `FieldValue.delete()` で消す**。消し残り (`lineUserId: null` 等) があると、
+ * 再連携時に「写しは既にある」と読める余地が残る。フィールドごと消せば、
+ * 再連携は必ず「未連携からの新規連携」と同じ状態から始まる。
  *
  * 冪等: 連携が無い状態で呼ばれても失敗させず `not_linked` を返す (解除は
  * 「その状態にする」操作であり、二重解除をエラーにする意味がない)。
@@ -527,10 +500,19 @@ export async function linkLineUser(
  * 触らない (解除 != データ削除。データ削除は GDPR `customers/redact` webhook /
  * cx-agent `/api/erase` の担当)。
  *
+ * ⚠ **この戻り値で「解除できたか」を判断しない** (2026-08-22 / P9)。連携の正本は
+ *   cx-agent の `customer_linkages` であり、ここはその写し。Web / LIFF から連携した
+ *   お客さまには写しが書かれていない期間があり、写しの有無で判定すると「台帳からは
+ *   外れたのに not_linked」という嘘になる。呼び出し側 (`DELETE /api/user/line-link`) は
+ *   cx-agent の `cleared_count` で判定する。
+ *
  * @param customerId Shopify numeric customer ID (サーバ確定値のみを渡すこと)
+ * @param expectedLineUserId 任意。指定すると **写しがこの LINE のものであるときだけ**消す。
+ *   世帯共有 (1 顧客に複数 LINE) で、家族の写しを取り違えて消さないため。
  */
 export async function unlinkLineUser(
-  customerId: string
+  customerId: string,
+  expectedLineUserId?: string
 ): Promise<{ success: boolean; action: "unlinked" | "not_linked" }> {
   const db = getAdminFirestore();
   const docRef = db.doc(userDoc(customerId));
@@ -542,6 +524,11 @@ export async function unlinkLineUser(
 
   const existing = snapshot.data()?.lineUserId;
   if (existing === undefined || existing === null) {
+    return { success: true, action: "not_linked" };
+  }
+  if (expectedLineUserId !== undefined && existing !== expectedLineUserId) {
+    /* 写しは別の LINE のもの。名指しで解除された LINE とは違うので触らない
+       (消すと、まだ連携している家族の写しが消える)。 */
     return { success: true, action: "not_linked" };
   }
 

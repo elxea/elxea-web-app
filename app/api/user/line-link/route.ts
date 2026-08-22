@@ -1,58 +1,41 @@
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
 import { requireAuth } from "@/lib/firebase/auth-guard";
-import { linkLineUser, unlinkLineUser } from "@/lib/firebase/server-actions";
-import { parseJsonBody } from "@/lib/validation/zod-helpers";
+import { unlinkLineUser } from "@/lib/firebase/server-actions";
 import { enforceRateLimit, limiters } from "@/lib/ratelimit";
 import { requestCxUnlink } from "@/lib/line/unlink";
 import {
   fetchShopifyCustomerIdForLineUser,
   invalidateReverseLinkage,
+  invalidateReverseLinkageForCustomer,
 } from "@/lib/line/linkage-status";
 import { readVerifiedLineUserId } from "@/lib/line/session";
 
-// LINE user IDs are opaque strings starting with "U" followed by 32 hex chars
-// (total length 33). Accept a reasonable length range to be future-proof.
-const LineLinkSchema = z.object({
-  lineUserId: z
-    .string()
-    .min(10)
-    .max(100)
-    .regex(/^[A-Za-z0-9_-]+$/, "Invalid lineUserId format"),
-});
-
 /**
- * POST /api/user/line-link
- * Links a LINE user ID to the authenticated Shopify customer's Firestore document.
- * Called from the LIFF page after LINE authentication.
+ * ## POST は廃止した (P10 / 2026-08-22)
+ *
+ * かつてここには「ブラウザが `{ lineUserId }` を送ってきたら、その LINE を
+ * ログイン中の顧客に連携する」という POST があった。**LINE に何も検証させていない**
+ * ので、任意の LINE userId を名乗って自分のアカウントに結び付けられる — 連携と
+ * 呼べる代物ではなかった (「連携した」と画面に出るが、実際に Bot が読む台帳
+ * `customer_linkages` には何も起きない偽の連携でもあった)。
+ *
+ * いま連携が成立する経路は、いずれも **LINE 自身に id_token を検証させてから**
+ * cx-agent の台帳に書く 3 つだけ。
+ *   - `GET  /api/user/line-link/callback` … マイページの連携ボタン (Web)
+ *   - `POST /api/user/line-link-liff`     … LIFF (トーク内)
+ *   - `GET  /api/auth/callback`           … メールログイン時の取りこぼし再試行
+ *
+ * 本番にこの POST の呼び出し元は無い (e2e が疎通確認で叩いていただけ)。
+ * ルート自体は DELETE のために残るので、POST には 405 が返る。
  */
-export async function POST(request: NextRequest) {
-  try {
-    const auth = await requireAuth();
-    if (!auth.authenticated) {
-      return NextResponse.json({ error: auth.error }, { status: auth.status });
-    }
-
-    const limited = await enforceRateLimit(request, limiters.authedUser, auth.customerId);
-    if (limited) return limited;
-
-    const parsed = await parseJsonBody(request, LineLinkSchema);
-    if (!parsed.ok) return parsed.response;
-
-    const result = await linkLineUser(auth.customerId, parsed.data.lineUserId);
-    return NextResponse.json(result);
-  } catch (err) {
-    console.error("[POST /api/user/line-link]", err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
-  }
-}
 
 /**
  * DELETE /api/user/line-link
  *
- * POST の対称操作 (連携解除)。同じリソース・同じ認証機構で、ログイン済みご本人の
- * 連携情報だけを外す。解除後は同じ経路で再連携できる (`unlinkLineUser` が
- * `lineUserId` フィールドごと消すため、再連携は「未連携からの新規連携」を通る)。
+ * 連携解除。同じ認証機構で、ログイン済みご本人の連携情報だけを外す。解除後は
+ * 通常の連携導線 (`/api/user/line-link/callback` / LIFF) で再連携できる
+ * (`unlinkLineUser` が `lineUserId` フィールドごと消すため、再連携は
+ * 「未連携からの新規連携」を通る)。
  *
  * 設計上の要点:
  *   - 解除対象は **サーバ認証済みセッション (requireAuth) で確定した customerId** の
@@ -148,7 +131,9 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ success: true, action: "not_linked" });
     }
 
-    const response = await unlinkForCustomer(linkedCustomerId);
+    /* 外すのは **この LINE の連携だけ**。世帯共有 (1 顧客に複数 LINE) のとき、
+       自分の解除で家族の連携まで巻き添えにしない (P8)。 */
+    const response = await unlinkForCustomer(linkedCustomerId, lineUserId);
 
     /* 逆引きキャッシュ (最大 60 秒) を捨てる。捨てないと、解除した本人が引き直した
        マイページに「連携済み」がしばらく残り、解除できていないように見える。 */
@@ -168,12 +153,25 @@ export async function DELETE(request: NextRequest) {
  * 逆だと cx が失敗したときに写しだけ消えて「画面は未連携・実際は連携中」という
  * より悪い割れ方になる。
  *
+ * ## 「解除できました」は台帳が決める (P9 / 2026-08-22)
+ *
+ * 応答の `action` は以前 **Firestore の写しだけ**を見て決めていた。ところが Web / LIFF
+ * から連携した人にはこの写しが一度も書かれておらず (書いていたのは廃止した POST だけ)、
+ * **台帳からは実際に外れたのに `not_linked` = 「連携していませんでした」と返る**という
+ * 食い違いが起きていた。連携の正本は台帳なので、`action` も台帳の結果 (`clearedCount`)
+ * から決める。写しの掃除は続けるが、判定には使わない。
+ *
  * @param customerId **サーバ確定**の Shopify 顧客 ID
  *   (requireAuth の結果、または検証済み LINE userId から台帳で引いた連携先)。
+ * @param lineUserId 任意。**サーバ検証済み**の LINE userId。渡すとその 1 件だけを外す
+ *   (世帯共有で家族の連携を巻き添えにしない・P8)。
  */
-async function unlinkForCustomer(customerId: string): Promise<NextResponse> {
+async function unlinkForCustomer(
+  customerId: string,
+  lineUserId?: string,
+): Promise<NextResponse> {
   /* 1) 連携の正本 (cx-agent) を先に外す。ここが失敗したら Firestore は触らない。 */
-  const cx = await requestCxUnlink(customerId);
+  const cx = await requestCxUnlink(customerId, lineUserId);
   if (!cx.ok) {
     const status = cx.reason === "not_configured" ? 503 : 502;
     return NextResponse.json(
@@ -182,7 +180,18 @@ async function unlinkForCustomer(customerId: string): Promise<NextResponse> {
     );
   }
 
-  /* 2) 写し (Firestore) を消す。冪等なので cx 側が 0 件でも安全に通る。 */
-  const result = await unlinkLineUser(customerId);
-  return NextResponse.json(result);
+  /* 2) 写し (Firestore) を消す。冪等なので cx 側が 0 件でも安全に通る。
+        写しが元から無い顧客 (Web / LIFF 連携組) でも失敗しない。 */
+  await unlinkLineUser(customerId, lineUserId);
+
+  /* 3) メールセッションからの解除では、外した LINE userId が分からないまま
+        逆引きキャッシュに「連携済み」が最大 60 秒残る。残っている間にその人が
+        LINE 側から画面を開くと、解除したはずの顧客の棚が見える。連携先の顧客 ID
+        から引いて捨てる (cx-agent に生 ID を返させずに窓を閉じる・P6/E1)。 */
+  invalidateReverseLinkageForCustomer(customerId);
+
+  return NextResponse.json({
+    success: true,
+    action: cx.clearedCount > 0 ? "unlinked" : "not_linked",
+  });
 }

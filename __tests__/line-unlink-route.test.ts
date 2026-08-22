@@ -34,10 +34,8 @@ vi.mock("@/lib/firebase/auth-guard", () => ({
   requireAuth: () => requireAuthMock(),
 }));
 
-const linkLineUserMock = vi.fn();
 const unlinkLineUserMock = vi.fn();
 vi.mock("@/lib/firebase/server-actions", () => ({
-  linkLineUser: (...args: unknown[]) => linkLineUserMock(...args),
   unlinkLineUser: (...args: unknown[]) => unlinkLineUserMock(...args),
 }));
 
@@ -61,14 +59,19 @@ vi.mock("@/lib/line/session", () => ({
 /** 逆引き（LINE userId → 連携先の Shopify 顧客）。3 値（string / false / null）。 */
 const fetchShopifyCustomerIdForLineUserMock = vi.fn();
 const invalidateReverseLinkageMock = vi.fn();
+const invalidateReverseLinkageForCustomerMock = vi.fn();
 vi.mock("@/lib/line/linkage-status", () => ({
   fetchShopifyCustomerIdForLineUser: (...args: unknown[]) =>
     fetchShopifyCustomerIdForLineUserMock(...args),
   invalidateReverseLinkage: (...args: unknown[]) =>
     invalidateReverseLinkageMock(...args),
+  invalidateReverseLinkageForCustomer: (...args: unknown[]) =>
+    invalidateReverseLinkageForCustomerMock(...args),
 }));
 
-import { DELETE, POST } from "@/app/api/user/line-link/route";
+import * as route from "@/app/api/user/line-link/route";
+
+const { DELETE } = route;
 
 const CUSTOMER_ID = "900800400001";
 const OTHER_CUSTOMER_ID = "999999999999";
@@ -83,20 +86,11 @@ function makeDeleteRequest(body?: unknown): NextRequest {
   });
 }
 
-function makePostRequest(body: unknown): NextRequest {
-  return new NextRequest("http://localhost/api/user/line-link", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(body),
-  });
-}
-
 beforeEach(() => {
   vi.clearAllMocks();
   // 既定は「制限なし」。rate limit のテストだけ上書きする。
   enforceRateLimitMock.mockResolvedValue(null);
   unlinkLineUserMock.mockResolvedValue({ success: true, action: "unlinked" });
-  linkLineUserMock.mockResolvedValue({ success: true, action: "linked" });
   // 既定は「cx-agent 側の解除に成功」。失敗系のテストだけ上書きする。
   requestCxUnlinkMock.mockResolvedValue({ ok: true, clearedCount: 1 });
   // 既定は「LINE セッション無し」。LINE 経路のテストだけ上書きする。
@@ -130,7 +124,7 @@ describe("DELETE /api/user/line-link", () => {
     expect(json.action).toBe("unlinked");
 
     expect(unlinkLineUserMock).toHaveBeenCalledTimes(1);
-    expect(unlinkLineUserMock).toHaveBeenCalledWith(CUSTOMER_ID);
+    expect(unlinkLineUserMock).toHaveBeenCalledWith(CUSTOMER_ID, undefined);
   });
 
   it("body で他人の customerId / lineUserId を指定しても無視する（他人の連携は外せない）", async () => {
@@ -145,13 +139,15 @@ describe("DELETE /api/user/line-link", () => {
     expect(res.status).toBe(200);
 
     // 引数はサーバ確定 ID のみ。body の victim id は一切渡らない。
-    expect(unlinkLineUserMock).toHaveBeenCalledWith(CUSTOMER_ID);
-    expect(unlinkLineUserMock).not.toHaveBeenCalledWith(OTHER_CUSTOMER_ID);
-    expect(unlinkLineUserMock.mock.calls[0]).toHaveLength(1);
+    expect(unlinkLineUserMock).toHaveBeenCalledWith(CUSTOMER_ID, undefined);
+    expect(unlinkLineUserMock.mock.calls[0][0]).toBe(CUSTOMER_ID);
+    expect(unlinkLineUserMock.mock.calls[0][1]).toBeUndefined();
+    expect(requestCxUnlinkMock.mock.calls[0][0]).toBe(CUSTOMER_ID);
   });
 
   it("連携が無い状態で呼んでも 200 + not_linked（冪等・二重解除でも落ちない）", async () => {
     requireAuthMock.mockResolvedValue({ authenticated: true, customerId: CUSTOMER_ID });
+    requestCxUnlinkMock.mockResolvedValue({ ok: true, clearedCount: 0 });
     unlinkLineUserMock.mockResolvedValue({ success: true, action: "not_linked" });
 
     const res = await DELETE(makeDeleteRequest());
@@ -186,18 +182,11 @@ describe("DELETE /api/user/line-link", () => {
     errorSpy.mockRestore();
   });
 
-  it("解除 → 再連携が同じ route で成立する（DELETE の後の POST が linked を返す）", async () => {
-    requireAuthMock.mockResolvedValue({ authenticated: true, customerId: CUSTOMER_ID });
-
-    const delRes = await DELETE(makeDeleteRequest());
-    expect(delRes.status).toBe(200);
-    expect(((await delRes.json()) as { action?: string }).action).toBe("unlinked");
-
-    const postRes = await POST(makePostRequest({ lineUserId: VALID_LINE_USER_ID }));
-    expect(postRes.status).toBe(200);
-    const postJson = (await postRes.json()) as { action?: string };
-    expect(postJson.action).toBe("linked");
-    expect(linkLineUserMock).toHaveBeenCalledWith(CUSTOMER_ID, VALID_LINE_USER_ID);
+  it("POST は存在しない（ブラウザ申告だけで連携できる入口を残さない・P10）", () => {
+    /* かつてここには「ブラウザが送ってきた lineUserId をそのまま顧客に結び付ける」
+       POST があった。LINE に何も検証させていないので、任意の LINE を名乗れた。
+       ハンドラが export されていない = Next.js は 405 を返す。 */
+    expect((route as Record<string, unknown>).POST).toBeUndefined();
   });
 });
 
@@ -216,7 +205,36 @@ describe("DELETE /api/user/line-link / cx-agent との順序と失敗の扱い",
   it("連携の正本（cx-agent）をサーバ確定 customerId で呼ぶ", async () => {
     await DELETE(makeDeleteRequest());
     expect(requestCxUnlinkMock).toHaveBeenCalledTimes(1);
-    expect(requestCxUnlinkMock).toHaveBeenCalledWith(CUSTOMER_ID);
+    /* マイページには LINE を選ぶ UI が無く「このアカウントの連携を解除する」だけなので、
+       ここでは対象を名指ししない（= その顧客の連携をすべて外す）。 */
+    expect(requestCxUnlinkMock).toHaveBeenCalledWith(CUSTOMER_ID, undefined);
+  });
+
+  it("解除できたかは台帳（cx の cleared_count）が決める（写しの有無で判定しない・P9）", async () => {
+    /* Web / LIFF から連携した人は Firestore の写しを持たない期間がある。写しを見て
+       判定すると「台帳からは外れたのに not_linked」という嘘になる。 */
+    requestCxUnlinkMock.mockResolvedValue({ ok: true, clearedCount: 1 });
+    unlinkLineUserMock.mockResolvedValue({ success: true, action: "not_linked" });
+
+    const res = await DELETE(makeDeleteRequest());
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { action?: string }).action).toBe("unlinked");
+  });
+
+  it("メールセッションからの解除でも逆引きキャッシュを捨てる（P6/E1）", async () => {
+    /* 外した LINE userId は分からないが、キャッシュは連携先の顧客 ID を値に
+       持っているので、値の側から引いて消せる。cx-agent に生 ID を返させない。 */
+    const res = await DELETE(makeDeleteRequest());
+    expect(res.status).toBe(200);
+    expect(invalidateReverseLinkageForCustomerMock).toHaveBeenCalledWith(CUSTOMER_ID);
+  });
+
+  it("cx-agent が失敗したらキャッシュも触らない（外れていないのに未連携に見せない）", async () => {
+    requestCxUnlinkMock.mockResolvedValue({ ok: false, reason: "upstream_error" });
+
+    const res = await DELETE(makeDeleteRequest());
+    expect(res.status).toBe(502);
+    expect(invalidateReverseLinkageForCustomerMock).not.toHaveBeenCalled();
   });
 
   it("cx-agent を先に呼び、そのあとで Firestore を消す（順序が結果を決める）", async () => {
@@ -302,9 +320,10 @@ describe("DELETE /api/user/line-link / LINE セッション", () => {
     expect(fetchShopifyCustomerIdForLineUserMock).toHaveBeenCalledWith(
       VALID_LINE_USER_ID,
     );
-    // 外すのは台帳が返した連携先だけ（推測しない）。
-    expect(requestCxUnlinkMock).toHaveBeenCalledWith(CUSTOMER_ID);
-    expect(unlinkLineUserMock).toHaveBeenCalledWith(CUSTOMER_ID);
+    /* 外すのは台帳が返した連携先の、**この LINE の連携だけ**（推測しない・
+       世帯共有で家族の連携を巻き添えにしない・P8）。 */
+    expect(requestCxUnlinkMock).toHaveBeenCalledWith(CUSTOMER_ID, VALID_LINE_USER_ID);
+    expect(unlinkLineUserMock).toHaveBeenCalledWith(CUSTOMER_ID, VALID_LINE_USER_ID);
   });
 
   it("body で他人の customerId / lineUserId を指定しても無視する（本人の連携しか外れない）", async () => {
@@ -321,9 +340,10 @@ describe("DELETE /api/user/line-link / LINE セッション", () => {
     expect(fetchShopifyCustomerIdForLineUserMock).toHaveBeenCalledWith(
       VALID_LINE_USER_ID,
     );
-    expect(requestCxUnlinkMock).toHaveBeenCalledWith(CUSTOMER_ID);
-    expect(requestCxUnlinkMock).not.toHaveBeenCalledWith(OTHER_CUSTOMER_ID);
-    expect(unlinkLineUserMock).not.toHaveBeenCalledWith(OTHER_CUSTOMER_ID);
+    expect(requestCxUnlinkMock).toHaveBeenCalledWith(CUSTOMER_ID, VALID_LINE_USER_ID);
+    expect(requestCxUnlinkMock.mock.calls[0][0]).toBe(CUSTOMER_ID);
+    expect(requestCxUnlinkMock.mock.calls[0][1]).toBe(VALID_LINE_USER_ID);
+    expect(unlinkLineUserMock.mock.calls[0][0]).toBe(CUSTOMER_ID);
   });
 
   it("未連携 → 200 + not_linked・cx も Firestore も触らない（冪等）", async () => {
@@ -401,6 +421,6 @@ describe("DELETE /api/user/line-link / LINE セッション", () => {
     expect(res.status).toBe(200);
     expect(readVerifiedLineUserIdMock).not.toHaveBeenCalled();
     expect(fetchShopifyCustomerIdForLineUserMock).not.toHaveBeenCalled();
-    expect(requestCxUnlinkMock).toHaveBeenCalledWith(CUSTOMER_ID);
+    expect(requestCxUnlinkMock).toHaveBeenCalledWith(CUSTOMER_ID, undefined);
   });
 });

@@ -140,13 +140,15 @@ test.describe("TC-1: LIFF 紐付けフロー", () => {
     expect(pageContent).toBeTruthy();
   });
 
-  test("LINE 紐付け API エンドポイントが存在する", async ({ page }) => {
-    // POST /api/user/line-link が 401 (未認証) を返すことを確認
+  test("ブラウザ申告だけで連携できる入口が無い", async ({ page }) => {
+    /* かつて POST /api/user/line-link は「ブラウザが送ってきた lineUserId を
+       ログイン中の顧客に結び付ける」入口だった。LINE に何も検証させていないので
+       任意の LINE を名乗れる偽の連携で、2026-08-22 に削除した (P10)。
+       ハンドラが無いので Next.js は 405 を返す。200 が返ったら復活の合図。 */
     const response = await page.request.post("/api/user/line-link", {
       data: { lineUserId: TEST_LINE_USER_ID },
     });
-    // 401 (未認証) または 200 (認証済み) — 500 は NG
-    expect([200, 401]).toContain(response.status());
+    expect(response.status()).toBe(405);
   });
 
   test("persona API エンドポイントが存在する", async ({ page }) => {
