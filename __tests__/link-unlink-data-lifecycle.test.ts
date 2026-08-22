@@ -36,7 +36,6 @@
  * このファイルの該当 `it` を書き換えることが、変更の申告そのものになる。
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Firestore } from "firebase-admin/firestore";
 
 // --- module mocks（被テスト module の import より前に置く） -----------------
 
@@ -91,83 +90,15 @@ import {
   favoritesCol,
   followsCol,
   ordersCol,
+  userDoc,
 } from "@/lib/firebase/collections";
+import { completeLineLinkage } from "@/lib/auth/identity-link";
+import { createFakeFirestore } from "./helpers/fake-firestore";
 
 const LINE_USER_ID = "U0123456789abcdef0123456789abcdef";
 const LINE_KEY = `line:${LINE_USER_ID}`;
 const CUSTOMER_A = "900800400001";
 const CUSTOMER_B = "900800400002";
-
-// ---------------------------------------------------------------------------
-// 偽 Firestore（`identity-merge.test.ts` の作りを踏襲し、任意コレクションを足せる形に）
-// ---------------------------------------------------------------------------
-
-type DocData = Record<string, unknown>;
-
-function createFakeFirestore() {
-  const store = new Map<string, Map<string, DocData>>();
-  let counter = 0;
-
-  const colOf = (path: string) => {
-    let col = store.get(path);
-    if (!col) {
-      col = new Map();
-      store.set(path, col);
-    }
-    return col;
-  };
-
-  function makeQuery(path: string, clauses: [string, unknown][], limit: number | null) {
-    return {
-      where(field: string, _op: string, value: unknown) {
-        return makeQuery(path, [...clauses, [field, value] as [string, unknown]], limit);
-      },
-      limit(n: number) {
-        return makeQuery(path, clauses, n);
-      },
-      async get() {
-        let entries = [...colOf(path).entries()];
-        for (const [field, value] of clauses) {
-          entries = entries.filter(([, data]) => data[field] === value);
-        }
-        if (limit !== null) entries = entries.slice(0, limit);
-        return {
-          empty: entries.length === 0,
-          docs: entries.map(([id, data]) => ({
-            id,
-            data: () => ({ ...data }),
-            ref: {
-              async delete() {
-                colOf(path).delete(id);
-              },
-            },
-          })),
-        };
-      },
-      async add(data: DocData) {
-        const id = `added-${++counter}`;
-        colOf(path).set(id, { ...data });
-        return { id };
-      },
-    };
-  }
-
-  const db = {
-    collection: (path: string) => makeQuery(path, [], null),
-  } as unknown as Firestore;
-
-  return {
-    db,
-    /** その棚に今いくつ入っているか。中身（PII）ではなく件数で語る。 */
-    count: (path: string) => store.get(path)?.size ?? 0,
-    /** 棚の中身（テスト内の同定用。実データではない固定文字列のみ）。 */
-    contents: (path: string) => [...(store.get(path)?.values() ?? [])],
-    /** 「その画面に立ったときに書き込まれるもの」を模す直書き。 */
-    seed: (path: string, data: DocData) => {
-      colOf(path).set(`seed-${++counter}`, { ...data });
-    },
-  };
-}
 
 let fs: ReturnType<typeof createFakeFirestore>;
 const currentDb = () => fs.db;
@@ -398,13 +329,23 @@ describe("A. 状態 → 棚（userKey）", () => {
 // ===========================================================================
 
 describe("B. 連携時のデータの行方", () => {
-  it("B1: メールでログインし直す経路なら、お気に入り・フォロー・イベントは顧客の棚へ移る", async () => {
+  /** 実際の連携経路（連携ボタン / LIFF / メールログイン）が通る 1 か所。 */
+  const linkAndMerge = (customerId: string) =>
+    completeLineLinkage({
+      lineUserId: LINE_USER_ID,
+      shopifyCustomerId: customerId,
+      source: "line-link-callback",
+    });
+
+  it("B1: 連携が成立すると、お気に入り・フォロー・イベントは顧客の棚へ移る", async () => {
     fs.seed(favoritesCol(LINE_KEY), A_FAVORITE);
     fs.seed(followsCol(LINE_KEY), { farmerSlug: "yamada-farm" });
     fs.seed(eventRegistrationsCol(LINE_KEY), { eventSlug: "marche-2026-08" });
 
-    await mergeLineIdentityIntoShopify(LINE_USER_ID, CUSTOMER_A);
+    ledger.link(LINE_USER_ID, CUSTOMER_A);
+    const { outcome } = await linkAndMerge(CUSTOMER_A);
 
+    expect(outcome).toBe("merged");
     expect(fs.count(favoritesCol(CUSTOMER_A))).toBe(1);
     expect(fs.count(followsCol(CUSTOMER_A))).toBe(1);
     expect(fs.count(eventRegistrationsCol(CUSTOMER_A))).toBe(1);
@@ -412,74 +353,172 @@ describe("B. 連携時のデータの行方", () => {
     expect(fs.count(favoritesCol(LINE_KEY))).toBe(0);
   });
 
-  it("B2 [現状]: 行動ログ・会話履歴・注文は合体の対象外で line: 棚に取り残される", async () => {
-    fs.seed(behaviorLogCol(LINE_KEY), { event: "view", targetId: "p1" });
-    fs.seed(conversationsCol(LINE_KEY), { role: "user" });
-    fs.seed(ordersCol(LINE_KEY), { orderId: "1001" });
+  it("B2: 行動ログ・会話履歴・注文も一緒に運ばれる（置き去りにしない）", async () => {
+    /* かつて合体は favorites / follows / eventRegistrations の 3 つしか触らず、
+       あとから `COLLECTIONS` に足された行動ログ・会話履歴・注文ミラーは
+       `line:` 棚に取り残されていた。連携後は LINE セッションも顧客の棚に解決する
+       ので、その 3 つは **どのログイン手段からも読めない**場所に消えていた。
+       いまは運ぶ荷物を `USER_SUBCOLLECTIONS` から導出するので、同じ落とし方は
+       できない（足して strategy を書かなければ型エラーになる）。 */
+    fs.seed(behaviorLogCol(LINE_KEY), { action: "view_content", channel: "line" });
+    fs.seed(conversationsCol(LINE_KEY), { role: "user", content: "こんにちは" });
+    fs.seed(ordersCol(LINE_KEY), { orderNumber: "1001" });
 
-    await mergeLineIdentityIntoShopify(LINE_USER_ID, CUSTOMER_A);
+    ledger.link(LINE_USER_ID, CUSTOMER_A);
+    await linkAndMerge(CUSTOMER_A);
 
-    /* 合体が触るのは favorites / follows / eventRegistrations の 3 つだけ
-       （lib/auth/identity-merge.ts）。残り 3 つは line: 棚に残る。連携後は
-       LINE セッションも顧客の棚に解決するので、この 3 つは **どのログイン手段
-       からも読めない**状態になる。 */
-    expect(fs.count(behaviorLogCol(LINE_KEY))).toBe(1);
-    expect(fs.count(conversationsCol(LINE_KEY))).toBe(1);
-    expect(fs.count(ordersCol(LINE_KEY))).toBe(1);
-    expect(fs.count(behaviorLogCol(CUSTOMER_A))).toBe(0);
-    expect(fs.count(conversationsCol(CUSTOMER_A))).toBe(0);
-    expect(fs.count(ordersCol(CUSTOMER_A))).toBe(0);
+    expect(fs.count(behaviorLogCol(CUSTOMER_A))).toBe(1);
+    expect(fs.count(conversationsCol(CUSTOMER_A))).toBe(1);
+    expect(fs.count(ordersCol(CUSTOMER_A))).toBe(1);
+    expect(fs.count(behaviorLogCol(LINE_KEY))).toBe(0);
+    expect(fs.count(conversationsCol(LINE_KEY))).toBe(0);
+    expect(fs.count(ordersCol(LINE_KEY))).toBe(0);
   });
 
-  it("B3 [現状]: マイページの「LINE 連携」ボタン経由では合体が起きず、お気に入りが消えたように見える", async () => {
+  it("B2b: ログ系はドキュメント ID を保って運ぶ（同じ内容の 2 件目を消さない）", async () => {
+    /* 行動ログは追記オンリーで、同じ内容の 2 件目が正当に存在する（同じ記事を
+       もう一度読んだ）。内容で重複判定するとその 2 件目が「重複」として消える
+       ので、ID を保って運ぶ。ID を保つこと自体が再実行の冪等性にもなる。 */
+    const sameEvent = { action: "view_content", channel: "line", contentId: "a1" };
+    fs.seed(behaviorLogCol(LINE_KEY), sameEvent, "evt-1");
+    fs.seed(behaviorLogCol(LINE_KEY), sameEvent, "evt-2");
+
+    ledger.link(LINE_USER_ID, CUSTOMER_A);
+    await linkAndMerge(CUSTOMER_A);
+
+    expect(fs.count(behaviorLogCol(CUSTOMER_A))).toBe(2);
+    expect(fs.ids(behaviorLogCol(CUSTOMER_A)).sort()).toEqual(["evt-1", "evt-2"]);
+  });
+
+  it("B2c: 注文が両方の棚にあるとき、顧客の棚の中身を LINE 側で上書きしない", async () => {
+    /* 注文ミラーはドキュメント ID が注文 ID。同じ ID が両側にあるのは再実行の
+       痕跡でしかなく、そこで LINE 側を書き戻すと、前回の実行後に顧客の棚で
+       更新された内容を巻き戻すことになる。衝突は常に既存（顧客の棚）優先。 */
+    fs.seed(ordersCol(LINE_KEY), { orderNumber: "1001", stale: true }, "order-1001");
+    fs.seed(ordersCol(CUSTOMER_A), { orderNumber: "1001", stale: false }, "order-1001");
+
+    ledger.link(LINE_USER_ID, CUSTOMER_A);
+    await linkAndMerge(CUSTOMER_A);
+
+    expect(fs.contents(ordersCol(CUSTOMER_A))).toEqual([
+      { orderNumber: "1001", stale: false },
+    ]);
+    expect(fs.count(ordersCol(LINE_KEY))).toBe(0);
+  });
+
+  it("B2d: ユーザードキュメント本体も畳む。欠けているフィールドだけを足す", async () => {
+    /* ペルソナ・嗜好プロファイルは両側で育つ。顧客の棚のほうが本命の記録なので、
+       LINE 側の値で塗り替えず、**引っ越し先に無いフィールドだけ**を足す。 */
+    fs.seed(
+      "users",
+      { persona: "line-side", tasteProfile: "only-on-line" },
+      LINE_KEY,
+    );
+    fs.seed("users", { persona: "customer-side" }, CUSTOMER_A);
+
+    ledger.link(LINE_USER_ID, CUSTOMER_A);
+    await linkAndMerge(CUSTOMER_A);
+
+    expect(fs.docData(userDoc(CUSTOMER_A))).toEqual({
+      persona: "customer-side", // 既存が勝つ
+      tasteProfile: "only-on-line", // 欠けていた分だけ足される
+    });
+    expect(fs.docData(userDoc(LINE_KEY))).toBeUndefined();
+  });
+
+  it("B3: マイページの「LINE 連携」ボタン経由でも合体が起き、お気に入りは消えない", async () => {
     // LINE だけで使っていた頃に貯めたお気に入り。
     fs.seed(favoritesCol(LINE_KEY), A_FAVORITE);
 
     /* Web 連携導線（/api/user/line-link/init → LINE 認可 → /callback）は、
-       cx-agent に台帳の行を作るだけで `mergeLineIdentityIntoShopify` を呼ばない
-       （app/api/user/line-link/callback/route.ts に merge の呼び出しが無い）。 */
+       かつて cx-agent に台帳の行を作るだけで合体を呼ばなかった。連携した瞬間に
+       解決先の棚だけが変わり、中身は置き去りになるので「連携したらお気に入りが
+       消えた」に見えていた。いまは同じ route が台帳成立と合体を対で行う。 */
     ledger.link(LINE_USER_ID, CUSTOMER_A);
+    await linkAndMerge(CUSTOMER_A);
 
-    // メールセッション: 顧客の棚。合体していないので 0 件。
-    givenShopifySession(CUSTOMER_A);
-    expect(await visibleFavorites()).toBe(0);
-
-    // LINE セッション: 連携済みなので同じく顧客の棚に解決する。やはり 0 件。
-    __clearLinkageCacheForTest();
-    givenLineSession();
-    expect(await currentShelf()).toBe(CUSTOMER_A);
-    expect(await visibleFavorites()).toBe(0);
-
-    // データ自体は残っているが、どちらのセッションからも到達できない。
-    expect(fs.count(favoritesCol(LINE_KEY))).toBe(1);
-  });
-
-  it("B4 [現状]: 合体しても台帳の連携は張られないので、次に LINE だけで入ると空の棚に戻る", async () => {
-    fs.seed(favoritesCol(LINE_KEY), A_FAVORITE);
-
-    /* Shopify OAuth の帰り道で合体だけが走る
-       （app/api/auth/callback/route.ts:208）。台帳には何も書かない。 */
-    await mergeLineIdentityIntoShopify(LINE_USER_ID, CUSTOMER_A);
-
+    // メールセッション: 顧客の棚。合体済みなので見える。
     givenShopifySession(CUSTOMER_A);
     expect(await visibleFavorites()).toBe(1);
 
-    // 後日 LINE だけでログインし直すと、台帳に連携が無いので line: の棚。
+    // LINE セッション: 連携済みなので同じ棚に解決する。同じものが見える。
+    __clearLinkageCacheForTest();
     givenLineSession();
-    expect(await currentShelf()).toBe(LINE_KEY);
-    expect(await visibleFavorites()).toBe(0);
+    expect(await currentShelf()).toBe(CUSTOMER_A);
+    expect(await visibleFavorites()).toBe(1);
+
+    // 到達できない場所に残っているデータは無い。
+    expect(fs.count(favoritesCol(LINE_KEY))).toBe(0);
   });
 
-  it("B5 [現状]: 合体は台帳の同意を見ず、cookie が同居しているだけで発火する", async () => {
-    /* auth callback は「line_uid cookie がある」だけを条件に合体する。台帳に
-       その LINE と顧客 A の連携があるかは見ない。共用端末で前の人の LINE
-       セッションが残っていると、その人のお気に入りが次の人の棚へ移る。 */
+  it("B4: 台帳に連携が無ければ合体しない（「合体したのに未連携」を作れない）", async () => {
     fs.seed(favoritesCol(LINE_KEY), A_FAVORITE);
 
-    await mergeLineIdentityIntoShopify(LINE_USER_ID, CUSTOMER_B);
+    /* かつてメールログインの帰り道は `line_uid` cookie の存在だけで合体し、
+       台帳には何も書かなかった。その結果「データは顧客の棚に移ったのに台帳は
+       未連携」という状態が作れ、次に LINE だけで入ると空の棚に戻った。
+       いまは合体が台帳の成立を前提にするので、この状態はどの経路からも作れない。 */
+    const { outcome } = await completeLineLinkage({
+      lineUserId: LINE_USER_ID,
+      shopifyCustomerId: CUSTOMER_A,
+      source: "auth-callback",
+    });
 
-    expect(fs.count(favoritesCol(CUSTOMER_B))).toBe(1);
-    expect(fs.count(favoritesCol(LINE_KEY))).toBe(0);
+    expect(outcome).toBe("not-linked");
+    expect(fs.count(favoritesCol(CUSTOMER_A))).toBe(0);
+    expect(fs.count(favoritesCol(LINE_KEY))).toBe(1);
+
+    // 後日 LINE だけでログインしても、自分の棚に自分の中身がある。
+    givenLineSession();
+    expect(await currentShelf()).toBe(LINE_KEY);
+    expect(await visibleFavorites()).toBe(1);
+  });
+
+  it("B5: cookie が同居しているだけでは合体しない（共用端末で持ち去られない）", async () => {
+    /* 共用端末に前の人の LINE セッションが残ったまま次の人がメールでログインする
+       と、以前はその人のお気に入りが次の人の棚へ移っていた。合体は cookie の
+       同居ではなく台帳の本人一致で発火する。 */
+    fs.seed(favoritesCol(LINE_KEY), A_FAVORITE);
+    ledger.link(LINE_USER_ID, CUSTOMER_A); // この LINE の持ち主は顧客 A
+
+    const { outcome } = await completeLineLinkage({
+      lineUserId: LINE_USER_ID,
+      shopifyCustomerId: CUSTOMER_B, // ログインしたのは別人
+      source: "auth-callback",
+    });
+
+    expect(outcome).toBe("linked-elsewhere");
+    expect(fs.count(favoritesCol(CUSTOMER_B))).toBe(0);
+    expect(fs.count(favoritesCol(LINE_KEY))).toBe(1);
+  });
+
+  it("B6: 台帳が読めないときは合体しない（推測で棚を動かさない）", async () => {
+    /* 合体は元を消す操作なので、間違えたときに戻せない。読めないときに
+       「たぶん連携済み」へ倒す価値は無い。次の機会に再試行すればよい。 */
+    fs.seed(favoritesCol(LINE_KEY), A_FAVORITE);
+    ledger.link(LINE_USER_ID, CUSTOMER_A);
+    ledger.setUnreachable(true);
+
+    const { outcome } = await completeLineLinkage({
+      lineUserId: LINE_USER_ID,
+      shopifyCustomerId: CUSTOMER_A,
+      source: "auth-callback",
+    });
+
+    expect(outcome).toBe("ledger-unreadable");
+    expect(fs.count(favoritesCol(LINE_KEY))).toBe(1);
+    expect(fs.count(favoritesCol(CUSTOMER_A))).toBe(0);
+
+    // 台帳が戻れば、次のログインで拾われる（取りこぼしの再試行）。
+    ledger.setUnreachable(false);
+    __clearLinkageCacheForTest();
+    const retry = await completeLineLinkage({
+      lineUserId: LINE_USER_ID,
+      shopifyCustomerId: CUSTOMER_A,
+      source: "auth-callback",
+    });
+    expect(retry.outcome).toBe("merged");
+    expect(fs.count(favoritesCol(CUSTOMER_A))).toBe(1);
   });
 });
 
@@ -518,9 +557,15 @@ describe("C. 解除時のデータの行方", () => {
   });
 
   it("C3 [現状]: 合体で空になった line: 棚は、解除しても復活しない", async () => {
+    /* 連携時に運んだものは顧客の棚のものになる。解除は「連携が無い状態にする」
+       操作であって、引っ越しの巻き戻しではない（C2 と同じ規則）。 */
     fs.seed(favoritesCol(LINE_KEY), A_FAVORITE);
-    await mergeLineIdentityIntoShopify(LINE_USER_ID, CUSTOMER_A);
     ledger.link(LINE_USER_ID, CUSTOMER_A);
+    await completeLineLinkage({
+      lineUserId: LINE_USER_ID,
+      shopifyCustomerId: CUSTOMER_A,
+      source: "line-link-callback",
+    });
     ledger.unlinkByCustomer(CUSTOMER_A);
     __clearLinkageCacheForTest();
 
@@ -528,17 +573,32 @@ describe("C. 解除時のデータの行方", () => {
     expect(await visibleFavorites()).toBe(0);
   });
 
-  it("C4: 合体されずに取り残されていたデータは、解除後にまた見えるようになる", async () => {
-    /* B3 の経路（合体なしの連携）で置き去りになったデータは line: 棚にあるので、
-       解除で棚が戻ると再び見える。救済ではあるが、連携中は消えて見えていた。 */
-    fs.seed(favoritesCol(LINE_KEY), A_FAVORITE);
+  it("C4: 合体しきれず取り残されたデータは、解除後にまた見えるようになる", async () => {
+    /* 合体は「引っ越し先で読み戻せたものだけ元を消す」ので、必須フィールドが
+       欠けた壊れたドキュメントは line: 棚に残る（消してしまうより残すほうが安全）。
+       それは解除で棚が戻ると再び見える。
+
+       本番にはこの形の置き去りが既に存在する（本 PR より前の、連携時に合体が
+       走らなかった時期の分）。**その救済移行は本 PR の対象外**で、コード側の
+       規則としてここで固定するのは「取り残しは消えていない」ことだけ。 */
+    const BROKEN_FAVORITE = { type: "product" }; // targetId が無い = 運べない
+    fs.seed(favoritesCol(LINE_KEY), BROKEN_FAVORITE);
     ledger.link(LINE_USER_ID, CUSTOMER_A);
+
+    const { merge } = await completeLineLinkage({
+      lineUserId: LINE_USER_ID,
+      shopifyCustomerId: CUSTOMER_A,
+      source: "line-link-callback",
+    });
+    expect(merge?.retained).toBe(1);
+
     givenLineSession();
-    expect(await visibleFavorites()).toBe(0);
+    expect(await currentShelf()).toBe(CUSTOMER_A);
+    expect(await visibleFavorites()).toBe(0); // 連携中は見えない
 
     ledger.unlinkByCustomer(CUSTOMER_A);
     __clearLinkageCacheForTest();
-    expect(await visibleFavorites()).toBe(1);
+    expect(await visibleFavorites()).toBe(1); // 消えてはいない
   });
 });
 
@@ -579,17 +639,21 @@ describe("D. 再連携", () => {
     expect(fs.count(favoritesCol(CUSTOMER_A))).toBe(1);
   });
 
-  it("D3 [現状]: 両方の棚に中身があるとき、再連携は合体させず顧客の棚だけを見せる", async () => {
+  it("D3: 両方の棚に中身があるとき、再連携で合流して両方見える", async () => {
     fs.seed(favoritesCol(LINE_KEY), A_FAVORITE);
     fs.seed(favoritesCol(CUSTOMER_A), ANOTHER_FAVORITE);
 
     ledger.link(LINE_USER_ID, CUSTOMER_A);
+    await completeLineLinkage({
+      lineUserId: LINE_USER_ID,
+      shopifyCustomerId: CUSTOMER_A,
+      source: "line-link-callback",
+    });
     givenLineSession();
 
-    /* 合体が走らないので合計 2 件にはならない。line: 側の 1 件は見えないまま
-       置き去りになる（B3 と同じ根で、再連携でも解消しない）。 */
-    expect(await visibleFavorites()).toBe(1);
-    expect(fs.count(favoritesCol(LINE_KEY))).toBe(1);
+    // 合体が走るので合計 2 件。line: 側に置き去りは残らない。
+    expect(await visibleFavorites()).toBe(2);
+    expect(fs.count(favoritesCol(LINE_KEY))).toBe(0);
   });
 });
 
@@ -638,28 +702,33 @@ describe("E. 逆引きキャッシュ（最大 60 秒）の窓", () => {
     expect(await currentShelf()).toBe(LINE_KEY);
   });
 
-  it("E3 [現状]: 連携した直後も最大 60 秒は line: 棚に書き続け、その分は永久に取り残される", async () => {
+  it("E3: 連携が成立した瞬間からキャッシュは捨てられ、次の読み取りで顧客の棚になる", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-08-22T00:00:00.000Z"));
 
     givenLineSession();
     expect(await currentShelf()).toBe(LINE_KEY); // 「未連携」がキャッシュに載る
 
-    /* 連携成立。どの連携経路も逆引きキャッシュを捨てない
-       （invalidateReverseLinkage の呼び出しは解除経路にしか無い）。 */
+    /* かつては、どの連携経路も逆引きキャッシュを捨てなかった
+       （`invalidateReverseLinkage` の呼び出しは解除経路にしか無かった）。
+       そのため連携後も最大 60 秒は `line:` 棚に書き続け、しかも合体は連携の
+       瞬間にしか走らないので、その窓の中で書かれた分を後から拾う経路が無かった。
+       いまは連携成立の経路が必ずキャッシュを捨てる。 */
     ledger.link(LINE_USER_ID, CUSTOMER_A);
+    await completeLineLinkage({
+      lineUserId: LINE_USER_ID,
+      shopifyCustomerId: CUSTOMER_A,
+      source: "line-link-callback",
+    });
 
-    vi.advanceTimersByTime(LINKAGE_CACHE_TTL_MS - 1);
-    expect(await currentShelf()).toBe(LINE_KEY);
-    fs.seed(favoritesCol(await currentShelf()), A_FAVORITE); // line: 棚に着地
-
-    vi.advanceTimersByTime(2);
+    // TTL を待たずに、直後の読み取りが顧客の棚を返す（窓が開かない）。
     expect(await currentShelf()).toBe(CUSTOMER_A);
+    fs.seed(favoritesCol(await currentShelf()), A_FAVORITE);
 
-    /* 合体は連携の瞬間にしか走らない（しかも Web 連携経路では走らない）ので、
-       窓の中で書かれたこの 1 件を後から拾う経路は存在しない。 */
-    expect(await visibleFavorites()).toBe(0);
-    expect(fs.count(favoritesCol(LINE_KEY))).toBe(1);
+    vi.advanceTimersByTime(LINKAGE_CACHE_TTL_MS + 1);
+    expect(await currentShelf()).toBe(CUSTOMER_A);
+    expect(await visibleFavorites()).toBe(1);
+    expect(fs.count(favoritesCol(LINE_KEY))).toBe(0);
   });
 
   it("E4: 台帳が読めなかったときはキャッシュに載せない（復旧が遅れない）", async () => {
@@ -683,35 +752,42 @@ describe("E. 逆引きキャッシュ（最大 60 秒）の窓", () => {
 // ===========================================================================
 
 describe("F. 往復シナリオ", () => {
-  it("F1 [現状]: LINE で貯める → 連携 → 解除 → 再連携 を一周すると、最初の分だけが失われる", async () => {
+  it("F1: LINE で貯める → 連携 → 解除 → 再連携 を一周しても、何も失われない", async () => {
+    const link = (customerId: string) =>
+      completeLineLinkage({
+        lineUserId: LINE_USER_ID,
+        shopifyCustomerId: customerId,
+        source: "line-link-callback",
+      });
+
     // 1) LINE だけで使っていた頃
     givenLineSession();
     expect(await currentShelf()).toBe(LINE_KEY);
     fs.seed(favoritesCol(LINE_KEY), A_FAVORITE);
     expect(await visibleFavorites()).toBe(1);
 
-    // 2) マイページから連携（Web 導線＝合体なし）
+    // 2) マイページから連携。台帳成立と合体が対で走る
     ledger.link(LINE_USER_ID, CUSTOMER_A);
-    __clearLinkageCacheForTest();
+    await link(CUSTOMER_A);
     expect(await currentShelf()).toBe(CUSTOMER_A);
-    expect(await visibleFavorites()).toBe(0); // ここで「消えた」ように見える
+    expect(await visibleFavorites()).toBe(1); // 消えたように見えない
 
     // 3) 連携中に新しく追加
     fs.seed(favoritesCol(CUSTOMER_A), ANOTHER_FAVORITE);
-    expect(await visibleFavorites()).toBe(1);
+    expect(await visibleFavorites()).toBe(2);
 
-    // 4) 解除
+    // 4) 解除。連携中に貯めた分は顧客の棚に残る（C2 の規則）
     ledger.unlinkByCustomer(CUSTOMER_A);
     __clearLinkageCacheForTest();
     expect(await currentShelf()).toBe(LINE_KEY);
-    expect(await visibleFavorites()).toBe(1); // 1) の分がここで戻る
+    expect(await visibleFavorites()).toBe(0);
 
-    // 5) 再連携
+    // 5) 再連携すると、通算 2 件がまとめて戻る
     ledger.link(LINE_USER_ID, CUSTOMER_A);
-    __clearLinkageCacheForTest();
-    expect(await visibleFavorites()).toBe(1); // 3) の分だけが見える
+    await link(CUSTOMER_A);
+    expect(await visibleFavorites()).toBe(2);
 
-    // 通算 2 件あるのに、どの状態でも同時に 2 件は見えない。
+    // 通算 2 件が、どの状態でも 1 か所にまとまっている。
     expect(fs.count(favoritesCol(LINE_KEY)) + fs.count(favoritesCol(CUSTOMER_A))).toBe(2);
   });
 
