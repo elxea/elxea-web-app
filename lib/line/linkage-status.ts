@@ -130,6 +130,178 @@ export function isLinkedForDisplay(
   return status?.linked === true;
 }
 
+/* ---------------------------------------------------------------------------
+ * 逆引き（LINE userId → Shopify 顧客）: マイページ分裂の根因を塞ぐ読み取り口
+ * ------------------------------------------------------------------------- */
+
+/**
+ * LINE セッションの本人が、どの Shopify 顧客として解決されるべきか。
+ *
+ * ## 何を直しているか
+ *
+ * `lib/firebase/auth-guard.ts` の `resolveIdentity` は、ログイン手段ごとに **別の
+ * Firestore の棚**を選ぶ（Shopify は `users/{shopifyCustomerId}`、LINE は
+ * `users/line:{lineUserId}`）。この 2 つは意図的に交わらない名前空間で、しかも
+ * **連携台帳を一切見ていなかった**。だから「連携したはずなのに、メールでログインすると
+ * A のマイページ、LINE でログインすると B のマイページ」という分裂が起きる。
+ * 本関数はその解決に使う読み取り口。
+ *
+ * ## 「見つからない」と「読めなかった」を混ぜない（既存 3 値方針の踏襲）
+ *
+ * 戻り値は 3 値。
+ *   - 文字列 … 検証済みの連携がある。**その Shopify 顧客の棚に解決してよい**
+ *   - `false` … 連携が無い（または解除済み）。**従来どおり LINE 単独の人格**
+ *   - `null` … 読めなかった（不達 / timeout / 秘密未設定 / 壊れた応答）
+ *
+ * `null` のときも呼び出し側は LINE 単独の人格に倒す（＝この変更が入る前と同じ挙動）。
+ * ここで例外を投げたり顧客 ID を推測したりしない。**推測で棚を選ぶと、他人の
+ * お気に入り・行動ログを見せる事故になる**ため、疑わしいときは必ず自分の棚に戻す。
+ *
+ * ## 解除が即座に効くこと（生存検証）
+ *
+ * cx-agent 側は `shopify_customer_id IS NOT NULL` かつ `unfollowed_at IS NULL` の行しか
+ * 返さない。解除（`clearCustomerLinkage`）は `shopify_customer_id` を null にするので、
+ * 解除された連携はここで自動的にヒットしなくなる。つまり **読み取りのたびに生存を
+ * 確かめている**。キャッシュはそれを最大 60 秒だけ遅らせる（下記）。
+ */
+export type ResolvedShopifyCustomer = string | false | null;
+
+/**
+ * 逆引きのキャッシュ TTL。
+ *
+ * `resolveIdentity` は SSR の広い範囲から呼ばれるため、素通しにすると 1 画面で
+ * cx-agent への往復が何度も出る。一方で長く持つと解除が効くまでの遅れになる。
+ * **解除の反映が 60 秒を超えない**ことを上限として、その範囲で往復を減らす。
+ */
+export const LINKAGE_CACHE_TTL_MS = 60_000;
+
+type CacheEntry = { value: ResolvedShopifyCustomer; expiresAt: number };
+
+/**
+ * プロセス内キャッシュ。
+ *
+ * ⚠ `null`（読めなかった）は **キャッシュしない**。障害中の「不明」を 60 秒固定すると、
+ *   cx-agent が復旧しても連携済みの人が自分の棚に戻れない時間が伸びる。
+ */
+const reverseCache = new Map<string, CacheEntry>();
+
+/**
+ * キャッシュの上限件数。
+ *
+ * TTL だけだと、長寿命プロセス（serverless でない実行環境）で訪問者が増え続けたときに
+ * Map が単調に膨らむ。上限に達したら期限切れを掃除し、それでも空かなければ最も古い
+ * 挿入から捨てる（Map は挿入順を保つ）。**正しさには影響しない** — 捨てられた人は
+ * 次の読み取りで台帳を引き直すだけ。
+ */
+const REVERSE_CACHE_MAX_ENTRIES = 5000;
+
+function evictIfNeeded(now: number): void {
+  if (reverseCache.size < REVERSE_CACHE_MAX_ENTRIES) return;
+
+  for (const [key, entry] of reverseCache) {
+    if (entry.expiresAt <= now) reverseCache.delete(key);
+  }
+
+  // 期限切れだけで足りなければ、古いものから落とす。
+  while (reverseCache.size >= REVERSE_CACHE_MAX_ENTRIES) {
+    const oldest = reverseCache.keys().next();
+    if (oldest.done) break;
+    reverseCache.delete(oldest.value);
+  }
+}
+
+/** テスト用。プロセス内キャッシュを空にする。 */
+export function __clearLinkageCacheForTest(): void {
+  reverseCache.clear();
+}
+
+/**
+ * サーバ検証済みの LINE userId から、連携先の Shopify 顧客 ID を引く。
+ *
+ * @param lineUserId **サーバ側で検証済み**の LINE userId のみを渡すこと
+ *   （暗号化 cookie `line_uid` の復号結果 / id_token の `sub`）。ブラウザ自己申告の
+ *   値を渡してはならない — 渡した瞬間、任意の LINE ID を名乗って他人の棚を開ける。
+ *   本モジュールは渡された値を検証できないため、これは呼び出し側の責務。
+ * @param now テスト用の時刻注入。
+ * @returns `ResolvedShopifyCustomer`。**決して throw しない**。
+ */
+export async function fetchShopifyCustomerIdForLineUser(
+  lineUserId: string,
+  now: number = Date.now(),
+): Promise<ResolvedShopifyCustomer> {
+  if (!lineUserId) return false;
+
+  const cached = reverseCache.get(lineUserId);
+  if (cached && cached.expiresAt > now) return cached.value;
+
+  const secret = process.env.SYNC_API_SECRET;
+  if (!secret) {
+    // 秘密が無ければ cx-agent は 401 を返すので、無駄打ちせず「不明」に倒す。
+    // 設定漏れを「未連携」と決めつけない。
+    console.warn(
+      "[line-linkage-status] SYNC_API_SECRET not set; reverse linkage unknown.",
+    );
+    return null;
+  }
+
+  const url = `${CX_AGENT_BASE_URL}/api/identity/linkage-status?line_user_id=${encodeURIComponent(
+    lineUserId,
+  )}`;
+
+  let resolved: ResolvedShopifyCustomer;
+  try {
+    const upstream = await fetch(url, {
+      method: "GET",
+      headers: { "X-API-Key": secret },
+      // 連携の生存は都度確かめる（解除直後に古い「連携済み」で他人の棚を開けない）。
+      cache: "no-store",
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
+
+    if (!upstream.ok) {
+      console.warn(
+        `[line-linkage-status] reverse lookup returned ${upstream.status}`,
+      );
+      return null;
+    }
+
+    const data = (await upstream.json()) as {
+      linked?: unknown;
+      shopify_customer_id?: unknown;
+    };
+
+    if (data.linked !== true) {
+      // 明示的に「連携が無い」と言われた。従来どおり LINE 単独の人格。
+      resolved = false;
+    } else if (
+      typeof data.shopify_customer_id === "string" &&
+      data.shopify_customer_id !== ""
+    ) {
+      resolved = data.shopify_customer_id;
+    } else {
+      // linked=true なのに顧客 ID が無い＝応答が壊れている。棚を推測しない。
+      console.warn(
+        "[line-linkage-status] reverse lookup: linked without customer id",
+      );
+      return null;
+    }
+  } catch (err) {
+    console.warn(
+      "[line-linkage-status] reverse lookup unreachable:",
+      err instanceof Error ? err.message : err,
+    );
+    return null;
+  }
+
+  // 確定した答え（連携先 or 未連携）だけを短時間キャッシュする。
+  evictIfNeeded(now);
+  reverseCache.set(lineUserId, {
+    value: resolved,
+    expiresAt: now + LINKAGE_CACHE_TTL_MS,
+  });
+  return resolved;
+}
+
 /**
  * 連携日時の表示（yyyy/mm/dd）。
  *

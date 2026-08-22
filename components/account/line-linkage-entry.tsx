@@ -1,5 +1,6 @@
 import { AccountPanelSection } from "@/components/account/account-panel";
 import { LineLinkageCta } from "@/components/account/line-linkage-cta";
+import { LineUnlinkControl } from "@/components/account/line-unlink-control";
 import {
   formatLinkedDate,
   isLinkedForDisplay,
@@ -53,6 +54,9 @@ const COPY = {
     /** 失敗して戻ってきたとき。原因は伏せる（外に検証内訳を出さない）が、黙って戻さない。 */
     noticeError:
       "連携を完了できませんでした。お手数ですが、もう一度お試しください。",
+    /** 状態が読めなかったとき。「未連携」と言い切らない（3 値表示）。 */
+    statusUnknown:
+      "ただいま連携の状態を確認できませんでした。すでに連携がお済みの場合、あらためて連携していただいても二重にはなりません。",
   },
   en: {
     heading: "Link with LINE",
@@ -66,6 +70,8 @@ const COPY = {
       "Linked with LINE. We send suggestions tailored to your taste in the LINE chat.",
     noticeSuccess: "Your LINE account is now linked.",
     noticeError: "We could not complete the link. Please try again.",
+    statusUnknown:
+      "We could not check your link status just now. If you are already linked, linking again will not create a duplicate.",
   },
 } as const;
 
@@ -81,9 +87,16 @@ type Locale = keyof typeof COPY;
  *   壊れない upsert）ため、「読めないので何も出さない」より安全側だから。逆に
  *   「連携済み」と言い切ってしまうと、実際は未連携の人が連携導線を失う。
  *
- *   ⚠ 連携済みでも**解除の導線は出さない**。解除が行削除か旗立てかという状態遷移が
- *   まだ確定しておらず（P1b で決める）、押せる解除ボタンを先に置くと定義が実装に
- *   引きずられる。ここに解除ボタンを足す前に、必ずその判断を先に済ませること。
+ *   連携済みには**解除の導線を出す**（`LineUnlinkControl`）。以前ここには「解除の導線は
+ *   出さない」と書いてあった。解除が行削除か旗立てかという状態遷移が未確定で、押せる
+ *   ボタンを先に置くと定義が実装に引きずられるからだった。その状態遷移が確定した
+ *   （連携行は消さず連携を表す列だけを空にする＝配信停止などお客さまの設定を巻き戻さない）
+ *   ため、導線を出せるようになった。
+ *
+ *   `null`（不明）のときは連携導線に加えて「確認できなかった」を明示する。解除が
+ *   実際に押せるようになった今、不明を黙って未連携の見た目にすると、**連携済みの人が
+ *   「未連携」と読んで解除が要らないと誤解する**。連携ボタンは冪等なので出したままにし、
+ *   言い切らない一文だけを足す。
  *
  * @param result 連携フローから戻ってきた直後の結果（`?line_link=success|error`）。
  *   一度きりの確認をこの節の中に出すためだけに使う。**専用の完了画面は作らない**
@@ -102,6 +115,11 @@ export function LineLinkageEntry({
 }) {
   const t = COPY[(locale as Locale) in COPY ? (locale as Locale) : "ja"];
 
+  /* 「状態が読めなかった」かどうかは、下の isLinkedForDisplay より **前**に determine する。
+     isLinkedForDisplay は型述語（`status is LineLinkageStatus`）なので、else 側で
+     status が never に狭まり `status?.linked` を読めなくなるため。 */
+  const statusUnknown = status?.linked === null;
+
   const notice = result ? (
     <p
       className="text-sm text-foreground leading-relaxed"
@@ -112,30 +130,46 @@ export function LineLinkageEntry({
     </p>
   ) : null;
 
-  // 連携済み: 状態を伝えるだけ。
+  // 連携済み: 状態を伝え、解除の導線を出す。
   if (isLinkedForDisplay(status)) {
     const date = formatLinkedDate(status.linkedAt, locale);
     return (
       <AccountPanelSection title={t.linkedHeading} testId="line-linkage-entry">
         <div className="space-y-2">
           {notice}
-          <p
-            className="text-sm text-muted-foreground leading-relaxed"
-            data-testid="line-linkage-linked"
-          >
-            {date ? t.linkedWithDate.replace("{date}", date) : t.linkedNoDate}
-          </p>
+          <div className="flex items-start justify-between gap-6">
+            <p
+              className="text-sm text-muted-foreground leading-relaxed"
+              data-testid="line-linkage-linked"
+            >
+              {date ? t.linkedWithDate.replace("{date}", date) : t.linkedNoDate}
+            </p>
+            <LineUnlinkControl locale={locale} />
+          </div>
         </div>
       </AccountPanelSection>
     );
   }
 
   /* 未連携 / 不明: 連携導線を出す。押せるかどうか（＝このデプロイに連携の設定があるか）は
-     CTA が init に問い合わせて決める。ここでは公開 env を見ない。 */
+     CTA が init に問い合わせて決める。ここでは公開 env を見ない。
+
+     不明（null）のときだけ「確認できなかった」を添える。解除が押せるようになった今、
+     不明を黙って未連携の見た目にすると、連携済みの人が「未連携」と読んで解除が
+     要らないと誤解する（3 値表示）。 */
   return (
     <AccountPanelSection title={t.heading} testId="line-linkage-entry">
       <div className="space-y-2">
         {notice}
+        {statusUnknown ? (
+          <p
+            className="text-sm text-foreground leading-relaxed"
+            data-testid="line-linkage-status-unknown"
+            role="status"
+          >
+            {t.statusUnknown}
+          </p>
+        ) : null}
         <div className="flex items-start justify-between gap-6">
           <p className="text-sm text-muted-foreground leading-relaxed">
             {t.description}

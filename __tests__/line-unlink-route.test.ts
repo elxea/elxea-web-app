@@ -11,6 +11,10 @@
  *   4. rate limit に当たったら limiter の応答をそのまま返し、解除は実行しない。
  *   5. 解除 → 再連携が同じ route で成立する（DELETE の後に POST が
  *      action="linked" を返せる = 消し残りに引っぱられない）。
+ *   6. **連携の正本（cx-agent）を先に外し、成功したときだけ Firestore を消す**。
+ *      cx-agent が失敗したら Firestore に触れず非 2xx（502 / 503）。
+ *      以前はここが Firestore しか消さずに 200 を返していたため、解除したはずの人に
+ *      LINE の配信が届き続けていた（＝成功偽装）。その再発防止をここで固定する。
  *
  * requireAuth / rate limit / server-actions は mock。Firestore 実体は使わない。
  * `unlinkLineUser` 自体の Firestore セマンティクス（FieldValue.delete で
@@ -37,6 +41,11 @@ const enforceRateLimitMock = vi.fn();
 vi.mock("@/lib/ratelimit", () => ({
   enforceRateLimit: (...args: unknown[]) => enforceRateLimitMock(...args),
   limiters: { authedUser: {} },
+}));
+
+const requestCxUnlinkMock = vi.fn();
+vi.mock("@/lib/line/unlink", () => ({
+  requestCxUnlink: (...args: unknown[]) => requestCxUnlinkMock(...args),
 }));
 
 import { DELETE, POST } from "@/app/api/user/line-link/route";
@@ -68,6 +77,8 @@ beforeEach(() => {
   enforceRateLimitMock.mockResolvedValue(null);
   unlinkLineUserMock.mockResolvedValue({ success: true, action: "unlinked" });
   linkLineUserMock.mockResolvedValue({ success: true, action: "linked" });
+  // 既定は「cx-agent 側の解除に成功」。失敗系のテストだけ上書きする。
+  requestCxUnlinkMock.mockResolvedValue({ ok: true, clearedCount: 1 });
 });
 
 describe("DELETE /api/user/line-link", () => {
@@ -164,5 +175,74 @@ describe("DELETE /api/user/line-link", () => {
     const postJson = (await postRes.json()) as { action?: string };
     expect(postJson.action).toBe("linked");
     expect(linkLineUserMock).toHaveBeenCalledWith(CUSTOMER_ID, VALID_LINE_USER_ID);
+  });
+});
+
+/* -------------------------------------------------------------------------
+ * 解除が「本当に効く」ことの契約（契約 6）
+ *
+ * ここが本 PR の主旨。以前の DELETE は Firestore の写ししか消さず、LINE Bot が
+ * 実際に読む cx-agent の連携台帳には触れないまま 200 を返していた。つまり
+ * 「解除しました」と言いながら解除できていなかった。
+ * ----------------------------------------------------------------------- */
+describe("DELETE /api/user/line-link / cx-agent との順序と失敗の扱い", () => {
+  beforeEach(() => {
+    requireAuthMock.mockResolvedValue({ authenticated: true, customerId: CUSTOMER_ID });
+  });
+
+  it("連携の正本（cx-agent）をサーバ確定 customerId で呼ぶ", async () => {
+    await DELETE(makeDeleteRequest());
+    expect(requestCxUnlinkMock).toHaveBeenCalledTimes(1);
+    expect(requestCxUnlinkMock).toHaveBeenCalledWith(CUSTOMER_ID);
+  });
+
+  it("cx-agent を先に呼び、そのあとで Firestore を消す（順序が結果を決める）", async () => {
+    const order: string[] = [];
+    requestCxUnlinkMock.mockImplementation(async () => {
+      order.push("cx");
+      return { ok: true, clearedCount: 1 };
+    });
+    unlinkLineUserMock.mockImplementation(async () => {
+      order.push("firestore");
+      return { success: true, action: "unlinked" };
+    });
+
+    const res = await DELETE(makeDeleteRequest());
+    expect(res.status).toBe(200);
+    expect(order).toEqual(["cx", "firestore"]);
+  });
+
+  it("cx-agent 不達 → 502・Firestore は触らない（成功偽装をしない）", async () => {
+    requestCxUnlinkMock.mockResolvedValue({ ok: false, reason: "upstream_error" });
+
+    const res = await DELETE(makeDeleteRequest());
+    expect(res.status).toBe(502);
+    expect(unlinkLineUserMock).not.toHaveBeenCalled();
+  });
+
+  it("このデプロイに連携の設定が無い → 503・Firestore は触らない", async () => {
+    requestCxUnlinkMock.mockResolvedValue({ ok: false, reason: "not_configured" });
+
+    const res = await DELETE(makeDeleteRequest());
+    expect(res.status).toBe(503);
+    expect(unlinkLineUserMock).not.toHaveBeenCalled();
+  });
+
+  it("失敗応答に内部の理由コードを載せない（検証の内訳を外に出さない）", async () => {
+    requestCxUnlinkMock.mockResolvedValue({ ok: false, reason: "upstream_error" });
+
+    const res = await DELETE(makeDeleteRequest());
+    const body = JSON.stringify(await res.json());
+    expect(body).not.toContain("upstream_error");
+    expect(body).not.toContain("not_configured");
+  });
+
+  it("cx 側に外す連携が無くても（0 件）解除は成功として通る（冪等）", async () => {
+    requestCxUnlinkMock.mockResolvedValue({ ok: true, clearedCount: 0 });
+    unlinkLineUserMock.mockResolvedValue({ success: true, action: "not_linked" });
+
+    const res = await DELETE(makeDeleteRequest());
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { action?: string }).action).toBe("not_linked");
   });
 });

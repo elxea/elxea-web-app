@@ -9,6 +9,7 @@
 import { cookies } from "next/headers";
 import { getSession } from "@/lib/shopify/auth";
 import { getCustomer, decryptToken } from "@/lib/shopify/customer";
+import { fetchShopifyCustomerIdForLineUser } from "@/lib/line/linkage-status";
 import { extractCustomerId } from "./types";
 
 type AuthResult =
@@ -93,6 +94,29 @@ export async function requireAuth(): Promise<AuthResult> {
  * prefix), so no data migration is required. When a LINE-only user later
  * completes Shopify OAuth, the callback route is responsible for merging
  * `users/line:<id>/*` into `users/<shopifyNumericId>/*`.
+ *
+ * ## 連携済みの LINE セッションは Shopify 顧客の棚に解決する（分裂の修正）
+ *
+ * 上の 2 つの名前空間が交わらないこと自体は設計どおりだが、**連携台帳を一切
+ * 見ていなかった**のが「連携したはずなのにログイン手段ごとに別のマイページが
+ * 見える」の根因。よって LINE セッションのときは、cx-agent の連携台帳
+ * （既存 `GET /api/identity/linkage-status` の逆引き）に問い合わせ、
+ * **検証済みの連携があればその Shopify 顧客の棚に解決する**。
+ *
+ * 判断の倒し方（安全側は常に「自分の棚」）:
+ *   - 連携あり   … `userKey = shopifyCustomerId`・`provider = "shopify"`
+ *   - 連携なし   … 従来どおり `userKey = "line:<id>"`（＝解除後もここに戻る）
+ *   - 読めない   … 従来どおり `userKey = "line:<id>"`。**顧客 ID を推測しない**
+ *
+ * 「読めない」を連携済みに倒さないのは、外れた推測が他人のお気に入り・行動ログを
+ * 見せる事故に直結するから。逆に自分の棚に倒れても失うのは一時的な利便だけで、
+ * cx-agent が復旧すれば最大 60 秒（キャッシュ TTL）で正しい棚に戻る。
+ *
+ * ⚠ `provider` は解決後の棚に合わせて `"shopify"` になるが、これは
+ *   **Shopify セッションを持っていることを意味しない**。金額・住所・支払い方法など
+ *   Shopify 顧客トークンを要する操作は、この関数ではなく `requireAuth()`
+ *   （Shopify セッション専用）で守ること。本関数が守るのは Firestore 上の
+ *   お気に入り / フォロー / イベント / 行動ログの棚だけ。
  */
 export async function resolveIdentity(): Promise<Identity> {
   try {
@@ -153,6 +177,24 @@ export async function resolveIdentity(): Promise<Identity> {
             // Ignore malformed cookie — keep default display name.
           }
         }
+        /* 連携台帳を引く。`lineUserId` は暗号化 cookie の復号結果＝サーバ確定値で、
+           ブラウザ自己申告ではない（自己申告を渡すと他人の棚を開けられる）。 */
+        const linkedCustomerId =
+          await fetchShopifyCustomerIdForLineUser(lineUserId);
+
+        if (typeof linkedCustomerId === "string") {
+          // 連携済み: メールでログインしたときと同じ棚を返す。
+          return {
+            authenticated: true,
+            userKey: linkedCustomerId,
+            provider: "shopify",
+            displayName,
+            shopifyCustomerId: linkedCustomerId,
+            lineUserId,
+          };
+        }
+
+        // 未連携（false）/ 読めない（null）はどちらも従来どおり LINE 単独の人格。
         return {
           authenticated: true,
           userKey: `line:${lineUserId}`,
