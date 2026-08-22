@@ -16,27 +16,29 @@ name: sync-notion-to-sanity
 #   - SLACK_WEBHOOK_URL があれば失敗時のみ Slack へ通知 (成功時は通知しない)
 #   - 失敗が連続したら tracking issue を open / 追記する (下の notify job)
 #
-# 実行時間: 記事数十件規模で数分。timeout-minutes: 20 で上限に当たらない
-# (GitHub の job 上限 6 時間 / 非公開リポの無料枠 月 2000 分に対して十分小さい)。
+# 実行時間: 記事数十件規模で 1 分前後 (2026-08-22 の検証 run は 45 秒)。
+# timeout-minutes: 20 は GitHub の job 上限 6 時間に対して十分小さい。
+# 課金: このリポジトリは public なので標準 runner の Actions 分数は無料
+# (毎時実行 = 月 730 run でも請求分数は 0)。private 化する場合は毎時 cron を
+# 見直すこと (月 2000 分の無料枠に対し 1 run/分換算で約 730 分を占める)。
 
 on:
-  # 定時実行は一時停止中 (2026-08-18)。
+  # 定時実行は再開済み (2026-08-22)。
   #
-  # 理由: この workflow が必要とする secret (NOTION_API_KEY /
-  # NOTION_CONTENT_HUB_DB_ID / NEXT_PUBLIC_SANITY_PROJECT_ID /
-  # SANITY_API_WRITE_TOKEN) がリポジトリに未登録のため、毎時走っても必ず失敗し、
-  # 失敗通知と tracking issue だけが積み上がる。本番サイトへの影響は無い
-  # (この workflow はデプロイに関与しない) が、無意味な赤を出し続けないよう
-  # cron を止めてある。
+  # 一時停止 (2026-08-18, ec6c068) の理由だった secret 未登録は解消した。
+  # NOTION_API_KEY / NOTION_CONTENT_HUB_DB_ID / NEXT_PUBLIC_SANITY_PROJECT_ID /
+  # SANITY_API_WRITE_TOKEN の 4 つをリポジトリ secret に登録し、
+  # workflow_dispatch (dry_run: true) で 1 回成功させてから cron を戻している。
+  #   - 検証 run: https://github.com/elxea/elxea-web-app/actions/runs/32559178084
+  #     (取得 22 / 成功 22 / 失敗 0 / outcome: success)
   #
-  # 再開手順: 上記 4 つの secret を登録し、workflow_dispatch (dry_run: true) で
-  # 1 回成功させてから、下の schedule ブロックのコメントを外す。
-  #
-  # schedule:
-  #   # 毎時 5 分 (UTC)。Spec の完了基準「1 時間以内に出る」に合わせる。
-  #   # cron の起動は数十分遅れることがある (GitHub の仕様) が、1 時間粒度の
-  #   # 要件には収まる。
-  #   - cron: "5 * * * *"
+  # 再度止めるときは、この schedule ブロックをコメントアウトする
+  # (workflow_dispatch は残す)。
+  schedule:
+    # 毎時 5 分 (UTC)。Spec の完了基準「1 時間以内に出る」に合わせる。
+    # cron の起動は数十分遅れることがある (GitHub の仕様) が、1 時間粒度の
+    # 要件には収まる。
+    - cron: "5 * * * *"
   workflow_dispatch:
     inputs:
       dry_run:
