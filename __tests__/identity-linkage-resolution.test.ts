@@ -57,6 +57,7 @@ import {
   fetchLineLinkageStatusForLineUser,
   fetchShopifyCustomerIdForLineUser,
   invalidateReverseLinkage,
+  invalidateReverseLinkageForCustomer,
   __clearLinkageCacheForTest,
   LINKAGE_CACHE_TTL_MS,
   UNKNOWN_LINE_LINKAGE,
@@ -326,8 +327,23 @@ describe("requestCxUnlink / 解除要求", () => {
     expect((init.headers as Record<string, string>)["X-API-Key"]).toBe(
       "test-sync-secret",
     );
+    /* 対象を名指ししないときは line_user_id を載せない（= その顧客の連携をすべて外す）。
+       マイページには LINE を選ぶ UI が無いので、これが意図どおり。 */
     expect(JSON.parse(init.body as string)).toEqual({
       shopify_customer_id: SHOPIFY_CUSTOMER_ID,
+    });
+  });
+
+  it("対象の LINE が分かるときは名指しする（世帯共有で家族の連携を巻き添えにしない・P8）", async () => {
+    stubUpstream({ success: true, cleared_count: 1 });
+
+    const result = await requestCxUnlink(SHOPIFY_CUSTOMER_ID, LINE_USER_ID);
+
+    expect(result).toEqual({ ok: true, clearedCount: 1 });
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(init.body as string)).toEqual({
+      shopify_customer_id: SHOPIFY_CUSTOMER_ID,
+      line_user_id: LINE_USER_ID,
     });
   });
 
@@ -475,5 +491,127 @@ describe("invalidateReverseLinkage（解除直後の見え方）", () => {
       await fetchShopifyCustomerIdForLineUser(OTHER_LINE_USER_ID, t0 + 1_000),
     ).toBe(SHOPIFY_CUSTOMER_ID);
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// (g) メールセッションからの解除でも逆引きキャッシュが消える（P6 / E1）
+//
+//     LINE userId が分からないまま解除すると、キャッシュに「連携済み」が最大
+//     60 秒残る。その窓の中でこの人が LINE 側から画面を開くと、解除したはずの
+//     顧客の棚が見える。cx-agent に生 ID を返させずに窓を閉じられることを固定する。
+// ---------------------------------------------------------------------------
+
+describe("invalidateReverseLinkageForCustomer（顧客 ID だけで捨てる）", () => {
+  it("その顧客に紐付いていたキャッシュを捨てる（次の読み取りで台帳を引き直す）", async () => {
+    const t0 = 8_000_000;
+    stubUpstream({
+      linked: true,
+      linkedAt: LINKED_AT,
+      shopify_customer_id: SHOPIFY_CUSTOMER_ID,
+    });
+    await fetchShopifyCustomerIdForLineUser(LINE_USER_ID, t0);
+
+    // メールセッションから解除。外した LINE userId は分からない。
+    invalidateReverseLinkageForCustomer(SHOPIFY_CUSTOMER_ID);
+    stubUpstream({ linked: false, shopify_customer_id: null });
+
+    expect(
+      await fetchShopifyCustomerIdForLineUser(LINE_USER_ID, t0 + 1_000),
+    ).toBe(false);
+  });
+
+  it("GID で渡しても数値 ID のキャッシュに当たる（形の違いで取り逃がさない）", async () => {
+    const t0 = 8_100_000;
+    stubUpstream({
+      linked: true,
+      linkedAt: LINKED_AT,
+      shopify_customer_id: SHOPIFY_CUSTOMER_ID,
+    });
+    await fetchShopifyCustomerIdForLineUser(LINE_USER_ID, t0);
+
+    invalidateReverseLinkageForCustomer(
+      `gid://shopify/Customer/${SHOPIFY_CUSTOMER_ID}`,
+    );
+    stubUpstream({ linked: false, shopify_customer_id: null });
+
+    expect(
+      await fetchShopifyCustomerIdForLineUser(LINE_USER_ID, t0 + 1_000),
+    ).toBe(false);
+  });
+
+  it("別の顧客のキャッシュは捨てない（巻き添えで往復を増やさない）", async () => {
+    const t0 = 8_200_000;
+    const OTHER_LINE_USER_ID = "Ufedcba9876543210fedcba9876543210";
+    stubUpstream({
+      linked: true,
+      linkedAt: LINKED_AT,
+      shopify_customer_id: SHOPIFY_CUSTOMER_ID,
+    });
+    await fetchShopifyCustomerIdForLineUser(OTHER_LINE_USER_ID, t0);
+
+    invalidateReverseLinkageForCustomer("999999999999");
+
+    expect(
+      await fetchShopifyCustomerIdForLineUser(OTHER_LINE_USER_ID, t0 + 1_000),
+    ).toBe(SHOPIFY_CUSTOMER_ID);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("空文字では何も捨てない（誤爆でキャッシュを全消ししない）", async () => {
+    const t0 = 8_300_000;
+    stubUpstream({
+      linked: true,
+      linkedAt: LINKED_AT,
+      shopify_customer_id: SHOPIFY_CUSTOMER_ID,
+    });
+    await fetchShopifyCustomerIdForLineUser(LINE_USER_ID, t0);
+
+    invalidateReverseLinkageForCustomer("");
+
+    expect(
+      await fetchShopifyCustomerIdForLineUser(LINE_USER_ID, t0 + 1_000),
+    ).toBe(SHOPIFY_CUSTOMER_ID);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// (h) ブロック中でも本人解決は顧客の棚のまま（cx-agent P4 の web 側の受け）
+//
+//     cx-agent が `linked: true, unfollowed: true` を返すようになった。Web 側は
+//     「届くかどうか」で棚を選ばない — 選んだら、ブロックしただけの人が空の
+//     `line:` 棚に落ちる（お気に入りも行動ログも消えたように見える）。
+// ---------------------------------------------------------------------------
+
+describe("resolveIdentity / LINE をブロック中の連携済みユーザー（P4）", () => {
+  it("unfollowed=true でも Shopify 顧客の棚に解決する", async () => {
+    givenLineSession();
+    stubUpstream({
+      linked: true,
+      linkedAt: LINKED_AT,
+      unfollowed: true,
+      shopify_customer_id: SHOPIFY_CUSTOMER_ID,
+    });
+
+    const identity = await resolveIdentity();
+
+    expect(identity.authenticated).toBe(true);
+    if (!identity.authenticated) return;
+    expect(identity.userKey).toBe(SHOPIFY_CUSTOMER_ID);
+    expect(identity.provider).toBe("shopify");
+  });
+
+  it("マイページの連携状態も「連携済み」のまま（解除と混同しない）", async () => {
+    stubUpstream({
+      linked: true,
+      linkedAt: LINKED_AT,
+      unfollowed: true,
+      shopify_customer_id: SHOPIFY_CUSTOMER_ID,
+    });
+
+    await expect(
+      fetchLineLinkageStatusForLineUser(LINE_USER_ID, 8_400_000),
+    ).resolves.toEqual({ linked: true, linkedAt: LINKED_AT });
   });
 });

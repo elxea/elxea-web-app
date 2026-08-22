@@ -41,12 +41,30 @@ const UNLINK_TIMEOUT_MS = 5000;
 /**
  * cx-agent の連携台帳からこの顧客の連携を外す。
  *
- * @param shopifyCustomerId **サーバ認証済みセッション（requireAuth）由来**の顧客 ID のみ。
- *   ブラウザから受け取った値を渡してはならない（他人の連携を外せる）。
+ * ## 誰の連携を外すのか（P8 / 2026-08-22）
+ *
+ * 1 人の顧客に複数の LINE が紐づきうる（世帯共有・cx-agent migration 027）。
+ * `lineUserId` を渡さないと cx-agent は **その顧客の連携をすべて**外す。
+ * LINE セッションから解除した人は「自分の連携を外す」つもりなので、
+ * 家族の連携まで巻き添えにするのは意図と違う。**対象が分かるときは必ず名指しする。**
+ *
+ * 名指しは cx-agent 側で所有権も確かめられる（その LINE がこの顧客に紐づいて
+ * いなければ 403）ので、範囲を狭めるだけでなく取り違えの検出にもなる。
+ *
+ * マイページ（Shopify セッション）からの解除には LINE を選ぶ UI が無く、
+ * 「このアカウントの LINE 連携を解除する」という 1 つの操作しか無い。そこでは
+ * 顧客単位（= 全件）が意図どおりなので `lineUserId` を渡さない。
+ *
+ * @param shopifyCustomerId **サーバ認証済みセッション（requireAuth）由来**、または
+ *   検証済み LINE userId から台帳で引いた連携先。ブラウザから受け取った値を渡しては
+ *   ならない（他人の連携を外せる）。
+ * @param lineUserId 任意。**サーバ側で検証済み**の LINE userId のみ（暗号化 cookie の
+ *   復号結果）。渡すとその 1 件だけを外す。
  * @returns 成功なら実際に解除できた件数。**決して throw しない**。
  */
 export async function requestCxUnlink(
   shopifyCustomerId: string,
+  lineUserId?: string,
 ): Promise<CxUnlinkResult> {
   if (!shopifyCustomerId) return { ok: false, reason: "upstream_error" };
 
@@ -65,7 +83,11 @@ export async function requestCxUnlink(
         "Content-Type": "application/json",
         "X-API-Key": secret,
       },
-      body: JSON.stringify({ shopify_customer_id: shopifyCustomerId }),
+      body: JSON.stringify({
+        shopify_customer_id: shopifyCustomerId,
+        // 対象が分かるときだけ名指しする（省略 = その顧客の連携をすべて外す）。
+        ...(lineUserId ? { line_user_id: lineUserId } : {}),
+      }),
       cache: "no-store",
       signal: AbortSignal.timeout(UNLINK_TIMEOUT_MS),
     });

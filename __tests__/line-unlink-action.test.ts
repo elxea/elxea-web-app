@@ -6,10 +6,13 @@
  *
  *   1. 連携済み → `lineUserId` を `FieldValue.delete()` で消す
  *      （null / 空文字での上書きではない）。action="unlinked"。
- *   2. 消した後に `linkLineUser` を呼ぶと action="linked"
- *      （= 未連携からの新規連携と同じ経路。`already_linked` に落ちない）。
+ *   2. 消した後は「写しが無い」状態から始まる（残骸が再連携に引っかからない）。
  *   3. 未連携ドキュメント / ドキュメント不在 → 書き込まず action="not_linked"。
  *   4. カルテ等の他フィールドは触らない（解除 != データ削除）。
+ *   5. 名指しの解除（P8）は、写しが別の LINE のものなら触らない。
+ *
+ * 写しを**書く**関数はここには無い（2026-08-22 / P10 で `linkLineUser` を削除）。
+ * 写しは `completeLineLinkage` が台帳の本人一致を確かめたあとにだけ書く。
  *
  * Firestore は「更新を実際に適用する」最小のフェイクで置き換える。delete
  * sentinel の判定には実物の `FieldValue.delete()` を使う（sentinel を素の
@@ -69,7 +72,7 @@ vi.mock("@/lib/firebase/admin", () => ({
   }),
 }));
 
-import { linkLineUser, unlinkLineUser, getLinkedLineUserId } from "@/lib/firebase/server-actions";
+import { unlinkLineUser, getLinkedLineUserId } from "@/lib/firebase/server-actions";
 
 const CUSTOMER_ID = "900800400001";
 const USER_DOC = `users/${CUSTOMER_ID}`;
@@ -101,21 +104,40 @@ describe("unlinkLineUser", () => {
     expect(await getLinkedLineUserId(CUSTOMER_ID)).toBeNull();
   });
 
-  it("解除後の再連携は「新規連携」経路を通る（linked / already_linked ではない）", async () => {
+  it("解除後は「写しが無い」状態から始まる（残骸が再連携に引っかからない）", async () => {
     store.set(USER_DOC, { lineUserId: LINE_USER_ID });
 
     await unlinkLineUser(CUSTOMER_ID);
+    expect(await getLinkedLineUserId(CUSTOMER_ID)).toBeNull();
 
-    // 同じ LINE アカウントで再連携
-    const relink = await linkLineUser(CUSTOMER_ID, LINE_USER_ID);
-    expect(relink).toEqual({ success: true, action: "linked" });
-    expect(await getLinkedLineUserId(CUSTOMER_ID)).toBe(LINE_USER_ID);
-
-    // 別の LINE アカウントへの差し替えも成立する
-    await unlinkLineUser(CUSTOMER_ID);
-    const relinkOther = await linkLineUser(CUSTOMER_ID, OTHER_LINE_USER_ID);
-    expect(relinkOther).toEqual({ success: true, action: "linked" });
+    /* 再連携で写しを書くのは completeLineLinkage（台帳の本人一致を確かめたあと）。
+       ここでは「未連携からの新規連携」と同じ状態になっていることだけを見る。 */
+    store.set(USER_DOC, { ...(store.get(USER_DOC) as DocData), lineUserId: OTHER_LINE_USER_ID });
     expect(await getLinkedLineUserId(CUSTOMER_ID)).toBe(OTHER_LINE_USER_ID);
+
+    // 別の LINE アカウントに差し替わっていても解除は成立する
+    const again = await unlinkLineUser(CUSTOMER_ID);
+    expect(again).toEqual({ success: true, action: "unlinked" });
+    expect(await getLinkedLineUserId(CUSTOMER_ID)).toBeNull();
+  });
+
+  it("名指しの解除は別の LINE の写しを消さない（世帯共有・P8）", async () => {
+    store.set(USER_DOC, { lineUserId: OTHER_LINE_USER_ID });
+
+    const result = await unlinkLineUser(CUSTOMER_ID, LINE_USER_ID);
+
+    expect(result).toEqual({ success: true, action: "not_linked" });
+    expect(updateCalls).toHaveLength(0);
+    expect(await getLinkedLineUserId(CUSTOMER_ID)).toBe(OTHER_LINE_USER_ID);
+  });
+
+  it("名指しが写しと一致すれば消す", async () => {
+    store.set(USER_DOC, { lineUserId: LINE_USER_ID });
+
+    const result = await unlinkLineUser(CUSTOMER_ID, LINE_USER_ID);
+
+    expect(result).toEqual({ success: true, action: "unlinked" });
+    expect(await getLinkedLineUserId(CUSTOMER_ID)).toBeNull();
   });
 
   it("解除は連携情報以外のフィールドを消さない（解除 != データ削除）", async () => {

@@ -419,10 +419,12 @@ describe("B. 連携時のデータの行方", () => {
     ledger.link(LINE_USER_ID, CUSTOMER_A);
     await linkAndMerge(CUSTOMER_A);
 
-    expect(fs.docData(userDoc(CUSTOMER_A))).toEqual({
-      persona: "customer-side", // 既存が勝つ
-      tasteProfile: "only-on-line", // 欠けていた分だけ足される
-    });
+    const merged = fs.docData(userDoc(CUSTOMER_A)) as Record<string, unknown>;
+    expect(merged.persona).toBe("customer-side"); // 既存が勝つ
+    expect(merged.tasteProfile).toBe("only-on-line"); // 欠けていた分だけ足される
+    /* 合体と同じ流れで LINE の写しも置かれる（P9・2026-08-22）。これが無いと
+       解除の応答が写しだけを見て「連携していませんでした」と嘘をつく。 */
+    expect(merged.lineUserId).toBe(LINE_USER_ID);
     expect(fs.docData(userDoc(LINE_KEY))).toBeUndefined();
   });
 
