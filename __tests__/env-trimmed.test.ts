@@ -2,6 +2,7 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 
 import {
   readEnvTrimmed,
+  readSecretEnvTrimmed,
   readUrlEnvTrimmed,
   getSiteUrl,
   getGtmId,
@@ -47,6 +48,32 @@ describe("readEnvTrimmed", () => {
 
   it("leaves a clean value untouched", () => {
     expect(readEnvTrimmed("https://elxea.com", "fb")).toBe("https://elxea.com");
+  });
+});
+
+/**
+ * Credentials hit the same defect, and hide it better: a Channel Secret with a
+ * trailing newline is 32 correct characters plus one invisible one, and the
+ * only symptom is the provider's generic rejection. That is what took the Web
+ * LINE linking flow down on 2026-08-22 (`invalid_client` on every token
+ * exchange) while email login, reading a clean variable for the same channel,
+ * kept working. See `resolveLinkChannelSecret` in `lib/line/link-flow.ts`.
+ */
+describe("readSecretEnvTrimmed", () => {
+  it("strips a trailing newline off a credential", () => {
+    expect(readSecretEnvTrimmed(`${"0".repeat(32)}\n`)).toBe("0".repeat(32));
+  });
+
+  it("returns undefined rather than a fallback when unset or blank", () => {
+    // A credential must never be substituted: an empty or placeholder secret
+    // sent upstream turns a config gap into a customer-facing auth error.
+    expect(readSecretEnvTrimmed(undefined)).toBeUndefined();
+    expect(readSecretEnvTrimmed("")).toBeUndefined();
+    expect(readSecretEnvTrimmed("  \t\r\n ")).toBeUndefined();
+  });
+
+  it("leaves a clean value untouched", () => {
+    expect(readSecretEnvTrimmed("2009473839")).toBe("2009473839");
   });
 });
 

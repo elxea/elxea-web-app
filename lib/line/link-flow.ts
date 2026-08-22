@@ -1,5 +1,6 @@
 import crypto from "crypto";
 
+import { readSecretEnvTrimmed } from "@/lib/env";
 import { encryptToken, decryptToken } from "@/lib/shopify/customer";
 
 /**
@@ -83,9 +84,45 @@ export type LinkResult = "success" | "error";
  *
  * どちらも未設定なら `undefined` を返し、呼び出し側は「このデプロイでは連携できない」
  * （init は 503 / callback は fail-closed）として扱う。
+ *
+ * ## 値は必ず trim する（2026-08-22 の本番障害の直接原因）
+ *
+ * `vercel env add NAME production < file` のように **標準入力から値を流し込むと、
+ * 末尾の改行までが値として保存される**。Channel Secret はもともと 32 文字の不透明な
+ * 文字列なので、33 文字目が改行でもダッシュボード上は正しく見える。気づけるのは
+ * LINE がそれを拒んだときだけで、返ってくるのは
+ * `400 error=invalid_client error_description=invalid client_secret` という
+ * 「秘密が違う」としか言わない汎用エラーである。
+ *
+ * 実際、本番の `LINE_LOGIN_CHANNEL_SECRET` はこの状態で保存されており、Web 発の連携は
+ * token 交換の一手前まで正しく進んだうえで毎回そこで落ちていた。同じチャネル
+ * (2009473839) の秘密でも、メールログインが読む `AUTH_LINE_SECRET` は改行なしで
+ * 保存されていたため**ログインだけは通り続け**、連携の不具合に見えていた。
+ *
+ * よって「本番の値を一度掃除する」では直したことにならない。**コード側を不感にする**
+ * （= `readSecretEnvTrimmed` を通す）ことで、同じ入れ方をされても二度と再発しない。
+ * 同じ判断の先例が `lib/env.ts`（`NEXT_PUBLIC_SITE_URL` の改行が sitemap を壊した件）。
  */
 export function resolveLinkChannelSecret(): string | undefined {
-  return process.env.LINE_LIFF_CHANNEL_SECRET ?? process.env.LINE_LOGIN_CHANNEL_SECRET;
+  return (
+    readSecretEnvTrimmed(process.env.LINE_LIFF_CHANNEL_SECRET) ??
+    readSecretEnvTrimmed(process.env.LINE_LOGIN_CHANNEL_SECRET)
+  );
+}
+
+/**
+ * 連携（P2 / LIFF 経路とも）が使う LINE Login チャネルの Channel ID。
+ *
+ * 秘密と同じ理由で trim する。こちらは token 交換の `client_id` になるだけでなく、
+ * `verifyLineIdToken` で **id_token の `aud` と等値比較**される。改行が 1 文字混じると
+ * 比較が必ず外れ、「LINE の署名は通ったのに aud が一致しない」という、原因に辿り着き
+ * にくい失敗の仕方をする。
+ *
+ * 空文字・未設定は `undefined`（＝このデプロイでは連携できない）に倒す。空文字のまま
+ * LINE に送ると、設定漏れが「認可エラー」として顧客側に出てしまう。
+ */
+export function resolveLinkChannelId(): string | undefined {
+  return readSecretEnvTrimmed(process.env.LINE_LIFF_CHANNEL_ID);
 }
 
 /** cookie に封じる中身。キーを 1 文字にしているのは cookie サイズを抑えるため。 */
