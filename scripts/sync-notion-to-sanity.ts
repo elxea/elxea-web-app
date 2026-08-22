@@ -49,6 +49,11 @@ import {
   type SyncOutcome,
 } from "./lib/sync-notify";
 import { upsertFromNotion } from "./lib/sanity-upsert";
+import {
+  resolveTeaOrigin,
+  resolveTeaOriginPlace,
+  resolveTeaSupplier,
+} from "../lib/roji/tea-origins";
 
 // ─── Config ──────────────────────────────────────────────────
 
@@ -77,6 +82,16 @@ const SANITY_PROJECT_ID = optionalEnv("NEXT_PUBLIC_SANITY_PROJECT_ID");
 const CONTENT_HUB_DB_ID = optionalEnv("NOTION_CONTENT_HUB_DB_ID");
 const NOTION_PAGE_REGISTRY_DB_ID = optionalEnv("NOTION_PAGE_REGISTRY_DB_ID");
 const NOTION_PAGE_CONTENT_DB_ID = optionalEnv("NOTION_PAGE_CONTENT_DB_ID");
+
+/**
+ * Tea Menu List の database id。
+ *
+ * 他の DB と違って既定値を持たせている: この id は秘密ではなく
+ * (`lib/roji/tea-origins.ts` の註にも同じ値が載っている)、既定値があれば
+ * 新しい secret を用意しなくても `--tea-menu` が動く。
+ * `NOTION_TEA_MENU_DB_ID` を設定すればそちらが優先される。
+ */
+const TEA_MENU_DB_ID_DEFAULT = "ee367f6c-3ff3-4251-ad9e-0bc5a2cc7358";
 
 /**
  * Clients are created by `initClients()` rather than at module load.
@@ -1270,10 +1285,328 @@ async function sync(): Promise<SyncCounts> {
   return { fetched: entries.length, synced, errors, failures };
 }
 
+// ─── Tea Menu (茶譜) ─────────────────────────────────────────
+
+/**
+ * 茶譜 (お茶メニュー) の同期: Notion Tea Menu List → Sanity `teaMenu`。
+ *
+ * ## なぜ必要か
+ *
+ * Sanity の `teaMenu` は 3 件しか無く、その 3 件は `scripts/seed-dummy-content.ts`
+ * が入れた架空データ (spring-sencha / uji-gyokuro / kaga-hojicha)。銘柄マスタの
+ * 実体は Notion Tea Menu List の 43 件で、欠けていたのは正本ではなく同期実装。
+ *
+ * ## 何を 43 件と数えるか
+ *
+ * `Menu Name` (title) が **5 桁の採番**になっている行だけを銘柄として扱う。
+ * DB には 218 行あるが、残りは採番前の下書きで銘柄として成立していない。
+ * この 43 件は `lib/roji/tea-origins.ts` の `TEA_ORIGIN_BY_NUMBER` と同じ集合。
+ *
+ * 表示名は `Menu Name` ではなく `Menu Name - full` に入っている
+ * (`Menu Name` は採番そのもの)。
+ *
+ * ## 産地をどこから取るか (2 段構え)
+ *
+ * 産地は銘柄ではなく仕入先に紐づく: Tea Menu List の `Supplier Name` (relation)
+ * → Supplier List の `Prefecture` / `Regions` / `Place`。Tea Menu List 側には
+ * その rollup (`Prefecture` / `Origin`) がある。
+ *
+ * ただし **Supplier List は統合 (elxea-performance-sync) に共有されていない**ため、
+ * API 経由では relation / rollup が空で返る (2026-08-18 実測: 43 件すべて空。
+ * 同じページを個人資格で読むと `Supplier Name` は入っており、データ欠損ではなく
+ * 権限によるマスク)。
+ *
+ * そこで解決順を 2 段にする:
+ *   1. Notion の rollup が入っていればそれを使う (正本が直接使える状態)
+ *   2. 空なら `lib/roji/tea-origins.ts` の検証済みスナップショットを 5 桁番号で
+ *      join する。これは Supplier List の写しであって新たな推定ではない
+ *
+ * Supplier List が統合へ共有された時点で 1 が自動的に効き始め、コード変更なしで
+ * 正本直結へ移行する。座標 (`Place`) は現状スナップショット側にしか無い。
+ *
+ * ## ダミー 3 件を消さないこと
+ *
+ * `_id` を `teaMenu-<5桁>` に固定するため、ランダム ID のダミー 3 件とは衝突せず
+ * 上書きも削除もしない (ダミーの遮断は read 層 `lib/fictional-content.ts` が担当)。
+ * 同じ `_id` に対する upsert なので再実行しても増殖しない。
+ *
+ * ## Studio 専用フィールドを消さないこと
+ *
+ * 書き込みは `upsertFromNotion` (createIfNotExists + patch.set) を使う。
+ * `createOrReplace` はドキュメント全体を差し替えるため、Notion 台帳に無く
+ * Studio でしか入力しないフィールド — `photo` / `color` / `relatedArticle` /
+ * `shopifyHandle` / `seo` — が同期のたびに消える。記事同期で実際にこれが起き
+ * (2026-08-22 の本番事故)、`scripts/lib/sanity-upsert.ts` で直した。茶譜も
+ * 同じ書き方に揃える。`createOrReplace` に戻さないこと。
+ */
+
+/**
+ * title 型プロパティを名前で読む。
+ *
+ * 既存の `getTitle()` は `"Title"` という名前を決め打ちしている (Content Hub の
+ * title プロパティ名)。Tea Menu List の title は `"Menu Name"` なので使えない。
+ * `getTitle()` 側を変えると記事同期の挙動が変わるため、こちらを足している。
+ */
+function getTitleNamed(page: PageObjectResponse, name: string): string {
+  const prop = page.properties[name];
+  if (prop?.type === "title") return prop.title.map((t) => t.plain_text).join("");
+  return "";
+}
+
+/** rollup (array) から文字列を取り出す。select / rich_text / title を平すだけ。 */
+function getRollupStrings(page: PageObjectResponse, name: string): string[] {
+  const prop = page.properties[name];
+  if (prop?.type !== "rollup" || prop.rollup.type !== "array") return [];
+
+  const out: string[] = [];
+  for (const item of prop.rollup.array) {
+    if (item.type === "select" && item.select) out.push(item.select.name);
+    else if (item.type === "rich_text")
+      out.push(item.rich_text.map((r) => r.plain_text).join(""));
+    else if (item.type === "title")
+      out.push(item.title.map((r) => r.plain_text).join(""));
+  }
+  return out.map((s) => s.trim()).filter(Boolean);
+}
+
+/**
+ * 「95℃ 120cc 90sec」のような 1 行の淹れ方を温度 / 湯量 / 時間へ分解する。
+ *
+ * Notion 側は `How to Brew` に 1 行で入っている行と、`How-to_Temp(℃)` /
+ * `How-to_Water(ml)` / `How-to_Time(Sec)` に分かれている行が混在する。
+ * 数字が 1 つも取れなければ `null` を返し、`brewingGuide` を書かない
+ * (空文字を入れると Studio 上「設定済みだが空」に見えて実態と食い違う)。
+ */
+function parseBrewingGuide(
+  oneLine: string,
+  temp: string,
+  water: string,
+  time: string
+): { temperature: string; water: string; time: string } | null {
+  const digits = (s: string): string => s.match(/\d+(?:\.\d+)?/)?.[0] ?? "";
+
+  let t = digits(temp);
+  let w = digits(water);
+  let s = digits(time);
+
+  if (!t && !w && !s && oneLine) {
+    // 単位で拾う (順序に依存させない)。℃/度 → 温度、cc/ml → 湯量、sec/秒 → 時間。
+    t = oneLine.match(/(\d+(?:\.\d+)?)\s*(?:℃|度|C)/i)?.[1] ?? "";
+    w = oneLine.match(/(\d+(?:\.\d+)?)\s*(?:cc|ml)/i)?.[1] ?? "";
+    s = oneLine.match(/(\d+(?:\.\d+)?)\s*(?:sec|s\b|秒)/i)?.[1] ?? "";
+  }
+
+  if (!t && !w && !s) return null;
+  return { temperature: t, water: w, time: s };
+}
+
+/** Tea Menu List の 1 行から取り出した銘柄。 */
+interface TeaMenuEntry {
+  notionId: string;
+  /** 5 桁の採番 (`Menu Name`)。Sanity の `productNumber` / dataviz の結合キー。 */
+  menuNumber: string;
+  displayName: string;
+  category: string;
+  variety: string;
+  season: string;
+  netWeight: number;
+  description: string;
+  brewingGuide: { temperature: string; water: string; time: string } | null;
+  /** Notion rollup 由来の都道府県 (空なら未共有 / 未設定)。 */
+  prefectureFromNotion: string;
+  /** Notion rollup 由来の産地 (Regions 原文・空なら未共有 / 未設定)。 */
+  originFromNotion: string;
+}
+
+async function fetchTeaMenuEntries(databaseId: string): Promise<TeaMenuEntry[]> {
+  const entries: TeaMenuEntry[] = [];
+  let startCursor: string | undefined;
+  let scanned = 0;
+
+  do {
+    const response = await notion.databases.query({
+      database_id: databaseId,
+      page_size: 100,
+      start_cursor: startCursor,
+    });
+
+    for (const page of response.results) {
+      if (!("properties" in page)) continue;
+      const p = page as PageObjectResponse;
+      scanned++;
+
+      // 採番済みの行だけを銘柄として扱う (下書き行を混ぜない)。
+      const menuNumber = getTitleNamed(p, "Menu Name").trim();
+      if (!/^\d{5}$/.test(menuNumber)) continue;
+
+      const displayName =
+        getText(p, "Menu Name - full").trim() ||
+        getText(p, "Menu Name - Supplier").trim();
+      if (!displayName) {
+        console.warn(`  Skipping ${menuNumber} — no display name`);
+        continue;
+      }
+
+      entries.push({
+        notionId: p.id,
+        menuNumber,
+        displayName,
+        category: getSelect(p, "Category"),
+        variety: getSelect(p, "Variety"),
+        season: getSelect(p, "Season"),
+        // 「3g」のような表記から数値だけを取る。取れなければ 0。
+        netWeight: Number(getText(p, "Net Wt.").match(/\d+(?:\.\d+)?/)?.[0] ?? 0),
+        // プロパティ名の末尾に空白がある (Notion 側の実際の名前)。
+        description: getText(p, "Menu Description(Short ver.) ").trim(),
+        brewingGuide: parseBrewingGuide(
+          getText(p, "How to Brew"),
+          getText(p, "How-to_Temp(℃)"),
+          getText(p, "How-to_Water(ml)"),
+          getText(p, "How-to_Time(Sec)")
+        ),
+        prefectureFromNotion: getRollupStrings(p, "Prefecture")[0] ?? "",
+        originFromNotion: getRollupStrings(p, "Origin")[0] ?? "",
+      });
+    }
+
+    startCursor = response.has_more ? (response.next_cursor ?? undefined) : undefined;
+  } while (startCursor);
+
+  console.log(`  scanned ${scanned} rows, ${entries.length} numbered (5-digit) menus`);
+
+  // 行は読めたのに 1 件も採番済みが無いのは異常。プロパティ名の変更や読み取り
+  // 側の取り違えがここに出る (実際にこの guard が無い間、title プロパティ名の
+  // 決め打ちで 0 件になったのを「成功 / 対象 0 件」と報告してしまった)。
+  // 「正常に 0 件だった」と区別できるよう投げて input-failure にする。
+  if (scanned > 0 && entries.length === 0) {
+    throw new Error(
+      `Tea Menu List の ${scanned} 行を読めたが、5 桁採番の銘柄が 1 件も見つからない。` +
+        `プロパティ名 (Menu Name / Menu Name - full) の変更を疑うこと。` +
+        `「公開対象 0 件」ではない。`
+    );
+  }
+
+  return entries;
+}
+
+async function syncTeaMenu(): Promise<SyncCounts> {
+  currentPhase = "input";
+
+  const databaseId = optionalEnv("NOTION_TEA_MENU_DB_ID", TEA_MENU_DB_ID_DEFAULT);
+
+  console.log(
+    `Syncing Notion Tea Menu List → Sanity teaMenu (${SANITY_PROJECT_ID} / ${SANITY_DATASET})`
+  );
+  if (DRY_RUN) console.log("=== DRY RUN MODE (no writes to Sanity) ===");
+
+  const entries = await fetchTeaMenuEntries(databaseId);
+
+  currentPhase = "write";
+
+  let synced = 0;
+  let errors = 0;
+  const failures: string[] = [];
+  // 産地がどちらの経路で解決したかを数えて、権限マスクの状態を可視化する。
+  let originFromNotionCount = 0;
+  let originFromSnapshotCount = 0;
+  let originMissingCount = 0;
+
+  for (const entry of entries) {
+    try {
+      const snapshot = resolveTeaOrigin(entry.menuNumber);
+
+      // 1. Notion rollup を優先。2. 空ならスナップショット。
+      const prefecture = entry.prefectureFromNotion || snapshot.prefecture || "";
+      const area = snapshot.area ?? "";
+      const originText =
+        entry.originFromNotion ||
+        resolveTeaOriginPlace(entry.menuNumber) ||
+        "";
+
+      if (entry.prefectureFromNotion) originFromNotionCount++;
+      else if (snapshot.prefecture) originFromSnapshotCount++;
+      else originMissingCount++;
+
+      const sanityId = `teaMenu-${entry.menuNumber}`;
+
+      const doc: Record<string, unknown> & { _id: string; _type: string } = {
+        _id: sanityId,
+        _type: "teaMenu",
+        title: entry.displayName,
+        displayName: entry.displayName,
+        // 5 桁の採番をそのまま slug にする。表示名は重複しうる
+        // (51301 と 51401 はどちらも「春摘みやぶきたの和紅茶」) ため、
+        // 名前から作ると衝突する。採番は業務側の一意キーで安定している。
+        slug: { _type: "slug", current: entry.menuNumber },
+        productNumber: entry.menuNumber,
+        category: entry.category,
+        variety: entry.variety,
+        season: entry.season,
+        netWeight: entry.netWeight,
+        origin: originText,
+        description: entry.description,
+        language: "ja",
+        // 由来を残す (どの Notion 行から来たかを追えるように)。
+        notionId: entry.notionId,
+        // 構造化産地。地図・集計はこちらを使う (`origin` は表示用の自由記述)。
+        prefecture,
+        area,
+        originPrecision: snapshot.precision,
+        supplier: resolveTeaSupplier(entry.menuNumber) ?? "",
+      };
+
+      if (snapshot.lat !== null && snapshot.lng !== null) {
+        doc.location = {
+          _type: "geopoint",
+          lat: snapshot.lat,
+          lng: snapshot.lng,
+        };
+      }
+      if (entry.brewingGuide) doc.brewingGuide = entry.brewingGuide;
+
+      if (DRY_RUN) {
+        console.log(
+          `  [dry-run] would upsert: ${sanityId} — ${entry.displayName} ` +
+            `(${entry.category} / ${originText || "産地不明"})`
+        );
+      } else {
+        await upsertFromNotion(sanity, doc);
+        console.log(`  -> synced: ${sanityId} — ${entry.displayName}`);
+      }
+
+      synced++;
+    } catch (err) {
+      errors++;
+      failures.push(entry.menuNumber);
+      console.error(`  ERROR (${entry.menuNumber}): ${errText(err)}`);
+    }
+  }
+
+  console.log("---");
+  console.log(
+    `Tea menu sync ${DRY_RUN ? "(dry run) " : ""}complete: ${synced} synced, ${errors} errors`
+  );
+  console.log(
+    `  origin source: Notion rollup ${originFromNotionCount} / ` +
+      `snapshot ${originFromSnapshotCount} / unresolved ${originMissingCount}`
+  );
+  if (originFromNotionCount === 0 && entries.length > 0) {
+    // 「産地が無い」のではなく「統合から見えていない」ことを明示する。
+    console.warn(
+      "  NOTE: Notion の Prefecture rollup が 1 件も取得できていない。Supplier List が " +
+        "統合に共有されていない可能性が高い (共有されれば正本直結に自動で切り替わる)。"
+    );
+  }
+
+  return { fetched: entries.length, synced, errors, failures };
+}
+
 const args = process.argv.slice(2);
 const SYNC_PAGES = args.includes("--pages");
+const SYNC_TEA_MENU = args.includes("--tea-menu");
 const SYNC_ALL = args.includes("--all");
-const SYNC_ARTICLES = !SYNC_PAGES || SYNC_ALL;
+// 明示的な対象指定が無いときだけ記事を既定にする (従来の挙動を保つ)。
+const SYNC_ARTICLES = (!SYNC_PAGES && !SYNC_TEA_MENU) || SYNC_ALL;
 
 /**
  * Run one sub-sync and turn its result — or its failure — into a report.
@@ -1356,6 +1689,10 @@ async function runReported(
   if (SYNC_PAGES || SYNC_ALL) {
     console.log("Syncing pages...");
     outcomes.push(await runReported("pages", syncPages));
+  }
+  if (SYNC_TEA_MENU || SYNC_ALL) {
+    console.log("Syncing tea menu...");
+    outcomes.push(await runReported("tea-menu", syncTeaMenu));
   }
 
   // Exit on the worst outcome so the runner's status matches the cause.

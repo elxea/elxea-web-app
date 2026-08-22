@@ -52,6 +52,10 @@ on:
         options:
           - articles
           - pages
+          # 茶譜 (Notion Tea Menu List → Sanity teaMenu)。記事と同じ起動口に
+          # 相乗りさせている — 同種の同期を 2 つの workflow に分けると
+          # secret・通知・失敗追跡がそれぞれ二重になる。
+          - tea-menu
           - all
       dataset:
         description: "書き込み先 Sanity dataset (空なら secret の既定値)。本番前の検証用データセットを入れる用途"
@@ -103,6 +107,9 @@ jobs:
           NOTION_CONTENT_HUB_DB_ID: ${{ secrets.NOTION_CONTENT_HUB_DB_ID }}
           NOTION_PAGE_REGISTRY_DB_ID: ${{ secrets.NOTION_PAGE_REGISTRY_DB_ID }}
           NOTION_PAGE_CONTENT_DB_ID: ${{ secrets.NOTION_PAGE_CONTENT_DB_ID }}
+          # 未設定でも動く (スクリプト側に既定 id がある。秘密ではない)。
+          # 差し替えたいときだけ secret を置く。
+          NOTION_TEA_MENU_DB_ID: ${{ secrets.NOTION_TEA_MENU_DB_ID }}
           NEXT_PUBLIC_SANITY_PROJECT_ID: ${{ secrets.NEXT_PUBLIC_SANITY_PROJECT_ID }}
           # dispatch で dataset を指定したときだけ上書きする (検証用データセット)。
           NEXT_PUBLIC_SANITY_DATASET: ${{ inputs.dataset || secrets.NEXT_PUBLIC_SANITY_DATASET }}
@@ -119,8 +126,9 @@ jobs:
             ARGS="$ARGS --dry-run"
           fi
           case "${{ inputs.target || 'articles' }}" in
-            pages) ARGS="$ARGS --pages" ;;
-            all)   ARGS="$ARGS --all" ;;
+            pages)    ARGS="$ARGS --pages" ;;
+            tea-menu) ARGS="$ARGS --tea-menu" ;;
+            all)      ARGS="$ARGS --all" ;;
           esac
 
           echo "Running: pnpm tsx scripts/sync-notion-to-sanity.ts $ARGS"
