@@ -253,7 +253,55 @@ describe("verifyShopifyIdToken — claims", () => {
     expect(result).toEqual({ ok: false, reason: "iat_in_future" });
   });
 
-  it("rejects a sub that is not a Customer GID", async () => {
+  /* ここから 4 件は 2026-08-22 の本番障害の回帰テスト。
+   *
+   * `sub` の形が想定と違うだけでログイン全体を拒否していたため、署名も nonce も
+   * 通っている本物のトークンで全メールログインが止まった（実測 reason: `sub_missing`）。
+   * `sub` は `shop_cid` を作るためだけの値で、無ければ `requireAuth` が Customer API を
+   * 引く遅い経路に落ちるだけなので、**取り出せないことは検証失敗ではない**。
+   *
+   * 逆に「取り出せた形は何か」は締めたままにする（cookie に入り Firestore の
+   * ユーザーキーになる値なので、見慣れない形を推測で詰め込まない）。 */
+
+  it("accepts a token whose sub is absent, without a customer id", async () => {
+    const claims = validClaims(NONCE);
+    delete (claims as { sub?: unknown }).sub;
+    const token = signIdToken(keypair, claims);
+
+    const result = await verifyShopifyIdToken(token, {
+      expectedNonce: NONCE,
+      fetchImpl: jwksFetch(),
+    });
+
+    expect(result).toMatchObject({ ok: true, customerId: null });
+  });
+
+  it("accepts a bare numeric sub as the customer id", async () => {
+    const token = signIdToken(keypair, validClaims(NONCE, { sub: "7654321" }));
+
+    const result = await verifyShopifyIdToken(token, {
+      expectedNonce: NONCE,
+      fetchImpl: jwksFetch(),
+    });
+
+    expect(result).toMatchObject({ ok: true, customerId: "7654321" });
+  });
+
+  it("accepts a numeric (non-string) sub as the customer id", async () => {
+    const token = signIdToken(
+      keypair,
+      validClaims(NONCE, { sub: 7654321 as unknown as string }),
+    );
+
+    const result = await verifyShopifyIdToken(token, {
+      expectedNonce: NONCE,
+      fetchImpl: jwksFetch(),
+    });
+
+    expect(result).toMatchObject({ ok: true, customerId: "7654321" });
+  });
+
+  it("accepts a sub of another resource type but derives no customer id", async () => {
     const token = signIdToken(
       keypair,
       validClaims(NONCE, { sub: "gid://shopify/StaffMember/1" }),
@@ -264,7 +312,7 @@ describe("verifyShopifyIdToken — claims", () => {
       fetchImpl: jwksFetch(),
     });
 
-    expect(result).toEqual({ ok: false, reason: "sub_not_customer_gid" });
+    expect(result).toMatchObject({ ok: true, customerId: null });
   });
 
   it("refuses to verify anything when the client id is not configured", async () => {

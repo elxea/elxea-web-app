@@ -73,12 +73,48 @@ const CLOCK_SKEW_SEC = 60;
  */
 const ALLOWED_ALGS = new Set(["RS256"]);
 
-/** `sub` の形式。Customer GID 以外は受けない。 */
+/** `sub` が Customer GID の形をしているとき、その数値部分を取り出す。 */
 const CUSTOMER_GID_REGEX = /^gid:\/\/shopify\/Customer\/(\d+)$/;
+
+/** `sub` が数値 ID だけで来たとき（GID に包まれていない形）。 */
+const BARE_CUSTOMER_ID_REGEX = /^\d+$/;
+
+/**
+ * `sub` から `shop_cid` に入れてよい顧客 ID を取り出す。取り出せなければ null。
+ *
+ * ## null を「検証失敗」にしない理由（2026-08-22 の本番障害）
+ *
+ * ここは一度「`sub` が Customer GID でなければログイン全体を拒否する」という形で
+ * 書かれていて、本番の全メールログインを止めた。実測（Vercel runtime log,
+ * `GET /api/auth/callback` 13:05-13:08 JST の 6 回すべて）が示したのは
+ * `reason: sub_missing` — つまり署名 / iss / aud / exp / nonce は**すべて通っており
+ * トークンは本物**で、`sub` の形だけが想定と違った。GID 前提は実測ではなく
+ * テスト fixture に手で書いた値が根拠になっていたため、テストは通ったまま本番だけが落ちた。
+ *
+ * `sub` は `shop_cid`（識別のキャッシュ）を作るためだけに使う。セッションの権限そのものは
+ * access token 側が持ち、`shop_cid` が無いときは `requireAuth` が Customer API を引く
+ * 遅い経路へ落ちるので、**取り出せないことは機能の欠落ではなく最適化の不発**でしかない。
+ * この修正より前（PR #91 以前）も `extractCustomerIdFromIdToken` が null を返し、
+ * 呼び出し側が `shop_cid` を省略するだけでログインは成立していた。その寛容さに戻す。
+ *
+ * 一方で**形の検査は捨てない**。cookie に入れて Firestore のユーザーキーになる値なので、
+ * 見慣れない形は「分からなかった」として null に倒し、推測して詰め込まない。
+ */
+function extractCustomerId(sub: unknown): string | null {
+  /* 数値で来る実装もあるため、文字列化してから形を見る。 */
+  const raw =
+    typeof sub === "string" ? sub : typeof sub === "number" ? String(sub) : null;
+  if (!raw) return null;
+
+  const gid = CUSTOMER_GID_REGEX.exec(raw);
+  if (gid) return gid[1];
+  if (BARE_CUSTOMER_ID_REGEX.test(raw)) return raw;
+  return null;
+}
 
 export type ShopifyIdTokenClaims = {
   iss: string;
-  sub: string;
+  sub?: string;
   aud: string | string[];
   exp: number;
   iat?: number;
@@ -88,7 +124,8 @@ export type ShopifyIdTokenClaims = {
 };
 
 export type VerifyShopifyIdTokenResult =
-  | { ok: true; customerId: string; claims: ShopifyIdTokenClaims }
+  /** `customerId` は `sub` から取り出せたときだけ入る。null は検証失敗ではない（上記参照）。 */
+  | { ok: true; customerId: string | null; claims: ShopifyIdTokenClaims }
   | { ok: false; reason: string };
 
 export type VerifyShopifyIdTokenOptions = {
@@ -345,9 +382,8 @@ export async function verifyShopifyIdToken(
     return { ok: false, reason: "nonce_mismatch" };
   }
 
-  if (typeof claims.sub !== "string") return { ok: false, reason: "sub_missing" };
-  const match = CUSTOMER_GID_REGEX.exec(claims.sub);
-  if (!match) return { ok: false, reason: "sub_not_customer_gid" };
-
-  return { ok: true, customerId: match[1], claims };
+  /* `sub` は識別のキャッシュ用でしかないので、ここでログインを止めない。
+   * 取り出せない形なら null を返し、呼び出し側は `shop_cid` を置かずに続ける
+   * （= PR #91 以前と同じ挙動）。理由は `extractCustomerId` の注記を参照。 */
+  return { ok: true, customerId: extractCustomerId(claims.sub), claims };
 }
