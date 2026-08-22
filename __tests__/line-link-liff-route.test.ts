@@ -77,6 +77,20 @@ vi.mock("@/lib/line/linkage-status", () => ({
   fetchLineLinkageStatus: (...args: unknown[]) => linkageStatusMock(...args),
 }));
 
+/* 連携成立とデータ合体を対で行う共通関数。ここでは「route が確かに呼ぶか」と
+   「何を渡すか」だけを見る（中で何が起きるかは identity-link / identity-merge の
+   テストの担当）。route 側は戻り値で応答を変えない契約なので、既定は成功。 */
+type LinkageCompletionStub = {
+  outcome: "merged" | "merge-failed" | "not-linked" | "linked-elsewhere";
+  merge: null;
+};
+const completeLineLinkageMock = vi.fn<
+  (args: unknown) => Promise<LinkageCompletionStub>
+>(async () => ({ outcome: "merged", merge: null }));
+vi.mock("@/lib/auth/identity-link", () => ({
+  completeLineLinkage: (args: unknown) => completeLineLinkageMock(args),
+}));
+
 import { POST } from "@/app/api/user/line-link-liff/route";
 
 const VALID_SUB = "U0123456789abcdef0123456789abcdef";
@@ -730,5 +744,149 @@ describe("P2 env に紛れ込んだ末尾改行（本番障害 2026-08-22 の回
 
     delete process.env.LINE_LIFF_CHANNEL_ID;
     expect(resolveLinkChannelId()).toBeUndefined();
+  });
+});
+
+/**
+ * P1: 連携の 3 経路すべてで「台帳成立」と「データ合体」が対で起きる。
+ *
+ * かつて合体を呼んでいたのは `/api/auth/callback`（メールログインの帰り道）だけで、
+ * **人が実際に「連携する」と押す 2 つの経路（マイページのボタン / LIFF）は
+ * 呼んでいなかった**。台帳の行が立つと `resolveIdentity` は LINE セッションを
+ * 顧客の棚に解決するのに、`line:` 棚の中身は運ばれない。だから連携した瞬間に
+ * 「お気に入りが消えた」ように見えていた。
+ *
+ * ここで見るのは route の責務の境界だけ:
+ *   - upsert が 2xx で返ったあと、必ず `completeLineLinkage` を呼ぶこと
+ *   - 渡す 2 つの識別子が **どちらもサーバ確定値**であること
+ *     （LINE 側 = LINE に検証させた id_token の `sub` / 顧客側 = requireAuth の結果）
+ *   - 連携が成立しなかったときは呼ばないこと
+ *
+ * 合体の中身（何を運ぶか・衝突をどう倒すか）は identity-merge の担当、本人一致の
+ * 確認は identity-link の担当で、どちらもこのファイルの対象外。
+ */
+describe("P1 連携成立とデータ合体が対で走る", () => {
+  it("LIFF 経路: upsert 成功後に合体を 1 回、サーバ確定の識別子で呼ぶ", async () => {
+    requireAuthMock.mockResolvedValue({ authenticated: true, customerId: "555" });
+    verifyLineIdTokenMock.mockResolvedValue({
+      ok: true,
+      messagingUserId: VALID_SUB,
+      email: "buyer@example.test",
+    });
+
+    const res = await POST(makeRequest({ idToken: VALID_ID_TOKEN }));
+
+    expect(res.status).toBe(200);
+    expect(completeLineLinkageMock).toHaveBeenCalledTimes(1);
+    expect(completeLineLinkageMock).toHaveBeenCalledWith({
+      lineUserId: VALID_SUB,
+      shopifyCustomerId: "555",
+      source: "line-link-liff",
+    });
+  });
+
+  it("LIFF 経路: Shopify 未ログインなら合体も呼ばない（連携が成立していない）", async () => {
+    requireAuthMock.mockResolvedValue({ authenticated: false });
+
+    await POST(makeRequest({ idToken: VALID_ID_TOKEN }));
+
+    expect(completeLineLinkageMock).not.toHaveBeenCalled();
+  });
+
+  it("LIFF 経路: cx-agent が失敗したら合体を呼ばない（台帳に行が無い）", async () => {
+    requireAuthMock.mockResolvedValue({ authenticated: true, customerId: "555" });
+    verifyLineIdTokenMock.mockResolvedValue({
+      ok: true,
+      messagingUserId: VALID_SUB,
+      email: null,
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: false,
+        status: 500,
+        text: async () => "boom",
+        json: async () => ({}),
+      })),
+    );
+
+    const res = await POST(makeRequest({ idToken: VALID_ID_TOKEN }));
+
+    expect(res.status).toBe(502);
+    expect(completeLineLinkageMock).not.toHaveBeenCalled();
+  });
+
+  it("マイページのボタン経路: upsert 成功後に合体を 1 回、サーバ確定の識別子で呼ぶ", async () => {
+    requireAuthMock.mockResolvedValue({ authenticated: true, customerId: OWNER });
+    verifyLineIdTokenMock.mockResolvedValue({
+      ok: true,
+      messagingUserId: VALID_SUB,
+      email: null,
+    });
+    stubLineThenCxAgent();
+
+    const { state, cookieValue } = sealLinkState({
+      customerId: OWNER,
+      returnTo: "/ja/account",
+    });
+    cookieJar.set(LINE_LINK_STATE_COOKIE, cookieValue);
+
+    const { GET: callback } = await import("@/app/api/user/line-link/callback/route");
+    const res = await callback(callbackRequest({ code: "auth-code", state }));
+
+    expect(new URL(res.headers.get("location")!).searchParams.get(LINK_RESULT_PARAM)).toBe(
+      "success",
+    );
+    expect(completeLineLinkageMock).toHaveBeenCalledTimes(1);
+    expect(completeLineLinkageMock).toHaveBeenCalledWith({
+      lineUserId: VALID_SUB,
+      shopifyCustomerId: OWNER,
+      source: "line-link-callback",
+    });
+  });
+
+  it("マイページのボタン経路: state が顧客不一致なら合体を呼ばない", async () => {
+    /* 攻撃者の LINE を被害者のアカウントへ連携させる経路（login-CSRF）は state の
+       顧客一致で塞いである。連携が成立しない以上、合体も走ってはならない —
+       ここが呼ばれると、塞いだはずの経路でデータだけが動くことになる。 */
+    requireAuthMock.mockResolvedValue({ authenticated: true, customerId: OWNER });
+    verifyLineIdTokenMock.mockResolvedValue({
+      ok: true,
+      messagingUserId: VALID_SUB,
+      email: null,
+    });
+    stubLineThenCxAgent();
+
+    const { state, cookieValue } = sealLinkState({
+      customerId: "someone-else",
+      returnTo: "/ja/account",
+    });
+    cookieJar.set(LINE_LINK_STATE_COOKIE, cookieValue);
+
+    const { GET: callback } = await import("@/app/api/user/line-link/callback/route");
+    const res = await callback(callbackRequest({ code: "auth-code", state }));
+
+    expect(new URL(res.headers.get("location")!).searchParams.get(LINK_RESULT_PARAM)).toBe(
+      "error",
+    );
+    expect(completeLineLinkageMock).not.toHaveBeenCalled();
+  });
+
+  it("合体が転んでも連携の成否は変えない（実際は連携できている人に失敗を告げない）", async () => {
+    completeLineLinkageMock.mockResolvedValueOnce({
+      outcome: "merge-failed",
+      merge: null,
+    });
+    requireAuthMock.mockResolvedValue({ authenticated: true, customerId: "555" });
+    verifyLineIdTokenMock.mockResolvedValue({
+      ok: true,
+      messagingUserId: VALID_SUB,
+      email: null,
+    });
+
+    const res = await POST(makeRequest({ idToken: VALID_ID_TOKEN }));
+
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { success?: boolean }).success).toBe(true);
   });
 });

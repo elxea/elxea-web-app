@@ -19,7 +19,6 @@
  * old key" has to be visible without reproducing the login.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Firestore } from "firebase-admin/firestore";
 
 vi.mock("@sentry/nextjs", () => ({
   captureMessage: vi.fn(),
@@ -43,88 +42,12 @@ import {
   favoritesCol,
   followsCol,
 } from "@/lib/firebase/collections";
+import { createFakeFirestore } from "./helpers/fake-firestore";
 
 const LINE_USER_ID = "U0123456789";
 const LINE_KEY = `line:${LINE_USER_ID}`;
 const SHOPIFY_ID = "7654321";
 
-// --- Minimal in-memory Firestore -------------------------------------------
-
-type DocData = Record<string, unknown>;
-type Seed = Record<string, DocData[]>;
-
-type Hooks = {
-  /** Throw to simulate a copy that fails. */
-  beforeAdd?: (path: string, data: DocData) => void;
-  /** Throw to simulate a delete that fails after a successful copy. */
-  beforeDelete?: (path: string, id: string) => void;
-  /** Return true to make a write be acknowledged but not land (unverifiable copy). */
-  dropWrite?: (path: string, data: DocData) => boolean;
-};
-
-function createFakeFirestore(seed: Seed, hooks: Hooks = {}) {
-  const store = new Map<string, Map<string, DocData>>();
-  let counter = 0;
-
-  const colOf = (path: string) => {
-    let col = store.get(path);
-    if (!col) {
-      col = new Map();
-      store.set(path, col);
-    }
-    return col;
-  };
-
-  for (const [path, docs] of Object.entries(seed)) {
-    for (const data of docs) colOf(path).set(`seed-${++counter}`, { ...data });
-  }
-
-  function makeQuery(path: string, clauses: [string, unknown][], limit: number | null) {
-    return {
-      where(field: string, _op: string, value: unknown) {
-        return makeQuery(path, [...clauses, [field, value] as [string, unknown]], limit);
-      },
-      limit(n: number) {
-        return makeQuery(path, clauses, n);
-      },
-      async get() {
-        let entries = [...colOf(path).entries()];
-        for (const [field, value] of clauses) {
-          entries = entries.filter(([, data]) => data[field] === value);
-        }
-        if (limit !== null) entries = entries.slice(0, limit);
-        return {
-          empty: entries.length === 0,
-          docs: entries.map(([id, data]) => ({
-            id,
-            data: () => ({ ...data }),
-            ref: {
-              async delete() {
-                hooks.beforeDelete?.(path, id);
-                colOf(path).delete(id);
-              },
-            },
-          })),
-        };
-      },
-      async add(data: DocData) {
-        hooks.beforeAdd?.(path, data);
-        if (hooks.dropWrite?.(path, data)) return { id: "dropped" };
-        const id = `added-${++counter}`;
-        colOf(path).set(id, { ...data });
-        return { id };
-      },
-    };
-  }
-
-  const db = {
-    collection: (path: string) => makeQuery(path, [], null),
-  } as unknown as Firestore;
-
-  const contents = (path: string) => [...(store.get(path)?.values() ?? [])];
-
-  return { db, contents };
-}
 
 // --- Fixtures ---------------------------------------------------------------
 
@@ -159,7 +82,7 @@ describe("documents missing required fields", () => {
     // The regression: this used to be [] because the delete ran anyway.
     expect(contents(favoritesCol(LINE_KEY))).toEqual([INVALID_FAVORITE]);
     expect(contents(favoritesCol(SHOPIFY_ID))).toEqual([]);
-    expect(result.favorites.skippedInvalid).toBe(1);
+    expect(result.collections.favorites.skippedInvalid).toBe(1);
     expect(result.retained).toBe(1);
     expect(result.complete).toBe(false);
   });
@@ -187,7 +110,7 @@ describe("documents missing required fields", () => {
     const result = await mergeLineIdentityIntoShopify(LINE_USER_ID, SHOPIFY_ID, db);
 
     expect(contents(favoritesCol(LINE_KEY))).toHaveLength(1);
-    expect(result.favorites.skippedInvalid).toBe(1);
+    expect(result.collections.favorites.skippedInvalid).toBe(1);
   });
 });
 
@@ -203,7 +126,7 @@ describe("only documents confirmed at the destination are deleted", () => {
 
     expect(contents(favoritesCol(SHOPIFY_ID))).toEqual([VALID_FAVORITE]);
     expect(contents(favoritesCol(LINE_KEY))).toEqual([INVALID_FAVORITE]);
-    expect(result.favorites).toMatchObject({ copied: 1, skippedInvalid: 1, failed: 0 });
+    expect(result.collections.favorites).toMatchObject({ copied: 1, skippedInvalid: 1, failed: 0 });
   });
 
   it("retains the source when the write is acknowledged but does not land", async () => {
@@ -218,7 +141,7 @@ describe("only documents confirmed at the destination are deleted", () => {
 
     expect(contents(favoritesCol(LINE_KEY))).toEqual([VALID_FAVORITE]);
     expect(contents(favoritesCol(SHOPIFY_ID))).toEqual([]);
-    expect(result.favorites).toMatchObject({ copied: 0, failed: 1 });
+    expect(result.collections.favorites).toMatchObject({ copied: 0, failed: 1 });
   });
 
   it("moves every valid document and empties the source when all succeed", async () => {
@@ -250,7 +173,7 @@ describe("partial failure", () => {
     const { db, contents } = createFakeFirestore(
       { [favoritesCol(LINE_KEY)]: [failing, VALID_FAVORITE] },
       {
-        beforeAdd: (_path, data) => {
+        beforeWrite: (_path, data) => {
           if (data.targetId === "boom") throw new Error("firestore write rejected");
         },
       },
@@ -262,7 +185,7 @@ describe("partial failure", () => {
     expect(contents(favoritesCol(SHOPIFY_ID))).toEqual([VALID_FAVORITE]);
     // ...and did not cost the user the document it could not copy.
     expect(contents(favoritesCol(LINE_KEY))).toEqual([failing]);
-    expect(result.favorites).toMatchObject({ copied: 1, failed: 1 });
+    expect(result.collections.favorites).toMatchObject({ copied: 1, failed: 1 });
     expect(result.retained).toBe(1);
   });
 
@@ -280,7 +203,7 @@ describe("partial failure", () => {
 
     expect(contents(favoritesCol(SHOPIFY_ID))).toEqual([VALID_FAVORITE]);
     expect(contents(favoritesCol(LINE_KEY))).toEqual([VALID_FAVORITE]);
-    expect(result.favorites.failed).toBe(1);
+    expect(result.collections.favorites.failed).toBe(1);
   });
 
   it("makes an incomplete merge visible on console.warn", async () => {
@@ -311,7 +234,7 @@ describe("idempotency", () => {
 
     expect(contents(favoritesCol(SHOPIFY_ID))).toHaveLength(1);
     expect(contents(favoritesCol(LINE_KEY))).toEqual([]);
-    expect(result.favorites).toMatchObject({ copied: 0, deduped: 1 });
+    expect(result.collections.favorites).toMatchObject({ copied: 0, deduped: 1 });
   });
 
   it("completes a merge whose delete failed on the previous run", async () => {
@@ -328,12 +251,12 @@ describe("idempotency", () => {
     );
 
     const first = await mergeLineIdentityIntoShopify(LINE_USER_ID, SHOPIFY_ID, db);
-    expect(first.favorites.failed).toBe(1);
+    expect(first.collections.favorites.failed).toBe(1);
 
     failDelete = false;
     const second = await mergeLineIdentityIntoShopify(LINE_USER_ID, SHOPIFY_ID, db);
 
-    expect(second.favorites).toMatchObject({ copied: 0, deduped: 1, failed: 0 });
+    expect(second.collections.favorites).toMatchObject({ copied: 0, deduped: 1, failed: 0 });
     expect(contents(favoritesCol(SHOPIFY_ID))).toHaveLength(1);
     expect(contents(favoritesCol(LINE_KEY))).toEqual([]);
     expect(second.complete).toBe(true);

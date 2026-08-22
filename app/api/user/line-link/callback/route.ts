@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 
 import { requireAuth } from "@/lib/firebase/auth-guard";
+import { completeLineLinkage } from "@/lib/auth/identity-link";
 import { getBaseUrl } from "@/lib/base-url";
 import { getCookieSpec, resolveCookieDomain } from "@/lib/auth/cookies";
 import { CX_AGENT_BASE_URL } from "@/lib/chat/proxy";
@@ -187,6 +188,25 @@ export async function GET(request: NextRequest) {
   } catch (err) {
     return fail(returnTo, `cx-agent unreachable: ${String(err)}`);
   }
+
+  /* 台帳に行が立った。**同じ流れの中で**データも合体させる。
+   *
+   * ここが無かったせいで、この経路で連携したお客さまは連携した瞬間に
+   * お気に入りが消えたように見えていた（PR #100 の B3）。台帳の行が立つと
+   * `resolveIdentity` は LINE セッションを顧客の棚に解決するのに、`line:` の棚に
+   * 貯めた中身は運ばれないままなので、**どちらのログイン手段からも読めない**
+   * 場所に取り残される。連携を成立させることと荷物を運ぶことは 1 つの操作で、
+   * 分けて片方だけ行う理由はどこにも無かった。
+   *
+   * `completeLineLinkage` は throw せず、台帳をもう一度引いて本人一致を確かめて
+   * から動く（いま行を立てた直後なので必ず通る）。合体が転んでも連携は成立して
+   * いるので、リダイレクトは成功のまま返す — ここで error に倒すと、実際には
+   * 連携できている人に「連携できませんでした」と言うことになる。 */
+  await completeLineLinkage({
+    lineUserId: verified.messagingUserId,
+    shopifyCustomerId: auth.customerId,
+    source: "line-link-callback",
+  });
 
   clearState();
   return NextResponse.redirect(new URL(returnUrlWithResult(returnTo, "success"), request.url));

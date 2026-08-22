@@ -11,7 +11,7 @@ import { sendWelcomeEmail } from "@/lib/email/welcome";
 import { sanitizeReturnTo } from "@/lib/auth/return-to";
 import { clearAuthCookies } from "@/lib/auth/cookies";
 import { getRequestOrigin } from "@/lib/base-url";
-import { mergeLineIdentityIntoShopify } from "@/lib/auth/identity-merge";
+import { completeLineLinkage } from "@/lib/auth/identity-link";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
@@ -190,28 +190,36 @@ export async function GET(request: NextRequest) {
     // into the next login.
     response.cookies.delete("shop_return_to");
 
-    /* Phase 1/2: if this user completed Shopify OAuth while already holding a
-     * LINE session, merge their LINE-only Firestore data into the Shopify
-     * userKey.
+    /* このブラウザが LINE セッションも持ったまま Shopify OAuth を終えた。
+     * **連携済みの人なら**、まだ `users/line:<id>/` に残っている分をここで
+     * 顧客の棚へ引き取る。
      *
-     * Still non-blocking — a merge problem must not cost the user their login —
-     * but no longer silent. `mergeLineIdentityIntoShopify` reports its own
-     * partial failures (see `lib/auth/identity-merge.ts`) and leaves anything it
-     * could not confirm in place, so a later login retries it. The catch here
-     * now only covers a hard throw (e.g. Firestore unreachable), and that is
-     * logged as an error rather than dropped. */
+     * ## cookie の同居だけでは動かない（挙動を変えた箇所）
+     *
+     * 以前はここが `line_uid` cookie の**存在だけ**を条件に合体していた。
+     * その LINE と、いまログインした顧客が同じ人かは確かめていない。共用端末に
+     * 前の人の LINE セッションが残っていれば、その人のお気に入りが次の人の棚へ
+     * 移る（PR #100 の B5 が現状として固定していた挙動）。
+     *
+     * いまは `completeLineLinkage` を通す。連携台帳に「この LINE ↔ この顧客」の
+     * 行があるときだけ合体する。連携していない人はここで何も起きない — 合体は
+     * 連携の 3 経路（連携ボタン / LIFF / ここ）が共有する 1 か所に寄せてあり、
+     * 台帳が意思の記録である以上、その行を持たない人のデータを動かす理由が無い。
+     *
+     * 連携済みの人にとって、ここは**取りこぼしの再試行**になる。合体は失敗した
+     * 分を必ず元の場所に残し、かつ冪等なので、ログインのたびに安全に通せる。
+     *
+     * ログインは決して失敗させない。`completeLineLinkage` は throw せず、
+     * 起きたことを自分で記録する。 */
     const lineUidEnc = request.cookies.get("line_uid")?.value;
     if (lineUidEnc && customerId) {
       const lineUserId = decryptToken(lineUidEnc);
       if (lineUserId) {
-        try {
-          await mergeLineIdentityIntoShopify(lineUserId, customerId);
-        } catch (mergeErr) {
-          console.error("[Auth Callback] Identity merge failed:", mergeErr);
-          Sentry.captureException(mergeErr, {
-            tags: { subsystem: "identity-merge" },
-          });
-        }
+        await completeLineLinkage({
+          lineUserId,
+          shopifyCustomerId: customerId,
+          source: "auth-callback",
+        });
       }
       // Drop the LINE pointer cookies now that this browser is attached to
       // the Shopify session. The client-visible `line_auth` flag is cleared
