@@ -48,6 +48,7 @@ import {
   reportSyncResult,
   type SyncOutcome,
 } from "./lib/sync-notify";
+import { upsertFromNotion } from "./lib/sanity-upsert";
 import {
   resolveTeaOrigin,
   resolveTeaOriginPlace,
@@ -566,13 +567,13 @@ async function ensureSanityCategory(
   if (dryRun) {
     console.log(`  [dry-run] would create category: "${title}" (${sanityId})`);
   } else {
-    await client.createOrReplace({
+    await upsertFromNotion(client, {
       _id: sanityId,
       _type: "category",
       title,
       slug: { _type: "slug", current: slug },
     });
-    console.log(`  -> created category: "${title}" (${sanityId})`);
+    console.log(`  -> upserted category: "${title}" (${sanityId})`);
   }
 
   categoryMap.set(title, sanityId);
@@ -593,13 +594,13 @@ async function ensureSanityTag(
   if (dryRun) {
     console.log(`  [dry-run] would create tag: "${title}" (${sanityId})`);
   } else {
-    await client.createOrReplace({
+    await upsertFromNotion(client, {
       _id: sanityId,
       _type: "tag",
       title,
       slug: { _type: "slug", current: slug },
     });
-    console.log(`  -> created tag: "${title}" (${sanityId})`);
+    console.log(`  -> upserted tag: "${title}" (${sanityId})`);
   }
 
   tagMap.set(title, sanityId);
@@ -620,13 +621,13 @@ async function ensureSanityAuthor(
   if (dryRun) {
     console.log(`  [dry-run] would create author: "${name}" (${sanityId})`);
   } else {
-    await client.createOrReplace({
+    await upsertFromNotion(client, {
       _id: sanityId,
       _type: "author",
       name,
       slug: { _type: "slug", current: slug },
     });
-    console.log(`  -> created author: "${name}" (${sanityId})`);
+    console.log(`  -> upserted author: "${name}" (${sanityId})`);
   }
 
   authorMap.set(name, sanityId);
@@ -933,10 +934,10 @@ async function syncPageContent(
 
       if (DRY_RUN) {
         console.log(
-          `  [dry-run] would createOrReplace page: ${sanityId} (${contentFields.length} fields)`
+          `  [dry-run] would upsert page: ${sanityId} (${contentFields.length} fields)`
         );
       } else {
-        await sanity.createOrReplace(doc);
+        await upsertFromNotion(sanity, doc);
         console.log(
           `  -> synced page: ${sanityId} (${contentFields.length} fields)`
         );
@@ -1215,7 +1216,7 @@ async function sync(): Promise<SyncCounts> {
 
       // 3e. Build Sanity document
       const sanityId = `notion-${entry.slug}`;
-      const doc: Record<string, unknown> = {
+      const doc: Record<string, unknown> & { _id: string; _type: string } = {
         _id: sanityId,
         _type: "article",
         title: entry.title,
@@ -1244,7 +1245,7 @@ async function sync(): Promise<SyncCounts> {
       };
 
       if (DRY_RUN) {
-        console.log(`  [dry-run] would createOrReplace: ${sanityId}`);
+        console.log(`  [dry-run] would upsert: ${sanityId}`);
         console.log(`    title: ${entry.title}`);
         console.log(`    slug: ${entry.slug}`);
         console.log(`    body blocks: ${body.length}`);
@@ -1261,7 +1262,7 @@ async function sync(): Promise<SyncCounts> {
           `    thumbnail: ${entry.thumbnailImageUrl ? "yes" : "none"} (source: ${entry.thumbnailImageSource})`
         );
       } else {
-        await sanity.createOrReplace(doc);
+        await upsertFromNotion(sanity, doc);
         console.log(`  -> synced to Sanity: ${sanityId}`);
       }
 
@@ -1327,7 +1328,16 @@ async function sync(): Promise<SyncCounts> {
  *
  * `_id` を `teaMenu-<5桁>` に固定するため、ランダム ID のダミー 3 件とは衝突せず
  * 上書きも削除もしない (ダミーの遮断は read 層 `lib/fictional-content.ts` が担当)。
- * 同じ `_id` に対する `createOrReplace` なので再実行しても増殖しない。
+ * 同じ `_id` に対する upsert なので再実行しても増殖しない。
+ *
+ * ## Studio 専用フィールドを消さないこと
+ *
+ * 書き込みは `upsertFromNotion` (createIfNotExists + patch.set) を使う。
+ * `createOrReplace` はドキュメント全体を差し替えるため、Notion 台帳に無く
+ * Studio でしか入力しないフィールド — `photo` / `color` / `relatedArticle` /
+ * `shopifyHandle` / `seo` — が同期のたびに消える。記事同期で実際にこれが起き
+ * (2026-08-22 の本番事故)、`scripts/lib/sanity-upsert.ts` で直した。茶譜も
+ * 同じ書き方に揃える。`createOrReplace` に戻さないこと。
  */
 
 /**
@@ -1519,7 +1529,7 @@ async function syncTeaMenu(): Promise<SyncCounts> {
 
       const sanityId = `teaMenu-${entry.menuNumber}`;
 
-      const doc: Record<string, unknown> = {
+      const doc: Record<string, unknown> & { _id: string; _type: string } = {
         _id: sanityId,
         _type: "teaMenu",
         title: entry.displayName,
@@ -1556,11 +1566,11 @@ async function syncTeaMenu(): Promise<SyncCounts> {
 
       if (DRY_RUN) {
         console.log(
-          `  [dry-run] would createOrReplace: ${sanityId} — ${entry.displayName} ` +
+          `  [dry-run] would upsert: ${sanityId} — ${entry.displayName} ` +
             `(${entry.category} / ${originText || "産地不明"})`
         );
       } else {
-        await sanity.createOrReplace(doc);
+        await upsertFromNotion(sanity, doc);
         console.log(`  -> synced: ${sanityId} — ${entry.displayName}`);
       }
 

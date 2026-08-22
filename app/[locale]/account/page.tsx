@@ -22,8 +22,11 @@ import { Button } from "@/components/ui/button";
 import { customerAccountPortalUrl } from "@/lib/account-links";
 import {
   fetchLineLinkageStatus,
+  fetchLineLinkageStatusForLineUser,
+  resolveLineLinkageEntryMode,
   UNKNOWN_LINE_LINKAGE,
 } from "@/lib/line/linkage-status";
+import { readVerifiedLineUserId } from "@/lib/line/session";
 import { LINK_RESULT_PARAM } from "@/lib/line/link-flow";
 import {
   ACCOUNT_SECTION_ORDER,
@@ -148,13 +151,18 @@ export default async function AccountPage({
     ? await loadAccountView(customer)
     : (seeded ?? (await loadLineOnlyAccountView(getLineDisplayName(cookieStore.get("line_user")?.value))));
 
-  /* LINE 連携状態 (P1)。顧客 ID は **サーバセッション由来の customer.id だけ** を使う
+  /* LINE 連携状態 (P1)。識別子は **サーバセッション由来の値だけ** を使う
      (URL パラメータ等からは受けない — 他人の連携状態を覗ける穴になる)。
+       - メールでログイン中 … customer.id で順引き
+       - LINE でログイン中   … 暗号化 cookie の復号結果 (サーバ確定の LINE userId) で逆引き
      PREVIEW_SEED の見本表示では実セッションが無いので問い合わせず「不明」のままにする。
      読み取りは never throw で、失敗しても linked=null になるだけ (マイページは落ちない)。 */
+  const lineUserId = customer ? null : auth.line ? await readVerifiedLineUserId() : null;
   const lineLinkage = customer
     ? await fetchLineLinkageStatus(customer.id)
-    : UNKNOWN_LINE_LINKAGE;
+    : lineUserId
+      ? await fetchLineLinkageStatusForLineUser(lineUserId)
+      : UNKNOWN_LINE_LINKAGE;
 
   /* 連携フロー (P2) から戻ってきた直後の結果。値は 2 つだけを許し、それ以外は無視する
      (任意の文字列を画面の分岐に持ち込ませない)。表示は LineLinkageEntry の中に閉じ、
@@ -162,6 +170,14 @@ export default async function AccountPage({
   const rawLineLink = (await searchParams)?.[LINK_RESULT_PARAM];
   const lineLinkResult =
     rawLineLink === "success" || rawLineLink === "error" ? rawLineLink : undefined;
+
+  /* 連携の節をどう出すか。コンポーネントと同じ関数で決めるので、枠 (page-container) だけが
+     残った空の節や、逆に節の中身があるのに枠が無い、という食い違いが起きない。 */
+  const lineLinkageMode = resolveLineLinkageEntryMode({
+    canLink: auth.shopify,
+    status: lineLinkage,
+    hasResult: Boolean(lineLinkResult),
+  });
 
   /* Shopify 顧客アカウントポータルへの外部リンク。LINE だけの人はポータルの
      セッションを持たないので出さない (押しても入れない導線を置かない)。 */
@@ -387,18 +403,22 @@ export default async function AccountPage({
         ) : null}
       </AccountOpsBand>
 
-      {/* LINE 連携エントリ (Web 側導線 / Phase 2 + 連携状態表示 / P1)。Shopify セッションを
-          前提にした導線なので、メールで入っている人にだけ出す。連携済みなら状態を出し、
-          未連携・不明なら従来どおり連携ボタンを出す (出し分けはコンポーネント側)。 */}
-      {auth.shopify ? (
+      {/* LINE 連携エントリ (Web 側導線 / Phase 2 + 連携状態表示 / P1 + LINE ログイン中の
+          解除導線 / A 案)。**ログイン経路で節ごと消さない** — 以前はここが `auth.shopify`
+          だったため、LINE で入っている人は連携済みでも解除に到達できなかった。
+          連携フローに入れるのは Shopify セッションのときだけ (`canLink`) だが、解除は
+          どちらの経路でもできる。何を出す/出さないかの判断は 1 か所
+          (`resolveLineLinkageEntryMode`) に置き、ここは同じ答えで枠の有無を決める。 */}
+      {lineLinkageMode === "hidden" ? null : (
         <div className="page-container">
           <LineLinkageEntry
             locale={locale}
             status={lineLinkage}
             result={lineLinkResult}
+            canLink={auth.shopify}
           />
         </div>
-      ) : null}
+      )}
     </>
   );
 }

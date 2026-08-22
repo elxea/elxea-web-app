@@ -15,6 +15,10 @@
  *      cx-agent が失敗したら Firestore に触れず非 2xx（502 / 503）。
  *      以前はここが Firestore しか消さずに 200 を返していたため、解除したはずの人に
  *      LINE の配信が届き続けていた（＝成功偽装）。その再発防止をここで固定する。
+ *   7. **LINE セッションでも解除できる**（2026-08-22 / A 案）。解除対象は
+ *      「検証済み LINE userId が台帳で結び付いている Shopify 顧客」だけで、
+ *      推測しない・ブラウザからは受け取らない。台帳が読めなければ 502
+ *      （「解除しました」と言って何も外さないのは契約 6 と同じ嘘）。
  *
  * requireAuth / rate limit / server-actions は mock。Firestore 実体は使わない。
  * `unlinkLineUser` 自体の Firestore セマンティクス（FieldValue.delete で
@@ -48,6 +52,22 @@ vi.mock("@/lib/line/unlink", () => ({
   requestCxUnlink: (...args: unknown[]) => requestCxUnlinkMock(...args),
 }));
 
+/** LINE セッションの本人（暗号化 cookie の復号結果）。既定は「LINE セッション無し」。 */
+const readVerifiedLineUserIdMock = vi.fn();
+vi.mock("@/lib/line/session", () => ({
+  readVerifiedLineUserId: () => readVerifiedLineUserIdMock(),
+}));
+
+/** 逆引き（LINE userId → 連携先の Shopify 顧客）。3 値（string / false / null）。 */
+const fetchShopifyCustomerIdForLineUserMock = vi.fn();
+const invalidateReverseLinkageMock = vi.fn();
+vi.mock("@/lib/line/linkage-status", () => ({
+  fetchShopifyCustomerIdForLineUser: (...args: unknown[]) =>
+    fetchShopifyCustomerIdForLineUserMock(...args),
+  invalidateReverseLinkage: (...args: unknown[]) =>
+    invalidateReverseLinkageMock(...args),
+}));
+
 import { DELETE, POST } from "@/app/api/user/line-link/route";
 
 const CUSTOMER_ID = "900800400001";
@@ -79,6 +99,9 @@ beforeEach(() => {
   linkLineUserMock.mockResolvedValue({ success: true, action: "linked" });
   // 既定は「cx-agent 側の解除に成功」。失敗系のテストだけ上書きする。
   requestCxUnlinkMock.mockResolvedValue({ ok: true, clearedCount: 1 });
+  // 既定は「LINE セッション無し」。LINE 経路のテストだけ上書きする。
+  readVerifiedLineUserIdMock.mockResolvedValue(null);
+  fetchShopifyCustomerIdForLineUserMock.mockResolvedValue(false);
 });
 
 describe("DELETE /api/user/line-link", () => {
@@ -244,5 +267,140 @@ describe("DELETE /api/user/line-link / cx-agent との順序と失敗の扱い",
     const res = await DELETE(makeDeleteRequest());
     expect(res.status).toBe(200);
     expect(((await res.json()) as { action?: string }).action).toBe("not_linked");
+  });
+});
+
+/* -------------------------------------------------------------------------
+ * LINE セッションからの解除（契約 7 / A 案・2026-08-22）
+ *
+ * `requireAuth()` は Shopify セッション専用なので、LINE で入っている人はここに来ても
+ * 401 だった。マイページ側も解除ボタンを Shopify セッションのときしか出していなかった
+ * ため、**LINE で入った人は自分の連携を自分で外せなかった**。
+ *
+ * 受け付けても信頼境界は動かない。解除対象は「検証済み LINE userId が台帳の上で
+ * 結び付いている Shopify 顧客」だけで、ブラウザからは何も受け取らない。
+ * ----------------------------------------------------------------------- */
+describe("DELETE /api/user/line-link / LINE セッション", () => {
+  beforeEach(() => {
+    // Shopify セッションは無い（＝従来は 401 になっていた状況）。
+    requireAuthMock.mockResolvedValue({
+      authenticated: false,
+      error: "Not authenticated",
+      status: 401,
+    });
+    readVerifiedLineUserIdMock.mockResolvedValue(VALID_LINE_USER_ID);
+  });
+
+  it("連携済み → 台帳で引いた顧客の連携を外して 200（LINE でも解除に到達できる）", async () => {
+    fetchShopifyCustomerIdForLineUserMock.mockResolvedValue(CUSTOMER_ID);
+
+    const res = await DELETE(makeDeleteRequest());
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { action?: string }).action).toBe("unlinked");
+
+    // 逆引きに渡すのはサーバ確定の LINE userId のみ。
+    expect(fetchShopifyCustomerIdForLineUserMock).toHaveBeenCalledWith(
+      VALID_LINE_USER_ID,
+    );
+    // 外すのは台帳が返した連携先だけ（推測しない）。
+    expect(requestCxUnlinkMock).toHaveBeenCalledWith(CUSTOMER_ID);
+    expect(unlinkLineUserMock).toHaveBeenCalledWith(CUSTOMER_ID);
+  });
+
+  it("body で他人の customerId / lineUserId を指定しても無視する（本人の連携しか外れない）", async () => {
+    fetchShopifyCustomerIdForLineUserMock.mockResolvedValue(CUSTOMER_ID);
+
+    const res = await DELETE(
+      makeDeleteRequest({
+        customerId: OTHER_CUSTOMER_ID,
+        lineUserId: "U99999999999999999999999999999999",
+      }),
+    );
+    expect(res.status).toBe(200);
+
+    expect(fetchShopifyCustomerIdForLineUserMock).toHaveBeenCalledWith(
+      VALID_LINE_USER_ID,
+    );
+    expect(requestCxUnlinkMock).toHaveBeenCalledWith(CUSTOMER_ID);
+    expect(requestCxUnlinkMock).not.toHaveBeenCalledWith(OTHER_CUSTOMER_ID);
+    expect(unlinkLineUserMock).not.toHaveBeenCalledWith(OTHER_CUSTOMER_ID);
+  });
+
+  it("未連携 → 200 + not_linked・cx も Firestore も触らない（冪等）", async () => {
+    fetchShopifyCustomerIdForLineUserMock.mockResolvedValue(false);
+
+    const res = await DELETE(makeDeleteRequest());
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as { success?: boolean; action?: string };
+    expect(json.success).toBe(true);
+    expect(json.action).toBe("not_linked");
+
+    expect(requestCxUnlinkMock).not.toHaveBeenCalled();
+    expect(unlinkLineUserMock).not.toHaveBeenCalled();
+  });
+
+  it("台帳が読めない → 502。200 を返して「解除しました」と嘘をつかない", async () => {
+    fetchShopifyCustomerIdForLineUserMock.mockResolvedValue(null);
+
+    const res = await DELETE(makeDeleteRequest());
+    expect(res.status).toBe(502);
+    expect(requestCxUnlinkMock).not.toHaveBeenCalled();
+    expect(unlinkLineUserMock).not.toHaveBeenCalled();
+  });
+
+  it("どちらのセッションも無い → 従来どおり 401・台帳も引かない", async () => {
+    readVerifiedLineUserIdMock.mockResolvedValue(null);
+
+    const res = await DELETE(makeDeleteRequest());
+    expect(res.status).toBe(401);
+    expect(((await res.json()) as { error?: string }).error).toBe("Not authenticated");
+
+    expect(fetchShopifyCustomerIdForLineUserMock).not.toHaveBeenCalled();
+    expect(requestCxUnlinkMock).not.toHaveBeenCalled();
+    expect(unlinkLineUserMock).not.toHaveBeenCalled();
+  });
+
+  it("rate limit は台帳を引く前に効き、識別子は LINE の名前空間で数値顧客 ID と衝突しない", async () => {
+    enforceRateLimitMock.mockResolvedValue(
+      new Response(JSON.stringify({ error: "Too many requests" }), { status: 429 }),
+    );
+
+    const res = await DELETE(makeDeleteRequest());
+    expect(res.status).toBe(429);
+
+    expect(enforceRateLimitMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      `line:${VALID_LINE_USER_ID}`,
+    );
+    expect(fetchShopifyCustomerIdForLineUserMock).not.toHaveBeenCalled();
+    expect(unlinkLineUserMock).not.toHaveBeenCalled();
+  });
+
+  it("解除できたら逆引きキャッシュを捨てる（引き直したマイページに「連携済み」が残らない）", async () => {
+    fetchShopifyCustomerIdForLineUserMock.mockResolvedValue(CUSTOMER_ID);
+
+    const res = await DELETE(makeDeleteRequest());
+    expect(res.status).toBe(200);
+    expect(invalidateReverseLinkageMock).toHaveBeenCalledWith(VALID_LINE_USER_ID);
+  });
+
+  it("解除に失敗したらキャッシュは捨てない（外れていないのに未連携に見せない）", async () => {
+    fetchShopifyCustomerIdForLineUserMock.mockResolvedValue(CUSTOMER_ID);
+    requestCxUnlinkMock.mockResolvedValue({ ok: false, reason: "upstream_error" });
+
+    const res = await DELETE(makeDeleteRequest());
+    expect(res.status).toBe(502);
+    expect(invalidateReverseLinkageMock).not.toHaveBeenCalled();
+  });
+
+  it("Shopify セッションがあるときは LINE 経路に入らない（従来経路を変えない）", async () => {
+    requireAuthMock.mockResolvedValue({ authenticated: true, customerId: CUSTOMER_ID });
+
+    const res = await DELETE(makeDeleteRequest());
+    expect(res.status).toBe(200);
+    expect(readVerifiedLineUserIdMock).not.toHaveBeenCalled();
+    expect(fetchShopifyCustomerIdForLineUserMock).not.toHaveBeenCalled();
+    expect(requestCxUnlinkMock).toHaveBeenCalledWith(CUSTOMER_ID);
   });
 });

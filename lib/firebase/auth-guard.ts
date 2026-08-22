@@ -10,6 +10,7 @@ import { cookies } from "next/headers";
 import { getSession } from "@/lib/shopify/auth";
 import { getCustomer, decryptToken } from "@/lib/shopify/customer";
 import { fetchShopifyCustomerIdForLineUser } from "@/lib/line/linkage-status";
+import { readVerifiedLineUserIdFrom } from "@/lib/line/session";
 import { extractCustomerId } from "./types";
 
 type AuthResult =
@@ -160,10 +161,10 @@ export async function resolveIdentity(): Promise<Identity> {
     }
 
     // 2) LINE session fallback.
-    const hasLineSession = cookieStore.has("line_session");
-    const lineUidEnc = cookieStore.get("line_uid")?.value;
-    if (hasLineSession && lineUidEnc) {
-      const lineUserId = decryptToken(lineUidEnc);
+    //    「LINE セッションの本人が誰か」の判定は lib/line/session.ts に 1 本化して
+    //    ある（cookie 2 本の組み合わせと復号を、ここと API route で別々に書かない）。
+    {
+      const lineUserId = readVerifiedLineUserIdFrom(cookieStore);
       if (lineUserId) {
         let displayName = "LINE User";
         const lineUserCookie = cookieStore.get("line_user")?.value;
