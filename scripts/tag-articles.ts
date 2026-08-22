@@ -1,7 +1,12 @@
 /**
  * Tag articles with persona/personalization fields in Sanity
- * Run with: pnpm tsx scripts/tag-articles.ts
- * Dry run:   pnpm tsx scripts/tag-articles.ts --dry-run
+ * Run with: pnpm tsx scripts/tag-articles.ts --dataset <name>
+ * Dry run:   pnpm tsx scripts/tag-articles.ts --dataset <name> --dry-run
+ *
+ * There is no default dataset. `--dry-run` is opt-in, so a bare invocation used
+ * to patch the live dataset; the target must now be named explicitly and
+ * production additionally requires --i-know-this-is-production
+ * (see lib/sanity/write-target.ts).
  *
  * Sets contentPersona, targetLayer, depthLevel for existing articles.
  * Assignment rationale: based on article tone, topic, and audience affinity.
@@ -17,10 +22,18 @@ import { createClient } from "next-sanity";
 import { readFileSync } from "fs";
 import { join } from "path";
 
+import { resolveWriteDatasetOrExit } from "../lib/sanity/write-target";
+
 // ─── Config ──────────────────────────────────────────────────
 
 const SANITY_PROJECT_ID = "5s8ahx87";
-const SANITY_DATASET = "production";
+
+// Fail-closed: resolved before any client is built and before any credential is
+// read. Exits non-zero (writing nothing) when the target is unnamed, or when it
+// is production without the explicit confirmation flag.
+const SANITY_DATASET = resolveWriteDatasetOrExit({
+  scriptName: "scripts/tag-articles.ts",
+});
 
 const sanityConfigPath = join(
   process.env.HOME || "",
