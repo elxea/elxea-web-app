@@ -73,10 +73,64 @@ function getAdminApp(): App {
 let _adminDb: Firestore | null = null;
 
 /**
+ * E2E 用の差し込み口（本番では絶対に埋まらない）。
+ *
+ * ## なぜ必要か
+ *
+ * 「LINE ログイン → お気に入り → メールで連携 → 合体して見える」という受入シナリオは、
+ * 途中で必ず Firestore に読み書きする。E2E は **別プロセスで動く dev サーバー**に対して
+ * 回すので、単体テストのように `vi.mock("@/lib/firebase/admin")` では差し替えられない。
+ * かといって本物の Firestore に向けたら「本番 DB に触らない」という前提が壊れ、資格情報を
+ * CI に置くことにもなる。エミュレーターは Java と 60MB 超のダウンロードを CI の実行経路に
+ * 持ち込む（＝ネットワーク起因の flaky を新しく作る）。
+ *
+ * よって「テスト用の env が立っているときだけ、プロセス内の偽 Firestore を使う」。偽物は
+ * 単体テストと同じ 1 つ（`__tests__/helpers/fake-firestore.ts`）で、差し込みは
+ * `instrumentation.ts` が起動時に 1 回だけ行う。
+ *
+ * ## なぜモジュール変数ではなく globalThis か
+ *
+ * Next の dev ビルドではルートごとにバンドルが分かれ、`instrumentation.ts` と route handler が
+ * **同じモジュール実体を共有するとは限らない**。モジュール変数に置くと「差し込んだのに
+ * route からは見えない」が起こる。プロセスに 1 つだけ在る `globalThis` に置くのが、Next で
+ * dev シングルトンを持つときの定石。
+ *
+ * ## 裏口ではない
+ *
+ * 差し込みは `setInjectedFirestoreForE2E()` を通してしか行えず、`NODE_ENV=production` では
+ * throw する。ヘッダー・クエリ・cookie といった **外部入力からは到達できない**
+ * （同一プロセスでコードを動かせる者だけが呼べる）ので、権限昇格の経路にはならない。
+ */
+const E2E_FIRESTORE_GLOBAL = "__elxeaE2eFirestore";
+
+type E2eFirestoreGlobal = typeof globalThis & {
+  [E2E_FIRESTORE_GLOBAL]?: Firestore;
+};
+
+export function setInjectedFirestoreForE2E(db: Firestore): void {
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "setInjectedFirestoreForE2E must never run in production. " +
+        "The in-memory Firestore is a test double; using it in production would " +
+        "silently discard every write.",
+    );
+  }
+  (globalThis as E2eFirestoreGlobal)[E2E_FIRESTORE_GLOBAL] = db;
+}
+
+/** 差し込みが入っているか（テストからの確認用）。 */
+export function hasInjectedFirestoreForE2E(): boolean {
+  return Boolean((globalThis as E2eFirestoreGlobal)[E2E_FIRESTORE_GLOBAL]);
+}
+
+/**
  * Get the server-side Firestore Admin instance (singleton).
  * Only use in API routes, Server Actions, and server-only modules.
  */
 export function getAdminFirestore(): Firestore {
+  const injected = (globalThis as E2eFirestoreGlobal)[E2E_FIRESTORE_GLOBAL];
+  if (injected) return injected;
+
   if (!_adminDb) {
     const app = getAdminApp();
     _adminDb = getFirestore(app);

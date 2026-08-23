@@ -397,6 +397,84 @@ jobs:
           path: playwright-report/
           retention-days: 7
 
+  identity-e2e:
+    name: identity-e2e
+    needs: static-checks
+    runs-on: ubuntu-latest
+    # 実測 (2026-08-23, 開発機): 偽サーバー 3 本の起動が数百 ms、dev サーバーの
+    # コールドコンパイルが最も重く、2 suite 合わせて 3〜5 分。上限はコールド
+    # Turbopack と runner の遅さに余裕を見て 20 分。
+    timeout-minutes: 20
+    env:
+      NODE_OPTIONS: --max-old-space-size=4096
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # auth-flow 側の S0 が <meta name="x-elxea-commit"> と
+          # `git rev-parse --short HEAD` を突き合わせる。浅いクローンでも HEAD は
+          # 読めるが、fetch-depth: 0 にしておくと SHA の解決が環境に依らない。
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        # e2e-tests と同じ理由でスクリプト経由 (apt ミラー障害でのハング対策)。
+        timeout-minutes: 10
+        run: bash scripts/ci/install-playwright.sh chromium
+
+      # Ring 2 は 2 つの config に分かれている。Next 16 は同じディレクトリから
+      # 2 つ目の dev サーバーを起動しないので、**逐次**に走らせる (並列にすると
+      # 後から起動した方が必ず落ちる)。
+      #
+      # 外へ出ていく先はすべてローカルの偽サーバー: 偽 LINE / 偽 cx-agent /
+      # 偽 Shopify Customer Account、および プロセス内の偽 Firestore。
+      # **本物の LINE / Shopify / Firestore / cx-agent には接続しない。**
+      # 資格情報は 1 つも要らない (合成値はどちらの config にも直書きしてある)。
+      - name: Run auth session flow (Ring 2)
+        run: pnpm exec playwright test --config e2e/playwright-auth-flow.config.ts
+        env:
+          CI: true
+          NEXT_PUBLIC_SANITY_PROJECT_ID: 5s8ahx87
+          NEXT_PUBLIC_SANITY_DATASET: production
+
+      - name: Run LINE linkage flow (Ring 2)
+        # `if: always()` にはしない。前段が落ちている時点で dev サーバーの前提が
+        # 壊れている可能性が高く、2 本目の失敗は原因ではなく症状になるため。
+        run: pnpm exec playwright test --config e2e/playwright-line-linkage.config.ts
+        env:
+          CI: true
+          NEXT_PUBLIC_SANITY_PROJECT_ID: 5s8ahx87
+          NEXT_PUBLIC_SANITY_DATASET: production
+
+      - name: Verify identity E2E test floor (空回り検知)
+        # 「0 件成功」で緑になるのを防ぐ。line-linkage suite が JUnit を出すので、
+        # そのテスト数が床を下回ったら落とす。suite 全体が testMatch の書き間違いで
+        # 1 件も拾われない、という壊れ方は静かなので機械で見る。
+        # 現在: ① ② ③ の 3 件。④ ⑤ とエッジを足したら上げること。
+        if: always()
+        env:
+          TEST_FLOOR_IDENTITY_E2E: "3"
+        run: node scripts/ops/check-test-floor.mjs --file test-results/line-linkage-junit.xml --min "${TEST_FLOOR_IDENTITY_E2E}" --label identity-e2e
+
+      - name: Upload identity E2E results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: identity-e2e-results
+          path: test-results/
+          retention-days: 7
+
   visual-regression:
     name: visual-regression
     # Runs on PRs AND on main pushes. Chromatic bills per snapshot, so it does
@@ -678,7 +756,7 @@ jobs:
     # 一覧で「デプロイした緑」と混同されない。判定を変えるときは ship-gate 側を
     # 触ること (このファイルで出荷ブランチを書いているのは ship-gate だけ)。
     if: needs.ship-gate.outputs.armed == 'true'
-    needs: [static-checks, unit-tests, coverage, build, storybook-tests, e2e-tests, ship-gate]
+    needs: [static-checks, unit-tests, coverage, build, storybook-tests, e2e-tests, identity-e2e, ship-gate]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     # Second layer of serialisation, for the cross-workflow case: the workflow

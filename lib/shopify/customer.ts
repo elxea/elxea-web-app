@@ -47,7 +47,18 @@ const TOKEN_URL =
 const LOGOUT_URL =
   process.env.SHOPIFY_CUSTOMER_ACCOUNT_LOGOUT_URL ||
   `https://${DEFAULT_ACCOUNT_DOMAIN}/authentication/logout`;
-const CUSTOMER_API_URL = `https://shopify.com/${process.env.SHOPIFY_SHOP_ID}/account/customer/api/${SHOPIFY_API_VERSION}/graphql`;
+// Customer GraphQL API の向き先。
+//
+// AUTHORIZE / TOKEN / LOGOUT は既に env で差し替えられるのに、ここだけ固定だった。その結果、
+// 偽の Customer Account サーバーに向けて自動テストを回しても **この 1 本だけ本物の
+// shopify.com へ出ていく**（`SHOPIFY_SHOP_ID` 未設定なら `.../undefined/...` という
+// 存在しない URL へ）。「テストは外部に接続しない」を設計で担保するために、他の 3 本と
+// 同じ形で差し替えられるようにする。
+//
+// 未設定時の値は従来と完全に同一なので、本番の挙動は変わらない。
+const CUSTOMER_API_URL =
+  process.env.SHOPIFY_CUSTOMER_ACCOUNT_API_URL ||
+  `https://shopify.com/${process.env.SHOPIFY_SHOP_ID}/account/customer/api/${SHOPIFY_API_VERSION}/graphql`;
 
 export { LOGOUT_URL };
 

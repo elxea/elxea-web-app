@@ -1,6 +1,12 @@
 import { readFileSync } from "node:fs";
 
-import { expect, test, type BrowserContext, type Page } from "@playwright/test";
+import {
+  expect,
+  test,
+  type APIRequestContext,
+  type BrowserContext,
+  type Page,
+} from "@playwright/test";
 
 /**
  * Ring 2 — the login/logout round trip, run behind a fake apex so the PRODUCTION
@@ -20,6 +26,24 @@ import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 const FAKE_APEX = ".elxea.test";
 const BASE_HOST = "www.elxea.test:3310";
 const LINE_SESSION_COOKIES = ["line_user", "line_session", "line_auth", "line_uid"] as const;
+
+/** Where the fake LINE server listens. Supplied by the config so both sides agree. */
+const LINE_ORIGIN = process.env.E2E_AUTH_FLOW_LINE_ORIGIN!;
+
+/**
+ * The LINE account the fake server hands back on a real login.
+ *
+ * The id ***must*** be `U` + 32 hex: `verifyLineIdToken` rejects anything else as
+ * "not a valid Messaging userId". The old stub returned `U-ring2-user`, which
+ * cannot pass that check — one of the two reasons the success path was
+ * unreachable.
+ *
+ * ASCII display name: a non-ASCII cookie value did not survive `addCookies` to
+ * the server (measured at stage 0), and S1 asserts the same string after
+ * injecting it, so both routes into this name stay ASCII.
+ */
+const LINE_USER_ID = `U${"1".repeat(32)}`;
+const LINE_DISPLAY_NAME = "RingTwoUser";
 
 /** Hosts that are legitimately contacted and are not our own origin. */
 const ALLOWED_EXTERNAL_HOSTS = new Set([
@@ -66,7 +90,7 @@ async function injectLineSession(context: BrowserContext) {
       /* ASCII only: a non-ASCII cookie value did not survive `addCookies` to the
        * server (measured at stage 0), which would have made the "session
        * reached the server" precondition silently false. */
-      value: name === "line_user" ? JSON.stringify({ displayName: "RingTwoUser" }) : "1",
+      value: name === "line_user" ? JSON.stringify({ displayName: LINE_DISPLAY_NAME }) : "1",
       domain: FAKE_APEX,
       path: "/",
       secure: false,
@@ -88,10 +112,30 @@ function sharedDomainLineCookies(cookies: { name: string; domain: string }[]) {
  * Drive the REAL /api/line-callback success path.
  *
  * The state cookie is issued by /api/line-login/init, so the flow is started
- * properly rather than forged: init sets the CSRF state, and the callback is then
- * given the matching value. LINE's own endpoints are served by the local stub.
+ * properly rather than forged. From there the browser follows the authorize URL
+ * to the fake LINE server, which redirects back with a real `code` — the same
+ * hops a phone makes.
+ *
+ * Previously this jumped straight to `/api/line-callback?code=ring2-code`, with
+ * a stub that answered `/oauth2/v2.1/verify` with `{ email }` and nothing else.
+ * Once the id_token became a GATE (aud / iss / exp / sub / nonce, D11), that
+ * shortcut could no longer reach SUCCESS: the callback rejected the token and
+ * issued no session, so S3 failed and — this being a `describe.serial` — the
+ * other eight tests never ran. Measured on `main` at fc4cbb2. Going through
+ * authorize is what makes the id_token belong to this authorization request.
  */
-async function completeLineLogin(page: Page, context: BrowserContext) {
+async function completeLineLogin(
+  page: Page,
+  context: BrowserContext,
+  request: APIRequestContext,
+) {
+  /* Who is "signed in" on the fake LINE side. Set explicitly rather than relying
+   * on the fake's default, so this spec states its own expectations. */
+  const setUser = await request.post(`${LINE_ORIGIN}/__control/line-user`, {
+    data: { userId: LINE_USER_ID, displayName: LINE_DISPLAY_NAME },
+  });
+  expect(setUser.ok(), "fake LINE must accept the user switch").toBe(true);
+
   await page.goto("/ja");
 
   const init = await page.evaluate(async () => {
@@ -100,10 +144,13 @@ async function completeLineLogin(page: Page, context: BrowserContext) {
   });
   expect(init.status, `init must succeed on the fake apex: ${init.body}`).toBe(200);
 
-  const state = new URL(JSON.parse(init.body).authUrl).searchParams.get("state");
-  expect(state, "init must have issued a CSRF state").toBeTruthy();
+  const authUrl = JSON.parse(init.body).authUrl as string;
+  expect(
+    new URL(authUrl).searchParams.get("state"),
+    "init must have issued a CSRF state",
+  ).toBeTruthy();
 
-  await page.goto(`/api/line-callback?code=ring2-code&state=${state}`);
+  await page.goto(authUrl);
   await page.waitForLoadState("domcontentloaded");
 
   return { cookies: await context.cookies(`http://${BASE_HOST}`) };
@@ -113,8 +160,9 @@ test.describe.serial("auth session flow", () => {
   test("S3: the real LINE callback logs the user in and scopes the session to the apex", async ({
     page,
     context,
+    request,
   }) => {
-    const { cookies } = await completeLineLogin(page, context);
+    const { cookies } = await completeLineLogin(page, context, request);
 
     /* The exact regression that shipped: the callback issued these four and then
      * cleared the state cookie on the same response, and the clear was deleting
@@ -133,11 +181,15 @@ test.describe.serial("auth session flow", () => {
 
     /* And the session must actually authorise — the point of having one. */
     await page.goto("/ja/account");
-    expect(await page.content()).toContain("RingTwoUser");
+    expect(await page.content()).toContain(LINE_DISPLAY_NAME);
   });
 
-  test("S2: an authenticated user can navigate the site normally", async ({ page, context }) => {
-    await completeLineLogin(page, context);
+  test("S2: an authenticated user can navigate the site normally", async ({
+    page,
+    context,
+    request,
+  }) => {
+    await completeLineLogin(page, context, request);
 
     const non2xx: string[] = [];
     page.on("response", (r) => {
@@ -157,6 +209,7 @@ test.describe.serial("auth session flow", () => {
   test("S7: a full login-then-logout round trip leaves no session behind", async ({
     page,
     context,
+    request,
   }) => {
     const externalHosts = new Set<string>();
     page.on("request", (r) => {
@@ -164,9 +217,9 @@ test.describe.serial("auth session flow", () => {
       if (host !== BASE_HOST && !host.startsWith("127.0.0.1:")) externalHosts.add(host);
     });
 
-    await completeLineLogin(page, context);
+    await completeLineLogin(page, context, request);
     await page.goto("/ja/account");
-    expect(await page.content()).toContain("RingTwoUser");
+    expect(await page.content()).toContain(LINE_DISPLAY_NAME);
 
     await page.goto("/api/auth/logout?locale=ja");
     await page.waitForLoadState("domcontentloaded");
@@ -228,7 +281,7 @@ test.describe.serial("auth session flow", () => {
      * `context.request`: APIRequestContext runs in Node, where the fake apex does
      * not resolve. */
     await page.goto("/ja/account");
-    expect(await page.content()).toContain("RingTwoUser");
+    expect(await page.content()).toContain(LINE_DISPLAY_NAME);
 
     await expect(page.locator('header a[href*="/api/auth/logout"]').first()).toBeVisible();
   });
@@ -243,7 +296,7 @@ test.describe.serial("auth session flow", () => {
     await page.goto("/ja");
     await injectLineSession(context);
     await page.goto("/ja/account");
-    expect(await page.content()).toContain("RingTwoUser");
+    expect(await page.content()).toContain(LINE_DISPLAY_NAME);
 
     await page.goto("/api/auth/logout?locale=ja");
     await page.waitForLoadState("domcontentloaded");
@@ -295,11 +348,11 @@ test.describe.serial("auth session flow", () => {
     await page.goto("/ja");
     await injectLineSession(context);
     await page.goto("/ja/account");
-    expect(await page.content()).toContain("RingTwoUser");
+    expect(await page.content()).toContain(LINE_DISPLAY_NAME);
 
     const second = await context.newPage();
     await second.goto("/ja/account");
-    expect(await second.content()).toContain("RingTwoUser");
+    expect(await second.content()).toContain(LINE_DISPLAY_NAME);
 
     await page.goto("/api/auth/logout?locale=ja");
 

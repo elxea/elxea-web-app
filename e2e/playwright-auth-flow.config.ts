@@ -50,6 +50,13 @@ const repoRoot = path.resolve(__dirname, "..");
 
 const STUB_PORT = 3311;
 const LINE_STUB_PORT = 3312;
+const CX_STUB_PORT = 3313;
+
+const LINE_ORIGIN = `http://127.0.0.1:${LINE_STUB_PORT}`;
+const CX_ORIGIN = `http://127.0.0.1:${CX_STUB_PORT}`;
+
+/** 偽 cx-agent が要求する鍵。合成値で、秘密ではない。 */
+const SYNC_API_SECRET = "auth-flow-sync-secret";
 /* The stub appends one JSON line per hit here. Specs read this file to assert on
  * stub hits, which is what makes the assertion possible at all — see the
  * webServer comment below. */
@@ -62,6 +69,8 @@ const STUB_LOG = path.join(repoRoot, "test-results", "shopify-logout-stub-hits.j
 process.env.VERCEL_GIT_COMMIT_SHA = commitSha;
 /* Same reason: the spec reads the stub's hit log directly. */
 process.env.SHOPIFY_LOGOUT_STUB_LOG = STUB_LOG;
+/* The spec drives the fake LINE server's "who is signed in" control endpoint. */
+process.env.E2E_AUTH_FLOW_LINE_ORIGIN = LINE_ORIGIN;
 
 
 export default defineConfig({
@@ -114,10 +123,25 @@ export default defineConfig({
      * them — and without them the suite can only ever exercise this route's error
      * redirects, which is the blind spot that let a session-destroying change
      * pass fully green. */
+    /* 偽 LINE。旧 `line-api-stub.mjs` の後継で、認可の往復（authorize）と、
+     * `verifyLineIdToken` が要求する claim（aud / iss / exp / sub / nonce）を満たす
+     * verify 応答を持つ。旧スタブはそのどちらも持たず、id_token がゲートになった時点で
+     * SUCCESS 経路に到達できなくなっていた（S3 が落ち、serial なので残り 8 本が
+     * 走らない状態が main に居た）。偽 LINE を 2 つ育てないため、
+     * `line-linkage-flow` と同じ 1 本を共有する。 */
     {
-      command: `node scripts/e2e/line-api-stub.mjs ${LINE_STUB_PORT}`,
+      command: `node scripts/e2e/fake-line-server.mjs ${LINE_STUB_PORT} ${LINE_ORIGIN}`,
       cwd: repoRoot,
-      url: `http://127.0.0.1:${LINE_STUB_PORT}/health`,
+      url: `${LINE_ORIGIN}/health`,
+      reuseExistingServer: !process.env.CI,
+      timeout: 30_000,
+    },
+    /* 偽 cx-agent。以前は cx-agent 宛の呼び出しも LINE スタブに向けていたが、
+     * 偽 LINE が未知パスを 404 で返すようになったので、行き先を分ける。 */
+    {
+      command: `node scripts/e2e/fake-cx-agent-server.mjs ${CX_STUB_PORT} ${SYNC_API_SECRET}`,
+      cwd: repoRoot,
+      url: `${CX_ORIGIN}/health`,
       reuseExistingServer: !process.env.CI,
       timeout: 30_000,
     },
@@ -149,11 +173,25 @@ export default defineConfig({
         SHOPIFY_CUSTOMER_ACCOUNT_LOGOUT_URL: `http://127.0.0.1:${STUB_PORT}/authentication/00000000/logout`,
         /* Lets the specs read the stub's hit log. */
         SHOPIFY_LOGOUT_STUB_LOG: STUB_LOG,
-        /* Points the LINE callback at the local LINE stub. */
-        LINE_API_BASE_URL: `http://127.0.0.1:${LINE_STUB_PORT}`,
-        NEXT_PUBLIC_CHAT_API_URL: `http://127.0.0.1:${LINE_STUB_PORT}/api/chat`,
+        /* Points the LINE callback at the local fake LINE server.
+         *
+         * AUTH と API の両方を渡す。片方だけだと id_token の `iss`（認可ホスト由来）が
+         * 本物の access.line.me のままになり、`verifyLineIdToken` が必ず
+         * "iss is not LINE" で落ちる。 */
+        LINE_AUTH_BASE_URL: LINE_ORIGIN,
+        LINE_API_BASE_URL: LINE_ORIGIN,
+        NEXT_PUBLIC_CHAT_API_URL: `${CX_ORIGIN}/api/chat`,
+        SYNC_API_SECRET,
         AUTH_LINE_ID: "ring2-channel-id",
         AUTH_LINE_SECRET: "ring2-channel-secret",
+        /* cookie の暗号化に使う。合成値で、本物の秘密ではない。
+         *
+         * これが無いと `lib/shopify/customer.ts` が **モジュール評価時に** throw し、
+         * `/api/line-callback` は 1 行も走らずに 500 になる。開発機では `.env.local`
+         * が埋めてくれるので気づけず、`.env.local` を持たない環境（新しい worktree、
+         * そして CI）でだけ落ちていた。ここで明示するまで、この suite は CI に
+         * 載せられる状態ではなかった。 */
+        SESSION_SECRET: "e2e-auth-flow-session-secret-0123456789abcdef",
         /* Telemetry off — the "no unexpected external hosts" assertion counts
          * every outbound host, and Sentry would make it non-deterministic. */
         NEXT_PUBLIC_SENTRY_DSN: "",
