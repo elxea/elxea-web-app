@@ -23,6 +23,8 @@
 
 import { createHash, timingSafeEqual } from "crypto";
 
+import { lineApiBaseUrl, lineAuthBaseUrl } from "@/lib/line/endpoints";
+
 /** verify API が返す最小の payload（本フローで使うフィールドのみ）。 */
 export interface LiffIdTokenPayload {
   /** LINE userId（同一プロバイダー前提で Messaging userId と一致）。 */
@@ -44,8 +46,17 @@ export interface LiffIdTokenPayload {
   email?: string;
 }
 
-/** LINE ID トークンの発行者（iss）固定値（LINE 公式仕様）。 */
-const LINE_TOKEN_ISSUER = "https://access.line.me";
+/**
+ * LINE ID トークンの発行者（iss）。本物の LINE では常に `https://access.line.me`（LINE 公式仕様）。
+ *
+ * `LINE_AUTH_BASE_URL` で差し替えられるのは verify エンドポイント（`LINE_API_BASE_URL`）と同じ
+ * 理由。偽 LINE サーバーに向けたテストでは iss も偽サーバーのオリジンになるため、ここだけ
+ * 本物固定だと必ず「iss が LINE でない」で落ちて SUCCESS 経路を一度も通せない。
+ * env 未設定（本番・通常実行）では本物の LINE と完全に同じ値になる。
+ */
+function lineTokenIssuer(): string {
+  return lineAuthBaseUrl();
+}
 
 /** exp 検証の時刻ずれ許容（秒）。サーバ時計の微差で正当トークンを弾かないための猶予。 */
 const EXP_CLOCK_SKEW_SEC = 300;
@@ -62,8 +73,7 @@ export type VerifyResult =
  * api.line.me を叩きに行く。
  */
 function lineVerifyEndpoint(): string {
-  const base = process.env.LINE_API_BASE_URL || "https://api.line.me";
-  return `${base}/oauth2/v2.1/verify`;
+  return `${lineApiBaseUrl()}/oauth2/v2.1/verify`;
 }
 
 /** Messaging userId 形式（U + 32 hex）。sub がこの形でなければ拒否（多層防御）。 */
@@ -152,7 +162,7 @@ export async function verifyLineIdToken(
   }
 
   // iss（発行者）が LINE であることを確認する（docstring の LINE 仕様を実チェック化・多層防御）。
-  if (payload.iss !== LINE_TOKEN_ISSUER) {
+  if (payload.iss !== lineTokenIssuer()) {
     return { ok: false, reason: "id_token iss is not LINE" };
   }
 

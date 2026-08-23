@@ -7,6 +7,7 @@ import { getBaseUrl } from "@/lib/base-url";
 import { getCookieSpec, resolveCookieDomain } from "@/lib/auth/cookies";
 import { CX_AGENT_BASE_URL } from "@/lib/chat/proxy";
 import { verifyLineIdToken } from "@/lib/line/verify-liff-token";
+import { lineApiBaseUrl } from "@/lib/line/endpoints";
 import {
   LINE_LINK_STATE_COOKIE,
   defaultReturnTo,
@@ -127,7 +128,7 @@ export async function GET(request: NextRequest) {
 
   let idToken: string | undefined;
   try {
-    const tokenRes = await fetch("https://api.line.me/oauth2/v2.1/token", {
+    const tokenRes = await fetch(`${lineApiBaseUrl()}/oauth2/v2.1/token`, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
