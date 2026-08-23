@@ -1,0 +1,304 @@
+// =============================================================================
+// line-log-monitor.mjs — LINE 連携・ログイン系の本番異常を「ログの実物」から拾う
+//
+// ここには純粋な判定だけを置く (I/O は monitor-line-prod.mjs 側)。ネットワークも
+// ファイルも触らないので、__tests__/ops/line-log-monitor.test.ts から実データ形の
+// 入力を渡して端から端まで検証できる。検知条件をテストで固定できない監視は、
+// 壊れても壊れたと分からない。
+//
+// ## なぜこの監視が要るのか (消す前に読むこと)
+//
+// LINE 連携は「本物の LINE」としか結合できない。偽 LINE を立てた E2E
+// (e2e/line-linkage-flow.spec.ts) が守れるのは自分たちのコードの筋道までで、
+// **本物との境界** — チャネルの鍵・redirect_uri の登録・LINE 側の仕様変更 — は
+// 本番でしか壊れない。テスト用の個人 LINE アカウントは持たない方針 (Setaka 決定
+// 2026-08-23) なので、その境界は「本番ログの監視による早期検知」で守る。
+//
+// 実在した壊れ方が根拠になっている:
+//   - 2026-08-22 の本番障害。Channel Secret を保存したときに紛れ込んだ末尾改行
+//     1 文字で、token 交換が毎回 `400 invalid_client` を返していた。コードは
+//     1 行も壊れておらず、CI も E2E も緑のままだった。
+//     (app/api/user/line-link/callback/route.ts の resolveLinkChannelSecret 参照)
+//
+// ## 検知の二本立て
+//
+//   1. ログ検知 (matchLogEntry) — 実際に落ちた人がいた痕跡を拾う。
+//      壊れてから「誰かが踏むまで」は気付けない。
+//   2. ヘルスプローブ (evaluateProbe / monitor-line-prod.mjs) — 誰も踏まなくても
+//      設定破壊そのものを拾う。踏む人がいない夜間の破壊はこちらでしか出ない。
+//
+// 2 は 1 の穴を埋めるために居る。片方だけにしないこと。
+// =============================================================================
+
+/**
+ * 監視対象の route。ログ行の `requestPath` がこの接頭辞のいずれかで始まるものだけを
+ * 見る (それ以外の 5xx は、この監視の担当ではない)。
+ *
+ * `/api/line-login` は `/api/line-login/init` も兼ねる接頭辞になっている。
+ */
+export const WATCHED_PATH_PREFIXES = [
+  '/api/line-login',
+  '/api/line-callback',
+  '/api/user/line-link',
+];
+
+/**
+ * ログ本文に出る失敗の型。
+ *
+ * `pattern` は**実際にコードが出力している文字列**に合わせてある。推測で書くと
+ * 「動いているのに何も拾わない監視」になるので、増やすときは必ず route の
+ * console.warn / console.error を grep して現物と突き合わせること。
+ *
+ * severity:
+ *   critical … 設定・鍵の破壊。全員が連携できない。放置すると被害が増え続ける。
+ *   error    … その回の連携/ログインは失敗した。単発ならユーザー起因もありうる。
+ */
+export const LOG_PATTERNS = [
+  {
+    id: 'token-exchange-failed',
+    severity: 'critical',
+    // [line-link/callback] token exchange failed: 400 invalid_client: ...
+    // [line-callback] Token exchange failed: ...
+    pattern: /token exchange (failed|threw)/i,
+    description: 'LINE との token 交換に失敗 (鍵・redirect_uri の不一致が典型)',
+  },
+  {
+    id: 'invalid-client',
+    severity: 'critical',
+    // 2026-08-22 の本番障害そのもの。Channel Secret の末尾改行で毎回これが出た。
+    pattern: /invalid_client/i,
+    description: 'client_id と client_secret の組み合わせが LINE に拒否されている',
+  },
+  {
+    id: 'not-configured',
+    severity: 'critical',
+    // route が返す 503 の理由文字列。env が消えた / ホスト未登録。
+    pattern: /(not configured|auth_not_configured|link_not_configured|auth_host_not_registered|SYNC_API_SECRET not set)/i,
+    description: 'このデプロイに LINE 連携の設定が無い (env 欠落 / ホスト未登録)',
+  },
+  {
+    id: 'id-token-verify-failed',
+    severity: 'error',
+    // [line-callback] id_token rejected: <reason>
+    // [line-link/callback] id_token verification failed: <reason>
+    pattern: /id_token (verification failed|rejected)|verify failed/i,
+    description: 'id_token の検証に失敗 (nonce/aud/exp の不一致、LINE 側仕様変更の疑い)',
+  },
+  {
+    id: 'profile-fetch-failed',
+    severity: 'error',
+    pattern: /profile fetch failed/i,
+    description: 'LINE プロフィール取得に失敗 (access_token かスコープの問題)',
+  },
+  {
+    id: 'cx-agent-link-failed',
+    severity: 'error',
+    // [line-link/callback] cx-agent returned 401: ... / cx-agent unreachable: ...
+    pattern: /cx-agent (returned|unreachable)|identity link failed/i,
+    description: '連携台帳 (cx-agent) への書き込みに失敗 — 連携行が立たない',
+  },
+];
+
+/**
+ * `invalid_grant` と「ユーザーが LINE 側でキャンセルした」は**異常ではない**。
+ * 拾ってしまうと、正常な離脱でアラートが鳴り続けて監視そのものが無視される。
+ *
+ * state 不一致も、cookie を消した人・10 分放置した人で普通に起きる。単発では
+ * 異常と言えないので、ここでは黙らせて 5xx とプローブ側に判断を委ねる。
+ */
+export const BENIGN_PATTERNS = [
+  /line returned error: (access_denied|user_cancel|disallowed)/i,
+  /state rejected/i,
+  /state mismatch/i,
+  /no authorization code/i,
+  /no shopify session on return/i,
+];
+
+/** 監視対象の route かどうか。 */
+export function isWatchedPath(requestPath) {
+  if (typeof requestPath !== 'string' || requestPath === '') return false;
+  return WATCHED_PATH_PREFIXES.some((prefix) => requestPath.startsWith(prefix));
+}
+
+/**
+ * ログ 1 行を判定する。該当しなければ null。
+ *
+ * 入力は `vercel logs --json` の 1 行 (JSON Lines)。実際に返ってくる形:
+ *   { timestamp, level, message, source, domain, requestMethod,
+ *     requestPath, responseStatusCode, environment, deploymentId, id }
+ */
+export function matchLogEntry(entry) {
+  if (!entry || typeof entry !== 'object') return null;
+  if (!isWatchedPath(entry.requestPath)) return null;
+
+  const message = typeof entry.message === 'string' ? entry.message : '';
+
+  // 正常な離脱を先に落とす。5xx より先に見るのは、キャンセルが 3xx で来るため。
+  if (BENIGN_PATTERNS.some((p) => p.test(message))) return null;
+
+  for (const rule of LOG_PATTERNS) {
+    if (rule.pattern.test(message)) {
+      return {
+        kind: 'log',
+        id: rule.id,
+        severity: rule.severity,
+        description: rule.description,
+        requestPath: entry.requestPath,
+        statusCode: entry.responseStatusCode ?? null,
+        timestamp: entry.timestamp ?? null,
+        // 本文はそのまま持たせない。route 側は秘密を出さない作りだが、監視が
+        // Issue に丸ごと転記すると公開リポジトリの issue に流れる。先頭だけ。
+        excerpt: message.slice(0, 200),
+      };
+    }
+  }
+
+  // 本文に何も出ていなくても 5xx は異常。init/callback が 500 を返している状態は
+  // 「誰も連携できない」なので、文字列に頼らずステータスだけで拾う。
+  const status = Number(entry.responseStatusCode);
+  if (Number.isFinite(status) && status >= 500) {
+    return {
+      kind: 'log',
+      id: 'route-5xx',
+      severity: 'critical',
+      description: 'LINE 系 route が 5xx を返している',
+      requestPath: entry.requestPath,
+      statusCode: status,
+      timestamp: entry.timestamp ?? null,
+      excerpt: message.slice(0, 200),
+    };
+  }
+
+  return null;
+}
+
+/** JSON Lines を解析する。壊れた行は黙って飛ばさず数える (静かな欠測を作らない)。 */
+export function parseLogLines(lines) {
+  const entries = [];
+  let unparsable = 0;
+
+  for (const line of lines) {
+    const trimmed = typeof line === 'string' ? line.trim() : '';
+    // CLI は stdout に "Vercel CLI 50.22.1" 等の非 JSON も混ぜてくる。
+    if (trimmed === '' || !trimmed.startsWith('{')) continue;
+
+    try {
+      entries.push(JSON.parse(trimmed));
+    } catch {
+      unparsable += 1;
+    }
+  }
+
+  return { entries, unparsable };
+}
+
+/**
+ * 同じログ行を複数回数えない。
+ *
+ * 監視は 2 回に分けてログを引く (下の monitor-line-prod.mjs 参照) ので、両方に
+ * 出てくる行がある。重複したまま数えると「1 件の障害が 2 件」に見える。
+ */
+export function dedupeById(entries) {
+  const seen = new Set();
+  const out = [];
+  for (const entry of entries) {
+    const key = entry?.id ?? `${entry?.timestamp}:${entry?.requestPath}:${entry?.message}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(entry);
+  }
+  return out;
+}
+
+/** 解析済みのログ行をまとめて判定する。 */
+export function scanLogEntries(entries) {
+  const findings = [];
+  for (const entry of entries) {
+    const finding = matchLogEntry(entry);
+    if (finding) findings.push(finding);
+  }
+  return { scanned: entries.length, findings };
+}
+
+/** JSON Lines をまとめて判定する (解析 + 判定のひとまとめ)。 */
+export function scanLogLines(lines) {
+  const { entries, unparsable } = parseLogLines(lines);
+  const { scanned, findings } = scanLogEntries(entries);
+  return { scanned, unparsable, findings };
+}
+
+/**
+ * ヘルスプローブ 1 件の判定。
+ *
+ * これが「設定破壊の即検知」の本体。誰も LINE 連携を踏まなかった時間帯でも、
+ * この 2 本が期待通りかどうかは必ず分かる。
+ *
+ * @param {object} probe   期待値 (name / expectedStatus / expectedLocationHost)
+ * @param {object} actual  実測 ({ status, location, error })
+ */
+export function evaluateProbe(probe, actual) {
+  const base = {
+    kind: 'probe',
+    id: `probe-${probe.name}`,
+    severity: 'critical',
+    description: probe.description,
+    requestPath: probe.path,
+  };
+
+  if (actual.error) {
+    return { ...base, reason: `到達できなかった: ${actual.error}`, statusCode: null };
+  }
+
+  if (actual.status !== probe.expectedStatus) {
+    return {
+      ...base,
+      reason: `期待 ${probe.expectedStatus} に対し ${actual.status} が返った`,
+      statusCode: actual.status,
+    };
+  }
+
+  if (probe.expectedLocationHost) {
+    // 307 が返っていても行き先が LINE でなければ意味がない。実際、サイト全体の
+    // パスワード保護 (middleware) が前に出ると /password へ 307 が返る。
+    // ステータスだけ見る監視はここを緑と誤認する。
+    let host = null;
+    try {
+      host = new URL(actual.location ?? '').host;
+    } catch {
+      host = null;
+    }
+    if (host !== probe.expectedLocationHost) {
+      return {
+        ...base,
+        reason: `リダイレクト先が ${probe.expectedLocationHost} ではなく ${host ?? '(不明)'} だった`,
+        statusCode: actual.status,
+      };
+    }
+  }
+
+  return null;
+}
+
+/** 検知結果を 1 行の要約にする (Issue 本文と Job Summary の見出しに使う)。 */
+export function summarize(result) {
+  const { findings, scanned, windowMinutes } = result;
+  if (findings.length === 0) {
+    return `異常なし (直近 ${windowMinutes} 分 / ログ ${scanned} 行を検査、プローブ全通過)`;
+  }
+  const counts = new Map();
+  for (const f of findings) counts.set(f.id, (counts.get(f.id) ?? 0) + 1);
+  const detail = [...counts.entries()].map(([id, n]) => `${id} x${n}`).join(', ');
+  return `異常 ${findings.length} 件 (直近 ${windowMinutes} 分 / ログ ${scanned} 行): ${detail}`;
+}
+
+/**
+ * 終了コード。0 = 異常なし / 1 = 異常検知 / 2 = 監視自体が回らなかった。
+ *
+ * 2 を 0 と混ぜないのが肝心。ログを 1 行も取れなかった run を「異常なし」と
+ * 報告する監視は、壊れたときに黙る。
+ */
+export function decideOutcome(result) {
+  if (result.fatal) return { code: 2, outcome: 'fatal' };
+  if (result.findings.length > 0) return { code: 1, outcome: 'detected' };
+  return { code: 0, outcome: 'clean' };
+}
