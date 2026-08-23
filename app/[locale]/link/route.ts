@@ -4,6 +4,7 @@ import { enforceRateLimit, limiters } from "@/lib/ratelimit";
 import { CX_AGENT_BASE_URL } from "@/lib/chat/proxy";
 import { getRequestOrigin } from "@/lib/base-url";
 import { getCookieSpec, isSecure } from "@/lib/auth/cookies";
+import { lineAuthRedirectPrefix } from "@/lib/line/endpoints";
 import {
   ACCOUNT_LINK_TOKEN_COOKIE,
   ACCOUNT_LINK_TOKEN_COOKIE_MAX_AGE,
@@ -137,8 +138,15 @@ export async function GET(
   } | null;
   const redirectUrl = data?.redirect_url;
 
-  // 4. LINE の連携ダイアログへ（cx-agent が組んだ URL のみを信頼する）。
-  if (typeof redirectUrl !== "string" || !redirectUrl.startsWith("https://access.line.me/")) {
+  /* 4. LINE の連携ダイアログへ（cx-agent が組んだ URL のみを信頼する）。
+   *
+   * 許可する前置きは `lineAuthRedirectPrefix()`（既定 `https://access.line.me/`）。オープン
+   * リダイレクト防止のホワイトリストなので、緩めていないことが重要:
+   *   - 既定値は従来のリテラルと一字一句同じ。env 未設定＝本番では判定が変わらない。
+   *   - 前置きは末尾スラッシュ込み。`https://access.line.me.evil.example/` は通らない。
+   *   - 差し替え元は env（サーバの運用者だけが書ける）であって、リクエストや上流の応答では
+   *     ない。攻撃者が判定対象を選べる経路は増えていない。 */
+  if (typeof redirectUrl !== "string" || !redirectUrl.startsWith(lineAuthRedirectPrefix())) {
     console.error("[account-link] unexpected nonce response (no valid redirect_url)");
     return failureRedirect(origin, locale, "account_link_unavailable");
   }

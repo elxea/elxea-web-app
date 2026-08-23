@@ -6,6 +6,7 @@ import { enforceRateLimit, limiters } from "@/lib/ratelimit";
 import { getBaseUrl, getRequestHostname, isTrustedAuthHost } from "@/lib/base-url";
 import { getCookieSpec, isSecure, resolveCookieDomain } from "@/lib/auth/cookies";
 import { fetchLineLinkageStatus } from "@/lib/line/linkage-status";
+import { lineAuthBaseUrl } from "@/lib/line/endpoints";
 import {
   LINE_LINK_STATE_COOKIE,
   STATE_TTL_MS,
@@ -143,7 +144,7 @@ export async function POST(request: NextRequest) {
 
   /* `prompt` も `disable_auto_login` も送らない。どちらも LINE の自動ログインを殺し、
    * 自動ログインは電話で LINE アプリが開く唯一の経路である（`lib/line/auto-login.ts`）。 */
-  const authUrl = `https://access.line.me/oauth2/v2.1/authorize?${params.toString()}`;
+  const authUrl = `${lineAuthBaseUrl()}/oauth2/v2.1/authorize?${params.toString()}`;
 
   return NextResponse.json({ authUrl });
 }

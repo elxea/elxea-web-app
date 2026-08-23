@@ -6,9 +6,16 @@
  * Environment vars required:
  *   LINE_CHANNEL_ACCESS_TOKEN - Channel access token from LINE Developers Console
  *   LINE_ADMIN_USER_ID        - LINE user ID of the admin to push to
+ *   LINE_API_BASE_URL         - Optional. Overrides the LINE API host (tests only).
  */
 
-const LINE_PUSH_API = "https://api.line.me/v2/bot/message/push";
+import { lineApiBaseUrl } from "@/lib/line/endpoints";
+
+/** Messaging API の push エンドポイント。ホストは `LINE_API_BASE_URL` で差し替え可能
+ *  （未設定なら本物の LINE）。テストが実際に LINE へ push してしまうのを防ぐため。 */
+function linePushApi(): string {
+  return `${lineApiBaseUrl()}/v2/bot/message/push`;
+}
 
 export type LineNotifyPayload = {
   subject: string;
@@ -43,7 +50,7 @@ export async function sendLineNotify({
   const text = `${emoji} ${subject}\n\n${body}`;
 
   try {
-    const response = await fetch(LINE_PUSH_API, {
+    const response = await fetch(linePushApi(), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

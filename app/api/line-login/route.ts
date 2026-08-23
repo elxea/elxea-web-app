@@ -4,6 +4,7 @@ import crypto from "crypto";
 import { getBaseUrl, getRequestHostname, isTrustedAuthHost } from "@/lib/base-url";
 import { getCookieSpec, isSecure, resolveCookieDomain } from "@/lib/auth/cookies";
 import { wantsAutoLoginDisabled } from "@/lib/line/auto-login";
+import { lineAuthBaseUrl } from "@/lib/line/endpoints";
 
 /**
  * Direct LINE Login OAuth 2.0 redirect endpoint.
@@ -110,7 +111,7 @@ export async function GET(request: NextRequest) {
     params.set("disable_auto_login", "true");
   }
 
-  const authUrl = `https://access.line.me/oauth2/v2.1/authorize?${params.toString()}`;
+  const authUrl = `${lineAuthBaseUrl()}/oauth2/v2.1/authorize?${params.toString()}`;
 
   return NextResponse.redirect(authUrl);
 }

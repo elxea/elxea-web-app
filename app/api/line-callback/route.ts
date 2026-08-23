@@ -13,6 +13,7 @@ import {
   AUTO_LOGIN_FAILED_VALUE,
 } from "@/lib/line/auto-login";
 import { verifyLineIdToken } from "@/lib/line/verify-liff-token";
+import { lineApiBaseUrl } from "@/lib/line/endpoints";
 
 /**
  * LINE Login OAuth 2.0 callback endpoint.
@@ -26,18 +27,6 @@ import { verifyLineIdToken } from "@/lib/line/verify-liff-token";
 /**
  * I4: Resolve locale from cookie or accept-language header, defaulting to "ja".
  */
-/**
- * Base for LINE's API endpoints.
- *
- * Env-overridable for the same reason `SHOPIFY_CUSTOMER_ACCOUNT_*_URL` already
- * is: these calls are made server-side, so a browser-level test harness cannot
- * intercept them, and without an override there is no way to drive this route's
- * SUCCESS path in an end-to-end test. That gap is not hypothetical — it is why a
- * change that destroyed the session cookies this route issues passed a full green
- * suite. Unset (production, and every normal run) it is the real LINE host.
- */
-const LINE_API_BASE = process.env.LINE_API_BASE_URL || "https://api.line.me";
-
 function resolveLocale(request: NextRequest): string {
   // Check NEXT_LOCALE cookie first (set by next-intl)
   const localeCookie = request.cookies.get("NEXT_LOCALE")?.value;
@@ -137,7 +126,7 @@ export async function GET(request: NextRequest) {
 
   try {
     // Exchange code for tokens
-    const tokenRes = await fetch(`${LINE_API_BASE}/oauth2/v2.1/token`, {
+    const tokenRes = await fetch(`${lineApiBaseUrl()}/oauth2/v2.1/token`, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
@@ -158,7 +147,7 @@ export async function GET(request: NextRequest) {
     const tokens = await tokenRes.json();
 
     // Get user profile
-    const profileRes = await fetch(`${LINE_API_BASE}/v2/profile`, {
+    const profileRes = await fetch(`${lineApiBaseUrl()}/v2/profile`, {
       headers: { Authorization: `Bearer ${tokens.access_token}` },
     });
 
