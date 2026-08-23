@@ -71,11 +71,16 @@ process.env.VERCEL_GIT_COMMIT_SHA = commitSha;
 process.env.SHOPIFY_LOGOUT_STUB_LOG = STUB_LOG;
 /* The spec drives the fake LINE server's "who is signed in" control endpoint. */
 process.env.E2E_AUTH_FLOW_LINE_ORIGIN = LINE_ORIGIN;
+/* 初回コンパイルをテストの制限時間の外へ出す。理由は e2e/support/warm-dev-server.ts。
+ * この suite も `next dev` 前提なので同じ risk を持つ（line-linkage 側で実際に踏んだ）。 */
+process.env.E2E_WARMUP_BASE_URL = `http://127.0.0.1:${PORT}`;
+process.env.E2E_WARMUP_PATHS = ["/ja", "/ja/login", "/ja/account"].join(",");
 
 
 export default defineConfig({
   testDir: ".",
   testMatch: ["**/auth-session-flow.spec.ts"],
+  globalSetup: require.resolve("./support/warm-dev-server"),
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: 0,
