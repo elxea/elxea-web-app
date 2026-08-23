@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 
 import { requireAuth } from "@/lib/firebase/auth-guard";
 import { completeLineLinkage } from "@/lib/auth/identity-link";
-import { getBaseUrl } from "@/lib/base-url";
+import { getBaseUrl, getRequestOrigin } from "@/lib/base-url";
 import { getCookieSpec, resolveCookieDomain } from "@/lib/auth/cookies";
 import { CX_AGENT_BASE_URL } from "@/lib/chat/proxy";
 import { verifyLineIdToken } from "@/lib/line/verify-liff-token";
@@ -52,6 +52,23 @@ export async function GET(request: NextRequest) {
   const locale = resolveLocale(request);
   const fallbackReturn = defaultReturnTo(locale);
 
+  /* 戻り先は **ユーザーが宛てたオリジン**から組む（`request.url` からではない）。
+   *
+   * `request.url` はサーバーが束ねられているオリジンを報告する。Vercel ではそれが
+   * リクエストの Host と一致するのでこの route は動いているように見えるが、それ以外
+   * ——dev サーバー、プロキシの後ろ——では一致せず、連携を終えた人を**サーバー自身の
+   * オリジン**へ放り出す。別オリジンに着いた人には apex スコープのセッション cookie が
+   * 適用されないので、**連携は成功したのにログアウト状態のログイン画面に着く**。
+   *
+   * これは推測ではなく、この route を初めて端から端まで踏んだ E2E
+   * （`e2e/line-linkage-flow.spec.ts` ②）が実測で捕まえた。同じ穴は
+   * `app/api/line-callback` で既に `getRequestOrigin` に直してあり（同 route の冒頭に経緯）、
+   * こちらだけ直っていなかった。
+   *
+   * `getRequestOrigin` は fail-closed で、見知らぬ Host は `nextUrl.origin` に落ちる。
+   * よって偽装ヘッダーでオープンリダイレクトにはならない。 */
+  const requestOrigin = getRequestOrigin(request);
+
   const cookieStore = await cookies();
   const stateCookie = cookieStore.get(LINE_LINK_STATE_COOKIE)?.value;
 
@@ -71,7 +88,7 @@ export async function GET(request: NextRequest) {
   const fail = (returnTo: string, reason: string) => {
     console.warn(`[line-link/callback] ${reason}`);
     clearState();
-    return NextResponse.redirect(new URL(returnUrlWithResult(returnTo, "error"), request.url));
+    return NextResponse.redirect(new URL(returnUrlWithResult(returnTo, "error"), requestOrigin));
   };
 
   /* 顧客 ID はここでも **その場のセッション**から取り直す。cookie に封じた値を
@@ -210,7 +227,7 @@ export async function GET(request: NextRequest) {
   });
 
   clearState();
-  return NextResponse.redirect(new URL(returnUrlWithResult(returnTo, "success"), request.url));
+  return NextResponse.redirect(new URL(returnUrlWithResult(returnTo, "success"), requestOrigin));
 }
 
 /**

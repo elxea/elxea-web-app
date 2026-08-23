@@ -56,10 +56,16 @@ export default defineConfig({
    * deletion they exist to check is never exercised and they would either fail
    * or, worse, pass while asserting nothing. Excluded here rather than
    * repointing `E2E_BASE_URL`, which is global to all specs in this config. */
+  /* `line-linkage-flow.spec.ts` も同じ理由で除外する。こちらは偽アペックス
+   * `www.elxea.test:3320` に加えて **偽 LINE / 偽 cx-agent / 偽 Shopify / 偽 Firestore**
+   * を env で立てた dev サーバーを前提にしており、その env はこの config には無い。
+   * ここから走らせると本物のホストへ出ていこうとして落ちる。
+   * 正しい入口は `e2e/playwright-line-linkage.config.ts`（CI では専用ジョブ）。 */
   testIgnore: [
     "**/membership.spec.ts",
     "**/staging-smoke.spec.ts",
     "**/auth-session-flow.spec.ts",
+    "**/line-linkage-flow.spec.ts",
   ],
   use: {
     baseURL,
