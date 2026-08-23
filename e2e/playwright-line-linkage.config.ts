@@ -70,9 +70,19 @@ process.env.E2E_LINE_HIT_LOG = LINE_HIT_LOG;
 process.env.E2E_CX_HIT_LOG = CX_HIT_LOG;
 process.env.E2E_BASE_HOST = `${FAKE_APEX_HOST}:${PORT}`;
 
+/* テスト開始前に温めるルート。理由は e2e/support/warm-dev-server.ts に書いてある
+ * （要約: `next dev` の初回コンパイルを、テストの制限時間ではなく globalSetup の
+ * 予算で払わせる）。suite が最初に触る順に並べてある。 */
+process.env.E2E_WARMUP_BASE_URL = `http://127.0.0.1:${PORT}`;
+process.env.E2E_WARMUP_PATHS = ["/ja", "/ja/login", "/ja/account", "/api/user/favorites"].join(
+  ",",
+);
+
 export default defineConfig({
   testDir: ".",
   testMatch: ["**/line-linkage-flow.spec.ts"],
+  /* 初回コンパイルをテストの制限時間の外へ出す。詳細は同ファイルのコメント。 */
+  globalSetup: require.resolve("./support/warm-dev-server"),
   /* 受入シナリオは①→⑤が 1 本の物語で、しかも偽サーバーと偽 Firestore は
    * プロセス内の 1 つの状態を共有する。並列にすると互いの台帳を踏む。 */
   fullyParallel: false,
@@ -85,8 +95,11 @@ export default defineConfig({
   /* dev サーバーは初回アクセスでルートをコンパイルする。冷えた Turbopack では
    * `/ja/account` の初回が 30 秒を超えることがあり、それは `ERR_ABORTED` として
    * 現れるのでプロダクトの不具合に見えてしまう。Ring 2 は `next dev` でなければ
-   * ならない（本番ビルドだと Secure cookie になり http では保存されない）。 */
-  timeout: 120_000,
+   * ならない（本番ビルドだと Secure cookie になり http では保存されない）。
+   *
+   * globalSetup で温めてもなお、CI ランナーが遅い日に 1 テストが 2 分に届くことがある
+   * （main の run 32620718882 で実測）。温めが一次の対策で、これは二枚目の保険。 */
+  timeout: 180_000,
   outputDir: path.join(repoRoot, "test-results", "line-linkage-artifacts"),
   reporter: [
     ["list"],
