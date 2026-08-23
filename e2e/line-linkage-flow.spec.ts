@@ -153,6 +153,30 @@ async function addFavorite(page: Page, favorite: { targetId: string; title: stri
   }, favorite);
 }
 
+/** ログアウトする（どちらの身元でも同じ入口）。 */
+async function logout(page: Page): Promise<void> {
+  await page.goto("/api/auth/logout?locale=ja");
+  await page.waitForLoadState("domcontentloaded");
+  /* Shopify セッションを持っていた場合は偽 Shopify の logout を経由して戻ってくる。
+   * 自サイトに帰ってきていることを確かめてから次へ進む。 */
+  await page.waitForURL(new RegExp(`^http://${BASE_HOST.replace(".", "\\.")}/`));
+}
+
+/** マイページから LINE 連携を解除する（確認ダイアログまで含めて画面の操作で）。 */
+async function unlinkLineFromAccount(page: Page): Promise<void> {
+  await page.goto("/ja/account");
+  await page.getByTestId("line-unlink-trigger").click();
+
+  /* 確認ダイアログの文言は「解除しても何が残るか」を伝える契約そのもの。
+   * 出ていることを確かめてから押す（黙って外れる導線にしない）。 */
+  await expect(page.getByTestId("line-unlink-dialog")).toBeVisible();
+  await expect(page.getByTestId("line-unlink-keeps")).toBeVisible();
+
+  await page.getByTestId("line-unlink-confirm").click();
+  /* 解除が反映されて連携済み表示が消えるまで待つ。 */
+  await expect(page.getByTestId("line-linkage-linked")).toHaveCount(0);
+}
+
 /** 今ログインしている人の棚に見えるお気に入りのタイトル一覧。 */
 async function listFavoriteTitles(page: Page): Promise<string[]> {
   const result = await page.evaluate(async () => {
@@ -283,5 +307,150 @@ test.describe.serial("LINE ログイン・メール連携・合体", () => {
     /* 画面にも出ること。API だけ通って描画側が拾えていない、を分けて見るため。 */
     await page.goto("/ja/account");
     expect(await page.content()).toContain(title);
+  });
+
+  test("④ 連携後に LINE でログインし直しても、同じ棚が見える", async ({
+    page,
+    context,
+    request,
+  }) => {
+    const user = { userId: lineUserId("step4"), displayName: "ステップ4太郎" };
+    const customer = { id: "9004", email: "step4@example.test" };
+    const title = "どちらの入口でも見えるべき茶";
+    await control(request).setLineUser(user);
+    await control(request).setShopifyCustomer(customer);
+
+    /* ①〜③ と同じところまで進める（LINE で貯める → メールで入る → 連携）。 */
+    await loginWithLine(page);
+    expect((await addFavorite(page, { targetId: "step4-item", title })).status).toBe(200);
+    await loginWithEmail(page);
+    await linkLineFromAccount(page);
+    expect(await listFavoriteTitles(page)).toContain(title);
+
+    /* --- ④ いったん出て、今度は LINE の入口から入る --- */
+    await logout(page);
+    expect(await sessionCookieNames(context), "ログアウトで LINE 側も畳まれる").toEqual([]);
+
+    await loginWithLine(page);
+
+    /* 連携済みなので、LINE で入っても棚は **メールのアカウントのもの** になる。
+     * ここが `line:<uid>` の棚に戻ってしまうと、同じ人なのに入口によって
+     * 見えるものが変わる（合体の意味が消える）。 */
+    expect(
+      await listFavoriteTitles(page),
+      "LINE から入ったときに連携先アカウントの棚が見えない",
+    ).toContain(title);
+
+    await page.goto("/ja/account");
+    expect(await page.content()).toContain(title);
+  });
+
+  test("⑤ 解除するとつながりが切れ、もう一度連携すると戻る", async ({ page, request }) => {
+    const user = { userId: lineUserId("step5"), displayName: "ステップ5太郎" };
+    const customer = { id: "9005", email: "step5@example.test" };
+    const title = "解除しても残るべき茶";
+    await control(request).setLineUser(user);
+    await control(request).setShopifyCustomer(customer);
+
+    await loginWithLine(page);
+    expect((await addFavorite(page, { targetId: "step5-item", title })).status).toBe(200);
+    await loginWithEmail(page);
+    await linkLineFromAccount(page);
+    expect(await listFavoriteTitles(page)).toContain(title);
+
+    /* --- 解除 --- */
+    await unlinkLineFromAccount(page);
+
+    /* 正本（台帳）から消えていること。画面から連携済み表示が消えるだけでは、
+     * 「見た目は外れたが台帳には残っている」を見逃す。 */
+    expect(
+      (await readLedger(request)).find((e) => e.lineUserId === user.userId),
+      "解除したのに台帳に連携が残っている",
+    ).toBeUndefined();
+
+    /* 解除は「つながりを切る」であって「持ち物を捨てる」ではない。合体で移した
+     * お気に入りは、メールのアカウントに残り続ける（確認ダイアログがそう約束している）。 */
+    expect(
+      await listFavoriteTitles(page),
+      "解除でお気に入りまで消えてはいけない",
+    ).toContain(title);
+
+    /* --- 再連携 --- */
+    await linkLineFromAccount(page);
+    await expect(page.getByTestId("line-linkage-linked")).toBeVisible();
+    expect(
+      (await readLedger(request)).find((e) => e.lineUserId === user.userId)?.shopifyCustomerId,
+      "再連携が台帳に載っていない",
+    ).toBe(customer.id);
+  });
+
+  test("エッジ: 他人に連携済みの LINE は、別のアカウントに繋ぎ直せない", async ({
+    page,
+    request,
+  }) => {
+    const shared = { userId: lineUserId("edge-shared"), displayName: "共用端末の人" };
+    const first = { id: "9006", email: "edge-first@example.test" };
+    const second = { id: "9007", email: "edge-second@example.test" };
+    const title = "最初の人の茶";
+
+    /* --- 1 人目: LINE で貯めて、自分のアカウントに連携する --- */
+    await control(request).setLineUser(shared);
+    await control(request).setShopifyCustomer(first);
+    await loginWithLine(page);
+    expect((await addFavorite(page, { targetId: "edge-item", title })).status).toBe(200);
+    await loginWithEmail(page);
+    await linkLineFromAccount(page);
+    expect(await listFavoriteTitles(page)).toContain(title);
+    await logout(page);
+
+    /* --- 2 人目: 同じ端末・同じ LINE のまま、別のメールアカウントで入る --- */
+    await control(request).setShopifyCustomer(second);
+    await loginWithEmail(page);
+
+    /* 連携を試みる。cx-agent（正本）が 409 を返し、連携は成立しない。
+     * ここが通ってしまうと、共用端末で前の人の棚が次の人に見える。 */
+    await linkLineFromAccount(page);
+    await expect(page.getByTestId("line-linkage-notice-error")).toBeVisible();
+
+    expect(
+      await listFavoriteTitles(page),
+      "他人の LINE を横取り連携して、その人の棚が見えてはいけない",
+    ).not.toContain(title);
+
+    /* 台帳は 1 人目のままで動いていないこと。 */
+    expect(
+      (await readLedger(request)).find((e) => e.lineUserId === shared.userId)?.shopifyCustomerId,
+      "台帳の連携先が上書きされている",
+    ).toBe(first.id);
+  });
+
+  test("エッジ: 解除した直後に LINE で入っても、前のアカウントの棚は見えない", async ({
+    page,
+    request,
+  }) => {
+    const user = { userId: lineUserId("edge-fresh"), displayName: "解除直後の人" };
+    const customer = { id: "9008", email: "edge-fresh@example.test" };
+    const title = "解除後は見えてはいけない茶";
+    await control(request).setLineUser(user);
+    await control(request).setShopifyCustomer(customer);
+
+    await loginWithLine(page);
+    expect((await addFavorite(page, { targetId: "edge-fresh-item", title })).status).toBe(200);
+    await loginWithEmail(page);
+    await linkLineFromAccount(page);
+    expect(await listFavoriteTitles(page)).toContain(title);
+
+    await unlinkLineFromAccount(page);
+    await logout(page);
+
+    /* 逆引きには 60 秒のプロセス内キャッシュがある。解除で捨てそこねると、その間に
+     * LINE 側から入った人に「解除したはずの顧客の棚」が見える（P6/E1 の窓）。
+     * **待たずに**入り直すことが、この窓を撃つということ。 */
+    await loginWithLine(page);
+
+    expect(
+      await listFavoriteTitles(page),
+      "解除直後の LINE ログインに、前の連携先の棚が見えている（逆引きキャッシュが残っている）",
+    ).not.toContain(title);
   });
 });
