@@ -74,7 +74,7 @@ export type LinkResult = "success" | "error";
 /**
  * 連携（P2）の token 交換と存在ゲートに使う Channel Secret を解決する。
  *
- * `LINE_LIFF_CHANNEL_ID` と `LINE_LOGIN_CHANNEL_ID` は同一 Login チャネル (2009473839) を指すため、
+ * `LINE_LIFF_CHANNEL_ID` と `LINE_LOGIN_CHANNEL_ID` は同一 Login チャネル (本番 2011239425) を指すため、
  * その Channel Secret は `LINE_LOGIN_CHANNEL_SECRET` と同値である。P2 は `LINE_LIFF_CHANNEL_SECRET`
  * を優先し、未設定時は既存の `LINE_LOGIN_CHANNEL_SECRET` にフォールバックする。
  *
@@ -96,7 +96,7 @@ export type LinkResult = "success" | "error";
  *
  * 実際、本番の `LINE_LOGIN_CHANNEL_SECRET` はこの状態で保存されており、Web 発の連携は
  * token 交換の一手前まで正しく進んだうえで毎回そこで落ちていた。同じチャネル
- * (2009473839) の秘密でも、メールログインが読む `AUTH_LINE_SECRET` は改行なしで
+ * (当時 2009473839) の秘密でも、メールログインが読む `AUTH_LINE_SECRET` は改行なしで
  * 保存されていたため**ログインだけは通り続け**、連携の不具合に見えていた。
  *
  * よって「本番の値を一度掃除する」では直したことにならない。**コード側を不感にする**

@@ -79,7 +79,10 @@ describe("LINE authorize URL carries no prompt", () => {
     // The parameters that DO carry the flow must still be there.
     expect(url.searchParams.get("response_type")).toBe("code");
     expect(url.searchParams.get("state")).toBeTruthy();
-    expect(url.searchParams.get("scope")).toBe("profile openid email");
+    /* email は既定で載せない（M-0 / fail-soft）。新チャネル 2011239425 は
+       メールアドレス取得権限が未承認で、投げると認可ごと拒まれる。
+       判断は lib/line/login-channel.ts、単体は line-channel-namespace.test.ts。 */
+    expect(url.searchParams.get("scope")).toBe("profile openid");
   });
 
   it("GET /api/line-login (legacy redirect route)", async () => {
@@ -90,6 +93,56 @@ describe("LINE authorize URL carries no prompt", () => {
     expect(url.host).toBe("access.line.me");
     expect(url.searchParams.has("prompt")).toBe(false);
     expect(url.searchParams.get("state")).toBeTruthy();
+  });
+});
+
+/**
+ * `bot_prompt` は `prompt` とは別物である（M-0 / 2026-08-25 に復活）。
+ *
+ * このファイルが長々と説いているのは「LINE には `prompt` を送るな」という決定で、
+ * 理由は auto login が切れて LINE アプリに渡らなくなるから。`bot_prompt` は
+ * **友だち追加の出し方**を指定する別のパラメータで、auto login には影響しない。
+ * 名前が似ているせいで、片方を消すついでにもう片方も消される事故が起きやすい —
+ * だから同じファイルで、両方の性質を並べて固定する。
+ *
+ * 2026-04-13 に `bot_prompt` を外したのは、本番 OA `@307tzhkw` が別プロバイダに
+ * あってこの Login チャネルに紐付けられなかったから。新チャネル 2011239425 は
+ * 紐付け済みなので前提ごと解消した。友だち追加は親切ではなく、**Account Link
+ * （LINE トーク内からの連携）と配信が届く条件**そのものである。
+ */
+describe("LINE authorize URL carries bot_prompt (a different parameter from prompt)", () => {
+  it("POST /api/line-login/init sends bot_prompt=aggressive but still no prompt", async () => {
+    const { POST } = await import("@/app/api/line-login/init/route");
+    const res = await POST(request("https://www.elxea.com/api/line-login/init"));
+    const { authUrl } = (await res.json()) as { authUrl: string };
+
+    const url = new URL(authUrl);
+    expect(url.searchParams.get("bot_prompt")).toBe("aggressive");
+    expect(url.searchParams.has("prompt")).toBe(false);
+    // ...and it must not have re-enabled the thing that breaks the app hand-off.
+    expect(url.searchParams.has("disable_auto_login")).toBe(false);
+  });
+
+  it("GET /api/line-login sends bot_prompt=aggressive but still no prompt", async () => {
+    const { GET } = await import("@/app/api/line-login/route");
+    const res = await GET(request("https://www.elxea.com/api/line-login"));
+
+    const url = new URL(res.headers.get("location")!);
+    expect(url.searchParams.get("bot_prompt")).toBe("aggressive");
+    expect(url.searchParams.has("prompt")).toBe(false);
+    expect(url.searchParams.has("disable_auto_login")).toBe(false);
+  });
+
+  it("LINE_LOGIN_BOT_PROMPT=off drops the parameter entirely (no redeploy needed)", async () => {
+    process.env.LINE_LOGIN_BOT_PROMPT = "off";
+    try {
+      const { POST } = await import("@/app/api/line-login/init/route");
+      const res = await POST(request("https://www.elxea.com/api/line-login/init"));
+      const { authUrl } = (await res.json()) as { authUrl: string };
+      expect(new URL(authUrl).searchParams.has("bot_prompt")).toBe(false);
+    } finally {
+      delete process.env.LINE_LOGIN_BOT_PROMPT;
+    }
   });
 });
 
@@ -131,7 +184,10 @@ describe("auto login is disabled only on an explicit retry", () => {
     // The retry must still be a complete, valid authorization request.
     expect(url.searchParams.get("response_type")).toBe("code");
     expect(url.searchParams.get("state")).toBeTruthy();
-    expect(url.searchParams.get("scope")).toBe("profile openid email");
+    /* email は既定で載せない（M-0 / fail-soft）。新チャネル 2011239425 は
+       メールアドレス取得権限が未承認で、投げると認可ごと拒まれる。
+       判断は lib/line/login-channel.ts、単体は line-channel-namespace.test.ts。 */
+    expect(url.searchParams.get("scope")).toBe("profile openid");
   });
 
   it("GET /api/line-login?disable_auto_login=true", async () => {

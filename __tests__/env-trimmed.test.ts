@@ -73,7 +73,7 @@ describe("readSecretEnvTrimmed", () => {
   });
 
   it("leaves a clean value untouched", () => {
-    expect(readSecretEnvTrimmed("2009473839")).toBe("2009473839");
+    expect(readSecretEnvTrimmed("2011239425")).toBe("2011239425");
   });
 });
 

@@ -124,7 +124,7 @@ export async function GET(request: NextRequest) {
   const channelId = resolveLinkChannelId();
   /* client_secret は LINE_LIFF_CHANNEL_SECRET を優先し、未設定なら既存の
    * LINE_LOGIN_CHANNEL_SECRET にフォールバックする。LINE_LIFF_CHANNEL_ID と
-   * LINE_LOGIN_CHANNEL_ID は同一 Login チャネル (2009473839) を指すため、その Channel Secret は
+   * LINE_LOGIN_CHANNEL_ID は同一 Login チャネル (本番 2011239425) を指すため、その Channel Secret は
    * LINE_LOGIN_CHANNEL_SECRET と同値であり、client_id (= LINE_LIFF_CHANNEL_ID) と整合する。
    * 本番 Vercel に新規シークレットを追加せず既存 env で連携を成立させるための措置。
    *
