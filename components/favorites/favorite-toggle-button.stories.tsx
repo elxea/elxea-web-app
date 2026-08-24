@@ -54,8 +54,26 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** 未ログイン (cookie なし)。押すとログインを促す。 */
+/**
+ * 未ログイン。押すとログインを促す。
+ *
+ * ## cookie を「無いはず」に頼らない
+ *
+ * story はブラウザの 1 ページを共有して走るので、**別の story が置いた cookie が
+ * 残っている**ことがある (ログイン済みを装う story がこのファイルにも他のファイル
+ * にもある)。残っていると部品は「ログイン済み」と判断して登録状態の確認に出かけ、
+ * 実 API が無い story 環境では失敗して `unknown` (状態不明) の見た目になる。
+ *
+ * 実際 CI ではこれで落ちた (期待「ログインすると保存できます」/ 実際「保存の状態を
+ * 取得できませんでした」)。手元では story の走る順が違って通るので、順番に依存した
+ * 見つけにくい壊れ方をする。よってこの story は**自分で消してから**描く。
+ */
 export const LoggedOut: Story = {
+  beforeEach: async () => {
+    const expire = "; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+    document.cookie = `shop_auth=${expire}`;
+    document.cookie = `line_auth=${expire}`;
+  },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await waitFor(async () => {
