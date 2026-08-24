@@ -25,7 +25,8 @@ type Phase =
   | "loading" // 初期化・通信中
   | "success" // 連携完了
   | "needs_shopify_login" // Shopify 未ログイン
-  | "error" // 静かな失敗
+  | "error" // 静かな失敗（やり直せば直るかもしれない）
+  | "conflict" // 恒久的な衝突（既に別の LINE が連携済み）— やり直しても直らない
   | "unavailable"; // 設定未完（LIFF_ID 未投入 等）
 
 /** ロケール別の逐語コピー（絵文字なし・静か）。 */
@@ -47,6 +48,16 @@ const COPY = {
     loginCta: "ログインする",
     errorTitle: "連携できませんでした",
     errorBody: "連携できませんでした。時間をおいてもう一度お試しください。",
+    /**
+     * 恒久的な衝突。ここだけ**原因を伏せない**。
+     *
+     * 伏せてよいのは「やり直せば直るかもしれない」失敗だけで、これはやり直しても
+     * 直らない。「時間をおいてもう一度」と案内すると、**永久に成功しない再試行**を
+     * 促すことになる（従来はまさにそうなっていた）。再試行ボタンも出さない。
+     */
+    conflictTitle: "すでに別の LINE と連携されています",
+    conflictBody:
+      "このアカウントには、すでに別の LINE アカウントが連携されています。連携できるのは 1 つの LINE アカウントだけです。連携先を変えたい場合は、先に今の連携を解除してください。",
     retry: "もう一度試す",
     unavailableBody:
       "ただいま連携をご利用いただけません。時間をおいてもう一度お試しください。",
@@ -66,6 +77,9 @@ const COPY = {
     loginCta: "Sign in",
     errorTitle: "Couldn't link your account",
     errorBody: "We couldn't link your account. Please try again in a little while.",
+    conflictTitle: "Already linked to a different LINE account",
+    conflictBody:
+      "This account is already linked to a different LINE account. Only one LINE account can be linked at a time. To link a different one, please unlink the current account first.",
     retry: "Try again",
     unavailableBody:
       "Account linking is not available right now. Please try again in a little while.",
@@ -131,6 +145,14 @@ export function LiffLinkClient({ locale }: { locale: string }) {
         };
         setHasActivity(data.hasPurchaseActivity === true);
         setPhase("success");
+        return;
+      }
+
+      /* 409 = このアカウントには既に別の LINE が連携済み（1 対 1 固定）。
+         **恒久的な衝突であって障害ではない。** error に倒すと「時間をおいて
+         もう一度」と案内してしまい、何度試しても成功しない。 */
+      if (res.status === 409) {
+        setPhase("conflict");
         return;
       }
 
@@ -209,6 +231,21 @@ export function LiffLinkClient({ locale }: { locale: string }) {
           <p className="text-sm leading-relaxed text-muted-foreground">{t.errorBody}</p>
           <Button variant="outline" className="w-full" onClick={() => void run()}>
             {t.retry}
+          </Button>
+        </div>
+      )}
+
+      {/* 恒久的な衝突。**再試行ボタンを出さない**のが要点 — 出すと「押せば直る
+          かもしれない」と読ませることになるが、何度押しても直らない。
+          代わりに、次に取れる行動（今の連携を解除する）を文中で伝える。 */}
+      {phase === "conflict" && (
+        <div className="space-y-6" data-testid="liff-link-conflict">
+          <h1 className="text-xl font-normal">{t.conflictTitle}</h1>
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            {t.conflictBody}
+          </p>
+          <Button variant="outline" className="w-full" onClick={closeLiff}>
+            {t.close}
           </Button>
         </div>
       )}

@@ -54,6 +54,15 @@ const COPY = {
     /** 失敗して戻ってきたとき。原因は伏せる（外に検証内訳を出さない）が、黙って戻さない。 */
     noticeError:
       "連携を完了できませんでした。お手数ですが、もう一度お試しください。",
+    /**
+     * 恒久的な衝突（このメールアドレスには既に別の LINE が連携済み）。
+     *
+     * ここだけ**原因を伏せない**。伏せてよいのは「やり直せば直るかもしれない」失敗
+     * だけで、これはやり直しても直らない。何が起きたかと、次に何をすればよいかを
+     * 言わないと、お客さまは同じ操作を繰り返すことになる。
+     */
+    noticeConflict:
+      "このメールアドレスには、すでに別の LINE アカウントが連携されています。連携できるのは 1 つの LINE アカウントだけです。連携先を変えたい場合は、先に今の連携を解除してください。",
     /** 状態が読めなかったとき。「未連携」と言い切らない（3 値表示）。 */
     statusUnknown:
       "ただいま連携の状態を確認できませんでした。すでに連携がお済みの場合、あらためて連携していただいても二重にはなりません。",
@@ -75,6 +84,8 @@ const COPY = {
       "Linked with LINE. We send suggestions tailored to your taste in the LINE chat.",
     noticeSuccess: "Your LINE account is now linked.",
     noticeError: "We could not complete the link. Please try again.",
+    noticeConflict:
+      "This email address is already linked to a different LINE account. Only one LINE account can be linked at a time. To link a different one, please unlink the current account first.",
     statusUnknown:
       "We could not check your link status just now. If you are already linked, linking again will not create a duplicate.",
     statusHeading: "LINE linkage",
@@ -106,11 +117,14 @@ type Locale = keyof typeof COPY;
  *   「未連携」と読んで解除が要らないと誤解する**。連携ボタンは冪等なので出したままにし、
  *   言い切らない一文だけを足す。
  *
- * @param result 連携フローから戻ってきた直後の結果（`?line_link=success|error`）。
+ * @param result 連携フローから戻ってきた直後の結果（`?line_link=success|error|conflict`）。
  *   一度きりの確認をこの節の中に出すためだけに使う。**専用の完了画面は作らない**
  *   （旧 LIFF 導線が連携済みの人にも毎回「連携完了」を見せていた問題の再発防止）。
  *   `error` を黙って捨てないのは、失敗して戻ってきた人が「何も起きなかった」と
  *   受け取るのが、まさに P2 で直している体験だから。
+ *
+ *   `conflict`（既に別の LINE が連携済み）は `error` と**分ける**。恒久的な衝突なので
+ *   「もう一度お試しください」は嘘になる — 何度試しても成功しない。M-1 / J-4。
  *
  * @param canLink この画面から連携フローに入れるか（＝ Shopify の顧客セッションがあるか）。
  *   既定 `true`（従来の呼び出し方＝メールでログインしている人）。
@@ -130,7 +144,7 @@ export function LineLinkageEntry({
 }: {
   locale: string;
   status?: LineLinkageStatus;
-  result?: "success" | "error";
+  result?: "success" | "error" | "conflict";
   canLink?: boolean;
 }) {
   const t = COPY[(locale as Locale) in COPY ? (locale as Locale) : "ja"];
@@ -150,7 +164,11 @@ export function LineLinkageEntry({
       data-testid={`line-linkage-notice-${result}`}
       role="status"
     >
-      {result === "success" ? t.noticeSuccess : t.noticeError}
+      {result === "success"
+        ? t.noticeSuccess
+        : result === "conflict"
+          ? t.noticeConflict
+          : t.noticeError}
     </p>
   ) : null;
 

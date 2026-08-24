@@ -97,7 +97,7 @@ export default async function AccountPage({
   searchParams,
 }: {
   /* Next 15+ では searchParams は Promise。連携フローからの復帰結果
-     (`?line_link=success|error`) を受け取るためだけに使う。 */
+     (`?line_link=success|error|conflict`) を受け取るためだけに使う。 */
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const t = await getTranslations("account");
@@ -171,7 +171,9 @@ export default async function AccountPage({
      専用の完了画面は作らない。 */
   const rawLineLink = (await searchParams)?.[LINK_RESULT_PARAM];
   const lineLinkResult =
-    rawLineLink === "success" || rawLineLink === "error" ? rawLineLink : undefined;
+    rawLineLink === "success" || rawLineLink === "error" || rawLineLink === "conflict"
+      ? rawLineLink
+      : undefined;
 
   /* 連携の節をどう出すか。コンポーネントと同じ関数で決めるので、枠 (page-container) だけが
      残った空の節や、逆に節の中身があるのに枠が無い、という食い違いが起きない。 */

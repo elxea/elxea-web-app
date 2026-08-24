@@ -201,6 +201,15 @@ export async function GET(request: NextRequest) {
     });
     if (!upstream.ok) {
       const detail = await upstream.text().catch(() => "");
+      /* 409 = このメールアドレスには既に別の LINE が連携済み（1 対 1 固定・J-4）。
+         **恒久的な衝突であって障害ではない。** `error` に丸めると画面が
+         「時間をおいてもう一度」と案内し、永久に成功しない再試行を促すことになる。 */
+      if (upstream.status === 409) {
+        console.warn("[line-link/callback] shopify customer already linked to another LINE");
+        return NextResponse.redirect(
+          new URL(returnUrlWithResult(returnTo, "conflict"), requestOrigin),
+        );
+      }
       return fail(returnTo, `cx-agent returned ${upstream.status}: ${detail}`);
     }
   } catch (err) {
