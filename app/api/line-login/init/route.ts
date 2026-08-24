@@ -5,6 +5,8 @@ import { getBaseUrl, getRequestHostname, isTrustedAuthHost } from "@/lib/base-ur
 import { getCookieSpec, isSecure, resolveCookieDomain } from "@/lib/auth/cookies";
 import { wantsAutoLoginDisabled } from "@/lib/line/auto-login";
 import { lineAuthBaseUrl } from "@/lib/line/endpoints";
+import { loginBotPrompt, loginScopeParam } from "@/lib/line/login-channel";
+import { reportChannelNamespace } from "@/lib/line/login-channel-report";
 
 /**
  * LINE Login state initialization endpoint.
@@ -125,14 +127,23 @@ export async function POST(request: NextRequest) {
    * parameter that forces the app hand-off, so those two omissions ARE the
    * feature. See `lib/line/auto-login.ts` for the sources and for the retry that
    * catches the case where the OS refuses to honour the Universal Link. */
+  /* 名前空間ガード（M-0）。詳細は lib/line/login-channel-report.ts。 */
+  reportChannelNamespace("line-login-init");
+
   const params = new URLSearchParams({
     response_type: "code",
     client_id: channelId,
     redirect_uri: redirectUri,
     state,
     nonce,
-    scope: "profile openid email",
+    scope: loginScopeParam(),
   });
+  /* `bot_prompt` は 2026-08-25 に復活（新チャネル 2011239425 が本番 OA `@307tzhkw` を
+   * 紐付け済みになったため）。判断の中身は `lib/line/login-channel.ts`。
+   * ⚠ `prompt` とは別のパラメータである。上の長い注記が禁じているのは `prompt` の方で、
+   * `bot_prompt` は auto login を無効化しない。 */
+  const botPrompt = loginBotPrompt();
+  if (botPrompt) params.set("bot_prompt", botPrompt);
 
   if (wantsAutoLoginDisabled(request)) {
     params.set("disable_auto_login", "true");

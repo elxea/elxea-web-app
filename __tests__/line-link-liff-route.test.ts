@@ -556,7 +556,7 @@ describe("GET /api/user/line-link/callback", () => {
 /* =========================================================================
  * P2 — client_secret の env フォールバック（LINE_LIFF → LINE_LOGIN_CHANNEL_SECRET）
  *
- * LINE_LIFF_CHANNEL_ID と LINE_LOGIN_CHANNEL_ID は同一 Login チャネル (2009473839) を指すため、
+ * LINE_LIFF_CHANNEL_ID と LINE_LOGIN_CHANNEL_ID は同一 Login チャネル (本番 2011239425) を指すため、
  * その Channel Secret は LINE_LOGIN_CHANNEL_SECRET と同値。本番 Vercel は後者だけ設定済みで
  * 前者は未設定なので、フォールバックが無いと init は 503・callback は fail-closed で連携が回らない。
  * ここでは (a) LIFF のみ (b) LOGIN のみ (c) 両方未設定 の 3 状態を固定する。
@@ -644,7 +644,7 @@ describe("P2 client_secret env フォールバック", () => {
  *
  * 原因: 本番の LINE_LOGIN_CHANNEL_SECRET が「正しい 32 文字 + 改行」で保存されていた
  *       (`vercel env add ... < file` のように stdin から入れると末尾の改行まで値になる)。
- *       同じチャネル (2009473839) でもメールログインが読む AUTH_LINE_SECRET は改行なしで
+ *       同じチャネル (当時 2009473839) でもメールログインが読む AUTH_LINE_SECRET は改行なしで
  *       保存されていたため、ログインだけは通り続け、連携の不具合に見えていた。
  *
  * 直し方の方針: 本番の値を掃除するだけでは同じ入れ方でまた再発する。**コードを不感にする**
@@ -736,8 +736,8 @@ describe("P2 env に紛れ込んだ末尾改行（本番障害 2026-08-22 の回
   it("resolveLinkChannelId: 改行を落とし、空なら undefined", async () => {
     const { resolveLinkChannelId } = await import("@/lib/line/link-flow");
 
-    process.env.LINE_LIFF_CHANNEL_ID = " 2009473839\r\n";
-    expect(resolveLinkChannelId()).toBe("2009473839");
+    process.env.LINE_LIFF_CHANNEL_ID = " 2011239425\r\n";
+    expect(resolveLinkChannelId()).toBe("2011239425");
 
     process.env.LINE_LIFF_CHANNEL_ID = "   ";
     expect(resolveLinkChannelId()).toBeUndefined();

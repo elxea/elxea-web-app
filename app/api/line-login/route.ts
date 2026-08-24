@@ -5,6 +5,8 @@ import { getBaseUrl, getRequestHostname, isTrustedAuthHost } from "@/lib/base-ur
 import { getCookieSpec, isSecure, resolveCookieDomain } from "@/lib/auth/cookies";
 import { wantsAutoLoginDisabled } from "@/lib/line/auto-login";
 import { lineAuthBaseUrl } from "@/lib/line/endpoints";
+import { loginBotPrompt, loginScopeParam } from "@/lib/line/login-channel";
+import { reportChannelNamespace } from "@/lib/line/login-channel-report";
 
 /**
  * Direct LINE Login OAuth 2.0 redirect endpoint.
@@ -89,22 +91,26 @@ export async function GET(request: NextRequest) {
 
   const redirectUri = `${baseUrl}/api/line-callback`;
 
-  // Note: bot_prompt=aggressive removed 2026-04-13. The production LINE Official
-  // Account (@307tzhkw) is owned under a different LINE Developers Console
-  // provider (channel 2008324925, 404 from setaka-on@elxea.com). Linked OA on
-  // the elxea provider's LINE Login channel can only point to the test OA
-  // (@426vlcyb), which is wrong for production users. Until the channel
-  // ownership is reconciled, login proceeds without the friend-add prompt.
-  // Restore bot_prompt: "aggressive" once the production OA's channel can be
-  // linked to this LINE Login channel.
+  /* 名前空間ガード（M-0）。ログインは止めない — 止めると「連携を直す変更で
+   * ログインが全滅する」ことになる。不一致は必ず記録に残し、監視で拾う。 */
+  reportChannelNamespace("line-login");
+
+  /* `bot_prompt` は 2026-04-13 に外され、2026-08-25 に戻した。
+   *
+   * 外した理由は「本番 OA `@307tzhkw` が別プロバイダにあり、この Login チャネルに
+   * 紐付けられる OA がテスト用 `@426vlcyb` しか無かった」。新チャネル 2011239425 は
+   * 本番 OA を紐付け済みなので、前提ごと解消している。判断の中身は
+   * `lib/line/login-channel.ts` の `loginBotPrompt` に置いた。 */
   const params = new URLSearchParams({
     response_type: "code",
     client_id: channelId,
     redirect_uri: redirectUri,
     state: state,
     nonce,
-    scope: "profile openid email",
+    scope: loginScopeParam(),
   });
+  const botPrompt = loginBotPrompt();
+  if (botPrompt) params.set("bot_prompt", botPrompt);
 
   // Same auto-login-failure escape hatch as the init route; see lib/line/auto-login.ts.
   if (wantsAutoLoginDisabled(request)) {
