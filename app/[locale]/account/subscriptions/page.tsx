@@ -21,7 +21,12 @@ import {
 import { captionClass } from "@/components/editorial/rule-list";
 import { Button } from "@/components/ui/button";
 import { Link } from "@/i18n/navigation";
-import { isSignedIn, type AccountAuth } from "@/lib/account-capabilities";
+import {
+  accountActionHref,
+  isSignedIn,
+  lockedActionFor,
+  type AccountAuth,
+} from "@/lib/account-capabilities";
 import { seedSubscriptionContracts } from "@/lib/preview-seed";
 import { getCustomerFromSession, getSubscriptionsFromSession } from "@/lib/shopify/auth";
 import type { SubscriptionContract } from "@/lib/shopify/customer";
@@ -97,6 +102,10 @@ export default async function SubscriptionsPage() {
       line: (await cookies()).has("line_session"),
     };
 
+    /* ラベルも行き先もカタログから引く。この画面だけ別の文言・別の行き先を
+       持たせない (以前は `/api/auth/login` を直書きしていた — as-is D-18)。 */
+    const action = lockedActionFor("subscriptions");
+
     if (isSignedIn(auth)) {
       return (
         <div className="flex min-h-[70vh] items-center justify-center px-4 py-24">
@@ -108,9 +117,11 @@ export default async function SubscriptionsPage() {
             <p className={cn(captionClass, "mb-8 text-muted-foreground")}>
               {t("emailRequiredReason")}
             </p>
-            <Button variant="outline" asChild>
-              <a href={`/api/auth/login?locale=${locale}`}>{t("connectShopifyButton")}</a>
-            </Button>
+            {action ? (
+              <Button variant="outline" asChild>
+                <a href={accountActionHref(action.target, locale)}>{t(action.labelKey)}</a>
+              </Button>
+            ) : null}
             <div className="mt-6">
               <Button variant="link" className="h-auto p-0 text-muted-foreground" asChild>
                 <Link href="/account">{t("backToAccountLink")}</Link>

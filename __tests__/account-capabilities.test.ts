@@ -77,9 +77,11 @@ describe("マイページの項目カタログ", () => {
         expect(item.lockedReasonKey, item.id).toBeTruthy();
       }
     }
-    /* Shopify が要る項目は必ず「連携する」導線を持つ (行き止まりにしない)。 */
+    /* Shopify が要る項目は必ず次の行動を持つ (行き止まりにしない)。 */
     for (const item of ACCOUNT_ITEMS.filter((i) => i.requires === "shopify")) {
-      expect(item.lockedActionKey, item.id).toBeTruthy();
+      expect(item.lockedAction, item.id).toBeTruthy();
+      expect(item.lockedAction?.labelKey, item.id).toBeTruthy();
+      expect(item.lockedAction?.target, item.id).toBeTruthy();
     }
   });
 
@@ -97,7 +99,7 @@ describe("マイページの項目カタログ", () => {
       const candidates: (string | null)[] = [
         item.lockedTitleKey,
         item.lockedReasonKey,
-        item.lockedActionKey,
+        item.lockedAction?.labelKey ?? null,
       ];
       return candidates.filter((key): key is string => key !== null);
     });

@@ -31,6 +31,7 @@ import { LINK_RESULT_PARAM } from "@/lib/line/link-flow";
 import { FAVORITE_KIND_META } from "@/lib/account-favorites";
 import {
   ACCOUNT_SECTION_ORDER,
+  accountActionHref,
   isAvailable,
   isSignedIn,
   splitSectionItems,
@@ -190,15 +191,22 @@ export default async function AccountPage({
 
   const recordDate = (record: AccountRecord) => formatRecordDate(record.date, locale);
 
-  /** 使えない項目 1 件をグレーのカードにする。文言はカタログのキー経由。 */
+  /** 使えない項目 1 件をグレーのカードにする。文言も行き先もカタログ経由。
+   *
+   * 行き先をここで組み立てない — 以前は `lockedActionKey` が何であっても
+   * `/api/auth/login` に直書きで送っていた (as-is D-18)。ラベルと行き先は
+   * カタログで対になっており、URL への変換は `accountActionHref` の 1 箇所だけ。 */
   const lockedCard = (item: AccountItem) => (
     <AccountLockedCard
       key={item.id}
       title={t(item.lockedTitleKey)}
       reason={t(item.lockedReasonKey)}
       action={
-        item.lockedActionKey
-          ? { label: t(item.lockedActionKey), href: `/api/auth/login?locale=${locale}` }
+        item.lockedAction
+          ? {
+              label: t(item.lockedAction.labelKey),
+              href: accountActionHref(item.lockedAction.target, locale),
+            }
           : undefined
       }
     />
