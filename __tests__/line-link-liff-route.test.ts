@@ -84,11 +84,17 @@ type LinkageCompletionStub = {
   outcome: "merged" | "merge-failed" | "not-linked" | "linked-elsewhere";
   merge: null;
 };
-const completeLineLinkageMock = vi.fn<
+/* M-2 以降、この 2 経路が呼ぶのは `applyLinkageEstablished`。
+   `completeLineLinkage`（台帳を HTTP で引き直してから合体する版）は、
+   まだ台帳の状態を知らない呼び出し元 — メールログインの取りこぼし再試行 —
+   専用になった。この 2 経路は**たった今その行を書いたばかり**なので、
+   引き直す相手が自分自身になっており、3 秒一発の HTTP に合体の成否を
+   賭ける理由が無い。 */
+const applyLinkageEstablishedMock = vi.fn<
   (args: unknown) => Promise<LinkageCompletionStub>
 >(async () => ({ outcome: "merged", merge: null }));
 vi.mock("@/lib/auth/identity-link", () => ({
-  completeLineLinkage: (args: unknown) => completeLineLinkageMock(args),
+  applyLinkageEstablished: (args: unknown) => applyLinkageEstablishedMock(args),
 }));
 
 import { POST } from "@/app/api/user/line-link-liff/route";
@@ -757,7 +763,7 @@ describe("P2 env に紛れ込んだ末尾改行（本番障害 2026-08-22 の回
  * 「お気に入りが消えた」ように見えていた。
  *
  * ここで見るのは route の責務の境界だけ:
- *   - upsert が 2xx で返ったあと、必ず `completeLineLinkage` を呼ぶこと
+ *   - upsert が 2xx で返ったあと、必ず `applyLinkageEstablished` を呼ぶこと
  *   - 渡す 2 つの識別子が **どちらもサーバ確定値**であること
  *     （LINE 側 = LINE に検証させた id_token の `sub` / 顧客側 = requireAuth の結果）
  *   - 連携が成立しなかったときは呼ばないこと
@@ -777,8 +783,8 @@ describe("P1 連携成立とデータ合体が対で走る", () => {
     const res = await POST(makeRequest({ idToken: VALID_ID_TOKEN }));
 
     expect(res.status).toBe(200);
-    expect(completeLineLinkageMock).toHaveBeenCalledTimes(1);
-    expect(completeLineLinkageMock).toHaveBeenCalledWith({
+    expect(applyLinkageEstablishedMock).toHaveBeenCalledTimes(1);
+    expect(applyLinkageEstablishedMock).toHaveBeenCalledWith({
       lineUserId: VALID_SUB,
       shopifyCustomerId: "555",
       source: "line-link-liff",
@@ -790,7 +796,7 @@ describe("P1 連携成立とデータ合体が対で走る", () => {
 
     await POST(makeRequest({ idToken: VALID_ID_TOKEN }));
 
-    expect(completeLineLinkageMock).not.toHaveBeenCalled();
+    expect(applyLinkageEstablishedMock).not.toHaveBeenCalled();
   });
 
   it("LIFF 経路: cx-agent が失敗したら合体を呼ばない（台帳に行が無い）", async () => {
@@ -813,7 +819,7 @@ describe("P1 連携成立とデータ合体が対で走る", () => {
     const res = await POST(makeRequest({ idToken: VALID_ID_TOKEN }));
 
     expect(res.status).toBe(502);
-    expect(completeLineLinkageMock).not.toHaveBeenCalled();
+    expect(applyLinkageEstablishedMock).not.toHaveBeenCalled();
   });
 
   it("マイページのボタン経路: upsert 成功後に合体を 1 回、サーバ確定の識別子で呼ぶ", async () => {
@@ -837,8 +843,8 @@ describe("P1 連携成立とデータ合体が対で走る", () => {
     expect(new URL(res.headers.get("location")!).searchParams.get(LINK_RESULT_PARAM)).toBe(
       "success",
     );
-    expect(completeLineLinkageMock).toHaveBeenCalledTimes(1);
-    expect(completeLineLinkageMock).toHaveBeenCalledWith({
+    expect(applyLinkageEstablishedMock).toHaveBeenCalledTimes(1);
+    expect(applyLinkageEstablishedMock).toHaveBeenCalledWith({
       lineUserId: VALID_SUB,
       shopifyCustomerId: OWNER,
       source: "line-link-callback",
@@ -869,11 +875,11 @@ describe("P1 連携成立とデータ合体が対で走る", () => {
     expect(new URL(res.headers.get("location")!).searchParams.get(LINK_RESULT_PARAM)).toBe(
       "error",
     );
-    expect(completeLineLinkageMock).not.toHaveBeenCalled();
+    expect(applyLinkageEstablishedMock).not.toHaveBeenCalled();
   });
 
   it("合体が転んでも連携の成否は変えない（実際は連携できている人に失敗を告げない）", async () => {
-    completeLineLinkageMock.mockResolvedValueOnce({
+    applyLinkageEstablishedMock.mockResolvedValueOnce({
       outcome: "merge-failed",
       merge: null,
     });

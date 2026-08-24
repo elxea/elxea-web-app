@@ -111,7 +111,15 @@ export type LinkageCompletion = {
 export type LinkageSource =
   | "line-link-callback"
   | "line-link-liff"
-  | "auth-callback";
+  | "auth-callback"
+  /**
+   * cx-agent が「台帳に行が立った」を通知してきた（M-2）。
+   *
+   * LINE トーク内の Account Link はこの経路でしか合体できない — その連携は
+   * **web-app を一度も通らずに成立する**（LINE → cx-agent の webhook で完結する）ため、
+   * web-app 側に合体を起こすきっかけが構造的に無かった。それが D-3 の正体である。
+   */
+  | "linkage-event";
 
 /**
  * 台帳の連携成立を確かめ、成立していればデータを合体する。
@@ -287,6 +295,97 @@ export async function completeLineLinkage({
     /* 合体の中の per-document の失敗はここに来ない（counters で返る）。
        ここに来るのはコレクション列挙そのものの失敗など。連携・ログインは
        成立させたまま、事実だけ残す。 */
+    console.error(`[identity-link] merge threw (source=${source}):`, err);
+    Sentry.captureException(err, {
+      tags: { subsystem: "identity-link", source },
+    });
+    return none("merge-failed");
+  }
+}
+
+/**
+ * **台帳に行が立ったと分かっている**ときに、合体だけを実行する（M-2）。
+ *
+ * ## `completeLineLinkage` と何が違うのか
+ *
+ * `completeLineLinkage` は「台帳を **HTTP で引き直して** 本人一致を確かめてから合体する」。
+ * それは**まだ台帳の状態を知らない**呼び出し元（メールログインの取りこぼし再試行）には
+ * 正しい。しかし連携経路 — LIFF / マイページの連携 CTA / LINE トーク内の Account Link —
+ * は違う。**たった今その行を書いたばかり**である。
+ *
+ * その 3 経路が引き直していたせいで、次の形が構造的に保証されていた。
+ *
+ *   1. 書いた直後にキャッシュを捨て（`invalidateReverseLinkage`）
+ *   2. 3 秒のタイムアウト付きで HTTP を投げ（`lib/line/linkage-status.ts`）
+ *   3. **その一発が外れたら合体しない**
+ *
+ * 「連携しました」と画面に出たのに、お気に入りは元の棚に残ったまま — という壊れ方は
+ * ここから出ていた。しかも次のメールログインまで誰も気付かない。
+ *
+ * 引き直しは「書いた事実」を確かめ直しているだけで、**書いた側より確かな情報源は無い**。
+ * よって連携経路は本関数を使い、引き直しをやめる。
+ *
+ * ## 何を根拠に合体してよいのか（G1 をどう満たすか）
+ *
+ * G1 は「合体は本人一致を確認してから。cookie の同居を意思の代わりにしない」。本関数は
+ * その確認を**引き直しではなく、台帳への書き込みが成立したこと**で満たす。書き込みには
+ * 必ず本人の意思が先立つ（nonce の single-use 消費 / state cookie に封じた顧客 ID /
+ * 検証済み id_token の sub）。
+ *
+ * @param lineUserId **サーバ側で検証済み**の LINE userId のみ。
+ *   ブラウザ自己申告や、リクエスト body からそのまま流し込んだ値を渡してはならない。
+ * @param shopifyCustomerId **サーバ確定**の Shopify 顧客 ID のみ。
+ * @returns 何が起きたか。**決して throw しない**。
+ */
+export async function applyLinkageEstablished({
+  lineUserId,
+  shopifyCustomerId,
+  source,
+  db,
+}: {
+  lineUserId: string;
+  shopifyCustomerId: string;
+  source: LinkageSource;
+  db?: Firestore;
+}): Promise<LinkageCompletion> {
+  const none = (outcome: LinkageOutcome): LinkageCompletion => ({
+    outcome,
+    merge: null,
+  });
+
+  if (!lineUserId || !shopifyCustomerId) {
+    console.warn(
+      `[identity-link] line linkage skipped: invalid input (source=${source})`,
+    );
+    Sentry.captureMessage("Identity link called with empty identifier", {
+      level: "warning",
+      tags: { subsystem: "identity-link", source, outcome: "invalid-input" },
+    });
+    return none("invalid-input");
+  }
+  if (`line:${lineUserId}` === shopifyCustomerId) {
+    console.warn(
+      `[identity-link] line linkage skipped: same key (source=${source})`,
+    );
+    return none("same-key");
+  }
+
+  try {
+    /* 逆引きキャッシュは捨てる。捨てないと、連携の直前に読んだ「未連携」が最大 60 秒
+       残り、その窓の中で書かれたお気に入りが**合体後に置き去りになる**（合体は
+       この 1 回しか走らないので、後から拾う経路が無い）。
+       ⚠ 引き直しはしない — それが M-2 で廃止した構造そのもの。 */
+    invalidateReverseLinkage(lineUserId);
+
+    await mirrorLineUserId(lineUserId, shopifyCustomerId, source, db);
+
+    const merge = await mergeLineIdentityIntoShopify(
+      lineUserId,
+      shopifyCustomerId,
+      db,
+    );
+    return { outcome: "merged", merge };
+  } catch (err) {
     console.error(`[identity-link] merge threw (source=${source}):`, err);
     Sentry.captureException(err, {
       tags: { subsystem: "identity-link", source },

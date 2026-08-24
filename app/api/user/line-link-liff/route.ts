@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAuth } from "@/lib/firebase/auth-guard";
-import { completeLineLinkage } from "@/lib/auth/identity-link";
+import { applyLinkageEstablished } from "@/lib/auth/identity-link";
 import { parseJsonBody } from "@/lib/validation/zod-helpers";
 import { enforceRateLimit, limiters } from "@/lib/ratelimit";
 import { verifyLineIdToken } from "@/lib/line/verify-liff-token";
@@ -113,10 +113,15 @@ export async function POST(request: NextRequest) {
      * `line:` の棚に貯めた中身は運ばれないままなので、**どちらのログイン手段
      * からも読めない**場所に取り残される。
      *
-     * `completeLineLinkage` は throw せず、台帳をもう一度引いて本人一致を
-     * 確かめてから動く。合体が転んでも連携自体は成立しているので 200 を返す —
-     * ここで 502 に倒すと、実際には連携できている人に失敗を告げることになる。 */
-    await completeLineLinkage({
+     * **台帳を引き直さない**（M-2）。この経路は直前に自分で cx-agent へ書き、
+     * その 200 を受け取っている — 書いた側より確かな情報源は無い。以前はここで
+     * キャッシュを捨てて 3 秒タイムアウト付きの HTTP を投げ直しており、その
+     * 一発が外れると「連携しました」と表示したまま合体だけが起きなかった。
+     *
+     * `applyLinkageEstablished` は throw しない。合体が転んでも連携自体は成立して
+     * いるので 200 を返す — ここで 502 に倒すと、実際には連携できている人に
+     * 失敗を告げることになる。 */
+    await applyLinkageEstablished({
       lineUserId: verified.messagingUserId,
       shopifyCustomerId: auth.customerId,
       source: "line-link-liff",

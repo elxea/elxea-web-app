@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 
 import { requireAuth } from "@/lib/firebase/auth-guard";
-import { completeLineLinkage } from "@/lib/auth/identity-link";
+import { applyLinkageEstablished } from "@/lib/auth/identity-link";
 import { getBaseUrl, getRequestOrigin } from "@/lib/base-url";
 import { getCookieSpec, resolveCookieDomain } from "@/lib/auth/cookies";
 import { CX_AGENT_BASE_URL } from "@/lib/chat/proxy";
@@ -216,11 +216,15 @@ export async function GET(request: NextRequest) {
    * 場所に取り残される。連携を成立させることと荷物を運ぶことは 1 つの操作で、
    * 分けて片方だけ行う理由はどこにも無かった。
    *
-   * `completeLineLinkage` は throw せず、台帳をもう一度引いて本人一致を確かめて
-   * から動く（いま行を立てた直後なので必ず通る）。合体が転んでも連携は成立して
-   * いるので、リダイレクトは成功のまま返す — ここで error に倒すと、実際には
+   * **台帳を引き直さない**（M-2）。この経路は直前に自分で cx-agent へ書き、その
+   * 200 を受け取っている。「いま行を立てた直後なので必ず通る」という前提で
+   * 引き直していたが、必ず通るなら引く意味が無く、通らないとき（cx-agent が
+   * 一時的に不達）は**合体だけが黙って落ちる**。書いた事実を根拠にする。
+   *
+   * `applyLinkageEstablished` は throw しない。合体が転んでも連携は成立している
+   * ので、リダイレクトは成功のまま返す — ここで error に倒すと、実際には
    * 連携できている人に「連携できませんでした」と言うことになる。 */
-  await completeLineLinkage({
+  await applyLinkageEstablished({
     lineUserId: verified.messagingUserId,
     shopifyCustomerId: auth.customerId,
     source: "line-link-callback",
