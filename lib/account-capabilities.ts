@@ -39,6 +39,38 @@ export type AccountAuth = {
  */
 export type AccountRequirement = "signed-in" | "shopify";
 
+/**
+ * 「次の行動」の行き先。**ラベルと行き先を必ず一緒に持つ**ための識別子。
+ *
+ * 以前はカタログがラベルのキー (`lockedActionKey`) だけを持ち、行き先は画面側で
+ * `/api/auth/login?locale=...` に直書きされていた。ラベルが何であってもログインへ
+ * 送るので、カタログに別の行き先の項目を足した瞬間に「ラベルと行き先が食い違う」
+ * (as-is D-18)。行き先もカタログ側に置き、画面は解決するだけにする。
+ *
+ * - `shopify-login` … Shopify (メールアドレス) のログインへ送る
+ */
+export type AccountActionTarget = "shopify-login";
+
+/** 使えない項目に添える「次の行動」。ラベルのキーと行き先は必ず対で持つ。 */
+export type AccountLockedAction = {
+  /** ラベル (`messages/*.json` の `account.*` キー)。 */
+  labelKey: string;
+  target: AccountActionTarget;
+};
+
+/**
+ * 行き先を実 URL にする。**ここが唯一の変換口**。
+ *
+ * 画面側 (`app/[locale]/account/page.tsx` / `.../subscriptions/page.tsx`) が
+ * それぞれ URL を組み立てていたのをやめ、1 箇所に集めた。
+ */
+export function accountActionHref(target: AccountActionTarget, locale: string): string {
+  switch (target) {
+    case "shopify-login":
+      return `/api/auth/login?locale=${encodeURIComponent(locale)}`;
+  }
+}
+
 /** マイページの節。並び順は `ACCOUNT_SECTION_ORDER`。 */
 export type AccountSectionId = "upcoming" | "continue" | "follows" | "past" | "payment";
 
@@ -63,10 +95,14 @@ export type AccountItem = {
   /** 使えない理由。なぜ出せないのかを、その場で言う。 */
   lockedReasonKey: string;
   /**
-   * 次の行動のラベル。`null` なら行動リンクを出さない。
-   * 現状はすべて「メールアドレスを連携する」に収束する。
+   * 次の行動。`null` なら行動リンクを出さない。
+   *
+   * 現状はすべて `shopify-login` (メールアドレスでのログイン) に収束する。
+   * **「連携」ではなく「ログイン」である** — この導線が実際に起こすのは Shopify の
+   * ログインだけで、LINE との連携は起きない。連携はログイン後にマイページの
+   * 「LINEと連携する」で行う 2 段階 (再設計 J-1 案B)。
    */
-  lockedActionKey: string | null;
+  lockedAction: AccountLockedAction | null;
 };
 
 /**
@@ -82,7 +118,7 @@ export const ACCOUNT_ITEMS = [
     requires: "shopify",
     lockedTitleKey: "featureSubscriptions",
     lockedReasonKey: "emailRequiredReason",
-    lockedActionKey: "connectShopifyButton",
+    lockedAction: { labelKey: "connectShopifyButton", target: "shopify-login" },
   },
   {
     id: "events",
@@ -90,7 +126,7 @@ export const ACCOUNT_ITEMS = [
     requires: "signed-in",
     lockedTitleKey: "registeredEvents",
     lockedReasonKey: "signInRequiredReason",
-    lockedActionKey: null,
+    lockedAction: null,
   },
   {
     id: "favorites",
@@ -98,7 +134,7 @@ export const ACCOUNT_ITEMS = [
     requires: "signed-in",
     lockedTitleKey: "favorites",
     lockedReasonKey: "signInRequiredReason",
-    lockedActionKey: null,
+    lockedAction: null,
   },
   {
     id: "follows",
@@ -106,7 +142,7 @@ export const ACCOUNT_ITEMS = [
     requires: "signed-in",
     lockedTitleKey: "followingFarmers",
     lockedReasonKey: "signInRequiredReason",
-    lockedActionKey: null,
+    lockedAction: null,
   },
   {
     id: "orders",
@@ -114,7 +150,7 @@ export const ACCOUNT_ITEMS = [
     requires: "shopify",
     lockedTitleKey: "featureOrders",
     lockedReasonKey: "emailRequiredReason",
-    lockedActionKey: "connectShopifyButton",
+    lockedAction: { labelKey: "connectShopifyButton", target: "shopify-login" },
   },
   {
     id: "payment",
@@ -122,7 +158,7 @@ export const ACCOUNT_ITEMS = [
     requires: "shopify",
     lockedTitleKey: "featurePayment",
     lockedReasonKey: "emailRequiredReason",
-    lockedActionKey: "connectShopifyButton",
+    lockedAction: { labelKey: "connectShopifyButton", target: "shopify-login" },
   },
 ] as const satisfies readonly AccountItem[];
 
@@ -163,6 +199,14 @@ export function splitSectionItems(
     available: items.filter((item) => isItemAvailable(item, auth)),
     locked: items.filter((item) => !isItemAvailable(item, auth)),
   };
+}
+
+/**
+ * その項目の「次の行動」。項目専用の画面 (例: /account/subscriptions) が
+ * 自前でラベルと行き先を持たないようにするための引き口。
+ */
+export function lockedActionFor(id: AccountItemId): AccountLockedAction | null {
+  return ACCOUNT_ITEMS.find((candidate) => candidate.id === id)?.lockedAction ?? null;
 }
 
 /** その項目 id が今使えるか (画面側から id 直指定で引くとき用)。 */
