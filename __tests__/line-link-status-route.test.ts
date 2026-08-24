@@ -281,25 +281,27 @@ describe("resolveLineLinkageEntryMode（連携節の出し分け）", () => {
     ).toBe("link-cta");
   });
 
-  it("LINE ログイン中の未連携は節ごと出さない（押せない連携ボタンを置かない）", () => {
+  /* ここは 2026-08-25 に反転した（J-1 案A / L4 緩和）。
+   *
+   * 以前は「LINE ログイン中の未連携は節ごと出さない」だった。`/api/user/line-link/init`
+   * が Shopify セッションを要求するので、押しても弾かれるボタンを出さない、という
+   * 判断で、当時は正しい。ただしその結果 **LINE だけで使っている人のマイページに
+   * 連携の入口が 1 つも無い**状態が残った — 連携が一番必要な人に、連携の話が
+   * 出てこない。ワンタップの入口 `/api/user/line-link/intent` は Shopify セッションを
+   * 要求しないので、その前提はもう成立しない。 */
+  it("LINE ログイン中の未連携には、ワンタップの入口を出す", () => {
     expect(resolveLineLinkageEntryMode({ canLink: false, status: NOT_LINKED })).toBe(
-      "hidden",
+      "one-tap-cta",
     );
   });
 
-  it("LINE ログイン中に状態が読めなかったら黙って消さない（連携済みの人が誤解する）", () => {
+  it("LINE ログイン中に状態が読めなくても入口は出す（連携は冪等・黙って消さない）", () => {
     expect(
       resolveLineLinkageEntryMode({ canLink: false, status: UNKNOWN_LINE_LINKAGE }),
-    ).toBe("status-only");
+    ).toBe("one-tap-cta");
   });
 
-  it("連携フローから戻ってきた結果があるときは、未連携でも黙って捨てない", () => {
-    expect(
-      resolveLineLinkageEntryMode({
-        canLink: false,
-        status: NOT_LINKED,
-        hasResult: true,
-      }),
-    ).toBe("status-only");
+  it("status が未取得（undefined）でも入口は出す", () => {
+    expect(resolveLineLinkageEntryMode({ canLink: false })).toBe("one-tap-cta");
   });
 });

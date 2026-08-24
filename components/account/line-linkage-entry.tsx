@@ -1,6 +1,7 @@
 import { AccountPanelSection } from "@/components/account/account-panel";
 import { LineLinkageCta } from "@/components/account/line-linkage-cta";
 import { LineUnlinkControl } from "@/components/account/line-unlink-control";
+import { Button } from "@/components/ui/button";
 import {
   formatLinkedDate,
   resolveLineLinkageEntryMode,
@@ -76,11 +77,23 @@ const COPY = {
     /** 状態が読めなかったとき。「未連携」と言い切らない（3 値表示）。 */
     statusUnknown:
       "ただいま連携の状態を確認できませんでした。すでに連携がお済みの場合、あらためて連携していただいても二重にはなりません。",
-    /** LINE でログイン中の見出し（この画面から新たに連携する導線は無いので、動詞にしない）。 */
-    statusHeading: "LINEとの連携",
-    /** LINE でログイン中に状態が読めなかったとき。連携ボタンが無いので促し方を変える。 */
+    /** LINE でログイン中の見出し。 */
+    statusHeading: "メールアドレスと連携する",
+    /**
+     * LINE だけでログインしている人への説明（ワンタップ・J-1 案A）。
+     *
+     * 「メールアドレスでログイン」ではなく「連携する」と言い切ってよくなった。
+     * Wave 1 でこの文言を「ログイン」に正したのは、当時のボタンが**押しても定義上
+     * 100% 何も起きなかった**ためで（設計書 §1-2）、名前が実体と食い違っていたから
+     * である。ワンタップは戻ってきた時点で台帳に行が立つので、いまは実体が言葉に
+     * 追いついている。
+     */
+    oneTapDescription:
+      "ご注文や定期便の状況をこの画面でご覧いただくには、お使いのメールアドレスとの連携が必要です。連携すると、LINE で保存されたお気に入りもそのまま引き継がれます。",
+    oneTapButton: "メールアドレスと連携する",
+    /** LINE でログイン中に状態が読めなかったとき。 */
     statusUnknownNoCta:
-      "ただいま連携の状態を確認できませんでした。お手数ですが、少し時間をおいてからもう一度ご覧ください。",
+      "ただいま連携の状態を確認できませんでした。すでに連携がお済みの場合、あらためて連携していただいても二重にはなりません。",
   },
   en: {
     heading: "Link with LINE",
@@ -100,9 +113,12 @@ const COPY = {
       "This LINE account is already linked to a different email address. Only one email address can be linked at a time. To link it here instead, please sign in with that email address and unlink it first.",
     statusUnknown:
       "We could not check your link status just now. If you are already linked, linking again will not create a duplicate.",
-    statusHeading: "LINE linkage",
+    statusHeading: "Link your email address",
+    oneTapDescription:
+      "To see your orders and subscription here, link the email address you use with elxea. Anything you saved while signed in with LINE comes with you.",
+    oneTapButton: "Link your email address",
     statusUnknownNoCta:
-      "We could not check your link status just now. Please take a look again in a little while.",
+      "We could not check your link status just now. If you are already linked, linking again will not create a duplicate.",
   },
 } as const;
 
@@ -141,11 +157,22 @@ type Locale = keyof typeof COPY;
  *   `line-conflict`（この LINE に既に別のメールアドレスが付いている）はその逆向きで、
  *   **解除できる場所がもう一方のアカウント側にある**ため、案内すべき行動が違う。
  *
- * @param canLink この画面から連携フローに入れるか（＝ Shopify の顧客セッションがあるか）。
+ * @param canLink Shopify の顧客セッションがあるか（＝メールでログインしているか）。
  *   既定 `true`（従来の呼び出し方＝メールでログインしている人）。
  *
- *   LINE だけでログインしている人には `false` を渡す。`/api/user/line-link/init` は
- *   Shopify セッションを要求するので、押しても入口で弾かれる連携ボタンを出さないため。
+ *   LINE だけでログインしている人には `false` を渡す。この値は「連携できるか」ではなく
+ *   **どちらの入口を出すか**を決める。
+ *
+ *   - `true`  … `LineLinkageCta`（LINE の認可へ行く。P2 の導線）
+ *   - `false` … ワンタップの入口 `/api/user/line-link/intent`（J-1 案A）
+ *
+ *   以前この場所には「LINE だけの人には連携ボタンを出さない」と書いてあった。
+ *   `/api/user/line-link/init` が Shopify セッションを要求するので、押しても入口で
+ *   弾かれるボタンを出さない、という判断で、当時それは正しかった。ただしその結果
+ *   **LINE だけで使っている人のマイページには連携の入口が 1 つも無い**状態が残った。
+ *   連携が一番必要な人に、連携の話が出てこない。ワンタップの入口は Shopify セッションを
+ *   要求しないので、その前提はもう成立しない（設計書 §3-4 の L4 緩和の枠内）。
+ *
  *   **解除は別**で、連携済みなら `canLink` に関係なく状態と解除の導線を出す
  *   （解除の対象は台帳の自分の行なので、LINE セッションでも指定できる）。ここが
  *   出ていなかったのが「LINE でログインすると連携を解除できない」の正体。
@@ -164,11 +191,7 @@ export function LineLinkageEntry({
 }) {
   const t = COPY[(locale as Locale) in COPY ? (locale as Locale) : "ja"];
 
-  const mode = resolveLineLinkageEntryMode({
-    canLink,
-    status,
-    hasResult: Boolean(result),
-  });
+  const mode = resolveLineLinkageEntryMode({ canLink, status });
 
   /* 「状態が読めなかった」かどうか（3 値の null）。連携済みかどうかとは別の軸。 */
   const statusUnknown = status?.linked === null;
@@ -210,22 +233,26 @@ export function LineLinkageEntry({
     );
   }
 
-  /* 連携フローに入れない（LINE だけでログインしている）ときは、連携ボタンを出さない。
-     未連携なら節ごと出さず、状態が読めなかったときと連携から戻ってきた直後だけ、
-     その事実を静かに置く。
-
-     この経路の入口は **2 段階**である（再設計 J-1 案B）。LINE だけの人が見る
-     グレーのカードは「メールアドレスでログイン」へ送るだけで、連携そのものは
-     起こさない。ログイン後にこの節が連携できる姿（`canLink=true`）で出て、
-     そこで「LINEと連携する」を押してもらう。以前この場所には「連携の入口は
-     『メールアドレスを連携する』の既存導線が持つ」と書いてあったが、その導線は
-     Shopify のログインへ送るだけで連携は一切起きない — 名前が実体と食い違って
-     おり、押しても何も起きないボタンを「連携の入口」と呼んでいた。
-     不明を黙って消さないのは、連携済みの人が「未連携」と読んで解除が要らないと
-     誤解するのを防ぐため（3 値表示の原則は経路が変わっても同じ）。 */
-  if (mode === "hidden") return null;
-
-  if (mode === "status-only") {
+  /* LINE だけでログインしている人の入口（ワンタップ・J-1 案A / L4 緩和）。
+   *
+   * ここは以前 **何も出さなかった**（`hidden`）。`/api/user/line-link/init` が Shopify
+   * セッションを要求するので「押しても弾かれるボタンを出さない」という判断で、当時は
+   * 正しかった。ただしその結果、LINE だけで使っている人のマイページには連携の入口が
+   * 1 つも無い状態が残った — 連携が一番必要な人に、連携の話が出てこない。
+   *
+   * ワンタップの入口 `/api/user/line-link/intent` は Shopify セッションを要求しない。
+   * 押した瞬間に意思を封緘してログインへ送り、帰り道（`/api/auth/callback`）で台帳に
+   * 行を立てる。よって「押しても弾かれる」はもう成立しない。
+   *
+   * ## なぜ素の `<a>` なのか（client component にしない）
+   *
+   * この導線は「cookie を 1 本置いて 302」するだけで、事前に取りに行くものが無い。
+   * `LineLinkageCta` が client component なのは、LINE の自動ログインを発火させるために
+   * 認可 URL を**先読みして実 `<a>` に載せる**必要があるからで、ここにその制約は無い。
+   *
+   * 状態が読めなかったときは、入口を出したうえで一言添える。連携は冪等なので
+   * 二度押しても壊れず、黙って未連携の顔をするより安全側（`link-cta` と同じ判断）。 */
+  if (mode === "one-tap-cta") {
     return (
       <AccountPanelSection title={t.statusHeading} testId="line-linkage-entry">
         <div className="space-y-2">
@@ -239,6 +266,20 @@ export function LineLinkageEntry({
               {t.statusUnknownNoCta}
             </p>
           ) : null}
+          <div className="flex items-start justify-between gap-6">
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              {t.oneTapDescription}
+            </p>
+            <Button variant="secondary" className="shrink-0 shadow-xs" asChild>
+              {/* Route Handler なので next/link ではなく素の `<a>` で遷移させる。 */}
+              <a
+                href={`/api/user/line-link/intent?locale=${encodeURIComponent(locale)}`}
+                data-testid="line-linkage-one-tap-cta"
+              >
+                {t.oneTapButton}
+              </a>
+            </Button>
+          </div>
         </div>
       </AccountPanelSection>
     );
