@@ -448,9 +448,16 @@ test.describe.serial("LINE ログイン・メール連携・合体", () => {
     await loginWithEmail(page);
 
     /* 連携を試みる。cx-agent（正本）が 409 を返し、連携は成立しない。
-     * ここが通ってしまうと、共用端末で前の人の棚が次の人に見える。 */
+     * ここが通ってしまうと、共用端末で前の人の棚が次の人に見える。
+     *
+     * ⚠ 出るのは **conflict** の文言であって error ではない（M-1 / J-4）。
+     *   この衝突は「1 LINE = 1 顧客」という決めどおりの結果で、時間をおいても
+     *   直らない。かつてはここが error に潰され「時間をおいてもう一度お試し
+     *   ください」と案内していた = **永久に成功しない再試行を促していた**。
+     *   error が出ないことまで見るのは、丸め直しの再発を捕まえるため。 */
     await linkLineFromAccount(page);
-    await expect(page.getByTestId("line-linkage-notice-error")).toBeVisible();
+    await expect(page.getByTestId("line-linkage-notice-conflict")).toBeVisible();
+    await expect(page.getByTestId("line-linkage-notice-error")).toHaveCount(0);
 
     expect(
       await listFavoriteTitles(page),

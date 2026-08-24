@@ -101,6 +101,32 @@ describe("LineLinkageEntry / LINE でログイン中（canLink=false）", () => 
     expect(html).toContain('data-testid="line-linkage-notice-error"');
   });
 
+  /**
+   * 恒久的な衝突（すでに別の LINE が連携済み）を、一時エラーと同じ顔にしない。
+   *
+   * かつては 409 も 500 も同じ `error` に潰され、画面は「時間をおいてもう一度
+   * お試しください」と案内していた。**永久に成功しない再試行を促していた**わけで、
+   * お客さまは同じ操作を繰り返すことになる。J-4 で「1 LINE = 1 顧客」と決めた以上、
+   * これは決めたとおりの結果であって障害ではない。
+   */
+  it("恒久的な衝突は error と別の文言で出す（もう一度お試しください、と言わない）", () => {
+    const html = render(
+      <LineLinkageEntry
+        locale="ja"
+        status={NOT_LINKED}
+        canLink={false}
+        result="conflict"
+      />,
+    );
+
+    expect(html).toContain('data-testid="line-linkage-notice-conflict"');
+    expect(html).not.toContain('data-testid="line-linkage-notice-error"');
+    /* 次に取れる行動（先に今の連携を解除する）を伝えていること。
+       ここを伏せると、お客さまは同じ操作を繰り返すしかない。 */
+    expect(html).toContain("すでに別の LINE アカウントが連携されています");
+    expect(html).toContain("解除");
+  });
+
   it("英語ロケールでも同じ出し分けになる", () => {
     const html = render(
       <LineLinkageEntry locale="en" status={LINKED} canLink={false} />,
