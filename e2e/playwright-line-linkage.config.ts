@@ -53,6 +53,19 @@ const LINE_LOGIN_CHANNEL_ID = "1000000001";
 const LINE_LINK_CHANNEL_ID = "1000000002";
 const SHOPIFY_CLIENT_ID = "fake-shopify-client-id";
 const SYNC_API_SECRET = "fake-sync-api-secret";
+/**
+ * 合体イベント（M-2）と消去（M-5）の鍵。**どちらも `SYNC_API_SECRET` とは別鍵**。
+ *
+ * 本物が鍵を分けているのには理由があり、その分離自体が検査対象になる。
+ *   - 合体イベントの口は「この LINE とこの顧客は同一人物である」と宣言できる。
+ *     通れば web-app は元の棚を消して荷物を移すので、取り返しがつかない
+ *   - 消去の口は消すことしかしない。他の用途で配った鍵で開けさせない
+ * ここで同じ値にすると、鍵を取り違える退行が偽物側で吸収されて見えなくなる。
+ */
+const LINKAGE_EVENT_SECRET = "fake-linkage-event-secret";
+const ERASE_API_SECRET = "fake-erase-api-secret";
+/** Shopify webhook の HMAC 鍵（S15 の customers/redact を署名するのに要る）。 */
+const SHOPIFY_WEBHOOK_SECRET = "fake-shopify-webhook-secret";
 
 const repoRoot = path.resolve(__dirname, "..");
 
@@ -69,6 +82,9 @@ process.env.E2E_SHOPIFY_ORIGIN = SHOPIFY_ORIGIN;
 process.env.E2E_LINE_HIT_LOG = LINE_HIT_LOG;
 process.env.E2E_CX_HIT_LOG = CX_HIT_LOG;
 process.env.E2E_BASE_HOST = `${FAKE_APEX_HOST}:${PORT}`;
+/* S15（消去）は Shopify の webhook を偽造して叩くので、spec 側も同じ鍵で署名する。
+   合成値であって本物の秘密ではない。 */
+process.env.E2E_SHOPIFY_WEBHOOK_SECRET = SHOPIFY_WEBHOOK_SECRET;
 
 /* テスト開始前に温めるルート。理由は e2e/support/warm-dev-server.ts に書いてある
  * （要約: `next dev` の初回コンパイルを、テストの制限時間ではなく globalSetup の
@@ -105,6 +121,11 @@ process.env.E2E_WARMUP_PATHS = [
   "/api/user/line-link",
   "/api/user/line-link/init",
   "/api/user/line-link/callback",
+  /* LINE トーク内 Account Link の受け口 (S13) と GDPR 消去 (S15)。
+     どちらも POST 専用なので GET は 405 だが、Next はどのメソッドが export されて
+     いるかを知るためにルートモジュールを読み込むので、405 でもコンパイルは済む。 */
+  "/api/internal/linkage-established",
+  "/api/webhooks/gdpr/customers-redact",
 ].join(",");
 /* `/{locale}/account` は `middleware.ts` がセッション cookie の **有無** で門を張る。
  * cookie 無しの素の fetch は `/ja/login` へ折り返され、account ページ本体は 1 行も
@@ -164,7 +185,10 @@ export default defineConfig({
       timeout: 30_000,
     },
     {
-      command: `node scripts/e2e/fake-cx-agent-server.mjs ${CX_PORT} ${SYNC_API_SECRET} ${CX_HIT_LOG}`,
+      /* 偽 cx-agent には web-app の**素の origin**（127.0.0.1）を渡す。偽アペックスの
+         名前解決は Chromium の `--host-resolver-rules` にしかなく、Node からは
+         引けない。S13 の合体イベントはサーバ間の POST なので cookie は関係しない。 */
+      command: `node scripts/e2e/fake-cx-agent-server.mjs ${CX_PORT} ${SYNC_API_SECRET} ${CX_HIT_LOG} http://127.0.0.1:${PORT} ${LINKAGE_EVENT_SECRET} ${ERASE_API_SECRET}`,
       cwd: repoRoot,
       url: `${CX_ORIGIN}/health`,
       reuseExistingServer: !process.env.CI,
@@ -205,6 +229,13 @@ export default defineConfig({
         /* --- 偽 cx-agent（連携台帳の正本） --- */
         NEXT_PUBLIC_CHAT_API_URL: `${CX_ORIGIN}/api/chat`,
         SYNC_API_SECRET,
+        /* 合体イベントの受け口（M-2 / S13）。未設定だと 503 で fail-closed に
+           なるので、この env が無いと S13 は「合体が起きない」形で落ちる。 */
+        LINKAGE_EVENT_SECRET,
+        /* 消去（M-5 / S15）。**SYNC_API_SECRET と別鍵**であることに意味がある。 */
+        ERASE_API_SECRET,
+        /* GDPR webhook の署名検証（S15）。未設定だと handler が 500 を返す。 */
+        SHOPIFY_WEBHOOK_SECRET,
 
         /* --- 偽 Shopify Customer Account（メールログイン） --- */
         SHOPIFY_CUSTOMER_ACCOUNT_CLIENT_ID: SHOPIFY_CLIENT_ID,
