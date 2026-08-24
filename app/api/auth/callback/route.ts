@@ -12,7 +12,12 @@ import { sendWelcomeEmail } from "@/lib/email/welcome";
 import { sanitizeReturnTo } from "@/lib/auth/return-to";
 import { clearAuthCookies } from "@/lib/auth/cookies";
 import { getRequestOrigin } from "@/lib/base-url";
-import { completeLineLinkage } from "@/lib/auth/identity-link";
+import {
+  applyLinkageEstablished,
+  completeLineLinkage,
+} from "@/lib/auth/identity-link";
+import { LINK_INTENT_COOKIE, openLinkIntent } from "@/lib/auth/link-intent";
+import { establishLinkageFromIntent } from "@/lib/auth/one-tap-link";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
@@ -232,13 +237,59 @@ export async function GET(request: NextRequest) {
     const lineUidEnc = request.cookies.get("line_uid")?.value;
     if (lineUidEnc && customerId) {
       const lineUserId = decryptToken(lineUidEnc);
-      const completion = lineUserId
-        ? await completeLineLinkage({
-            lineUserId,
-            shopifyCustomerId: customerId,
-            source: "auth-callback",
-          })
-        : null;
+
+      /* ── ワンタップ連携（J-1 案A）─────────────────────────────────
+       *
+       * この人はマイページで「メールアドレスと連携する」を押して出て行ったのか。
+       * それを言えるのは、押した瞬間にしか作られない封筒だけである
+       * （`lib/auth/link-intent.ts`）。封筒があり、10 分以内で、**いまの LINE と
+       * 束縛が取れている**ときにだけ、ここで台帳に行を立てる。
+       *
+       * G1（cookie の同居を意思の代わりにしない）はこれで満たす。同居している
+       * だけでは何も起きない — 下の `completeLineLinkage` は台帳に行がある人しか
+       * 動かさないまま。緩めたのは「意思の運び方」だけで、「本人でなくてよい」に
+       * は一切していない。
+       *
+       * ⚠ 封筒は**結果によらず必ず消す**（1 回きり）。成功しても失敗しても、
+       *   同じ意思が 2 度目の連携に流用されてはならない。 */
+      const intent = openLinkIntent(
+        request.cookies.get(LINK_INTENT_COOKIE)?.value,
+        lineUserId,
+      );
+      response.cookies.delete(LINK_INTENT_COOKIE);
+
+      let oneTapOutcome: Awaited<
+        ReturnType<typeof establishLinkageFromIntent>
+      > | null = null;
+      if (intent.ok && customerId) {
+        oneTapOutcome = await establishLinkageFromIntent({
+          lineUserId: intent.lineUserId,
+          shopifyCustomerId: customerId,
+        });
+      } else if (!intent.ok && intent.reason !== "absent") {
+        /* 封筒はあったのに使えなかった。**通常運転ではない**ので残す。
+           識別子は載せない（reason だけで切り分けられる）。 */
+        console.warn(
+          `[one-tap-link] intent present but unusable (reason=${intent.reason})`,
+        );
+      }
+
+      /* 台帳に行が立ったなら、その事実を根拠に合体する（M-2 と同じ立て付け。
+         書いた側より確かな情報源は無いので、HTTP で引き直さない）。
+         立たなかった / そもそも押していないなら、従来どおり取りこぼしの再試行。 */
+      const completion = !lineUserId
+        ? null
+        : oneTapOutcome?.ok
+          ? await applyLinkageEstablished({
+              lineUserId,
+              shopifyCustomerId: customerId,
+              source: "auth-callback",
+            })
+          : await completeLineLinkage({
+              lineUserId,
+              shopifyCustomerId: customerId,
+              source: "auth-callback",
+            });
 
       /* LINE セッションを捨てるのは、**実際に合体まで到達したときだけ**。
        *
