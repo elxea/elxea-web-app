@@ -11,7 +11,9 @@
  * - NEXT_PUBLIC_FIREBASE_APP_ID
  */
 import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
-import { getFirestore, type Firestore } from "firebase/firestore";
+import { connectFirestoreEmulator, getFirestore, type Firestore } from "firebase/firestore";
+
+import { resolveClientFirestoreTarget, splitEmulatorHost } from "./firestore-target";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -37,8 +39,21 @@ let _db: Firestore | null = null;
  */
 export function getClientFirestore(): Firestore {
   if (!_db) {
+    /* サーバー側と同じ約束をブラウザ側にも敷く: 手元では既定で本番へ繋がない。
+       判定の順番と理由は lib/firebase/firestore-target.ts に 1 か所だけ書いてある。
+       本番ビルドでは NODE_ENV が "production" に畳まれるため、ここは常に
+       { kind: "production" } を返す枝になる（= 挙動は従来どおり）。 */
+    const target = resolveClientFirestoreTarget();
+
     const app = getFirebaseApp();
-    _db = getFirestore(app);
+    const db = getFirestore(app);
+
+    if (target.kind === "emulator") {
+      const { host, port } = splitEmulatorHost(target.host);
+      connectFirestoreEmulator(db, host, port);
+    }
+
+    _db = db;
   }
   return _db;
 }

@@ -4,6 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "node ./scripts/copy-maplibre-worker.mjs && next dev",
+    "emulator:start": "npx --yes firebase-tools@14 emulators:start --only firestore --project demo-elxea",
+    "dev:emulator": "FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 NEXT_PUBLIC_FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 pnpm dev",
+    "test:e2e:emulator": "FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 NEXT_PUBLIC_FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 pnpm test:e2e",
     "build": "node ./scripts/copy-maplibre-worker.mjs && node sd.config.mjs && npx tsx scripts/check-placeholders.ts && next build",
     "start": "next start",
     "lint": "eslint . --max-warnings 0",

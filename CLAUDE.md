@@ -53,6 +53,10 @@ pre-commit install --hook-type pre-commit --hook-type pre-push
 - CMS: Sanity.io（コンテンツ）+ Notion（タスク・運用）
 - EC: Shopify Storefront API（ヘッドレス）
 - Auth/DB: Firebase（Firestore + Auth）
+  - **手元では本番Firestoreに繋がらない**（既定はfail-closed）。`pnpm dev` は止まるので、
+    エミュレーター（`pnpm emulator:start` + `pnpm dev:emulator`）か偽Firestore
+    （`E2E_FIRESTORE_STUB=1`）を選ぶ。判定の正本は `lib/firebase/firestore-target.ts`、
+    手順は `docs/firestore-local-emulator.md`。本番・Previewの挙動は従来どおり。
 - Deploy: Vercel
 - i18n: next-intl（日本語 primary）
 - Package Manager: pnpm

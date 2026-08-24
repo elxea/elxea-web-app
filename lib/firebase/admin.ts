@@ -15,6 +15,8 @@ import {
 } from "firebase-admin/app";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
 
+import { resolveServerFirestoreTarget } from "./firestore-target";
+
 /**
  * Decode FIREBASE_PRIVATE_KEY from various storage formats:
  * 1. Base64-encoded PEM (recommended for Vercel)
@@ -50,6 +52,22 @@ function getAdminApp(): App {
     return getApps()[0];
   }
 
+  /* エミュレーターが立っているなら、本物の資格情報を読む前に分岐する。
+     エミュレーターは資格情報を要求しないので、ここで先に返さないと
+     「手元で開発したいだけなのに本番の鍵が要る」という妙な依存が残る。
+     Admin SDK は FIRESTORE_EMULATOR_HOST が立っていれば Firestore の通信先を
+     そこへ固定するので、この app から本番へ出て行く経路は無い。 */
+  if (process.env.FIRESTORE_EMULATOR_HOST) {
+    const target = resolveServerFirestoreTarget();
+    if (target.kind === "emulator") {
+      console.warn(
+        `[firebase/admin] FIRESTORE_EMULATOR_HOST=${target.host} — ` +
+          `エミュレーターに接続します（project=${target.projectId}）。本番 Firestore には触れません。`,
+      );
+      return initializeApp({ projectId: target.projectId });
+    }
+  }
+
   const projectId = process.env.FIREBASE_PROJECT_ID;
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
   const privateKey = decodePrivateKey(process.env.FIREBASE_PRIVATE_KEY);
@@ -60,6 +78,12 @@ function getAdminApp(): App {
         `projectId=${!!projectId}, clientEmail=${!!clientEmail}, privateKey=${!!privateKey}`
     );
   }
+
+  /* ここまで来たということは「本番の資格情報が揃っている」。本番ランタイム
+     （NODE_ENV=production / Vercel）ならそのまま通す＝従来と同じ。手元なら止める。
+     資格情報の有無を見るより後に置いているのは、資格情報が無いときの文言を
+     変えないため（lib/journal/popular-articles.ts がその文言で "未設定" を判定している）。 */
+  resolveServerFirestoreTarget();
 
   return initializeApp({
     credential: cert({
