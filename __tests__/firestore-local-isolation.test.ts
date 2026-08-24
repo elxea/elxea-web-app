@@ -185,6 +185,29 @@ describe("getAdminFirestore の実際の分岐", () => {
     expect(() => getAdminFirestore()).toThrow(/missing required env vars/);
   });
 
+  it("先に誰かが app を作っていても、判定は飛ばさない", async () => {
+    /* 「app が在れば即返す」を判定より前に置くと、他所が先に app を作った瞬間に
+       ガードが丸ごと飛ぶ。守りが「初期化したのが自分が最初か」という順番次第に
+       なるのは守りとして成立しないので、そこを固定する。
+
+       firebase-admin を先に import して app を登録し、**同じモジュール登録簿のまま**
+       こちらの admin.ts を読む（間に resetModules を挟むと登録簿ごと作り直されて
+       しまい、このテストが何も検査しなくなる）。 */
+    vi.stubEnv("NODE_ENV", "development");
+    stubProductionCredentials();
+
+    const { initializeApp, getApps, deleteApp } = await import("firebase-admin/app");
+    initializeApp({ projectId: "someone-elses-app" });
+    expect(getApps().length).toBeGreaterThan(0);
+
+    try {
+      const { getAdminFirestore } = await import("@/lib/firebase/admin");
+      expect(() => getAdminFirestore()).toThrow(/本番 Firestore への接続を止めました/);
+    } finally {
+      await Promise.all(getApps().map((app) => deleteApp(app)));
+    }
+  });
+
   it("エミュレーター指定があれば、資格情報が 1 つも無くても初期化できる", async () => {
     vi.stubEnv("NODE_ENV", "development");
     vi.stubEnv("FIRESTORE_EMULATOR_HOST", "127.0.0.1:8080");
