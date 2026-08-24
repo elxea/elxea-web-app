@@ -22,16 +22,29 @@
 
 import type { Timestamp } from "firebase/firestore";
 
+import type { FavoriteKind } from "@/lib/account-favorites";
+
 // ---------------------------------------------------------------------------
-// Favorites (products & articles)
+// Favorites (products, articles & people)
 // ---------------------------------------------------------------------------
 
-export type FavoriteType = "product" | "article";
+/**
+ * The kinds of things that can be favorited.
+ *
+ * Deliberately an alias of `FavoriteKind` rather than its own union: the single
+ * source of truth is `FAVORITE_KINDS` in `lib/account-favorites.ts`, which the
+ * UI also iterates over. Re-declaring the union here used to let the two drift
+ * (a kind visible in the UI but rejected by the API with a 400).
+ */
+export type FavoriteType = FavoriteKind;
 
 export type Favorite = {
-  /** "product" or "article" */
+  /** "product", "article" or "person" */
   type: FavoriteType;
-  /** Shopify product handle (products) or Sanity article slug (articles) */
+  /**
+   * Shopify product handle (products), Sanity article slug (articles) or
+   * Sanity person slug (people)
+   */
   targetId: string;
   /** Human-readable title for display in my-page without re-fetching */
   title: string;

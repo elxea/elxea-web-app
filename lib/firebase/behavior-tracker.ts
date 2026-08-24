@@ -12,6 +12,8 @@
  *   trackPageView({ contentId: "article-slug", category: "tea-culture" });
  */
 
+import type { FavoriteKind } from "@/lib/account-favorites";
+
 export type TrackPageViewParams = {
   contentId: string;
   category?: string;
@@ -35,7 +37,11 @@ export type TrackProductViewParams = {
 export type TrackFavoriteAddParams = {
   contentId?: string;
   productId?: string;
-  type: "article" | "product";
+  /**
+   * お気に入りの種類。正本は `FAVORITE_KINDS` (`lib/account-favorites.ts`)。
+   * ここで語をベタ書きすると、種類を足したときに計測だけ古い語のまま残る。
+   */
+  type: FavoriteKind;
 };
 
 export type TrackSearchParams = {

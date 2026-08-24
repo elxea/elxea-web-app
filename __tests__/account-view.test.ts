@@ -140,6 +140,71 @@ describe("buildContinueItems (続き)", () => {
   it("抜粋は 1 行 (2 枚) より多い — 「入れたのに見当たらない」を作らない", () => {
     expect(ACCOUNT_CONTINUE_LIMIT).toBeGreaterThan(2);
   });
+
+  /**
+   * 種類が 3 つになった時点 (F4 で人を追加) の回帰。
+   *
+   * 「優先順位の高い種類から順に 6 枚で打ち切る」だけだと、持っている件数が
+   * 多い種類が枠を食い尽くし、後ろの種類が **1 枚も出ない**。お客さまからは
+   * 「商品のお気に入りが消えた」に見え、種類が増えるたびに末尾が黙って落ちる。
+   */
+  it("持っているどの種類も 1 枚は出る (後ろの種類が枠を食われて消えない)", () => {
+    const favorites = [
+      ...Array.from({ length: 5 }, (_, i) => ({
+        id: `a-${i}`,
+        type: "article",
+        targetId: `a-${i}`,
+        title: `記事 ${i}`,
+      })),
+      ...Array.from({ length: 4 }, (_, i) => ({
+        id: `pe-${i}`,
+        type: "person",
+        targetId: `pe-${i}`,
+        title: `人 ${i}`,
+      })),
+      ...Array.from({ length: 3 }, (_, i) => ({
+        id: `pr-${i}`,
+        type: "product",
+        targetId: `pr-${i}`,
+        title: `商品 ${i}`,
+      })),
+    ];
+
+    const result = buildContinueItems(favorites);
+
+    expect(result).toHaveLength(ACCOUNT_CONTINUE_LIMIT);
+    for (const kind of ["article", "person", "product"]) {
+      expect(result.filter((item) => item.kind === kind).length, kind).toBeGreaterThan(0);
+    }
+    // 描く順は種類ごとにまとまったまま (混ぜて時系列に並べない)。
+    expect(result.map((item) => item.kind)).toEqual([
+      ...result.map((item) => item.kind).filter((kind) => kind === "article"),
+      ...result.map((item) => item.kind).filter((kind) => kind === "person"),
+      ...result.map((item) => item.kind).filter((kind) => kind === "product"),
+    ]);
+  });
+
+  it("1 種類しか持っていない人の見え方は変わらない (余った枠は前へ回る)", () => {
+    const favorites = Array.from({ length: 10 }, (_, i) => ({
+      id: `a-${i}`,
+      type: "article",
+      targetId: `a-${i}`,
+      title: `記事 ${i}`,
+    }));
+
+    const result = buildContinueItems(favorites);
+
+    expect(result).toHaveLength(ACCOUNT_CONTINUE_LIMIT);
+    expect(result.every((item) => item.kind === "article")).toBe(true);
+    expect(result.map((item) => item.id)).toEqual(["a-0", "a-1", "a-2", "a-3", "a-4", "a-5"]);
+  });
+
+  it("人はその人のページへ飛ぶ", () => {
+    const [item] = buildContinueItems([
+      { id: "pe1", type: "person", targetId: "masayuki-kubo", title: "久保 雅之" },
+    ]);
+    expect(item).toMatchObject({ kind: "person", href: "/people/masayuki-kubo" });
+  });
 });
 
 describe("buildPast (これまで = 注文履歴)", () => {

@@ -17,6 +17,7 @@
  */
 
 import {
+  FAVORITE_CONTINUE_ORDER,
   normalizeFavorites,
   type FavoriteInput,
   type FavoriteKind,
@@ -188,20 +189,53 @@ export function buildUpcoming({
  * ここは並べ方と枚数だけを決める。以前はこの関数の中に同じ正規化をもう一度
  * 書いていたので、一覧ページと抜粋で落ちる件が食い違う余地があった。
  *
- * 並びは **種類ごとにまとめる** (読みもの → 商品)。混ぜて時系列に並べると、
+ * 並びは **種類ごとにまとめる** (読みもの → 人 → 商品)。混ぜて時系列に並べると、
  * 6 枚のなかで種類がばらけて「種類別に見たい」という要望から遠ざかる。
  * 種類の中の順序は入力順 (= createdAt 降順) のまま。
+ *
+ * ## どの種類も必ず 1 枚は顔を出す (F4)
+ *
+ * 以前は「優先順位の高い種類から順に 6 枚で打ち切る」だけだった。種類が 2 つの
+ * うちは実害が無かったが、3 つ目 (人) を足した瞬間に **後ろの種類が 1 枚も
+ * 出なくなる** 事故が起きる (実測: 読みもの 4 + 人 2 で 6 枚が埋まり、商品が
+ * まるごと消えた)。お客さまから見ると「商品のお気に入りが無くなった」であり、
+ * 種類が増えるたびに末尾の種類が黙って落ちていく壊れ方をする。
+ *
+ * そこで **枠の割り当てだけ順番に 1 枚ずつ配り** (優先順位の高い種類から)、
+ * 描くときは種類ごとにまとめ直す。持っている種類が少なければ余った枠は
+ * そのまま前の種類に回るので、1 種類しか無い人の見え方は変わらない。
  */
 export function buildContinueItems(favorites: AccountFavoriteInput[]): AccountMediaItem[] {
   const entries = normalizeFavorites(favorites);
 
-  /* 確定版の 1 枚目は読みもの。`FAVORITE_KINDS` の並び (product → article) とは
-     逆向きに読みものを先へ出すので、ここで明示的に並べ替える。 */
-  const order: readonly FavoriteKind[] = ["article", "product"];
+  /* 種類の優先順位は `FAVORITE_KIND_META.continueRank` が正本 (確定版の 1 枚目は
+     読みもの = `FAVORITE_KINDS` の並びとは別)。ここに語を並べ直すと、種類が
+     増えたときに抜粋から黙って漏れる — 実際 F3 までの並びは
+     ["article","product"] のベタ書きで、人を足しても出なかった。 */
+  const order: readonly FavoriteKind[] = FAVORITE_CONTINUE_ORDER;
+
+  const byKind = new Map<FavoriteKind, typeof entries>(
+    order.map((kind) => [kind, entries.filter((entry) => entry.kind === kind)])
+  );
+
+  /* 枠を 1 枚ずつ配る。配れる種類が無くなるか、枠を使い切ったら終わり。 */
+  const quota = new Map<FavoriteKind, number>(order.map((kind) => [kind, 0]));
+  let assigned = 0;
+  let assignedThisRound = true;
+  while (assigned < ACCOUNT_CONTINUE_LIMIT && assignedThisRound) {
+    assignedThisRound = false;
+    for (const kind of order) {
+      if (assigned >= ACCOUNT_CONTINUE_LIMIT) break;
+      const taken = quota.get(kind) ?? 0;
+      if (taken >= (byKind.get(kind)?.length ?? 0)) continue;
+      quota.set(kind, taken + 1);
+      assigned += 1;
+      assignedThisRound = true;
+    }
+  }
 
   return order
-    .flatMap((kind) => entries.filter((entry) => entry.kind === kind))
-    .slice(0, ACCOUNT_CONTINUE_LIMIT)
+    .flatMap((kind) => (byKind.get(kind) ?? []).slice(0, quota.get(kind) ?? 0))
     .map((entry) => ({
       id: entry.id,
       kind: entry.kind,

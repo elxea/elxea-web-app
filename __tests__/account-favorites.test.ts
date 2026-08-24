@@ -1,10 +1,11 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
 import {
   FAVORITES_KIND_LIMIT,
+  FAVORITE_CONTINUE_ORDER,
   FAVORITE_KINDS,
   FAVORITE_KIND_META,
   countFavorites,
@@ -151,6 +152,44 @@ describe("種類カタログ", () => {
       expect(meta.basePath.startsWith("/"), kind).toBe(true);
       expect(favoriteHref(kind, "x"), kind).toBe(`${meta.basePath}/x`);
     }
+  });
+
+  /**
+   * 0 件の節に出る「探しに行く」導線は **実在するページ** を指していなければ
+   * ならない。人 (`/people/[slug]`) は詳細だけがあって一覧が無いので、
+   * `basePath` をそのまま導線にすると 404 に送ってしまう。
+   */
+  it("0 件のときの導線は実在する一覧ページを指す", () => {
+    for (const kind of FAVORITE_KINDS) {
+      const { browsePath } = FAVORITE_KIND_META[kind];
+      expect(browsePath.startsWith("/"), kind).toBe(true);
+      expect(
+        existsSync(join(ROOT, "app/[locale]", browsePath.slice(1), "page.tsx")) ||
+          existsSync(join(ROOT, "app/[locale]/(reading)", browsePath.slice(1), "page.tsx")),
+        `${kind}: ${browsePath} に一覧ページが無い`
+      ).toBe(true);
+    }
+  });
+
+  it("抜粋の並びはすべての種類を含む (新しい種類が黙って漏れない)", () => {
+    expect([...FAVORITE_CONTINUE_ORDER].sort()).toEqual([...FAVORITE_KINDS].sort());
+    // 確定版の 1 枚目は読みもの。
+    expect(FAVORITE_CONTINUE_ORDER[0]).toBe("article");
+  });
+
+  /**
+   * API の受け口と Firestore の型は `FAVORITE_KINDS` から導く (F4)。
+   * ここが語のベタ書きに戻ると「画面には節が出るのに保存すると 400」が復活する。
+   */
+  it("API の受け口が種類の正本から導かれている", () => {
+    const route = read("app/api/user/favorites/route.ts");
+    expect(route).toContain("z.enum(FAVORITE_KINDS)");
+    expect(route).not.toMatch(/z\.enum\(\s*\[/);
+    expect(read("lib/firebase/types.ts")).toContain("export type FavoriteType = FavoriteKind");
+  });
+
+  it("人のお気に入りは人のページを指す", () => {
+    expect(favoriteHref("person", "masayuki-kubo")).toBe("/people/masayuki-kubo");
   });
 
   it("文言キーはすべて messages/ja.json と en.json に実在する", () => {

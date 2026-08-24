@@ -360,7 +360,18 @@
     "teasKicker": "TEAS BY THIS PERSON",
     "storiesKicker": "STORIES",
     "otherKicker": "OTHER PEOPLE",
-    "otherHead": "roji に関わる人たち"
+    "otherHead": "roji に関わる人たち",
+    "saveAdd": "この人を保存",
+    "saveRemove": "保存をやめる",
+    "saveSaved": "保存済み",
+    "saveLoading": "保存の状態を確認しています",
+    "saveLoginRequired": "ログインすると保存できます",
+    "saveStatusUnknown": "保存の状態を取得できませんでした。押すともう一度確認します。",
+    "saveAddedMessage": "マイページに保存しました",
+    "saveRemovedMessage": "保存をやめました",
+    "saveErrorMessage": "操作に失敗しました。もう一度お試しください。",
+    "saveLoginRequiredMessage": "保存するにはログインが必要です。",
+    "saveStatusRetryMessage": "保存の状態をもう一度確認しています。"
   },
   "farmer": {
     "heading": "茶畑をたずねて",
@@ -494,9 +505,11 @@
     "favorites": "お気に入り",
     "favoriteProducts": "お気に入り商品",
     "favoriteArticles": "お気に入り記事",
+    "favoritePeople": "お気に入りの人",
     "noFavorites": "お気に入りはまだありません。",
     "noFavoriteProducts": "お気に入り商品はまだありません。",
     "noFavoriteArticles": "お気に入り記事はまだありません。",
+    "noFavoritePeople": "保存した人はまだいません。読みものの書き手の名前から、その人のページをたずねられます。",
     "removedFromFavorites": "お気に入りから削除しました",
     "followingFarmers": "フォロー中の農家",
     "noFollows": "フォロー中の農家はいません。",
@@ -541,6 +554,7 @@
     "favoritesCount": "{count}件",
     "favoriteKindProduct": "お気に入りの商品",
     "favoriteKindArticle": "お気に入りの読みもの",
+    "favoriteKindPerson": "保存した人",
     "favoriteRemoveLabel": "「{title}」をお気に入りから外す"
   },
   "comment": {

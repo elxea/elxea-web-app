@@ -893,6 +893,25 @@ export function seedFavorites(): FavoriteInput[] | null {
       imageUrl: previewImageAt(6),
       createdAt: "2026-07-21T02:00:00.000Z",
     },
+    /* 人 (F4 で足した 3 つ目の種類)。見本にも入れておかないと、実寸確認のとき
+       「お気に入りの人」節が常に 0 件で、節の見た目 (カード・解除) を目で
+       確かめられない。targetId は /people/[slug] の slug。 */
+    {
+      id: `${SEED_ID_PREFIX}favorite-person-1`,
+      type: "person",
+      targetId: "seed-person-0",
+      title: "久保 雅之",
+      imageUrl: previewImageAt(7),
+      createdAt: "2026-08-19T02:00:00.000Z",
+    },
+    {
+      id: `${SEED_ID_PREFIX}favorite-person-2`,
+      type: "person",
+      targetId: "seed-person-1",
+      title: "西村 藍",
+      imageUrl: previewImageAt(8),
+      createdAt: "2026-08-05T02:00:00.000Z",
+    },
   ];
 }
 

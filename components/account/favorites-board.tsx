@@ -99,8 +99,11 @@ export function FavoritesBoard({ groups: initialGroups }: { groups: FavoriteGrou
                 group.items.length > 0
                   ? undefined
                   : /* 0 件の種類には「探しに行く」導線だけを置く (解除も並べ替えも
-                       できることが無いので、節を空のまま終わらせない)。 */
-                    { label: tCommon(meta.browseLabelKey), href: meta.basePath }
+                       できることが無いので、節を空のまま終わらせない)。
+                       遷移先は `basePath` ではなく `browsePath` — 人のように
+                       「詳細ページはあるが一覧ページが無い」種類があり、`basePath`
+                       をそのまま押させると 404 に送ってしまう。 */
+                    { label: tCommon(meta.browseLabelKey), href: meta.browsePath }
               }
             />
 
