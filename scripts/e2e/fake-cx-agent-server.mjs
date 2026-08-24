@@ -30,6 +30,13 @@
  * ぶら下がる（世帯共有）ため、逆向きの一意制約は置かない。これは本番の customer_linkages と
  * 同じ形で、解除が「その LINE だけ」を外す挙動（P8）をテストで再現するのに必要。
  *
+ * ## テストからの操作口 (`/__control/*`)
+ *
+ *   POST /__control/reset            … 台帳と遅延を初期化
+ *   GET  /__control/ledger           … 台帳の中身
+ *   POST /__control/latency {ms,times} … `/api/identity/*` の応答を遅らせる
+ *   GET  /__control/latency          … 現在の遅延設定
+ *
  * 使い方: node scripts/e2e/fake-cx-agent-server.mjs <port> <apiKey> [hitLogPath]
  */
 import { appendFileSync, mkdirSync } from "node:fs";
@@ -42,6 +49,54 @@ const HIT_LOG = process.argv[4] ?? null;
 
 /** line_user_id -> { shopifyCustomerId, linkedAt } */
 const ledger = new Map();
+
+/**
+ * 注入する遅延（ミリ秒）。既定 0 = 即答。
+ *
+ * ## なぜ要るのか（as-is D-16）
+ *
+ * web-app は cx-agent への問い合わせに 3000ms の上限を置き、超えたら
+ * `linked: null`（不明）へ縮退する（`lib/line/linkage-status.ts`）。この
+ * **縮退の先にある画面**が、今回の症状で一番効く安全装置になっている
+ * （「未連携」と言い切らず「確認できませんでした」を出す）。
+ *
+ * ところが偽サーバーは即答しかできず、`delay` / `sleep` / `setTimeout` /
+ * `latency` / `timeout` の出現がゼロだった。つまり **3000ms の上限も、
+ * その先の縮退も、テストで一度も踏まれていなかった**。「タイムアウト時の
+ * 挙動」は設計文書とコメントの中にしか存在しない状態。
+ *
+ * ここで注入できるようにして、E2E から実際に踏ませる。
+ *
+ * ⚠ 遅らせるのは `/api/identity/*` だけ。`/__control/*` と `/health` は
+ *   常に即答する（遅延を解除する手段まで一緒に固まると、テストが自分で
+ *   自分を詰ませる）。
+ */
+let latencyMs = 0;
+
+/** 遅延の残り回数。`null` なら無期限（reset まで続く）。 */
+let latencyRemaining = null;
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * 遅延を 1 回分消費する。適用したミリ秒を返す（0 なら遅らせていない）。
+ *
+ * ⚠ 記録は **待つ前** に取る。web-app は 3000ms で諦めて先へ進むので、待ち
+ *   終わってから記録すると、テストが「遅延が効いたか」を確かめる時点でまだ
+ *   1 行も書かれていない（実際にそれで落ちた）。知りたいのは「遅らせることに
+ *   した」という事実なので、決めた瞬間に残す。
+ */
+async function applyLatency(pathname) {
+  if (latencyMs <= 0) return 0;
+  if (latencyRemaining !== null) {
+    if (latencyRemaining <= 0) return 0;
+    latencyRemaining -= 1;
+  }
+  const ms = latencyMs;
+  recordHit({ path: pathname, delayedMs: ms });
+  await sleep(ms);
+  return ms;
+}
 
 if (HIT_LOG) mkdirSync(path.dirname(HIT_LOG), { recursive: true });
 
@@ -97,6 +152,10 @@ const server = http.createServer(async (req, res) => {
 
   if (pathname === "/__control/reset" && req.method === "POST") {
     ledger.clear();
+    /* 遅延も一緒に落とす。落とし忘れた遅延が次の spec に漏れると、無関係な
+       テストが「たまに落ちる」形で壊れ、原因の特定に一番時間がかかる。 */
+    latencyMs = 0;
+    latencyRemaining = null;
     return json(res, 200, { ok: true });
   }
 
@@ -106,6 +165,20 @@ const server = http.createServer(async (req, res) => {
     });
   }
 
+  /* 遅延の注入 (D-16)。`{ ms }` で秒単位の停止、`{ ms, times }` で回数を限る。
+     `{ ms: 0 }` で解除。GET で現在値を読める。 */
+  if (pathname === "/__control/latency") {
+    if (req.method === "POST") {
+      const body = await readJson(req);
+      const ms = Number(body.ms);
+      latencyMs = Number.isFinite(ms) && ms > 0 ? ms : 0;
+      const times = Number(body.times);
+      latencyRemaining = Number.isFinite(times) && times > 0 ? times : null;
+      return json(res, 200, { ok: true, ms: latencyMs, times: latencyRemaining });
+    }
+    return json(res, 200, { ms: latencyMs, times: latencyRemaining });
+  }
+
   /* ---- 認証 ---------------------------------------------------------------- */
 
   const isIdentityApi = pathname.startsWith("/api/identity/");
@@ -113,6 +186,11 @@ const server = http.createServer(async (req, res) => {
     recordHit({ path: pathname, rejected: "missing_or_bad_api_key" });
     return json(res, 401, { error: "unauthorized" });
   }
+
+  /* 遅延は認証のあと・処理の前に置く。認証の前に置くと、鍵の付け忘れという
+     別の欠陥まで遅延で隠れてしまう。台帳の状態は変えないので、遅らせても
+     この先の分岐は同じ答えを返す（web-app 側が待てなくなるだけ）。 */
+  if (isIdentityApi) await applyLatency(pathname);
 
   /* ---- 連携 ---------------------------------------------------------------- */
 

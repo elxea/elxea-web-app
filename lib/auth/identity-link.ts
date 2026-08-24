@@ -140,8 +140,36 @@ export async function completeLineLinkage({
     merge: null,
   });
 
-  if (!lineUserId || !shopifyCustomerId) return none("invalid-input");
-  if (`line:${lineUserId}` === shopifyCustomerId) return none("same-key");
+  /* 呼び出し側のバグ 2 種。**利用者の操作では起こりえない**。
+   *
+   * `invalid-input` は識別子が空のまま呼ばれた形で、`auth-callback` が
+   * `shop_cid` を任意にしている以上、配線を変えた拍子に静かに増えうる
+   * （そうなると連携済みの人の合体が丸ごと飛ぶ = as-is D-5 と同じ壊れ方）。
+   * `same-key` は LINE の仮の棚のキーを顧客 ID として渡してしまった形。
+   *
+   * どちらも「何も起きずに正常終了する」ので、計装が無いと存在自体に気付けない。
+   * 利用者起因では起こらない = 鳴ったら必ず直すべき、という意味で warning で残す。
+   * ⚠ 識別子そのものは載せない（source だけで発生箇所は特定できる）。 */
+  if (!lineUserId || !shopifyCustomerId) {
+    console.warn(
+      `[identity-link] line linkage skipped: invalid input (source=${source})`,
+    );
+    Sentry.captureMessage("Identity link called with empty identifier", {
+      level: "warning",
+      tags: { subsystem: "identity-link", source, outcome: "invalid-input" },
+    });
+    return none("invalid-input");
+  }
+  if (`line:${lineUserId}` === shopifyCustomerId) {
+    console.warn(
+      `[identity-link] line linkage skipped: same key (source=${source})`,
+    );
+    Sentry.captureMessage("Identity link source and target are the same key", {
+      level: "warning",
+      tags: { subsystem: "identity-link", source, outcome: "same-key" },
+    });
+    return none("same-key");
+  }
 
   try {
     /* 1) 逆引きキャッシュを捨てる。
@@ -191,7 +219,33 @@ export async function completeLineLinkage({
       });
       return none("ledger-unreadable");
     }
-    if (linked === false) return none("not-linked");
+    if (linked === false) {
+      /* 台帳に連携が無い。**経路によって意味がまるで違う**ので、扱いを分ける。
+       *
+       *   auth-callback … メールログインのたびに通る取りこぼし再試行。未連携の人が
+       *                   ログインしただけでここに来る。**これは正常**で、鳴らすと
+       *                   ログイン数だけイベントが出て監視が無視されるようになる。
+       *   連携ボタン / LIFF … いま台帳に行を立てた**直後**に呼ばれる。ここで
+       *                   「連携が無い」と返ってくるのは、書き込みが成立して
+       *                   いなかったか、書いた鍵と読んだ鍵が食い違っている
+       *                   （本番で実際に起きている番号体系のずれ）ということ。
+       *                   利用者には「連携しました」と出たのにデータは移らない。
+       *                   **静かな壊れ方なので、必ず残す。**
+       *
+       * 正常な方も無音にはしない。ログは出して監視の判断に委ね、Sentry の
+       * 割り当てだけを守る（ログは監視 cron が benign 判定できる）。 */
+      const suspicious = source !== "auth-callback";
+      console.warn(
+        `[identity-link] line linkage ledger reports not linked; skipping merge (source=${source})`,
+      );
+      if (suspicious) {
+        Sentry.captureMessage("Identity link ledger reports not linked", {
+          level: "warning",
+          tags: { subsystem: "identity-link", source, outcome: "not-linked" },
+        });
+      }
+      return none("not-linked");
+    }
 
     /* 顧客 ID の形（GID か数値か）は経路で揺れうるので、比較の前に数値部分へ
        正規化する。形の違いで本人一致を取り逃がすと、連携したのに合体しない

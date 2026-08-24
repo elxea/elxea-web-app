@@ -481,10 +481,11 @@ jobs:
         # 「0 件成功」で緑になるのを防ぐ。line-linkage suite が JUnit を出すので、
         # そのテスト数が床を下回ったら落とす。suite 全体が testMatch の書き間違いで
         # 1 件も拾われない、という壊れ方は静かなので機械で見る。
-        # 現在: ① 〜 ⑤ とエッジ 2 件の計 7 件。増やしたらここも上げること。
+        # 現在: ① 〜 ⑤ とエッジ 3 件 (他人の LINE / 解除直後 / 照会の遅延) の計 8 件。
+        # 増やしたらここも上げること。
         if: always()
         env:
-          TEST_FLOOR_IDENTITY_E2E: "7"
+          TEST_FLOOR_IDENTITY_E2E: "8"
         run: node scripts/ops/check-test-floor.mjs --file test-results/line-linkage-junit.xml --min "${TEST_FLOOR_IDENTITY_E2E}" --label identity-e2e
 
       - name: Upload identity E2E results

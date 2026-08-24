@@ -62,6 +62,7 @@ import * as Sentry from "@sentry/nextjs";
 
 import { resolveIdentity } from "@/lib/firebase/auth-guard";
 import {
+  fetchLineLinkageStatus,
   fetchLineLinkageStatusForLineUser,
   fetchShopifyCustomerIdForLineUser,
   invalidateReverseLinkage,
@@ -495,6 +496,144 @@ describe("読めなかったことを Sentry に残す", () => {
     await fetchShopifyCustomerIdForLineUser(LINE_USER_ID);
 
     expect(captured()).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// (c-2) 順引き（顧客 ID → 連携の有無）も同じ束に残す
+//
+// as-is D-15。順引きは **Sentry を一切鳴らしていなかった**。逆引きだけが
+// キャッシュ + Sentry + 専用の監視パターン + path 免除を持ち、その成熟度の差が
+// そのまま検知能力の差になっていた。順引きの主発生源はマイページ (メールで
+// ログインした人) の SSR なので、落ちれば「連携済みの人が未連携に見える」を
+// 直撃する。本番でそれが起きても一行も残らなかった。
+// ---------------------------------------------------------------------------
+
+describe("順引きの失敗も Sentry に残る (D-15)", () => {
+  const captured = () => vi.mocked(Sentry.captureMessage).mock.calls;
+  const lastOptions = () =>
+    captured().at(-1)?.[1] as
+      | { level?: string; tags?: { reason?: string; subsystem?: string; direction?: string } }
+      | undefined;
+
+  it.each([
+    ["非 2xx", () => stubUpstream({}, false, 502), "upstream-status"],
+    [
+      "不達 / timeout",
+      () =>
+        vi.stubGlobal(
+          "fetch",
+          vi.fn(async () => {
+            throw new Error("The operation was aborted due to timeout");
+          }),
+        ),
+      "unreachable",
+    ],
+    ["応答が壊れている", () => stubUpstream({ linked: "yes" }), "invalid-response"],
+  ])("%s → reason=%s で残る", async (_label, arrange, reason) => {
+    arrange();
+    const status = await fetchLineLinkageStatus(SHOPIFY_CUSTOMER_ID);
+
+    expect(status).toEqual(UNKNOWN_LINE_LINKAGE);
+    expect(captured()).toHaveLength(1);
+    expect(lastOptions()?.tags?.reason).toBe(reason);
+  });
+
+  it("SYNC_API_SECRET 未設定 → reason=secret-missing で残る", async () => {
+    delete process.env[SECRET_ENV];
+    await fetchLineLinkageStatus(SHOPIFY_CUSTOMER_ID);
+    expect(lastOptions()?.tags?.reason).toBe("secret-missing");
+  });
+
+  it("direction タグで順引き / 逆引きを切り分けられる", async () => {
+    /* どちら向きが壊れているか分からないと、「マイページが未連携に見える」の
+       原因を最初から追い直すことになる (実際にそうなった)。 */
+    stubUpstream({}, false, 500);
+    await fetchLineLinkageStatus(SHOPIFY_CUSTOMER_ID);
+    expect(lastOptions()?.tags?.direction).toBe("forward");
+
+    await fetchShopifyCustomerIdForLineUser(LINE_USER_ID);
+    expect(lastOptions()?.tags?.direction).toBe("reverse");
+  });
+
+  it("subsystem=identity-link / level=warning で逆引きと同じ束に入る", async () => {
+    stubUpstream({}, false, 500);
+    await fetchLineLinkageStatus(SHOPIFY_CUSTOMER_ID);
+
+    expect(lastOptions()?.tags?.subsystem).toBe("identity-link");
+    expect(lastOptions()?.level).toBe("warning");
+  });
+
+  it("顧客 ID も秘密も載せない (最小開示は逆引きと同じ)", async () => {
+    stubUpstream({}, false, 500);
+    await fetchLineLinkageStatus(SHOPIFY_CUSTOMER_ID);
+
+    const serialized = JSON.stringify(captured());
+    expect(serialized).not.toContain(SHOPIFY_CUSTOMER_ID);
+    expect(serialized).not.toContain("test-sync-secret");
+  });
+
+  it("順引きも 60 秒に 1 回まで (SSR から呼ばれるので素通しにしない)", async () => {
+    const t0 = 7_000_000;
+    stubUpstream({}, false, 500);
+
+    await fetchLineLinkageStatus(SHOPIFY_CUSTOMER_ID, t0);
+    await fetchLineLinkageStatus(SHOPIFY_CUSTOMER_ID, t0 + 59_000);
+    expect(captured()).toHaveLength(1);
+
+    await fetchLineLinkageStatus(SHOPIFY_CUSTOMER_ID, t0 + 60_001);
+    expect(captured()).toHaveLength(2);
+  });
+
+  it("向きが違えば間引かれない (片方が鳴っている間にもう片方の故障を落とさない)", async () => {
+    const t0 = 8_000_000;
+    stubUpstream({}, false, 500);
+
+    await fetchLineLinkageStatus(SHOPIFY_CUSTOMER_ID, t0);
+    await fetchShopifyCustomerIdForLineUser(LINE_USER_ID, t0 + 1);
+
+    expect(captured()).toHaveLength(2);
+  });
+
+  it("読めたときは何も残さない (正常時に鳴る監視にしない)", async () => {
+    stubUpstream({ linked: true, linkedAt: LINKED_AT });
+    await expect(fetchLineLinkageStatus(SHOPIFY_CUSTOMER_ID)).resolves.toEqual({
+      linked: true,
+      linkedAt: LINKED_AT,
+    });
+
+    stubUpstream({ linked: false });
+    await expect(fetchLineLinkageStatus(SHOPIFY_CUSTOMER_ID)).resolves.toEqual({
+      linked: false,
+      linkedAt: null,
+    });
+
+    expect(captured()).toHaveLength(0);
+  });
+
+  it("ログ文言が監視の正規表現に当たる (Sentry と監視の二本立てを両方通す)", async () => {
+    /* D-15 の 3 段漏れのうち 2 段目。Sentry だけ直しても、ログ監視 cron 側が
+       拾えないままだと「本番ログから異常を拾う」経路が空回りし続ける。
+       ここでは実際に出る文言を、監視が使う正規表現に通して確かめる。 */
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => {
+          throw new Error("The operation was aborted due to timeout");
+        }),
+      );
+      await fetchLineLinkageStatus(SHOPIFY_CUSTOMER_ID);
+
+      const line = warn.mock.calls.map((c) => c.join(" ")).join("\n");
+      expect(line).toContain("[line-linkage-status] forward lookup unreachable");
+      /* scripts/ops/lib/line-log-monitor.mjs の linkage-read-failed と同じ形。 */
+      expect(line).toMatch(
+        /(reverse|forward) lookup:? (returned|unreachable|unknown|linked without)|ledger unreadable/i,
+      );
+    } finally {
+      warn.mockRestore();
+    }
   });
 });
 
