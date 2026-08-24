@@ -578,6 +578,7 @@
     "description": "Sign in with LINE to continue your conversation across Web and LINE.",
     "lineButton": "Sign in with LINE",
     "lineButtonUnavailable": "Unavailable right now",
+    "lineEmailConsent": "When you sign in with LINE, we receive the email address registered with your LINE account and use it for order confirmations, support enquiries, and account linking.",
     "or": "or",
     "shopifyButton": "Sign in with Email",
     "terms": "By signing in, you agree to our <terms>Terms of Service</terms> and <privacy>Privacy Policy</privacy>.",

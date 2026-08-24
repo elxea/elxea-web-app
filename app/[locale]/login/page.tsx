@@ -63,6 +63,25 @@ export default async function LoginPage() {
         <AuthCardActions>
           <LineLoginButton>{t("lineButton")}</LineLoginButton>
 
+          {/* LINE のメールアドレス取得についての説明 (M-0 の前提整備)。
+            *
+            * ## なぜカード下部の同意文と別に置くのか
+            *
+            * 下の `terms` は「利用規約とプライバシーポリシーに同意したとみなす」という
+            * 包括の一文で、**何を取得するかは書いていない**。LINE ログインの email scope は
+            * 「LINE に登録されたメールアドレスを受け取る」という具体的な取得で、LINE の
+            * 審査もその用途の明示を求める。包括の同意文に埋めると、押す直前に読まれない。
+            *
+            * よって **押すボタンのすぐ下** に、取得するもの (LINE のメールアドレス) と
+            * 使う用途 (注文確認・お問い合わせ対応・アカウント連携) だけを 1 文で置く。
+            * 用途を増やすときはこの文も直すこと — ここが利用者に約束した範囲になる。 */}
+          <p
+            className="w-full text-center text-xs leading-4 text-muted-foreground"
+            data-testid="line-email-consent"
+          >
+            {t("lineEmailConsent")}
+          </p>
+
           <AuthCardDivider>{t("or")}</AuthCardDivider>
 
           {/* Shopify OAuth (PKCE)。Figma 6893:17352 = secondary */}

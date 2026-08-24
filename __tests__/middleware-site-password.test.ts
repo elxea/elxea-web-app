@@ -221,3 +221,75 @@ describe("LINE 連携の入口は preview でも従来どおり例外のまま",
     }
   });
 });
+
+/* ---------------------------------------------------------------------------
+ * 法定ページ (/legal/*) は門の外
+ *
+ * LINE ログインの email scope (LINE に登録されたメールアドレスの取得) は LINE の
+ * 審査を通らないと使えず、審査は**プライバシーポリシーの URL に実際にアクセスして
+ * 内容を読む**。門が立っていると審査側に見えるのは /password へのリダイレクトだけで、
+ * 何を書いてあっても読まれない (M-0 の前提整備)。
+ *
+ * 晒しているものは無い: /legal/* は規約・プライバシーポリシー・特商法表記・返品
+ * ポリシーで、いずれも公開が前提の静的な文書。顧客データも操作口も持たない。
+ * 特商法表記のように**掲示が義務**の文書もある。
+ * ------------------------------------------------------------------------- */
+describe("法定ページはサイトパスワードの対象外", () => {
+  const LEGAL_PATHS = [
+    "/legal/privacy",
+    "/ja/legal/privacy",
+    "/en/legal/privacy",
+    "/ja/legal/terms",
+    "/ja/legal/tokushoho",
+    "/ja/legal/returns",
+  ];
+
+  it.each(LEGAL_PATHS)("production で %s はパスワード画面に飛ばさない", async (path) => {
+    const middleware = await loadMiddleware({
+      sitePassword: PASSWORD,
+      vercelEnv: "production",
+    });
+
+    const response = await middleware(request(`https://elxea.com${path}`));
+
+    const location = response.headers.get("location");
+    if (location) {
+      expect(new URL(location).pathname).not.toBe("/password");
+    }
+  });
+
+  it("preview でも同じ (審査は preview URL を見ることがある)", async () => {
+    const middleware = await loadMiddleware({
+      sitePassword: PASSWORD,
+      vercelEnv: "preview",
+    });
+
+    const response = await middleware(
+      request("https://elxea-web-abc123.vercel.app/ja/legal/privacy"),
+    );
+
+    const location = response.headers.get("location");
+    if (location) {
+      expect(new URL(location).pathname).not.toBe("/password");
+    }
+  });
+
+  /* 例外を広げすぎていないこと。`/legal` で始まる**別のパス**まで抜けると、
+     門の目的 (公開前の商品・体験を見せない) が崩れる。 */
+  it.each([
+    "/legalese",
+    "/ja/legal-notes",
+    "/ja/products/legal",
+    "/illegal",
+  ])("%s は例外にならない (前方一致の緩みを作らない)", async (path) => {
+    const middleware = await loadMiddleware({
+      sitePassword: PASSWORD,
+      vercelEnv: "production",
+    });
+
+    const response = await middleware(request(`https://elxea.com${path}`));
+
+    expect(response.status).toBe(307);
+    expect(new URL(response.headers.get("location")!).pathname).toBe("/password");
+  });
+});
