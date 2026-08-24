@@ -163,41 +163,52 @@ export function isLinkedForDisplay(
  *
  *   - `linked`      … 連携済み。状態 + 解除の導線（`canLink` に関係なく出す）
  *   - `link-cta`    … 未連携 / 不明 かつ連携フローに入れる。従来どおり連携ボタン
- *   - `status-only` … 連携フローに入れないが、黙って消してはいけないとき
- *                     （状態が読めなかった / 連携フローから戻ってきた結果がある）
- *   - `hidden`      … LINE セッションで未連携。出す用は無い（この経路の入口は
- *                     「メールアドレスでログイン」→ ログイン後に連携、の 2 段階）
+ *   - `one-tap-cta` … LINE だけでログインしている人の入口（ワンタップ・J-1 案A）
+ *
+ * ## `hidden` を廃した理由（L4 の緩和・J-1 案A）
+ *
+ * ここには以前 `hidden`（LINE セッションで未連携なら節ごと出さない）があった。
+ * 理由は「この画面から連携フローに入れないから」で、当時それは事実だった —
+ * `/api/user/line-link/init` は Shopify の顧客セッションを要求するので、押しても
+ * 入口で弾かれるボタンを出さない、という判断である。
+ *
+ * ところがその結果、**LINE だけで使っている人のマイページには連携の入口が 1 つも
+ * 無い**状態が残った。連携が一番必要な人に、連携の話が出てこない。
+ *
+ * ワンタップ（#129）の入口 `/api/user/line-link/intent` は Shopify セッションを
+ * 要求しない。押した瞬間に意思を封緘してログインへ送り、帰り道で台帳に行を立てる。
+ * よって「押しても弾かれる」はもう成立せず、`hidden` を残す理由が消えた。
+ * 設計書 §3-4 の L4（連携 CTA を Shopify セッション時のみ出す）を、案A を採るなら
+ * 緩める、と決めてある枠内の変更である。
+ *
+ * 状態が読めなかった（`null`）ときも入口は出す。連携は冪等なので二度押しても
+ * 壊れず、「読めないので何も出さない」より安全側になる（`link-cta` と同じ判断）。
  *
  * 画面の JSX に直接この分岐を書かないのは `isLinkedForDisplay` と同じ理由
  * （3 値が `!!` に化けて不明が連携済みに倒れる事故を型と関数で止める）。
  */
-export type LineLinkageEntryMode =
-  | "linked"
-  | "link-cta"
-  | "status-only"
-  | "hidden";
+export type LineLinkageEntryMode = "linked" | "link-cta" | "one-tap-cta";
 
 export function resolveLineLinkageEntryMode({
   canLink,
   status,
-  hasResult = false,
 }: {
-  /** この画面から連携フローに入れるか（Shopify の顧客セッションがあるか）。 */
+  /**
+   * Shopify の顧客セッションがあるか（＝メールでログインしているか）。
+   *
+   * 以前これは「この画面から連携フローに入れるか」という意味だった。ワンタップの
+   * 入口は Shopify セッションを要求しないので、いまは**入れるかどうか**ではなく
+   * **どちらの入口を出すか**を決める値である。
+   */
   canLink: boolean;
   status?: LineLinkageStatus;
-  /** 連携フローから戻ってきた結果（`?line_link=...`）を出す必要があるか。 */
-  hasResult?: boolean;
 }): LineLinkageEntryMode {
-  /* 「状態が読めなかった」かを先に determine する。`isLinkedForDisplay` は型述語
-     （`status is LineLinkageStatus`）なので、あとに置くと else 側で status が never に
-     狭まり `status?.linked` を読めなくなる。 */
-  const statusUnknown = status?.linked === null;
-
   if (isLinkedForDisplay(status)) return "linked";
   if (canLink) return "link-cta";
-  // 不明を黙って消さない（連携済みの人が「解除は要らない」と誤解する）。
-  if (statusUnknown || hasResult) return "status-only";
-  return "hidden";
+  /* LINE だけでログインしている人。未連携でも不明でも入口を出す（連携は冪等なので
+     二度押しても壊れない）。ここを出さないと、連携が一番必要な人のマイページに
+     連携の話が 1 つも出てこない。 */
+  return "one-tap-cta";
 }
 
 /* ---------------------------------------------------------------------------

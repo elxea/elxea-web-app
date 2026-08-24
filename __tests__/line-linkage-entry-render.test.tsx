@@ -65,15 +65,28 @@ describe("LineLinkageEntry / LINE でログイン中（canLink=false）", () => 
     expect(html).not.toContain('data-testid="line-linkage-cta"');
   });
 
-  it("未連携 → 節ごと出さない（空の枠を残さない）", () => {
+  it("未連携 → ワンタップの入口を出す（連携が一番必要な人に入口を渡す）", () => {
     const html = render(
       <LineLinkageEntry locale="ja" status={NOT_LINKED} canLink={false} />,
     );
 
-    expect(html).toBe("");
+    expect(html).toContain('data-testid="line-linkage-one-tap-cta"');
+    /* 行き先は意思を封緘する route。ここを /api/auth/login に戻すと、押しても
+       連携が起きない旧状態（設計書 §1-2）に逆戻りする。 */
+    expect(html).toContain('href="/api/user/line-link/intent?locale=ja"');
+    /* LINE の認可へ行く方の CTA は出さない（押しても入口で弾かれる）。 */
+    expect(html).not.toContain('data-testid="line-linkage-cta"');
   });
 
-  it("状態が読めない → 黙って消さず、言い切らない一文だけを出す", () => {
+  it("未連携 → 「ログイン」ではなく「連携」と言う（実体が言葉に追いついた）", () => {
+    const html = render(
+      <LineLinkageEntry locale="ja" status={NOT_LINKED} canLink={false} />,
+    );
+
+    expect(html).toContain("メールアドレスと連携する");
+  });
+
+  it("状態が読めない → 入口を出したうえで、言い切らない一文を添える", () => {
     const html = render(
       <LineLinkageEntry
         locale="ja"
@@ -83,9 +96,8 @@ describe("LineLinkageEntry / LINE でログイン中（canLink=false）", () => 
     );
 
     expect(html).toContain('data-testid="line-linkage-status-unknown"');
-    // 連携ボタンが無いので「あらためて連携」とは促さない。
+    expect(html).toContain('data-testid="line-linkage-one-tap-cta"');
     expect(html).not.toContain('data-testid="line-linkage-cta"');
-    expect(html).not.toContain("二重にはなりません");
   });
 
   it("連携から戻ってきた直後の結果は、未連携でも捨てない", () => {
@@ -125,6 +137,15 @@ describe("LineLinkageEntry / LINE でログイン中（canLink=false）", () => 
        ここを伏せると、お客さまは同じ操作を繰り返すしかない。 */
     expect(html).toContain("すでに別の LINE アカウントが連携されています");
     expect(html).toContain("解除");
+  });
+
+  it("英語ロケールの入口は locale=en を持つ（日本語へ落とさない）", () => {
+    const html = render(
+      <LineLinkageEntry locale="en" status={NOT_LINKED} canLink={false} />,
+    );
+
+    expect(html).toContain('href="/api/user/line-link/intent?locale=en"');
+    expect(html).toContain("Link your email address");
   });
 
   it("英語ロケールでも同じ出し分けになる", () => {

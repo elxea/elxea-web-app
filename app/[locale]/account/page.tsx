@@ -23,7 +23,6 @@ import { customerAccountPortalUrl } from "@/lib/account-links";
 import {
   fetchLineLinkageStatus,
   fetchLineLinkageStatusForLineUser,
-  resolveLineLinkageEntryMode,
   UNKNOWN_LINE_LINKAGE,
 } from "@/lib/line/linkage-status";
 import { readVerifiedLineUserId } from "@/lib/line/session";
@@ -177,14 +176,6 @@ export default async function AccountPage({
     rawLineLink === "line-conflict"
       ? rawLineLink
       : undefined;
-
-  /* 連携の節をどう出すか。コンポーネントと同じ関数で決めるので、枠 (page-container) だけが
-     残った空の節や、逆に節の中身があるのに枠が無い、という食い違いが起きない。 */
-  const lineLinkageMode = resolveLineLinkageEntryMode({
-    canLink: auth.shopify,
-    status: lineLinkage,
-    hasResult: Boolean(lineLinkResult),
-  });
 
   /* Shopify 顧客アカウントポータルへの外部リンク。LINE だけの人はポータルの
      セッションを持たないので出さない (押しても入れない導線を置かない)。 */
@@ -427,19 +418,20 @@ export default async function AccountPage({
       {/* LINE 連携エントリ (Web 側導線 / Phase 2 + 連携状態表示 / P1 + LINE ログイン中の
           解除導線 / A 案)。**ログイン経路で節ごと消さない** — 以前はここが `auth.shopify`
           だったため、LINE で入っている人は連携済みでも解除に到達できなかった。
-          連携フローに入れるのは Shopify セッションのときだけ (`canLink`) だが、解除は
-          どちらの経路でもできる。何を出す/出さないかの判断は 1 か所
-          (`resolveLineLinkageEntryMode`) に置き、ここは同じ答えで枠の有無を決める。 */}
-      {lineLinkageMode === "hidden" ? null : (
-        <div className="page-container">
-          <LineLinkageEntry
-            locale={locale}
-            status={lineLinkage}
-            result={lineLinkResult}
-            canLink={auth.shopify}
-          />
-        </div>
-      )}
+
+          ワンタップ (J-1 案A) を入れたことで、この節は **どの状態でも必ず出る**。
+          以前は「LINE セッションで未連携」のときだけ節ごと畳んでいた (`hidden`) が、
+          その結果 LINE だけで使っている人のマイページに連携の入口が 1 つも無かった。
+          何をどう出すかの判断は 1 か所 (`resolveLineLinkageEntryMode`) が持ち、
+          ここは枠を置くだけにする。 */}
+      <div className="page-container">
+        <LineLinkageEntry
+          locale={locale}
+          status={lineLinkage}
+          result={lineLinkResult}
+          canLink={auth.shopify}
+        />
+      </div>
     </>
   );
 }
