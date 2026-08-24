@@ -183,6 +183,10 @@ export const COOKIE_REGISTRY: readonly CookieSpec[] = [
    * 片方の往復がもう片方の state を踏み潰すと、途中まで進んでいたほうが静かに壊れる。
    * 中身は暗号文 (顧客 ID を封じるため。lib/line/link-flow.ts)。 */
   { name: "line_link_state", group: "transient", scope: "shared-domain", secure: "prod-only" },
+  /* ワンタップ連携の「意思」（J-1 案A）。押した瞬間だけ立ち、10 分で切れ、
+     1 度使えば消える。中身は押したときの LINE userId で、帰ってきたときの
+     line_uid と一致しなければ開かない（lib/auth/link-intent.ts）。 */
+  { name: "line_link_intent", group: "transient", scope: "shared-domain", secure: "prod-only" },
   /* Name verified against lib/line/account-link.ts:22 — it is `acct_link_tk`,
    * not the longer form the design assumed. */
   { name: "acct_link_tk", group: "transient", scope: "host-only", secure: "prod-only" },
