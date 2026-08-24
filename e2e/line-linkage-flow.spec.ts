@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { readFileSync } from "node:fs";
 
 import {
@@ -45,6 +46,8 @@ const LINE_HIT_LOG = process.env.E2E_LINE_HIT_LOG!;
 const CX_HIT_LOG = process.env.E2E_CX_HIT_LOG!;
 
 const FAKE_APEX = ".elxea.test";
+/** Node から web-app を直に叩くときの origin（偽アペックスは Chromium しか解決できない）。 */
+const APP_ORIGIN = `http://127.0.0.1:${BASE_HOST.split(":")[1]}`;
 const LINE_SESSION_COOKIES = ["line_user", "line_session", "line_auth", "line_uid"] as const;
 
 /** LINE の Messaging userId 形式（U + 32 hex）。これを外すと id_token 検証が正しく落ちる。 */
@@ -80,7 +83,80 @@ function control(request: APIRequestContext) {
       const res = await request.post(`${CX_ORIGIN}/__control/latency`, { data: { ms } });
       expect(res.ok(), "偽 cx-agent の遅延注入に失敗").toBe(true);
     },
+    /**
+     * LINE トーク内の Account Link を起こす（S13）。
+     *
+     * **web-app のブラウザ導線を一度も通らない**のがこの経路の本質で、それが D-3 の
+     * 正体だった。よってテストからもブラウザを使わず、cx-agent 側から起こす。
+     * 偽 cx-agent は台帳に書いたあと、本物と同じ URL・同じ Bearer・同じ body で
+     * web-app の `/api/internal/linkage-established` を叩く。
+     */
+    async accountLinkFromLineTalk(pair: { lineUserId: string; shopifyCustomerId: string }) {
+      const res = await request.post(`${CX_ORIGIN}/__control/account-link`, {
+        data: {
+          line_user_id: pair.lineUserId,
+          shopify_customer_id: pair.shopifyCustomerId,
+        },
+      });
+      expect(res.ok(), "偽 cx-agent の Account Link 再現に失敗").toBe(true);
+      return (await res.json()) as {
+        linked: boolean;
+        notified: boolean;
+        notifyStatus: number | null;
+        notifyError: string | null;
+      };
+    },
+    /** `/api/erase` の応答を仕込む（S15）。 */
+    async setEraseMode(mode: "ok" | "continue" | "residue", times = 1) {
+      const res = await request.post(`${CX_ORIGIN}/__control/erase-mode`, {
+        data: { mode, times },
+      });
+      expect(res.ok(), "偽 cx-agent の消去モード設定に失敗").toBe(true);
+    },
+    /** 実際に消された subject（`kind:id`）。 */
+    async erasedSubjects(): Promise<string[]> {
+      const res = await request.get(`${CX_ORIGIN}/__control/erased`);
+      expect(res.ok(), "偽 cx-agent の消去記録が読めない").toBe(true);
+      return ((await res.json()) as { subjects: string[] }).subjects;
+    },
   };
+}
+
+/**
+ * Shopify の `customers/redact` webhook を偽造して web-app に投げる（S15）。
+ *
+ * 署名を本物と同じ HMAC-SHA256(base64) で作る。ここを省いて検証を通す抜け道を
+ * アプリ側に作ると、**誰でも他人の消去を要求できる口**になるので、テストの都合で
+ * 緩めない（鍵は合成値で、本物の秘密ではない）。
+ */
+async function postRedactWebhook(
+  request: APIRequestContext,
+  customerId: string,
+  webhookId: string,
+) {
+  const body = JSON.stringify({
+    shop_id: 1,
+    shop_domain: "elxea-test.myshopify.com",
+    customer: { id: Number(customerId), email: "redact@example.test" },
+  });
+  const hmac = crypto
+    .createHmac("sha256", process.env.E2E_SHOPIFY_WEBHOOK_SECRET!)
+    .update(body, "utf8")
+    .digest("base64");
+
+  return request.post(`${APP_ORIGIN}/api/webhooks/gdpr/customers-redact`, {
+    headers: {
+      "content-type": "application/json",
+      "x-shopify-hmac-sha256": hmac,
+      "x-shopify-topic": "customers/redact",
+      "x-shopify-webhook-id": webhookId,
+      "x-shopify-shop-domain": "elxea-test.myshopify.com",
+      /* 本物の Shopify (2024+) は必ず載せる。省くとリプレイ窓の検査が丸ごと
+         スキップされ、そこが壊れても E2E から見えない。 */
+      "x-shopify-webhook-timestamp": String(Math.floor(Date.now() / 1000)),
+    },
+    data: body,
+  });
 }
 
 /** 偽 cx-agent が実際に叩かれた記録。遅延が本当に効いたかはここでしか分からない。 */
@@ -578,5 +654,141 @@ test.describe.serial("LINE ログイン・メール連携・合体", () => {
     /* 読めるようになれば、その一文は消える。 */
     await page.reload();
     await expect(page.getByTestId("line-linkage-status-unknown")).toHaveCount(0);
+  });
+
+  /**
+   * S13 — LINE トーク内の連携ボタンから連携し、合体まで走る。
+   *
+   * ## なぜこの 1 本が要るのか
+   *
+   * この経路の連携は **LINE → cx-agent の webhook だけで完結し、web-app のブラウザ
+   * 導線を一度も通らない**。だから web-app 側には合体を始めるきっかけが構造的に
+   * 存在せず、連携は台帳上成立しているのにお気に入りは `users/line:<ID>` に
+   * 取り残された（D-3）。M-2 で「台帳に行が立った」を書いた側から知らせる形にし、
+   * その受け口が `/api/internal/linkage-established` である。
+   *
+   * ①〜⑤ はどれもブラウザから連携を起こすので、**この経路だけ一度も踏まれていない**。
+   * 受け口の単体テストはあるが、単体をどれだけ丁寧に書いても「呼ばれていなければ
+   * 本番では何も変わらない」— 再設計 §2-4 が名指しした失敗モードそのもの。
+   *
+   * ## どう再現するか
+   *
+   * テストからブラウザを使わない。偽 cx-agent の `/__control/account-link` が
+   * 台帳に書き、本物と同じ URL・同じ Bearer・同じ body で web-app を叩く。
+   */
+  test("S13 LINE トーク内から連携すると、合体が走ってお気に入りが引き継がれる", async ({
+    page,
+    context,
+    request,
+  }) => {
+    const user = { userId: lineUserId("s13"), displayName: "トーク内連携太郎" };
+    const customer = { id: "9013", email: "s13@example.test" };
+    const title = "トーク内連携で引き継がれるべき茶";
+    await control(request).setLineUser(user);
+    await control(request).setShopifyCustomer(customer);
+
+    /* --- LINE だけの人として棚に入れる --- */
+    await loginWithLine(page);
+    const added = await addFavorite(page, { targetId: "s13-item", title });
+    expect(added.status, `お気に入り追加に失敗: ${added.body}`).toBe(200);
+    expect(await listFavoriteTitles(page)).toContain(title);
+
+    /* --- LINE のトーク内で連携ボタンを押した（ブラウザは 1 度も関与しない）--- */
+    const linked = await control(request).accountLinkFromLineTalk({
+      lineUserId: user.userId,
+      shopifyCustomerId: customer.id,
+    });
+
+    /* 台帳に載ったこと。ここが空なら以降の assertion は意味を持たない。 */
+    const ledger = await readLedger(request);
+    expect(
+      ledger.find((e) => e.lineUserId === user.userId)?.shopifyCustomerId,
+      "台帳にこの LINE と顧客の対応が無い",
+    ).toBe(customer.id);
+
+    /* 合体イベントが web-app に**届いて受理された**こと。
+       200 以外は「連携したのに合体しない」が静かに残る状態そのもの。 */
+    expect(
+      linked.notified,
+      `合体イベントが受理されなかった (status=${linked.notifyStatus} err=${linked.notifyError})`,
+    ).toBe(true);
+
+    /* --- メールで入り直すと、LINE で貯めた分が顧客の棚に見える --- */
+    await logout(page);
+    for (const name of LINE_SESSION_COOKIES) {
+      await context.clearCookies({ name });
+    }
+    await loginWithEmail(page);
+
+    expect(
+      await listFavoriteTitles(page),
+      "トーク内から連携したのに、LINE で貯めたお気に入りが顧客の棚に見えない (D-3)",
+    ).toContain(title);
+  });
+
+  /**
+   * S15 — 消去。Shopify の削除要求で、cx-agent 側のデータまで実際に消える。
+   *
+   * ## 何を守るのか
+   *
+   * cx-agent には `POST /api/erase` が実装済みで、設計意図もコードにこう書いてある —
+   * 「消える範囲の定義を 1 か所に集約する」。**その呼び出しが一度も書かれていなかった**
+   * （Issue A）。削除要求に対し web-app は Firestore だけ消して 200 を返し、Supabase の
+   * 連携台帳・会話履歴・カルテは丸ごと残ったまま「消しました」と答えていた。
+   *
+   * 配線は #126 で入ったが、**配線そのものを通しで踏むテストが無い**。単体は
+   * 「呼べば正しく動く」しか言えず、「呼ばれている」は言えない。
+   *
+   * ## 202 を成功にしない（ここが一番効く）
+   *
+   * `/api/erase` は 3 分岐で返す。`202 {continue_required:true}` は **2xx だが完了では
+   * ない**（Workers の subrequest 上限に当たって途中まで消しただけ）。素朴に `res.ok`
+   * で判定すると静かに「成功」になり、消し残しが残る。呼び直しているかを実測する。
+   */
+  test("S15 削除要求で cx-agent 側も消える。202 は成功にせず、消し残しは 200 にしない", async ({
+    request,
+  }) => {
+    const customerId = "9015";
+
+    /* --- (1) 一発で消えるとき --- */
+    await control(request).setEraseMode("ok");
+    const okRes = await postRedactWebhook(request, customerId, "wh-s15-ok");
+    expect(okRes.status(), await okRes.text()).toBe(200);
+    expect(
+      await control(request).erasedSubjects(),
+      "web-app が cx-agent の /api/erase を呼んでいない (Issue A の配線が切れている)",
+    ).toContain(`shopify:${customerId}`);
+
+    /* 別鍵 (ERASE_API_SECRET) で通っていること。SYNC_API_SECRET を送っていたら
+       偽 cx-agent が 401 を返すので、上の assertion がそもそも成立しない。 */
+    expect(
+      cxHits().some((h) => h.path === "/api/erase"),
+      "/api/erase が偽 cx-agent に届いていない",
+    ).toBe(true);
+
+    /* --- (2) 202 が返る間は呼び直す --- */
+    const before = cxHits().filter((h) => h.path === "/api/erase").length;
+    await control(request).setEraseMode("continue", 2);
+    const contRes = await postRedactWebhook(request, "9016", "wh-s15-continue");
+    expect(contRes.status(), await contRes.text()).toBe(200);
+
+    const attempts = cxHits().filter((h) => h.path === "/api/erase").length - before;
+    expect(
+      attempts,
+      "202 (途中まで消した) を成功として扱っている — 消し残しが残る",
+    ).toBeGreaterThanOrEqual(3);
+    expect(await control(request).erasedSubjects()).toContain("shopify:9016");
+
+    /* --- (3) 消し残しがあるなら 200 を返さない (G10 成功偽装の禁止) --- */
+    await control(request).setEraseMode("residue");
+    const residueRes = await postRedactWebhook(request, "9017", "wh-s15-residue");
+    expect(
+      residueRes.status(),
+      "消し残しがあるのに 200 を返している (Shopify が再送しないので永久に消えない)",
+    ).toBeGreaterThanOrEqual(500);
+    expect(await control(request).erasedSubjects()).not.toContain("shopify:9017");
+
+    /* 後片付け。モードを残すと以降の spec が巻き添えになる。 */
+    await control(request).setEraseMode("ok");
   });
 });
