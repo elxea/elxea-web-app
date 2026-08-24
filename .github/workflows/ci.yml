@@ -448,6 +448,26 @@ jobs:
           NEXT_PUBLIC_SANITY_PROJECT_ID: 5s8ahx87
           NEXT_PUBLIC_SANITY_DATASET: production
 
+      - name: Reset Turbopack dev cache between the two suites
+        # Turbopack は dev のコンパイル結果を `.next/dev` に**永続化**する
+        # (`experimental.turbopackFileSystemCacheForDev` は 16.1.0 以降 既定 true)。
+        # 1 本目の dev サーバーは Playwright にプロセスごと止められるので、書き
+        # かけのグラフが残りうる。2 本目はそれを**復元して**起動するため、
+        # 復元したグラフが噛み合わないと turbo-tasks が panic する
+        # (main の run 32620718882 で実際に発生:
+        #  `inner_of_upper_lost_followers ... as they don't exist as upper or
+        #  follower edges`)。panic はコンパイル中のリクエストを中断させ、
+        # ブラウザ側には `net::ERR_ABORTED` として出るので、症状だけ見ると
+        # プロダクトの不具合に見える。
+        #
+        # 上流に修正は無い (vercel/next.js#89950 は未診断のままクローズ)。
+        # 公式に案内されている回避は「キャッシュを消す」なので、2 本目は必ず
+        # 冷えた状態から始める。復元で得ていた短縮は実測 0.5 秒程度
+        # (run 32650612439 の warmup ログ) で、捨てても釣りが来る。
+        #
+        # 消すのは dev の出力だけ。`.next/cache` (build 側) には触らない。
+        run: rm -rf .next/dev
+
       - name: Run LINE linkage flow (Ring 2)
         # `if: always()` にはしない。前段が落ちている時点で dev サーバーの前提が
         # 壊れている可能性が高く、2 本目の失敗は原因ではなく症状になるため。

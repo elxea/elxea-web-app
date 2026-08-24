@@ -72,11 +72,47 @@ process.env.E2E_BASE_HOST = `${FAKE_APEX_HOST}:${PORT}`;
 
 /* テスト開始前に温めるルート。理由は e2e/support/warm-dev-server.ts に書いてある
  * （要約: `next dev` の初回コンパイルを、テストの制限時間ではなく globalSetup の
- * 予算で払わせる）。suite が最初に触る順に並べてある。 */
+ * 予算で払わせる）。
+ *
+ * **suite が通る道を全部** 並べる。初版は 4 本しか無く、①→⑤ が実際に踏む
+ * `/ja/login/complete`・`/api/line-callback`・`/api/user/line-link/*`・`/api/auth/*`
+ * の初回コンパイルはテストの制限時間の中に残っていた。`waitForURL` が延々と待つ形で
+ * 出るので、症状だけ見ると「連携が成立しない」というプロダクトの不具合に見える。
+ *
+ * API ルートは GET で叩く。POST 専用のものは 405 を返すが、**Next はどのメソッドが
+ * export されているかを知るためにルートモジュールを読み込む**ので、405 でも
+ * コンパイルは済む。応答は一切見ない。 */
 process.env.E2E_WARMUP_BASE_URL = `http://127.0.0.1:${PORT}`;
-process.env.E2E_WARMUP_PATHS = ["/ja", "/ja/login", "/ja/account", "/api/user/favorites"].join(
-  ",",
-);
+process.env.E2E_WARMUP_PATHS = [
+  /* 画面 */
+  "/ja",
+  "/ja/login",
+  "/ja/login/complete",
+  "/ja/account",
+  /* LINE ログインの往復 */
+  "/api/line-login/init",
+  "/api/line-callback",
+  /* メールログインの往復 */
+  "/api/auth/login",
+  "/api/auth/callback",
+  "/api/auth/logout",
+  /* マイページが描画時・描画後に叩くもの */
+  "/api/user/favorites",
+  "/api/user/dashboard",
+  "/api/user/events",
+  "/api/user/follows",
+  /* 連携・解除 */
+  "/api/user/line-link",
+  "/api/user/line-link/init",
+  "/api/user/line-link/callback",
+].join(",");
+/* `/{locale}/account` は `middleware.ts` がセッション cookie の **有無** で門を張る。
+ * cookie 無しの素の fetch は `/ja/login` へ折り返され、account ページ本体は 1 行も
+ * コンパイルされない (緑の run でも `[warmup] /ja/account 8ms` と出ていた = 何もして
+ * いない)。中身は検証されないので、合成値の cookie を 1 つ持たせて門を通す。
+ * セッションとしては無効なままなので、ページは未ログインとして描画するか、その場で
+ * エラーになる。**どちらでもよい** — 欲しいのはコンパイルだけ。 */
+process.env.E2E_WARMUP_COOKIE = "line_session=warmup-not-a-session";
 
 export default defineConfig({
   testDir: ".",
@@ -97,8 +133,11 @@ export default defineConfig({
    * 現れるのでプロダクトの不具合に見えてしまう。Ring 2 は `next dev` でなければ
    * ならない（本番ビルドだと Secure cookie になり http では保存されない）。
    *
-   * globalSetup で温めてもなお、CI ランナーが遅い日に 1 テストが 2 分に届くことがある
-   * （main の run 32620718882 で実測）。温めが一次の対策で、これは二枚目の保険。 */
+   * run 32620718882 の ① はこの形で 2.1 分かけて落ちた。ただしあの run は温めが
+   * 入る前で、しかも `/ja/login` という**温めていれば防げた**ルートで落ちている。
+   * つまりこの 180 秒は「温めが効かなかったときの保険」ではなく、温めに取りこぼしが
+   * 無いことを前提にした余裕枠。取りこぼしを塞ぐのは warm-dev-server 側の仕事で、
+   * 塞げなかったときは globalSetup が落ちる（黙って時間だけ伸ばさない）。 */
   timeout: 180_000,
   outputDir: path.join(repoRoot, "test-results", "line-linkage-artifacts"),
   reporter: [

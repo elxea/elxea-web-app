@@ -72,9 +72,25 @@ process.env.SHOPIFY_LOGOUT_STUB_LOG = STUB_LOG;
 /* The spec drives the fake LINE server's "who is signed in" control endpoint. */
 process.env.E2E_AUTH_FLOW_LINE_ORIGIN = LINE_ORIGIN;
 /* 初回コンパイルをテストの制限時間の外へ出す。理由は e2e/support/warm-dev-server.ts。
- * この suite も `next dev` 前提なので同じ risk を持つ（line-linkage 側で実際に踏んだ）。 */
+ * この suite も `next dev` 前提なので同じ risk を持つ（line-linkage 側で実際に踏んだ）。
+ *
+ * line-linkage 側と同じ方針で、**この suite が通る道を全部** 並べる。S1〜S8 は
+ * `/ja/cart` と `/api/line-callback`（偽 LINE の authorize から転がり込む）も踏む。 */
 process.env.E2E_WARMUP_BASE_URL = `http://127.0.0.1:${PORT}`;
-process.env.E2E_WARMUP_PATHS = ["/ja", "/ja/login", "/ja/account"].join(",");
+process.env.E2E_WARMUP_PATHS = [
+  "/ja",
+  "/ja/login",
+  "/ja/login/complete",
+  "/ja/account",
+  "/ja/cart",
+  "/api/line-login/init",
+  "/api/line-callback",
+  "/api/auth/logout",
+].join(",");
+/* `/{locale}/account` の門を通すための合成 cookie。値は検証されない（`middleware.ts`
+ * は cookie の有無しか見ない）。詳細は line-linkage config の同じ箇所と
+ * e2e/support/warm-dev-server.ts のコメント。 */
+process.env.E2E_WARMUP_COOKIE = "line_session=warmup-not-a-session";
 
 
 export default defineConfig({
