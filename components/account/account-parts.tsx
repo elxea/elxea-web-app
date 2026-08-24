@@ -82,17 +82,29 @@ export function AccountTitleBlock({
   title,
   identity,
   action,
+  back,
 }: {
   title: React.ReactNode;
   identity?: React.ReactNode;
   /** PC のみ表示 (SP の TitleBlock 8095:796 はリンクを持たない)。 */
   action?: AccountLink;
+  /**
+   * マイページ配下の下位ページ (お気に入り一覧など) で見出しの上に置く戻り導線。
+   * `action` と違って **SP でも出す** — 下位ページから親へ戻る手段がブラウザの
+   * 戻るしか無い状態を作らないため。マイページ本体では渡さない。
+   */
+  back?: AccountLink;
 }) {
   return (
     <div
       data-slot="account-title-block"
       className="page-container flex flex-col gap-1.5 pt-6 pb-4 lg:gap-2 lg:pt-10 lg:pb-6"
     >
+      {back ? (
+        <div className="pb-2 lg:pb-3">
+          <AccountTextLink {...back} />
+        </div>
+      ) : null}
       <div className="flex items-baseline justify-between gap-6">
         {/* 主見出しは全体裁定どおり PC 44 (display トークン) / SP 32。 */}
         <h1 className="page-title text-foreground">{title}</h1>
@@ -251,17 +263,27 @@ export function AccountExpCard({
   imageUrl,
   imageAlt,
   href,
+  action,
 }: {
   label?: React.ReactNode;
   title: React.ReactNode;
   imageUrl?: string | null;
   imageAlt?: string;
   href?: string;
+  /**
+   * カード右端に置く操作 (お気に入り一覧の「解除」など)。
+   *
+   * 渡されたときだけカード全体を包む `<Link>` をやめ、**写真と文言だけをリンク**にして
+   * 操作をその外に出す。リンクの中にボタンを入れると (a > button) HTML として不正な
+   * うえ、押したときに遷移と操作のどちらが起きるか読めない。渡さないときの描画は
+   * 従来と同一 (マイページ本体の「続き」は今までどおりカード全体がリンク)。
+   */
+  action?: React.ReactNode;
 }) {
   const className =
     "flex items-center gap-4 overflow-hidden rounded-sm bg-card lg:gap-5";
 
-  const body = (
+  const media = (
     <>
       {/* 写真は 4:3 (SP 96x72 / PC 160x160*0.75=120)。カードに padding は無く、
           写真がカードの左端・上下端に接する (Figma 8095:778 は x0 y0)。 */}
@@ -278,7 +300,12 @@ export function AccountExpCard({
           <ImagePlaceholder />
         )}
       </div>
-      <div className="flex min-w-0 flex-col gap-1 pr-4 lg:pr-5">
+      <div
+        className={cn(
+          "flex min-w-0 flex-col gap-1",
+          action ? "flex-1" : "pr-4 lg:pr-5"
+        )}
+      >
         {label ? (
           <p className={cn(captionClass, "text-muted-foreground")}>{label}</p>
         ) : null}
@@ -287,13 +314,31 @@ export function AccountExpCard({
     </>
   );
 
+  if (action) {
+    const inner = "flex min-w-0 flex-1 items-center gap-4 lg:gap-5";
+    return (
+      <div data-slot="account-exp-card" className={className}>
+        {href ? (
+          <Link href={href} className={inner}>
+            {media}
+          </Link>
+        ) : (
+          <div className={inner}>{media}</div>
+        )}
+        <div data-slot="account-exp-card-action" className="shrink-0 pr-3 lg:pr-4">
+          {action}
+        </div>
+      </div>
+    );
+  }
+
   return href ? (
     <Link data-slot="account-exp-card" href={href} className={className}>
-      {body}
+      {media}
     </Link>
   ) : (
     <div data-slot="account-exp-card" className={className}>
-      {body}
+      {media}
     </div>
   );
 }

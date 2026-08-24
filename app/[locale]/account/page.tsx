@@ -28,6 +28,7 @@ import {
 } from "@/lib/line/linkage-status";
 import { readVerifiedLineUserId } from "@/lib/line/session";
 import { LINK_RESULT_PARAM } from "@/lib/line/link-flow";
+import { FAVORITE_KIND_META } from "@/lib/account-favorites";
 import {
   ACCOUNT_SECTION_ORDER,
   isAvailable,
@@ -252,7 +253,13 @@ export default async function AccountPage({
       );
     })(),
 
-    /* 4. 続き — お気に入り */
+    /* 4. 続き — お気に入りの抜粋。
+       ここは **抜粋** (`ACCOUNT_CONTINUE_LIMIT` = 6 枚) で、全件・種類別・解除は
+       /account/favorites が引き受ける。以前は 2 枚しか出ないうえ「すべて見る」が
+       ジャーナル一覧 (= 自分のお気に入りではない) へ飛んでいたので、残りに辿り
+       着けなかった (Setaka 指摘 2026-08-25)。
+       カードのラベルは種類ごとに変える — 全部「お気に入り」だと、並んだカードの
+       どれが商品でどれが読みものか押すまで分からない。 */
     continue: (() => {
       const { locked } = splitSectionItems("continue", auth);
       if (view.continueItems.length === 0 && locked.length === 0) return null;
@@ -260,15 +267,16 @@ export default async function AccountPage({
         <>
           <AccountSectionHeader
             title={t("continueHeading")}
-            action={{ label: t("continueAll"), href: "/journal" }}
+            action={{ label: t("continueAll"), href: "/account/favorites" }}
           />
           <AccountCardGrid columns={2}>
             {view.continueItems.map((item) => (
               <AccountExpCard
                 key={item.id}
-                label={t("continueFavorite")}
+                label={t(FAVORITE_KIND_META[item.kind].labelKey)}
                 title={item.title}
                 imageUrl={item.imageUrl}
+                imageAlt={item.title}
                 href={item.href}
               />
             ))}

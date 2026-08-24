@@ -437,7 +437,7 @@
     "upcomingEventMeta": "Event on {date}",
     "upcomingEventNote": "Attending",
     "continueHeading": "Pick up again",
-    "continueAll": "See all journal →",
+    "continueAll": "See all favorites →",
     "continueFavorite": "Saved",
     "pastHeading": "So far",
     "pastAll": "See all orders →",
@@ -537,7 +537,11 @@
     "emailRequiredReason": "This is tied to your order account. Connect your email address to see it.",
     "signInRequiredReason": "Sign in to see this.",
     "featurePayment": "Payment method",
-    "subscriptionsEmailRequired": "Managing your subscription requires a connected email address."
+    "subscriptionsEmailRequired": "Managing your subscription requires a connected email address.",
+    "favoritesCount": "{count} saved",
+    "favoriteKindProduct": "Saved product",
+    "favoriteKindArticle": "Saved story",
+    "favoriteRemoveLabel": "Remove {title} from favorites"
   },
   "comment": {
     "title": "Comments",
