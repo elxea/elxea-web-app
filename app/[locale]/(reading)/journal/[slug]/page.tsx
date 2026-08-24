@@ -235,7 +235,7 @@ export default async function ArticlePage({
                 addLabel={t("addToBookmarks")}
                 removeLabel={t("removeFromBookmarks")}
                 savedLabel={t("bookmarkSaved")}
-                loadingLabel={t("bookmarkSaving")}
+                loadingLabel={t("bookmarkLoading")}
                 loginRequiredLabel={t("bookmarkLoginToSave")}
                 statusUnknownLabel={t("bookmarkStatusUnknown")}
                 addedMessage={t("addedToBookmarks")}
