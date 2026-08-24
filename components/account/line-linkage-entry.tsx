@@ -6,6 +6,7 @@ import {
   resolveLineLinkageEntryMode,
   type LineLinkageStatus,
 } from "@/lib/line/linkage-status";
+import type { LinkResult } from "@/lib/line/link-flow";
 
 /**
  * Web 側の LINE 連携エントリ（案A 第2弾 / Phase 2）。
@@ -63,6 +64,15 @@ const COPY = {
      */
     noticeConflict:
       "このメールアドレスには、すでに別の LINE アカウントが連携されています。連携できるのは 1 つの LINE アカウントだけです。連携先を変えたい場合は、先に今の連携を解除してください。",
+    /**
+     * 恒久的な衝突・逆向き（この LINE に既に別のメールアドレスが連携済み）。
+     *
+     * `noticeConflict` と分けるのは文言の好みではなく、**次にやるべきことが逆**だから。
+     * こちらのお客さまが解除するには、いま連携中の**別のメールアドレスでログインし直す**
+     * 必要がある。この画面で解除ボタンを探しても見つからない。
+     */
+    noticeLineConflict:
+      "この LINE アカウントは、すでに別のメールアドレスと連携されています。連携できるのは 1 つのメールアドレスだけです。連携先を変えたい場合は、先に連携中のメールアドレスでログインして、連携を解除してください。",
     /** 状態が読めなかったとき。「未連携」と言い切らない（3 値表示）。 */
     statusUnknown:
       "ただいま連携の状態を確認できませんでした。すでに連携がお済みの場合、あらためて連携していただいても二重にはなりません。",
@@ -86,6 +96,8 @@ const COPY = {
     noticeError: "We could not complete the link. Please try again.",
     noticeConflict:
       "This email address is already linked to a different LINE account. Only one LINE account can be linked at a time. To link a different one, please unlink the current account first.",
+    noticeLineConflict:
+      "This LINE account is already linked to a different email address. Only one email address can be linked at a time. To link it here instead, please sign in with that email address and unlink it first.",
     statusUnknown:
       "We could not check your link status just now. If you are already linked, linking again will not create a duplicate.",
     statusHeading: "LINE linkage",
@@ -117,7 +129,8 @@ type Locale = keyof typeof COPY;
  *   「未連携」と読んで解除が要らないと誤解する**。連携ボタンは冪等なので出したままにし、
  *   言い切らない一文だけを足す。
  *
- * @param result 連携フローから戻ってきた直後の結果（`?line_link=success|error|conflict`）。
+ * @param result 連携フローから戻ってきた直後の結果
+ *   （`?line_link=success|error|conflict|line-conflict`）。
  *   一度きりの確認をこの節の中に出すためだけに使う。**専用の完了画面は作らない**
  *   （旧 LIFF 導線が連携済みの人にも毎回「連携完了」を見せていた問題の再発防止）。
  *   `error` を黙って捨てないのは、失敗して戻ってきた人が「何も起きなかった」と
@@ -125,6 +138,8 @@ type Locale = keyof typeof COPY;
  *
  *   `conflict`（既に別の LINE が連携済み）は `error` と**分ける**。恒久的な衝突なので
  *   「もう一度お試しください」は嘘になる — 何度試しても成功しない。M-1 / J-4。
+ *   `line-conflict`（この LINE に既に別のメールアドレスが付いている）はその逆向きで、
+ *   **解除できる場所がもう一方のアカウント側にある**ため、案内すべき行動が違う。
  *
  * @param canLink この画面から連携フローに入れるか（＝ Shopify の顧客セッションがあるか）。
  *   既定 `true`（従来の呼び出し方＝メールでログインしている人）。
@@ -144,7 +159,7 @@ export function LineLinkageEntry({
 }: {
   locale: string;
   status?: LineLinkageStatus;
-  result?: "success" | "error" | "conflict";
+  result?: LinkResult;
   canLink?: boolean;
 }) {
   const t = COPY[(locale as Locale) in COPY ? (locale as Locale) : "ja"];
@@ -168,7 +183,9 @@ export function LineLinkageEntry({
         ? t.noticeSuccess
         : result === "conflict"
           ? t.noticeConflict
-          : t.noticeError}
+          : result === "line-conflict"
+            ? t.noticeLineConflict
+            : t.noticeError}
     </p>
   ) : null;
 

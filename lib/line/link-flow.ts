@@ -78,8 +78,20 @@ export const LINK_RESULT_PARAM = "line_link";
  *
  * J-4 で「世帯共有は認めない（1 対 1 固定）」と決めた以上、この衝突は仕様どおりの
  * 結果であって障害ではない。仕様どおりの結果は、そう見えなければならない。
+ *
+ * ## なぜ衝突が 2 種類あるのか（`conflict` と `line-conflict`）
+ *
+ * 1 対 1 固定は**両側**に効く。ぶつかり方は 2 通りあり、**次にやるべきことが違う**。
+ *
+ * | 値 | 何がぶつかったか | お客さまが次にやること |
+ * |---|---|---|
+ * | `conflict` | このメールアドレスに、既に**別の LINE** が付いている | いま付いている LINE の連携を解除する |
+ * | `line-conflict` | この LINE に、既に**別のメールアドレス**が付いている | そのメールアドレスでログインして解除する |
+ *
+ * どちらも「もう一度お試しください」では直らない。しかも**取るべき行動が逆**なので、
+ * 1 つの文言にまとめると、片方の人を必ず間違った操作へ案内することになる。
  */
-export type LinkResult = "success" | "error" | "conflict";
+export type LinkResult = "success" | "error" | "conflict" | "line-conflict";
 
 /**
  * 連携（P2）の token 交換と存在ゲートに使う Channel Secret を解決する。

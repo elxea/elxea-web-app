@@ -28,6 +28,8 @@ import * as Sentry from "@sentry/nextjs";
 
 import { CX_AGENT_BASE_URL } from "@/lib/chat/proxy";
 import { readSecretEnvTrimmed } from "@/lib/env";
+import type { LinkageCompletion } from "@/lib/auth/identity-link";
+import type { LinkResult } from "@/lib/line/link-flow";
 
 /** 何が起きたか。**決して throw しない**（ログインを失敗させない）。 */
 export type OneTapLinkResult =
@@ -114,4 +116,57 @@ export async function establishLinkageFromIntent({
 
   console.log("[one-tap-link] linkage established from intent");
   return { ok: true };
+}
+
+/**
+ * ワンタップの結果を、**画面に出す 1 語**へ畳む（F1）。
+ *
+ * ## なぜこれが要るのか
+ *
+ * ワンタップ連携（J-1 案A）は、押した人を Shopify のログインへ送り出し、戻ってきた
+ * `/api/auth/callback` で台帳に行を立てる。ところがその戻り先は**何も表示していなかった**。
+ * 成功しても、恒久的な衝突で断られても、画面はただのマイページに戻るだけ。
+ *
+ * 押した人から見ると、成功も失敗も「押したのに何も起きなかった」と同じ形になる。
+ * これは J-1 案A が直そうとしていた体験（§1-2「押しても定義上 100% 何も起きない」）を、
+ * **別の経路で作り直している**。#128 が他の 3 経路に入れた明示表示と同じ品質を、
+ * この経路にも持たせる。
+ *
+ * ## 衝突の向きを、手元にある証拠だけで見分ける
+ *
+ * cx-agent は 1 対 1 固定に反する書き込みを 409 で断る。409 そのものは**どちら側が
+ * ぶつかったか**を言わない。しかしこの経路は、書き込みのあとに台帳を引き直す
+ * （`completeLineLinkage`）ところまで通る。その引き直しが `linked-elsewhere` を返したなら、
+ * **この LINE に別の顧客が付いている**ことが台帳の側から確定する。
+ *
+ * 分からないときに推測しない、という原則はここでも同じ。証拠が無ければ
+ * `conflict`（＝このメールアドレス側の衝突）に倒す。cx-agent の 409 が現に返している
+ * のは `shopify_customer_already_linked` だけなので、これは既定として正しい。
+ *
+ * ## 連携の成否と、合体の成否を混ぜない
+ *
+ * 台帳への書き込みが成立したなら、**連携は完了している**。そのあとの合体
+ * （お気に入りの引っ越し）が半端に終わっても、それは次のログインで拾い直される
+ * 取りこぼしであって、「連携できませんでした」ではない。よって `outcome.ok` は
+ * `success` に写す。合体の失敗は Sentry とログの担当で、画面の担当ではない。
+ *
+ * @param outcome 台帳への書き込みの結果。`null` は「呼ぶ前に諦めた」。
+ * @param completion 書き込み後の合体の結果（`null` は走らせていない）。
+ */
+export function resolveOneTapResult(
+  outcome: OneTapLinkResult | null,
+  completion: LinkageCompletion | null,
+): LinkResult {
+  /* 台帳が「この LINE は別の顧客のもの」と言っている。409 の向きを決めるのは
+     この 1 点だけで、これが出た時点で他の理由より優先する。 */
+  const lineTakenByAnother = completion?.outcome === "linked-elsewhere";
+
+  if (!outcome) return lineTakenByAnother ? "line-conflict" : "error";
+  if (outcome.ok) return lineTakenByAnother ? "line-conflict" : "success";
+  if (outcome.reason === "conflict") {
+    return lineTakenByAnother ? "line-conflict" : "conflict";
+  }
+  /* `not-configured` / `unreachable` / `rejected`。いずれも**やり直せば直りうる**
+     （鍵の投入・cx-agent の復旧）。恒久的な衝突と混ぜない。 */
+  return "error";
 }

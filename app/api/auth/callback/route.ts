@@ -17,7 +17,11 @@ import {
   completeLineLinkage,
 } from "@/lib/auth/identity-link";
 import { LINK_INTENT_COOKIE, openLinkIntent } from "@/lib/auth/link-intent";
-import { establishLinkageFromIntent } from "@/lib/auth/one-tap-link";
+import {
+  establishLinkageFromIntent,
+  resolveOneTapResult,
+} from "@/lib/auth/one-tap-link";
+import { returnUrlWithResult } from "@/lib/line/link-flow";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
@@ -331,6 +335,33 @@ export async function GET(request: NextRequest) {
        * 出す単一正本に委譲してある。 */
       if (completion?.outcome === "merged") {
         clearAuthCookies(response, "line");
+      }
+
+      /* ── ワンタップの結果を画面に出す（F1）──────────────────────────────
+       *
+       * ここは**押した人にだけ**出す。`intent.ok` が真なのは「マイページで
+       * 連携ボタンを押して出て行った」ときだけで、共用端末に他人の LINE cookie が
+       * 同居しているだけのログインは含まない（含めると、連携を頼んでいない人に
+       * 「連携できませんでした」と出ることになる）。
+       *
+       * 出さないと何が起きるか: 成功も、恒久的な衝突も、押した人からは
+       * 「押したのに何も起きなかった」と同じ形で終わる。J-1 案A が直そうとしていた
+       * 体験（§1-2）を、別の経路で作り直してしまう。#128 が他の 3 経路に入れた
+       * 明示表示と同じ品質をこの経路にも持たせる。
+       *
+       * Location だけを差し替えるのは、ここまでに `response` へ載せたセッション
+       * cookie 一式（`shop_at` / `shop_rt` / …）を作り直さないため。**連携の表示の
+       * ために、ログインそのものを組み立て直す理由が無い。** */
+      if (intent.ok) {
+        const linkResult = resolveOneTapResult(oneTapOutcome, completion);
+        console.log(`[one-tap-link] result=${linkResult}`);
+        response.headers.set(
+          "location",
+          new URL(
+            returnUrlWithResult(returnTo ?? `/${locale}/account`, linkResult),
+            origin,
+          ).toString(),
+        );
       }
     }
 

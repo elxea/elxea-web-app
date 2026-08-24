@@ -97,7 +97,7 @@ export default async function AccountPage({
   searchParams,
 }: {
   /* Next 15+ では searchParams は Promise。連携フローからの復帰結果
-     (`?line_link=success|error|conflict`) を受け取るためだけに使う。 */
+     (`?line_link=success|error|conflict|line-conflict`) を受け取るためだけに使う。 */
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const t = await getTranslations("account");
@@ -171,7 +171,10 @@ export default async function AccountPage({
      専用の完了画面は作らない。 */
   const rawLineLink = (await searchParams)?.[LINK_RESULT_PARAM];
   const lineLinkResult =
-    rawLineLink === "success" || rawLineLink === "error" || rawLineLink === "conflict"
+    rawLineLink === "success" ||
+    rawLineLink === "error" ||
+    rawLineLink === "conflict" ||
+    rawLineLink === "line-conflict"
       ? rawLineLink
       : undefined;
 
