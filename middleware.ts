@@ -139,6 +139,25 @@ async function checkSitePassword(request: NextRequest): Promise<NextResponse | n
   // Scoped to the /link path only, with or without a locale prefix.
   if (/^\/(?:(?:ja|en)\/)?link(?:\/|$)/.test(pathname)) return null;
 
+  /* 規約・プライバシーポリシー等の法定ページ (/legal/*) は門の外に出す。
+   *
+   * ## なぜ必要か (M-0 の前提整備)
+   *
+   * LINE ログインの email scope (LINE に登録されたメールアドレスの取得) は LINE の
+   * 審査を通らないと使えない。審査では**プライバシーポリシーの URL に実際にアクセスして
+   * 内容を読む**。サイトパスワードの門が立っていると、審査側に見えるのは
+   * `/password` へのリダイレクトだけで、**何を書いてあっても読まれない**。
+   *
+   * ## 何も晒していない
+   *
+   * `/legal/*` は規約・プライバシーポリシー・特商法表記・返品ポリシーで、いずれも
+   * **公開が前提の静的な文書**である。顧客データも操作口も持たない。門の目的は
+   * 「公開前の商品・体験を見せない」ことなので、公開が前提の文書を対象から外しても
+   * 目的は損なわれない。むしろ特商法表記のように**掲示が義務**の文書もある。
+   *
+   * `/liff` / `/link` と同じ形で、locale prefix の有無どちらでも当たるようにする。 */
+  if (/^\/(?:(?:ja|en)\/)?legal(?:\/|$)/.test(pathname)) return null;
+
   // Redirect to password page
   const passwordUrl = new URL("/password", request.url);
   return NextResponse.redirect(passwordUrl);

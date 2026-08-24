@@ -578,6 +578,7 @@
     "description": "LINE でログインすると、Web でも LINE でも会話を引き継げます。",
     "lineButton": "LINE でログイン",
     "lineButtonUnavailable": "現在ご利用いただけません",
+    "lineEmailConsent": "LINE でログインすると、LINE に登録されたメールアドレスを取得し、注文確認・お問い合わせ対応・アカウント連携に利用します。",
     "or": "または",
     "shopifyButton": "メールアドレスでログイン",
     "terms": "ログインすることで、<terms>利用規約</terms>と<privacy>プライバシーポリシー</privacy>に同意したものとみなされます。",
