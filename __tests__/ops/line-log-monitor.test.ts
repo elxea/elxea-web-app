@@ -182,6 +182,29 @@ describe('matchLogEntry — 連携台帳の読み取り失敗 (path 縛りの免
       '[identity-link] line linkage ledger unreadable; skipping merge (source=auth-callback)',
       '合体が見送られた',
     ],
+    /* --- 順引き (as-is D-15)。ここが 3 段とも漏れていた ------------------------
+       Sentry 無し / どの pattern にも当たらない / path 縛りで SSR を見ていない。
+       順引きの主発生源は `/ja/account` の SSR なので、path 免除も同時に要る。 */
+    [
+      '/ja/account',
+      '[line-linkage-status] forward lookup returned 502',
+      '順引きが 5xx',
+    ],
+    [
+      '/ja/account',
+      '[line-linkage-status] forward lookup unreachable: The operation was aborted due to timeout',
+      '順引きが timeout (今回の本番症状)',
+    ],
+    [
+      '/ja/account',
+      '[line-linkage-status] forward lookup unknown: unexpected response shape',
+      '順引きの応答が壊れている',
+    ],
+    [
+      '/en/account',
+      '[line-linkage-status] forward lookup unknown: SYNC_API_SECRET not set',
+      '順引きで秘密が未設定',
+    ],
   ])('%s の %s を拾う (%s)', (requestPath, message) => {
     const finding = matchLogEntry(
       logLine({ requestPath, message, responseStatusCode: 200 }),
@@ -231,11 +254,68 @@ describe('matchLogEntry — 連携台帳の読み取り失敗 (path 縛りの免
     ).toBeNull();
   });
 
-  it('規則表に anyPath 免除が 1 件だけ載っている (増えたら意図的か確かめる)', () => {
+  it('規則表の anyPath 免除は台帳系の 3 件だけ (増えたら意図的か確かめる)', () => {
+    /* 免除は「文字列が十分に固有な規則」にだけ付ける。3 件とも
+       `[line-linkage-status]` / `[identity-link]` 由来の固有文言で、
+       いずれも SSR (`/ja/account`) や `/api/auth/callback` で出る。 */
     const rules = LOG_PATTERNS as { id: string; anyPath?: boolean }[];
     expect(rules.filter((r) => r.anyPath).map((r) => r.id)).toEqual([
       'linkage-read-failed',
+      'linkage-not-linked-after-write',
+      'linkage-caller-bug',
     ]);
+  });
+});
+
+/**
+ * 「書いた直後なのに台帳が『連携なし』と言う」と、合体の呼び出し側のバグ。
+ *
+ * どちらも読み取り失敗ではないので `linkage-read-failed` には当たらない。
+ * 別の規則として持つのは、意味も打ち手も違うから (前者は台帳・鍵の問題、
+ * 後者は web-app の配線の問題)。
+ */
+describe('matchLogEntry — 合体が黙って飛ぶ痕跡', () => {
+  it.each([
+    ['line-link-callback', 'マイページの連携ボタン'],
+    ['line-link-liff', 'LIFF'],
+  ])('連携を書いた直後の source=%s は拾う (%s)', (source) => {
+    const finding = matchLogEntry(
+      logLine({
+        requestPath: '/api/user/line-link/callback',
+        message: `[identity-link] line linkage ledger reports not linked; skipping merge (source=${source})`,
+      }),
+    );
+    expect(finding?.id).toBe('linkage-not-linked-after-write');
+    expect(finding?.severity).toBe('error');
+  });
+
+  it('source=auth-callback の同じ行では鳴らない (未連携の人のログインは正常)', () => {
+    /* ここで鳴らすと「メールでログインした未連携の人」の数だけ上がり、
+       監視そのものが無視されるようになる。正常と異常を文字列で分けている。 */
+    expect(
+      matchLogEntry(
+        logLine({
+          requestPath: '/api/auth/callback',
+          message:
+            '[identity-link] line linkage ledger reports not linked; skipping merge (source=auth-callback)',
+          responseStatusCode: 302,
+        }),
+      ),
+    ).toBeNull();
+  });
+
+  it.each([
+    ['invalid input', '識別子が空のまま呼ばれた'],
+    ['same key', '仮の棚のキーを顧客 ID として渡した'],
+  ])('呼び出し側のバグ (%s) を拾う (%s)', (reason) => {
+    const finding = matchLogEntry(
+      logLine({
+        requestPath: '/ja/account',
+        message: `[identity-link] line linkage skipped: ${reason} (source=auth-callback)`,
+      }),
+    );
+    expect(finding?.id).toBe('linkage-caller-bug');
+    expect(finding?.severity).toBe('error');
   });
 });
 

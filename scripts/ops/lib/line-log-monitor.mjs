@@ -111,14 +111,57 @@ export const LOG_PATTERNS = [
     //   [line-linkage-status] reverse lookup returned 401
     //   [line-linkage-status] reverse lookup: linked without customer id
     //   [line-linkage-status] reverse lookup unreachable: <reason>
+    //   [line-linkage-status] forward lookup unknown: SYNC_API_SECRET not set
+    //   [line-linkage-status] forward lookup unknown: unexpected response shape
+    //   [line-linkage-status] forward lookup returned 401
+    //   [line-linkage-status] forward lookup unreachable: <reason>
     //   [identity-link] line linkage ledger unreadable; skipping merge (source=...)
     // `:?` は "reverse lookup: linked without customer id" の 1 件のためだけに要る。
-    pattern: /reverse lookup:? (returned|unreachable|unknown|linked without)|ledger unreadable/i,
+    //
+    // **forward を足したのが今回の修正 (as-is D-15)。** 順引き
+    // (`fetchLineLinkageStatus`) の失敗ログは以前 "[line-linkage-status] unreachable:"
+    // 等で、"reverse lookup" を含まないためこの規則にも `cx-agent (returned|unreachable)`
+    // にも当たらなかった。本番で順引きが timeout し続けても監視に一行も出ない状態
+    // だった。web-app 側でログ文言を forward/reverse で揃え、ここで両方を拾う。
+    pattern: /(reverse|forward) lookup:? (returned|unreachable|unknown|linked without)|ledger unreadable/i,
     // path 縛りを免除する。読み取りは SSR の描画中 (`/ja/account` 等) と
     // `auth-callback` から走るので、LINE 系 route の path には出ない。
+    // **順引きの主発生源はまさに SSR の `/ja/account`** なので、この免除が無いと
+    // 上の pattern を直しても一行も拾えない (D-15 の 3 段目)。
     anyPath: true,
     description:
       '連携台帳の読み取りに失敗 — 連携済みの人が未連携の棚に落ちる (お気に入りが消えたように見える) / 合体が見送られる',
+  },
+  {
+    id: 'linkage-not-linked-after-write',
+    severity: 'error',
+    // [identity-link] line linkage ledger reports not linked; skipping merge (source=line-link-callback)
+    //
+    // 連携ボタン / LIFF は **台帳に行を立てた直後** にこの関数へ来る。そこで
+    // 「連携が無い」と返るのは、書き込みが成立していないか、書いた鍵と読んだ鍵が
+    // 食い違っているということ。利用者には「連携しました」と出たのにデータは
+    // 移らない — 今回の本番症状そのもの。
+    //
+    // `source=line-link` に絞るのが肝。`source=auth-callback` の同じ行は
+    // 「未連携の人がメールでログインした」だけで **正常**。絞らないとログイン数
+    // だけ鳴って監視が無視されるようになる。
+    pattern: /ledger reports not linked; skipping merge \(source=line-link/i,
+    anyPath: true,
+    description:
+      '連携を書いた直後の確認で「連携が無い」と返っている — 画面には「連携しました」と出るのにデータが移らない',
+  },
+  {
+    id: 'linkage-caller-bug',
+    severity: 'error',
+    // [identity-link] line linkage skipped: invalid input (source=...)
+    // [identity-link] line linkage skipped: same key (source=...)
+    //
+    // どちらも利用者の操作では起こらない (識別子が空 / 仮の棚のキーを顧客 ID として
+    // 渡した)。何も起きずに正常終了するので、出たら必ず配線の退行。
+    pattern: /line linkage skipped: (invalid input|same key)/i,
+    anyPath: true,
+    description:
+      '合体の呼び出し側が壊れている (識別子が空 / 同一キー) — 連携済みの人の合体が黙って飛ぶ',
   },
 ];
 

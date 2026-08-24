@@ -42,6 +42,7 @@ const LINE_ORIGIN = process.env.E2E_LINE_ORIGIN!;
 const CX_ORIGIN = process.env.E2E_CX_ORIGIN!;
 const SHOPIFY_ORIGIN = process.env.E2E_SHOPIFY_ORIGIN!;
 const LINE_HIT_LOG = process.env.E2E_LINE_HIT_LOG!;
+const CX_HIT_LOG = process.env.E2E_CX_HIT_LOG!;
 
 const FAKE_APEX = ".elxea.test";
 const LINE_SESSION_COOKIES = ["line_user", "line_session", "line_auth", "line_uid"] as const;
@@ -69,7 +70,29 @@ function control(request: APIRequestContext) {
       const res = await request.post(`${SHOPIFY_ORIGIN}/__control/customer`, { data: customer });
       expect(res.ok(), "偽 Shopify の顧客切り替えに失敗").toBe(true);
     },
+    /**
+     * 偽 cx-agent の `/api/identity/*` を遅らせる（`ms: 0` で解除）。
+     *
+     * web-app は 3000ms で諦めて「不明」に縮退する。その縮退は今まで
+     * **一度もテストで踏まれていなかった**（偽サーバーが即答しかできなかった）。
+     */
+    async setCxLatency(ms: number) {
+      const res = await request.post(`${CX_ORIGIN}/__control/latency`, { data: { ms } });
+      expect(res.ok(), "偽 cx-agent の遅延注入に失敗").toBe(true);
+    },
   };
+}
+
+/** 偽 cx-agent が実際に叩かれた記録。遅延が本当に効いたかはここでしか分からない。 */
+function cxHits(): { path: string; delayedMs?: number }[] {
+  try {
+    return readFileSync(CX_HIT_LOG, "utf8")
+      .split("\n")
+      .filter(Boolean)
+      .map((l) => JSON.parse(l) as { path: string; delayedMs?: number });
+  } catch {
+    return [];
+  }
 }
 
 /** 偽 LINE が実際に叩かれた記録。「往復が本当に起きた」ことは外形からは見えない。 */
@@ -469,5 +492,84 @@ test.describe.serial("LINE ログイン・メール連携・合体", () => {
       await listFavoriteTitles(page),
       "解除直後の LINE ログインに、前の連携先の棚が見えている（逆引きキャッシュが残っている）",
     ).not.toContain(title);
+  });
+
+  /**
+   * エッジ: 台帳の照会が遅すぎるとき、マイページは嘘をつかない（S12 / D-16）。
+   *
+   * ## なぜこのテストが要るのか
+   *
+   * web-app は cx-agent への問い合わせに 3000ms の上限を置き、超えたら
+   * `linked: null`（不明）へ縮退する。**この縮退の先が今回の症状の安全装置**で、
+   * 「未連携です」と言い切らずに「確認できませんでした」と出すことになっている。
+   *
+   * ところが偽 cx-agent は即答しかできなかったので、3000ms の上限も縮退も
+   * **一度も踏まれたことがなかった**（as-is D-16）。「タイムアウト時の挙動」は
+   * 設計文書とコメントの中にしか存在しない状態だった。ここで初めて実際に踏む。
+   *
+   * ## 何を固定するか（現状の縮退挙動）
+   *
+   * 順引き（メールでログインした人の経路）が timeout したとき:
+   *   - 「確認できませんでした」の一文が出る
+   *   - 「連携済み」とは言わない
+   *   - 画面自体は落ちない（fail-soft）
+   * そして遅延を解除すれば、その一文は消える（常時出る飾りではない）。
+   *
+   * 表示そのものの作り直し（連携 CTA を「準備中」で固めない等）は後の波の仕事で、
+   * ここは**今の挙動を動かせない形に留める**のが目的。
+   */
+  test("エッジ: 台帳の照会が 3 秒を超えても、マイページは「未連携」と言い切らない", async ({
+    page,
+    request,
+  }) => {
+    const user = { userId: lineUserId("edge-slow"), displayName: "照会が遅い人" };
+    const customer = { id: "9009", email: "edge-slow@example.test" };
+    await control(request).setLineUser(user);
+    await control(request).setShopifyCustomer(customer);
+
+    await loginWithEmail(page);
+
+    /* 遅延なしのときは「確認できませんでした」が出ない。ここを先に確かめないと、
+       このあとの assertion が「常に出ている一文」を見ているだけになりうる。 */
+    await page.goto("/ja/account");
+    await expect(page.getByTestId("line-linkage-entry")).toBeVisible();
+    await expect(page.getByTestId("line-linkage-status-unknown")).toHaveCount(0);
+
+    const hitsBefore = cxHits().length;
+
+    try {
+      /* 3000ms の上限より確実に長く。台帳の中身は変えないので、遅延が無ければ
+         同じ要求は「未連携」を返す — 変わるのは待てるかどうかだけ。 */
+      await control(request).setCxLatency(5_000);
+      await page.reload();
+
+      await expect(
+        page.getByTestId("line-linkage-status-unknown"),
+        "照会が失敗したのに「確認できませんでした」が出ていない",
+      ).toBeVisible();
+      await expect(
+        page.getByTestId("line-linkage-linked"),
+        "読めていないのに「連携済み」と表示している",
+      ).toHaveCount(0);
+
+      /* 偽サーバー側の記録で「本当に遅らせた」ことを確かめる。画面だけ見ていると、
+         偶然この一文が出ている場合と区別が付かない。 */
+      await expect
+        .poll(
+          () =>
+            cxHits()
+              .slice(hitsBefore)
+              .some((h) => (h.delayedMs ?? 0) >= 5_000),
+          { message: "偽 cx-agent が遅延を適用していない（timeout 経路を踏んでいない）" },
+        )
+        .toBe(true);
+    } finally {
+      /* 遅延を残したまま抜けると、あとに続く spec が「たまに落ちる」形で壊れる。 */
+      await control(request).setCxLatency(0);
+    }
+
+    /* 読めるようになれば、その一文は消える。 */
+    await page.reload();
+    await expect(page.getByTestId("line-linkage-status-unknown")).toHaveCount(0);
   });
 });

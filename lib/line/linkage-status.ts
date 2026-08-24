@@ -65,6 +65,7 @@ const FETCH_TIMEOUT_MS = 3000;
  */
 export async function fetchLineLinkageStatus(
   shopifyCustomerId: string,
+  now: number = Date.now(),
 ): Promise<LineLinkageStatus> {
   if (!shopifyCustomerId) return UNKNOWN_LINE_LINKAGE;
 
@@ -72,7 +73,14 @@ export async function fetchLineLinkageStatus(
   if (!secret) {
     // 秘密が無ければ cx-agent は 401 を返すので、無駄打ちせず「不明」に倒す。
     // （連携していないと決めつけない。設定漏れは未連携ではない。）
-    console.warn("[line-linkage-status] SYNC_API_SECRET not set; status unknown.");
+    //
+    // 文言が "forward lookup" で始まるのは監視の都合（逆引きの 4 か所と揃えてある）。
+    // "SYNC_API_SECRET not set" も残してあるので、監視の not-configured 規則と
+    // linkage-read-failed 規則の両方に当たる。
+    console.warn(
+      "[line-linkage-status] forward lookup unknown: SYNC_API_SECRET not set",
+    );
+    reportLinkageReadFailure("forward", "secret-missing", now);
     return UNKNOWN_LINE_LINKAGE;
   }
 
@@ -90,7 +98,10 @@ export async function fetchLineLinkageStatus(
     });
 
     if (!upstream.ok) {
-      console.warn(`[line-linkage-status] cx-agent returned ${upstream.status}`);
+      console.warn(
+        `[line-linkage-status] forward lookup returned ${upstream.status}`,
+      );
+      reportLinkageReadFailure("forward", "upstream-status", now);
       return UNKNOWN_LINE_LINKAGE;
     }
 
@@ -100,7 +111,13 @@ export async function fetchLineLinkageStatus(
     };
 
     // 型が期待どおりでなければ「不明」。壊れた応答を連携済み / 未連携に化けさせない。
-    if (typeof data.linked !== "boolean") return UNKNOWN_LINE_LINKAGE;
+    if (typeof data.linked !== "boolean") {
+      console.warn(
+        "[line-linkage-status] forward lookup unknown: unexpected response shape",
+      );
+      reportLinkageReadFailure("forward", "invalid-response", now);
+      return UNKNOWN_LINE_LINKAGE;
+    }
 
     return {
       linked: data.linked,
@@ -109,9 +126,10 @@ export async function fetchLineLinkageStatus(
   } catch (err) {
     // 不達 / タイムアウト / JSON 崩れ。マイページは通常どおり描く。
     console.warn(
-      "[line-linkage-status] unreachable:",
+      "[line-linkage-status] forward lookup unreachable:",
       err instanceof Error ? err.message : err,
     );
+    reportLinkageReadFailure("forward", "unreachable", now);
     return UNKNOWN_LINE_LINKAGE;
   }
 }
@@ -147,8 +165,8 @@ export function isLinkedForDisplay(
  *   - `link-cta`    … 未連携 / 不明 かつ連携フローに入れる。従来どおり連携ボタン
  *   - `status-only` … 連携フローに入れないが、黙って消してはいけないとき
  *                     （状態が読めなかった / 連携フローから戻ってきた結果がある）
- *   - `hidden`      … LINE セッションで未連携。出す用は無い（連携の入口は
- *                     「メールアドレスを連携する」の既存導線が持っている）
+ *   - `hidden`      … LINE セッションで未連携。出す用は無い（この経路の入口は
+ *                     「メールアドレスでログイン」→ ログイン後に連携、の 2 段階）
  *
  * 画面の JSX に直接この分岐を書かないのは `isLinkedForDisplay` と同じ理由
  * （3 値が `!!` に化けて不明が連携済みに倒れる事故を型と関数で止める）。
@@ -292,7 +310,21 @@ export type LinkageReadFailure =
   | "secret-missing"
   | "upstream-status"
   | "linked-without-customer-id"
+  /** 200 が返ったが `linked` が boolean でない（応答が壊れている）。順引きのみ。 */
+  | "invalid-response"
   | "unreachable";
+
+/**
+ * どちら向きの読み取りが失敗したか。
+ *
+ *   - `forward` … 顧客 ID → 連携の有無（マイページを**メールで**開いた人）
+ *   - `reverse` … LINE userId → 顧客 ID（マイページを**LINE で**開いた人）
+ *
+ * 分けて持つのは、片方だけが壊れる状況が実在するから（順引きは cx-agent の
+ * 別クエリを通り、キャッシュも持たない）。Sentry のタグで切り分けられないと、
+ * 「マイページが未連携に見える」の原因がどちら側か分からないまま調べることになる。
+ */
+export type LinkageReadDirection = "forward" | "reverse";
 
 /**
  * 同じ理由を鳴らし続けない間隔。
@@ -306,11 +338,11 @@ export type LinkageReadFailure =
  */
 const LINKAGE_REPORT_COOLDOWN_MS = LINKAGE_CACHE_TTL_MS;
 
-/** 理由ごとの最終送信時刻。 */
-const lastReportedAt = new Map<LinkageReadFailure, number>();
+/** 向き + 理由ごとの最終送信時刻。 */
+const lastReportedAt = new Map<string, number>();
 
 /**
- * 逆引きの失敗を Sentry に残す（console.warn と対で呼ぶ）。
+ * 連携台帳の読み取り失敗を Sentry に残す（console.warn と対で呼ぶ）。
  *
  * ## なぜ console.warn だけでは足りないのか
  *
@@ -320,21 +352,41 @@ const lastReportedAt = new Map<LinkageReadFailure, number>();
  * 状態は「連携済みの人が未連携の棚を見る」＝ **お気に入りが消えたように見える**
  * 事故そのものなので、後から必ず辿れる記録が要る。それを Sentry 側に持たせる。
  *
+ * ## 順引きが長く無音だった話（as-is D-15）
+ *
+ * この関数は当初 **逆引きからしか呼ばれていなかった**。順引き
+ * （`fetchLineLinkageStatus`）は Sentry を一切鳴らさず、ログ文言も監視の
+ * どの正規表現にも当たらず、しかも監視は path 縛りで SSR（`/ja/account`）を
+ * 見ていなかった。3 段とも漏れていたので、本番で順引きが timeout し続けても
+ * **どこにも一行も残らなかった**。向きを引数にして両方から呼ぶ形に変えたのは、
+ * 「読み取り口が 2 実装ある」という現実を、少なくとも観測の側では 1 本に
+ * 束ねるため（実装の統合そのものは後の波）。
+ *
  * ⚠ LINE userId・顧客 ID・秘密は載せない（`extra` を使わないのはそのため）。
- *   分かるのは「いつ・どの理由で読めなかったか」だけで、原因の切り分けには足りる。
+ *   分かるのは「いつ・どちら向きが・どの理由で読めなかったか」だけで、
+ *   原因の切り分けには足りる。
  */
 function reportLinkageReadFailure(
+  direction: LinkageReadDirection,
   reason: LinkageReadFailure,
   now: number,
 ): void {
-  const last = lastReportedAt.get(reason);
+  /* 間引きは向きごとに独立させる。片方が鳴り続けている間にもう片方が壊れても
+     取りこぼさないため（同じ理由でも壊れている場所が違う）。 */
+  const key = `${direction}:${reason}`;
+  const last = lastReportedAt.get(key);
   if (last !== undefined && now - last < LINKAGE_REPORT_COOLDOWN_MS) return;
-  lastReportedAt.set(reason, now);
+  lastReportedAt.set(key, now);
 
-  Sentry.captureMessage("LINE linkage reverse lookup failed", {
-    level: "warning",
-    tags: { subsystem: "identity-link", reason },
-  });
+  Sentry.captureMessage(
+    direction === "forward"
+      ? "LINE linkage forward lookup failed"
+      : "LINE linkage reverse lookup failed",
+    {
+      level: "warning",
+      tags: { subsystem: "identity-link", reason, direction },
+    },
+  );
 }
 
 /** テスト用。プロセス内キャッシュを空にする（間引きの記録も一緒に捨てる）。 */
@@ -465,7 +517,7 @@ async function fetchReverseLinkage(
     console.warn(
       "[line-linkage-status] reverse lookup unknown: SYNC_API_SECRET not set",
     );
-    reportLinkageReadFailure("secret-missing", now);
+    reportLinkageReadFailure("reverse", "secret-missing", now);
     return unknown;
   }
 
@@ -487,7 +539,7 @@ async function fetchReverseLinkage(
       console.warn(
         `[line-linkage-status] reverse lookup returned ${upstream.status}`,
       );
-      reportLinkageReadFailure("upstream-status", now);
+      reportLinkageReadFailure("reverse", "upstream-status", now);
       return unknown;
     }
 
@@ -514,7 +566,7 @@ async function fetchReverseLinkage(
       console.warn(
         "[line-linkage-status] reverse lookup: linked without customer id",
       );
-      reportLinkageReadFailure("linked-without-customer-id", now);
+      reportLinkageReadFailure("reverse", "linked-without-customer-id", now);
       return unknown;
     }
   } catch (err) {
@@ -522,7 +574,7 @@ async function fetchReverseLinkage(
       "[line-linkage-status] reverse lookup unreachable:",
       err instanceof Error ? err.message : err,
     );
-    reportLinkageReadFailure("unreachable", now);
+    reportLinkageReadFailure("reverse", "unreachable", now);
     return unknown;
   }
 
