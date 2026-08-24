@@ -291,9 +291,26 @@ test.describe.serial("LINE ログイン・メール連携・合体", () => {
       "連携前にメールの棚から LINE の棚が見えてはいけない",
     ).not.toContain(title);
 
-    /* メールログインの往復で LINE セッションは畳まれている（同じブラウザに 2 つの
-     * 身元が同時に立ったままにしない）。 */
-    expect(await sessionCookieNames(context)).toEqual([]);
+    /* 逆に LINE セッションは**残っている** (F16)。
+     *
+     * ここは以前 `toEqual([])` — つまり「メールログインの往復で LINE セッションは
+     * 畳まれる」を正としていた。**その期待自体が欠陥だった。** 1 つ上の assertion が
+     * 言っているとおり、この時点では台帳に対応が無く合体は起きていない。にもかかわらず
+     * cookie 4 本を消すと、お気に入りは `users/line:<id>/` に残ったまま、そこへ戻る
+     * 入口だけが失われる。Setaka の実機テストで「LINE の保存情報が消えた」と見えたのは
+     * この状態。
+     *
+     * 掃除してよいのは合体まで到達したときだけで、その分岐は
+     * `app/api/auth/callback/route.ts` にある。ここはその**ブラウザ側の受入**:
+     * 未連携のままメールで入っても、LINE へ戻る道は残る。
+     *
+     * 「同じブラウザに 2 つの身元が同時に立つ」ことは問題にならない。棚の解決は
+     * `resolveIdentity()` が Shopify セッションを優先するので、いまこのブラウザが
+     * 見るのはメールの棚のまま（1 つ上の assertion がそれを見ている）。 */
+    expect(
+      await sessionCookieNames(context),
+      "未連携のままメールで入ったのに LINE セッションが消えている (F16)",
+    ).toEqual([...LINE_SESSION_COOKIES].sort());
 
     /* --- ③ 連携する = 合体が起きる --- */
     await linkLineFromAccount(page);
