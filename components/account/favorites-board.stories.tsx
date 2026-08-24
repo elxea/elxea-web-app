@@ -40,6 +40,14 @@ const favorites: FavoriteInput[] = [
     imageUrl: "/hero-approach.jpg",
     createdAt: "2026-08-16T02:00:00.000Z",
   },
+  {
+    id: "pe1",
+    type: "person",
+    targetId: "masayuki-kubo",
+    title: "久保 雅之",
+    imageUrl: "/hero-day.jpg",
+    createdAt: "2026-08-19T02:00:00.000Z",
+  },
 ];
 
 const meta = {
@@ -68,4 +76,18 @@ export const OneKindEmpty: Story = {
 /** 1 件も無い状態。どの種類も枠と「探しに行く」導線だけが残る。 */
 export const Empty: Story = {
   args: { groups: groupFavorites([]) },
+};
+
+/**
+ * 人だけがある状態 (F4 で足した 3 つ目の種類)。
+ *
+ * 人はカードから `/people/{slug}` へ飛び、解除も商品・読みものと同じ。
+ * 0 件のときの導線だけは `/people` (存在しない一覧) ではなく読みものを指す。
+ */
+export const PeopleOnly: Story = {
+  args: {
+    groups: groupFavorites(
+      normalizeFavorites(favorites.filter((favorite) => favorite.type === "person"))
+    ),
+  },
 };

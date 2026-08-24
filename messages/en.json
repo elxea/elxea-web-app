@@ -360,7 +360,18 @@
     "teasKicker": "TEAS BY THIS PERSON",
     "storiesKicker": "STORIES",
     "otherKicker": "OTHER PEOPLE",
-    "otherHead": "The people behind roji"
+    "otherHead": "The people behind roji",
+    "saveAdd": "Save this person",
+    "saveRemove": "Remove from saved",
+    "saveSaved": "Saved",
+    "saveLoading": "Checking saved status",
+    "saveLoginRequired": "Log in to save",
+    "saveStatusUnknown": "Could not load the saved status. Press to check again.",
+    "saveAddedMessage": "Saved to My Account",
+    "saveRemovedMessage": "Removed from saved",
+    "saveErrorMessage": "Action failed. Please try again.",
+    "saveLoginRequiredMessage": "Please log in to save this person.",
+    "saveStatusRetryMessage": "Checking the saved status again."
   },
   "farmer": {
     "heading": "Farmers",
@@ -494,9 +505,11 @@
     "favorites": "Favorites",
     "favoriteProducts": "Favorite Products",
     "favoriteArticles": "Favorite Articles",
+    "favoritePeople": "Saved People",
     "noFavorites": "No favorites yet.",
     "noFavoriteProducts": "No favorite products yet.",
     "noFavoriteArticles": "No favorite articles yet.",
+    "noFavoritePeople": "No saved people yet. You can reach a person's page from the author's name on any story.",
     "removedFromFavorites": "Removed from favorites",
     "followingFarmers": "Following",
     "noFollows": "You are not following any farmers.",
@@ -541,6 +554,7 @@
     "favoritesCount": "{count} saved",
     "favoriteKindProduct": "Saved product",
     "favoriteKindArticle": "Saved story",
+    "favoriteKindPerson": "Saved person",
     "favoriteRemoveLabel": "Remove {title} from favorites"
   },
   "comment": {

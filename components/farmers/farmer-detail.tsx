@@ -131,6 +131,15 @@ export type FarmerHeadProps = {
   bylineLabel?: React.ReactNode;
   /** AuthorByline を差し込む。 */
   byline?: React.ReactNode;
+  /**
+   * 見出し欄の末尾に置く操作 (例: People 詳細の「保存する」トグル)。
+   *
+   * 追加の任意スロット。渡さない画面 (農家詳細 / プレイリスト詳細) の描画は
+   * 導入前と一致する。この位置なのは、氏名・肩書・実数・聞き手を読んだ直後が
+   * 「この人を覚えておく」を押す自然な場所だから。写真の上に重ねると
+   * SP で全幅写真に被り、テンプレの実測値 (Figma 8079:3750 / 8079:3970) から外れる。
+   */
+  actions?: React.ReactNode;
   /** パンくず。 */
   children?: React.ReactNode;
 };
@@ -161,6 +170,7 @@ export function FarmerHead({
   stats,
   bylineLabel,
   byline,
+  actions,
   children,
 }: FarmerHeadProps) {
   return (
@@ -237,6 +247,14 @@ export function FarmerHead({
                 </p>
               ) : null}
               <div className="mt-2 lg:mt-1">{byline}</div>
+            </div>
+          ) : null}
+
+          {actions ? (
+            /* 間隔は byline と同じリズム (PC 36 / SP 28)。ボタンは 44 高なので
+               この位置でも Stats・クレジットの行間を崩さない。 */
+            <div data-slot="farmer-head-actions" className="mt-7 lg:mt-9">
+              {actions}
             </div>
           ) : null}
         </div>

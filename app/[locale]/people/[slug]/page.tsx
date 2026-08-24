@@ -13,6 +13,7 @@ import { Breadcrumb } from "@/components/seo/breadcrumb";
 import { AuthorByline } from "@/components/journal/author-byline";
 import { ArticleCard } from "@/components/journal/article-card";
 import { CatalogGrid } from "@/components/catalog/catalog-list";
+import { FavoriteToggleButton } from "@/components/favorites/favorite-toggle-button";
 import { SpecBand } from "@/components/editorial/section-blocks";
 import { bodySmClass, captionClass } from "@/components/editorial/rule-list";
 import {
@@ -238,6 +239,12 @@ export default async function PeoplePage({
 
   const heroImage = photoUrl(person.image, person._id, 640, 800);
 
+  /* お気に入りに保存する画像。**絶対 URL でなければ null**。
+     API の受け口が `z.string().url()` なので、プレビュー用の見本画像 (相対パス)
+     をそのまま渡すと 400 になる。Sanity の画像 URL は絶対なのでそのまま通る。 */
+  const favoriteImage =
+    heroImage && /^https?:\/\//.test(heroImage) ? heroImage : null;
+
   /* --- 3. THE WORK -------------------------------------------------------- */
 
   const workItems = toProcessItems(person.work, "work");
@@ -304,6 +311,31 @@ export default async function PeoplePage({
         imageAlt={person.image?.alt ?? person.name}
         stats={person.stats}
         bylineLabel={person.interviewer ? t("interviewerLabel") : undefined}
+        /* この人を覚えておく (Setaka 決定 2026-08-25「人物ページに正式実装」)。
+           マイページ /account/favorites の「お気に入りの人」節に出る。
+           `targetId` は人の slug — Firestore の他の種類と同じく識別子は slug で、
+           locale を混ぜた複合キーにはしない (既存データ互換)。 */
+        actions={
+          <FavoriteToggleButton
+            kind="person"
+            targetId={person.slug.current}
+            title={person.name}
+            imageUrl={favoriteImage}
+            labels={{
+              add: t("saveAdd"),
+              remove: t("saveRemove"),
+              saved: t("saveSaved"),
+              loading: t("saveLoading"),
+              loginRequired: t("saveLoginRequired"),
+              statusUnknown: t("saveStatusUnknown"),
+              added: t("saveAddedMessage"),
+              removed: t("saveRemovedMessage"),
+              error: t("saveErrorMessage"),
+              loginRequiredMessage: t("saveLoginRequiredMessage"),
+              statusRetry: t("saveStatusRetryMessage"),
+            }}
+          />
+        }
         byline={
           person.interviewer ? (
             <AuthorByline

@@ -10,22 +10,46 @@
  *
  * だけをここに持つ。種類を足す手順は「`FAVORITE_KINDS` に 1 語足す →
  * `FAVORITE_KIND_META` に 1 エントリ足す (足さないと型エラーになる) →
- * `messages/*.json` に文言を足す → API の zod enum に足す」の 4 手で閉じる。
+ * `messages/*.json` に文言を足す」の 3 手で閉じる。
  * 画面側 (マイページ本体 / お気に入り一覧) はこの配列を回すだけなので、
  * 「片方の画面にだけ種類を足し忘れる」事故が起きない。
+ *
+ * ## サーバ側 (API の受け口 / Firestore の型) もここから導く
+ *
+ * 以前は 4 手目に「API の zod enum に足す」があり、同じ語の列を
+ * `FAVORITE_KINDS` / `lib/firebase/types.ts` の `FavoriteType` /
+ * `app/api/user/favorites/route.ts` の `z.enum([...])` の **3 か所が独立に**
+ * 持っていた。足し忘れると「画面には節が出るのに、保存しようとすると 400 が
+ * 返る」という、症状から原因が遠い壊れ方をする。いまは後ろ 2 つをこの
+ * `FAVORITE_KINDS` から導出しているので、ここに 1 語足せば受け口も型も
+ * 自動で追従する (F4 / QA 指摘 2026-08-25)。
  *
  * 保存されている値は Firestore の生ドキュメント (`...doc.data()`) なので型が緩い。
  * 正規化 (`normalizeFavorites`) をここで一度だけ行い、以降は `FavoriteEntry` で扱う。
  */
 
-/** お気に入りにできるものの種類。API 側 (`FavoriteType`) と同じ語を使う。 */
-export const FAVORITE_KINDS = ["product", "article"] as const;
+/**
+ * お気に入りにできるものの種類。**API 側 (`FavoriteType` / zod) はここから導く**
+ * ので、この配列がサービス全体の唯一の正本。
+ *
+ * 並びは一覧ページ (/account/favorites) の節の並びでもある。
+ */
+export const FAVORITE_KINDS = ["product", "article", "person"] as const;
 
 export type FavoriteKind = (typeof FAVORITE_KINDS)[number];
 
 type FavoriteKindMeta = {
   /** 詳細ページの基底パス (locale 抜き)。`href` の組み立てに使う。 */
   basePath: string;
+  /**
+   * 0 件のときに出す「探しに行く」導線の遷移先 (locale 抜き)。
+   *
+   * `basePath` と別に持つのは、**詳細ページはあっても一覧ページが無い種類がある**
+   * ため。人 (`/people/[slug]`) がそれで、`/people` という一覧は実装されておらず
+   * (導線は読みものの著者名から入る)、`basePath` をそのまま導線にすると 404 へ
+   * 送ることになる。実在するページだけを指す。
+   */
+  browsePath: string;
   /** 節見出しの文言キー (`messages/*.json` の `account.*`)。 */
   headingKey: string;
   /** その種類が 0 件のときの文言キー。 */
@@ -34,6 +58,15 @@ type FavoriteKindMeta = {
   labelKey: string;
   /** 0 件のときに出す「探しに行く」導線のラベル (`common.*` のキー)。 */
   browseLabelKey: string;
+  /**
+   * マイページ本体の「続き」(抜粋 6 枚) に出すときの種類の優先順位 (小さいほど先)。
+   *
+   * 抜粋は枚数が限られるので、並べる順で「その種類が 1 枚も出ない」が起きる。
+   * どの種類を先に見せるかは表示の判断なので、`FAVORITE_KINDS` (= データの並び)
+   * とは別に持つ。`Record<FavoriteKind, …>` の一部なので、**種類を足すとここも
+   * 埋めないと型エラーになる** = 新しい種類が抜粋から黙って漏れることが無い。
+   */
+  continueRank: number;
 };
 
 /**
@@ -43,19 +76,50 @@ type FavoriteKindMeta = {
 export const FAVORITE_KIND_META: Record<FavoriteKind, FavoriteKindMeta> = {
   product: {
     basePath: "/products",
+    browsePath: "/products",
     headingKey: "favoriteProducts",
     emptyKey: "noFavoriteProducts",
     labelKey: "favoriteKindProduct",
     browseLabelKey: "products",
+    continueRank: 2,
   },
   article: {
     basePath: "/journal",
+    browsePath: "/journal",
     headingKey: "favoriteArticles",
     emptyKey: "noFavoriteArticles",
     labelKey: "favoriteKindArticle",
     browseLabelKey: "journal",
+    continueRank: 0,
+  },
+  /**
+   * 人 (作り手・つくり手を訪ねた記事の主・聞き手など `/people/[slug]` に載る人)。
+   *
+   * `browsePath` が `/journal` なのは上記のとおり `/people` 一覧が無いため。
+   * 人のページへは読みものの著者名から入るので、0 件のときの導線も読みものへ送る。
+   * `continueRank` は読みものの次 — 人のページは読みものの延長で見るものなので、
+   * 商品より読みもの側に寄せる。
+   */
+  person: {
+    basePath: "/people",
+    browsePath: "/journal",
+    headingKey: "favoritePeople",
+    emptyKey: "noFavoritePeople",
+    labelKey: "favoriteKindPerson",
+    browseLabelKey: "journal",
+    continueRank: 1,
   },
 };
+
+/**
+ * 「続き」(マイページ本体の抜粋) に出す種類の順。`continueRank` の昇順。
+ *
+ * 呼び出し側が並びを自前で書かないための唯一の出口。ここを経由する限り、
+ * 種類を足したときに抜粋から漏れることが無い。
+ */
+export const FAVORITE_CONTINUE_ORDER: readonly FavoriteKind[] = [...FAVORITE_KINDS].sort(
+  (a, b) => FAVORITE_KIND_META[a].continueRank - FAVORITE_KIND_META[b].continueRank
+);
 
 /**
  * 一覧ページで 1 種類あたりに描く上限。
