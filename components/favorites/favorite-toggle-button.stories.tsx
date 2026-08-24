@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, userEvent, waitFor, within } from "storybook/test";
 
+import { isolateCookies } from "../../.storybook/story-cookies";
+
 import { FavoriteToggleButton } from "./favorite-toggle-button";
 
 /**
@@ -66,14 +68,16 @@ type Story = StoryObj<typeof meta>;
  *
  * 実際 CI ではこれで落ちた (期待「ログインすると保存できます」/ 実際「保存の状態を
  * 取得できませんでした」)。手元では story の走る順が違って通るので、順番に依存した
- * 見つけにくい壊れ方をする。よってこの story は**自分で消してから**描く。
+ * 見つけにくい壊れ方をする。
+ *
+ * かつては「自分で消してから描く」で凌いでいたが、それでは**並行して走る別ファイル
+ * が消した直後に置き直す**ので直りきらない (F14 の作業中に `Journal/BookmarkButton
+ * > Logged Out` が同じ原因で落ちた — 2 回連続実行して 1 回だけ赤)。いまは共有の
+ * cookie jar を使うのをやめ、この iframe だけの入れ物に差し替えている
+ * (`.storybook/story-cookies.ts`)。他の story が何を置いていても影響を受けない。
  */
 export const LoggedOut: Story = {
-  beforeEach: async () => {
-    const expire = "; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-    document.cookie = `shop_auth=${expire}`;
-    document.cookie = `line_auth=${expire}`;
-  },
+  beforeEach: () => isolateCookies(),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await waitFor(async () => {
@@ -108,8 +112,9 @@ export const SavesAsPerson: Story = {
       releaseStaleCheck = resolve;
     });
 
-    // ログイン済みとして扱わせる (部品は cookie だけを見る)。
-    document.cookie = "shop_auth=1; path=/";
+    // ログイン済みとして扱わせる (部品は cookie だけを見る)。共有の jar を
+    // 汚すと、並行して走る他ファイルの「未ログイン」の story を巻き込む。
+    const restoreCookies = isolateCookies("shop_auth=1");
 
     window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === "string" ? input : input.toString();
@@ -142,7 +147,7 @@ export const SavesAsPerson: Story = {
     return () => {
       releaseStaleCheck?.();
       window.fetch = originalFetch;
-      document.cookie = "shop_auth=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+      restoreCookies();
     };
   },
   play: async ({ canvasElement, step }) => {

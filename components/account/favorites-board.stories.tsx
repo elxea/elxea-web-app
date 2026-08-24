@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { expect, userEvent, waitFor, within } from "storybook/test";
 
 import { FavoritesBoard } from "@/components/account/favorites-board";
 import {
@@ -89,5 +90,80 @@ export const PeopleOnly: Story = {
     groups: groupFavorites(
       normalizeFavorites(favorites.filter((favorite) => favorite.type === "person"))
     ),
+  },
+};
+
+/** その節の見出し脇に出ている件数 (「2件」等)。0 件の節では出ないので null。 */
+function kindCount(root: HTMLElement, kind: string): string | null {
+  const section = root.querySelector(`[data-slot="favorites-group"][data-kind="${kind}"]`);
+  if (!section) throw new Error(`${kind} の節が描かれていない`);
+  return section.querySelector("h2 span span")?.textContent ?? null;
+}
+
+/** 見出し (`AccountTitleBlock`) に出ている合計。 */
+function totalCount(root: HTMLElement): string {
+  const block = root.querySelector('[data-slot="account-title-block"]');
+  if (!block) throw new Error("見出しブロックが描かれていない");
+  return block.querySelector("p")?.textContent ?? "";
+}
+
+/**
+ * 解除したら **合計件数もその場で減る** (F14 / 本番実測 2026-08-25)。
+ *
+ * 起きていたこと: 3 件のうち 1 件を解除するとカードは即消えるのに、上部の合計は
+ * 「3件」のまま残り、リロードして初めて「2件」に正っていた。合計だけがページ
+ * (server component) 側で一度きり数えられていて、解除の状態と繋がっていなかった。
+ *
+ * ここで縛るのは「解除の直後」の 1 点だけ。初期表示は壊れていても緑になるので
+ * (壊れるのは解除した後だけ)、押した後の合計・節の件数・カード枚数の 3 つが
+ * 揃って減ることを見る。
+ */
+export const RemoveUpdatesCounts: Story = {
+  args: { groups: groupFavorites(normalizeFavorites(favorites)) },
+  beforeEach: async () => {
+    const originalFetch = window.fetch;
+
+    window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      const method = (init?.method ?? "GET").toUpperCase();
+
+      // 解除だけが本題。成功で返し、画面の側の追従を見る。
+      if (url.includes("/api/user/favorites") && method === "DELETE") {
+        return new Response(JSON.stringify({ ok: true }), { status: 200 });
+      }
+      // 行動ログ等、本題に関係ない送信は握り潰す。
+      return new Response("{}", { status: 200 });
+    }) as typeof window.fetch;
+
+    return () => {
+      window.fetch = originalFetch;
+    };
+  },
+  play: async ({ canvasElement, step }) => {
+    const canvas = within(canvasElement);
+
+    await step("解除する前は 4 件 (読みもの 2 / 商品 1 / 人 1)", async () => {
+      await expect(totalCount(canvasElement)).toBe("4件");
+      await expect(kindCount(canvasElement, "article")).toBe("2件");
+    });
+
+    await step("読みものを 1 件解除する", async () => {
+      await userEvent.click(
+        canvas.getByRole("button", { name: "「火入れという時間のかけ方」をお気に入りから外す" })
+      );
+      await waitFor(async () => {
+        await expect(canvas.queryByText("火入れという時間のかけ方")).toBeNull();
+      });
+    });
+
+    await step("合計も節の件数も、リロードを待たずに減る", async () => {
+      await waitFor(async () => {
+        await expect(totalCount(canvasElement)).toBe("3件");
+      });
+      await expect(kindCount(canvasElement, "article")).toBe("1件");
+      // 他の種類は巻き込まれない。
+      await expect(kindCount(canvasElement, "product")).toBe("1件");
+      await expect(kindCount(canvasElement, "person")).toBe("1件");
+    });
   },
 };

@@ -2,13 +2,11 @@ import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { getLocale, getTranslations } from "next-intl/server";
 
-import { AccountTitleBlock } from "@/components/account/account-parts";
 import { FavoritesBoard } from "@/components/account/favorites-board";
 import { captionClass } from "@/components/editorial/rule-list";
 import { Button } from "@/components/ui/button";
 import { isSignedIn, type AccountAuth } from "@/lib/account-capabilities";
 import {
-  countFavorites,
   groupFavorites,
   normalizeFavorites,
   type FavoriteGroup,
@@ -42,6 +40,12 @@ export async function generateMetadata(): Promise<Metadata> {
  * 正規化済みの `FavoriteGroup[]` だけで、識別子 (userKey / LINE userId) は渡さない。
  * 解除操作だけが `FavoritesBoard` (client) の仕事で、DELETE /api/user/favorites を
  * 叩く。API は同じ `resolveIdentity()` で本人確認するので、ここで持ち回る必要は無い。
+ *
+ * **件数はここで数えない。** 見出しと合計件数 (`AccountTitleBlock`) の描画も
+ * `FavoritesBoard` の側にある。以前はここで `countFavorites(groups)` を数えて
+ * 描いていたが、サーバで一度きりの値なので解除しても変わらず、「カードは消えたのに
+ * 合計は 3件のまま」になっていた (F14 / 本番実測 2026-08-25)。件数は解除の状態を
+ * 持っている側だけが数える — ここが数え直すと同じ壊れ方が戻る。
  *
  * ## ログイン経路
  *
@@ -90,19 +94,8 @@ export default async function FavoritesPage() {
   const groups: FavoriteGroup[] = groupFavorites(
     normalizeFavorites(seeded ?? (await loadFavorites()))
   );
-  const total = countFavorites(groups);
 
-  return (
-    <>
-      <AccountTitleBlock
-        title={t("favorites")}
-        identity={total > 0 ? t("favoritesCount", { count: total }) : t("noFavorites")}
-        back={{ label: t("backToAccountLink"), href: "/account" }}
-      />
-
-      <FavoritesBoard groups={groups} />
-    </>
-  );
+  return <FavoritesBoard groups={groups} />;
 }
 
 /**
