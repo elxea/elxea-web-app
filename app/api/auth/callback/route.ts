@@ -214,27 +214,55 @@ export async function GET(request: NextRequest) {
     const lineUidEnc = request.cookies.get("line_uid")?.value;
     if (lineUidEnc && customerId) {
       const lineUserId = decryptToken(lineUidEnc);
-      if (lineUserId) {
-        await completeLineLinkage({
-          lineUserId,
-          shopifyCustomerId: customerId,
-          source: "auth-callback",
-        });
-      }
-      // Drop the LINE pointer cookies now that this browser is attached to
-      // the Shopify session. The client-visible `line_auth` flag is cleared
-      // too so the header flips to the Shopify-logged-in state cleanly.
-      /* Clear the LINE session at BOTH scopes.
+      const completion = lineUserId
+        ? await completeLineLinkage({
+            lineUserId,
+            shopifyCustomerId: customerId,
+            source: "auth-callback",
+          })
+        : null;
+
+      /* LINE セッションを捨てるのは、**実際に合体まで到達したときだけ**。
        *
-       * This block used to compute the shared Domain itself, from
-       * `new URL(origin).hostname` — and only emitted the Domain-scoped delete
-       * when that host happened to look like the apex, emitting exactly ONE of
-       * the two scopes in either case. Under Next 16 `origin` derives from
-       * `nextUrl.origin`, which reports the server's own origin and ignores the
-       * request Host, so on any non-apex origin the Domain-scoped LINE cookies
-       * were never cleared here at all. Delegated to the single source of truth,
-       * which always emits both. */
-      clearAuthCookies(response, "line");
+       * ## 直している割れ方 (F16)
+       *
+       * ここは以前 `completeLineLinkage` の結果を見ずに掃除していた。合体の側は
+       * B5 を閉じるために「台帳に行があるときだけ動く」へ厳しくなったのに、掃除の
+       * 側は「`line_uid` cookie が同居していた」という**古い条件のまま**だった。
+       * 二つの条件がずれた結果、未連携の人が体験するのはこうなる:
+       *
+       *   1. LINE だけで使っていた人がメールでログインする
+       *   2. 台帳に行が無いので合体は起きない — お気に入りは `users/line:<id>/` に残る
+       *   3. それでも LINE cookie 4 本が消える
+       *   4. その人はもう `line:` の棚へ戻る入口を持たない。保存したものが消えたように見える
+       *
+       * 掃除が正当化されるのは「この browser の LINE 分はもう顧客の棚にある」ときで、
+       * それを言えるのは `merged` だけ。以下はいずれも**温存する**:
+       *
+       *   - `not-linked` / `linked-elsewhere` … 合体していない。棚は `line:` 側に残って
+       *     いるので、入口を奪うと取り戻す手段が無くなる（＝上の割れ方そのもの）
+       *   - `ledger-unreadable` … 台帳が読めない。**推測しない**。合体側が推測を避けて
+       *     いるのに掃除側だけ「たぶん連携済み」に倒すと、非対称がまた割れ目になる
+       *   - `merge-failed` … 一致は取れたが元が残っている。cookie を残すことが次回
+       *     ログインでの**取りこぼし再試行の唯一の燃料**（`line_uid` が無ければこの
+       *     ブロックにすら入らない）。ここで消すと再試行の道を自分で塞ぐ
+       *   - `same-key` / `invalid-input` … 何も起きていない
+       *   - 復号に失敗した (`completion === null`) … 何を消してよいか判断できていない
+       *
+       * 温存しても Shopify セッションの側は妨げない。ヘッダの表示は `shop_auth` を
+       * 見て切り替わり、`line_auth` の同居はログイン状態の判定を変えない。
+       *
+       * ## 掃除するときは両スコープで消す（既存の担保・維持）
+       *
+       * この掃除は以前、共有 Domain を `new URL(origin).hostname` から自前で計算し、
+       * その host が apex に見えたときだけ Domain スコープの delete を出していた
+       * （どちらの場合も 2 スコープのうち 1 つしか出ない）。Next 16 では `origin` が
+       * `nextUrl.origin` 由来でリクエストの Host を無視するため、apex 以外の origin
+       * では Domain スコープの LINE cookie が**一度も消えていなかった**。常に両方を
+       * 出す単一正本に委譲してある。 */
+      if (completion?.outcome === "merged") {
+        clearAuthCookies(response, "line");
+      }
     }
 
     // Send welcome email for new members (no order history = first registration)
