@@ -119,13 +119,13 @@ h1.contact-title {
 :root {
   /* Third-party brand colors */
   --brand-line: #06C755;
-  
+
   /* Overlay colors for hero sections with background images */
   --overlay: oklch(0 0 0 / 0.15);
   --overlay-foreground: oklch(0.98 0.01 60);
   --overlay-foreground-muted: oklch(0.75 0.01 60);
   --overlay-border: oklch(1 0.02 60 / 0.4);
-  
+
   --sidebar: hsl(0 0% 98%);
   --sidebar-foreground: hsl(240 5.3% 26.1%);
   --sidebar-primary: hsl(240 5.9% 10%);

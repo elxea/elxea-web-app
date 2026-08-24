@@ -1,0 +1,17 @@
+import pw from "/Users/setaka/github/elxea/products/elxea-web-app/node_modules/playwright/index.js";
+const { chromium } = pw;
+import { readFileSync } from "node:fs";
+const cookie = readFileSync("/tmp/roji-cookie.txt", "utf8").trim();
+const browser = await chromium.launch({ channel: "chromium", args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"] });
+const ctx = await browser.newContext();
+await ctx.addCookies([{ name: "site_auth", value: cookie, domain: "localhost", path: "/" }]);
+const page = await ctx.newPage();
+page.on("console", (m) => console.log("[console:" + m.type() + "]", m.text().slice(0, 300)));
+page.on("pageerror", (e) => console.log("[pageerror]", e.message.slice(0, 400)));
+page.on("requestfailed", (r) => console.log("[reqfail]", r.url().slice(0, 120), r.failure()?.errorText));
+await page.goto("http://localhost:3300/dev/origin-map?tea=51001", { waitUntil: "networkidle", timeout: 60000 });
+await page.evaluate(() => { const el = document.querySelector('[data-slot="tea-origin-block"]'); if (el) el.scrollIntoView(); });
+await page.waitForTimeout(8000);
+console.log("WEBGL:", await page.evaluate(() => { const c = document.createElement("canvas"); return !!(c.getContext("webgl2") || c.getContext("webgl")); }));
+console.log("FRAME HTML:", await page.evaluate(() => document.querySelector('[data-slot="origin-map-frame"]')?.outerHTML.slice(0, 800) ?? "NONE"));
+await browser.close();
