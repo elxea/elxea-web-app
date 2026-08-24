@@ -166,9 +166,29 @@ export async function completeLineLinkage({
     const linked = await fetchShopifyCustomerIdForLineUser(lineUserId);
 
     if (linked === null) {
+      /* 台帳が読めず、合体を見送った。**これは黙って通してよい分岐ではない。**
+       *
+       * 連携ボタン / LIFF から来た人はいま台帳に行を立てた直後なので、ここに
+       * 落ちるのは台帳側が壊れている（不達 / 401 / 応答崩れ）ときだけ。その人は
+       * 「連携できた」画面を見たのに、お気に入りは元の棚に残ったままになる。
+       * 次のメールログインで再試行される作りなので**壊れ方としては静か**で、
+       * 誰も気付かないまま何人分も積み上がりうる。
+       *
+       * console.warn だけでは残らない: 本番の Vercel ログ保持は Hobby プランの
+       * 1 時間しかなく（scripts/ops/monitor-line-prod.mjs 冒頭の注記参照）、
+       * 監視 cron が 60 分以上遅れれば痕跡ごと消える。**恒久記録は Sentry 側に
+       * 持たせる。**
+       *
+       * 文言に "line" を含めているのは監視の取得側の都合。ログ取得は
+       * `vercel logs --query line` で絞っており、`source=auth-callback` の行は
+       * この語が無いと取得段階で落ちる（`[identity-link]` に "line" は無い）。 */
       console.warn(
-        `[identity-link] ledger unreadable; skipping merge (source=${source})`,
+        `[identity-link] line linkage ledger unreadable; skipping merge (source=${source})`,
       );
+      Sentry.captureMessage("Identity link ledger unreadable; merge skipped", {
+        level: "warning",
+        tags: { subsystem: "identity-link", source },
+      });
       return none("ledger-unreadable");
     }
     if (linked === false) return none("not-linked");

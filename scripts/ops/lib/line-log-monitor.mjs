@@ -52,6 +52,12 @@ export const WATCHED_PATH_PREFIXES = [
  * severity:
  *   critical … 設定・鍵の破壊。全員が連携できない。放置すると被害が増え続ける。
  *   error    … その回の連携/ログインは失敗した。単発ならユーザー起因もありうる。
+ *
+ * `anyPath: true` … `WATCHED_PATH_PREFIXES` の縛りを免除する（既定は縛る）。
+ *   連携の**読み取り**は route ではなく SSR の描画中に走るので、その失敗ログの
+ *   `requestPath` は `/ja/account` のようなページ側になる。path で先に落とすと
+ *   一行も拾えない。免除は**文字列が十分に固有な規則にだけ**付けること
+ *   （`/cx-agent returned/` のような汎用語に付けると無関係な 401 で鳴り出す）。
  */
 export const LOG_PATTERNS = [
   {
@@ -97,6 +103,23 @@ export const LOG_PATTERNS = [
     pattern: /cx-agent (returned|unreachable)|identity link failed/i,
     description: '連携台帳 (cx-agent) への書き込みに失敗 — 連携行が立たない',
   },
+  {
+    id: 'linkage-read-failed',
+    severity: 'error',
+    // 台帳の**読み取り**が失敗した痕跡。現物 (grep 済み):
+    //   [line-linkage-status] reverse lookup unknown: SYNC_API_SECRET not set
+    //   [line-linkage-status] reverse lookup returned 401
+    //   [line-linkage-status] reverse lookup: linked without customer id
+    //   [line-linkage-status] reverse lookup unreachable: <reason>
+    //   [identity-link] line linkage ledger unreadable; skipping merge (source=...)
+    // `:?` は "reverse lookup: linked without customer id" の 1 件のためだけに要る。
+    pattern: /reverse lookup:? (returned|unreachable|unknown|linked without)|ledger unreadable/i,
+    // path 縛りを免除する。読み取りは SSR の描画中 (`/ja/account` 等) と
+    // `auth-callback` から走るので、LINE 系 route の path には出ない。
+    anyPath: true,
+    description:
+      '連携台帳の読み取りに失敗 — 連携済みの人が未連携の棚に落ちる (お気に入りが消えたように見える) / 合体が見送られる',
+  },
 ];
 
 /**
@@ -129,7 +152,11 @@ export function isWatchedPath(requestPath) {
  */
 export function matchLogEntry(entry) {
   if (!entry || typeof entry !== 'object') return null;
-  if (!isWatchedPath(entry.requestPath)) return null;
+
+  /* path 縛りはここで**落とさず**、規則ごとに適用する。連携台帳の読み取り失敗は
+     LINE 系 route ではなく SSR ページの描画中に出るので、先に落とすと
+     `anyPath` 規則が一件も当たらない。 */
+  const onWatchedPath = isWatchedPath(entry.requestPath);
 
   const message = typeof entry.message === 'string' ? entry.message : '';
 
@@ -137,13 +164,14 @@ export function matchLogEntry(entry) {
   if (BENIGN_PATTERNS.some((p) => p.test(message))) return null;
 
   for (const rule of LOG_PATTERNS) {
+    if (!onWatchedPath && !rule.anyPath) continue;
     if (rule.pattern.test(message)) {
       return {
         kind: 'log',
         id: rule.id,
         severity: rule.severity,
         description: rule.description,
-        requestPath: entry.requestPath,
+        requestPath: entry.requestPath ?? null,
         statusCode: entry.responseStatusCode ?? null,
         timestamp: entry.timestamp ?? null,
         // 本文はそのまま持たせない。route 側は秘密を出さない作りだが、監視が
@@ -153,8 +181,14 @@ export function matchLogEntry(entry) {
     }
   }
 
-  // 本文に何も出ていなくても 5xx は異常。init/callback が 500 を返している状態は
-  // 「誰も連携できない」なので、文字列に頼らずステータスだけで拾う。
+  /* 本文に何も出ていなくても 5xx は異常。init/callback が 500 を返している状態は
+     「誰も連携できない」なので、文字列に頼らずステータスだけで拾う。
+
+     ここは **path 縛りを外さない**。5xx は文字列を見ない規則なので、免除すると
+     サイト全域の 5xx がこの監視の担当になってしまう（LINE 連携が壊れていない
+     ときに鳴る監視は、やがて無視される）。 */
+  if (!onWatchedPath) return null;
+
   const status = Number(entry.responseStatusCode);
   if (Number.isFinite(status) && status >= 500) {
     return {
