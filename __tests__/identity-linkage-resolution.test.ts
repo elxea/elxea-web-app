@@ -151,6 +151,64 @@ describe("resolveIdentity / 連携済みの LINE セッション", () => {
 });
 
 // ---------------------------------------------------------------------------
+// (a-2) 台帳が返す顧客 ID の形が揺れても、棚のキーは 1 つに定まる
+// ---------------------------------------------------------------------------
+
+/**
+ * 台帳 (cx-agent の `customer_linkages`) が返す `shopify_customer_id` の形は
+ * 保証されていない。書き込んだ経路によって GID (`gid://shopify/Customer/123`) と
+ * 数値 (`123`) の両方がありうる。
+ *
+ * 一方、メールでログインしたときの棚のキーは `shop_cid` 経路も Customer API 経路も
+ * `extractCustomerId` を通した**数値**で確定している。だから台帳の値をそのまま
+ * 棚のキーにすると、同じ人が LINE で入ったときだけ
+ * `users/gid://shopify/Customer/123` という別の棚を持つ — **(a) で直したはずの
+ * 棚の分裂が、ID の形の揺れという別の入口から再発する**。
+ *
+ * ここで縛るのは「どの形で返ってきても棚のキーは数値ひとつ」。`identity-link.ts` の
+ * 本人一致判定が既に同じ正規化を通しているので、比較とキーで正規化がずれることも
+ * ない (ずれると「一致と見なして合体したのに、合体先とは別の棚を見る」になる)。
+ */
+describe("resolveIdentity / 台帳の顧客 ID の形が揺れても棚は分裂しない", () => {
+  it.each([
+    ["数値そのまま", SHOPIFY_CUSTOMER_ID],
+    ["GID 形式", `gid://shopify/Customer/${SHOPIFY_CUSTOMER_ID}`],
+  ])("台帳が %s を返しても userKey は数値に正規化される", async (_label, ledgerValue) => {
+    givenLineSession();
+    stubUpstream({ linked: true, shopify_customer_id: ledgerValue });
+
+    const identity = await resolveIdentity();
+
+    expect(identity.authenticated).toBe(true);
+    if (!identity.authenticated) return;
+    // 棚のキーはメールでログインしたときと同一 — 形の違いを持ち込まない。
+    expect(identity.userKey).toBe(SHOPIFY_CUSTOMER_ID);
+    expect(identity.userKey).not.toContain("gid://");
+    // 顧客 ID として外へ渡す値も同じ正規化を通す (呼び出し側で再分裂させない)。
+    expect(identity.shopifyCustomerId).toBe(SHOPIFY_CUSTOMER_ID);
+    expect(identity.provider).toBe("shopify");
+  });
+
+  it("GID で返ってきた場合の棚は、数値で返ってきた場合と完全に一致する", async () => {
+    givenLineSession();
+    stubUpstream({ linked: true, shopify_customer_id: SHOPIFY_CUSTOMER_ID });
+    const viaNumeric = await resolveIdentity();
+
+    __clearLinkageCacheForTest();
+    stubUpstream({
+      linked: true,
+      shopify_customer_id: `gid://shopify/Customer/${SHOPIFY_CUSTOMER_ID}`,
+    });
+    const viaGid = await resolveIdentity();
+
+    expect(viaNumeric.authenticated && viaGid.authenticated).toBe(true);
+    if (!viaNumeric.authenticated || !viaGid.authenticated) return;
+    expect(viaGid.userKey).toBe(viaNumeric.userKey);
+    expect(viaGid.shopifyCustomerId).toBe(viaNumeric.shopifyCustomerId);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // (b) 未連携の LINE セッションは従来どおり
 // ---------------------------------------------------------------------------
 

@@ -184,13 +184,25 @@ export async function resolveIdentity(): Promise<Identity> {
           await fetchShopifyCustomerIdForLineUser(lineUserId);
 
         if (typeof linkedCustomerId === "string") {
-          // 連携済み: メールでログインしたときと同じ棚を返す。
+          /* 連携済み: メールでログインしたときと同じ棚を返す。
+           *
+           * 台帳が返す顧客 ID の形は保証されていない (cx-agent 側の書き込み経路に
+           * よって GID `gid://shopify/Customer/123` と数値 `123` の両方がありうる)。
+           * 一方メールログイン経路の棚のキーは、`shop_cid` も Customer API 経路も
+           * `extractCustomerId` を通した**数値**で確定している
+           * (`lib/shopify/id-token.ts` / 上の Shopify 分岐)。
+           *
+           * ここで正規化を挟まないと、同じ人が「LINE で入ったとき」だけ
+           * `users/gid://shopify/Customer/123` という別の棚を持ち、
+           * **直したはずの棚の分裂がそのまま再発する**。比較 (identity-link.ts の
+           * 本人一致判定) と同じ正規化を、棚のキーにも通す。 */
+          const customerId = extractCustomerId(linkedCustomerId);
           return {
             authenticated: true,
-            userKey: linkedCustomerId,
+            userKey: customerId,
             provider: "shopify",
             displayName,
-            shopifyCustomerId: linkedCustomerId,
+            shopifyCustomerId: customerId,
             lineUserId,
           };
         }
