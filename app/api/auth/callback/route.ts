@@ -7,6 +7,7 @@ import {
   getCustomer,
 } from "@/lib/shopify/customer";
 import { verifyShopifyIdToken } from "@/lib/shopify/id-token";
+import { buildSessionCookieWrites } from "@/lib/shopify/session-cookies";
 import { sendWelcomeEmail } from "@/lib/email/welcome";
 import { sanitizeReturnTo } from "@/lib/auth/return-to";
 import { clearAuthCookies } from "@/lib/auth/cookies";
@@ -132,26 +133,43 @@ export async function GET(request: NextRequest) {
       path: "/",
     };
 
-    // Set session cookies directly on the response
-    response.cookies.set("shop_at", encryptToken(tokens.access_token), {
-      ...cookieOptions,
-      maxAge: tokens.expires_in,
+    /* セッション cookie を response に直接載せる。
+     *
+     * **何をどれだけの寿命で書くかは `lib/shopify/session-cookies.ts` が正本**。
+     * 以前ここは `shop_at` / `shop_exp` / `shop_auth` にアクセストークンの寿命
+     * (`tokens.expires_in`) を maxAge として付けていた。数時間で消えるので、
+     * 30 日の `shop_rt` を持っていても `getSession()` は null を返し、利用者は
+     * 無言でログアウトしていた (as-is D-1)。いまは 4 つとも 30 日で、
+     * アクセストークンの期限は `shop_exp` の**中身**が持つ。
+     *
+     * 書き込み先が response と cookie store の 2 通りあるので「書く動作」は
+     * 1 本にできないが、定義は共有している (リフレッシュ側は
+     * `lib/shopify/auth.ts` の `setSessionCookies`)。 */
+    const sessionCookies = buildSessionCookieWrites({
+      accessToken: tokens.access_token,
+      refreshToken: tokens.refresh_token,
+      expiresIn: tokens.expires_in,
+      encrypt: encryptToken,
     });
-    response.cookies.set("shop_rt", encryptToken(tokens.refresh_token), {
+
+    response.cookies.set("shop_at", sessionCookies.accessToken.value, {
       ...cookieOptions,
-      maxAge: 60 * 60 * 24 * 30, // 30 days
+      maxAge: sessionCookies.accessToken.maxAge,
     });
-    response.cookies.set(
-      "shop_exp",
-      String(Date.now() + tokens.expires_in * 1000),
-      { ...cookieOptions, maxAge: tokens.expires_in }
-    );
-    response.cookies.set("shop_auth", "1", {
+    response.cookies.set("shop_rt", sessionCookies.refreshToken.value, {
+      ...cookieOptions,
+      maxAge: sessionCookies.refreshToken.maxAge,
+    });
+    response.cookies.set("shop_exp", sessionCookies.expiresAt.value, {
+      ...cookieOptions,
+      maxAge: sessionCookies.expiresAt.maxAge,
+    });
+    response.cookies.set("shop_auth", sessionCookies.authFlag.value, {
       httpOnly: false,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       path: "/",
-      maxAge: tokens.expires_in,
+      maxAge: sessionCookies.authFlag.maxAge,
     });
 
     // Preserve the id_token so we can pass it as `id_token_hint` to the

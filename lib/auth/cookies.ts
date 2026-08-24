@@ -264,6 +264,34 @@ export function isSecure(spec: CookieSpec): boolean {
   return spec.secure === "always" || process.env.NODE_ENV === "production";
 }
 
+/**
+ * Shopify のセッションが「まだ生きているとみなせるか」を、復号せずに見る。
+ *
+ * ## 判定は `shop_rt` ただ 1 つ (as-is D-1)
+ *
+ * 以前ここは 2 か所に分かれていて、どちらも `shop_at`（アクセストークン）を
+ * 要求していた。`shop_at` はアクセストークンの寿命を maxAge に持っていたので
+ * 数時間でブラウザから消える。その瞬間に `/account` の門
+ * (`middleware.ts`) が閉まり、30 日の `shop_rt` を持っている人まで
+ * ログイン画面へ弾かれていた。
+ *
+ * どれだけログインが続くかを決めるのは **リフレッシュトークン**である。
+ * アクセストークンが切れているかどうかは別の話で、それは
+ * `lib/shopify/auth.ts` の `getSession()` が `shop_exp` の中身を見て判断し、
+ * 必要ならリフレッシュする。ここでその 2 つを混ぜない。
+ *
+ * この module は node crypto を読まないので Edge (middleware) から使える。
+ * 判定を持てる唯一の場所なのでここに置く。
+ *
+ * @param has cookie の有無を返す関数（`(name) => request.cookies.has(name)` 等）。
+ *   値を返す関数（`get(name)?.value`）でも動くよう truthy 判定にしてある。
+ */
+export function hasShopifySessionCookies(
+  has: (name: string) => boolean | string | undefined,
+): boolean {
+  return Boolean(has(COOKIE_NAME.shopRefreshToken));
+}
+
 // --- Domain decision --------------------------------------------------------
 
 /**
