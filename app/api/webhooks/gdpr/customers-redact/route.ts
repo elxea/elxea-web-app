@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import * as Sentry from "@sentry/nextjs";
 import { FieldValue } from "firebase-admin/firestore";
 import { validateWebhookRequest } from "@/lib/shopify/webhooks/verify";
+import { eraseInCxAgent } from "@/lib/erase/cx-agent";
 import { getAdminFirestore } from "@/lib/firebase/admin";
 import {
   userDoc,
@@ -39,6 +41,32 @@ async function deleteSubcollection(
  * elxea stores customer data in Firestore under users/{customerId},
  * including subcollections for orders, behaviorLog, favorites, follows,
  * eventRegistrations, and conversations. All must be deleted.
+ *
+ * ## 消える範囲は Firestore だけではない（M-5 / Issue A・2026-08-25）
+ *
+ * 本人のデータは 2 か所にある。Firestore（web-app の持ち物）と、Supabase の連携台帳・
+ * 会話履歴・カルテ（cx-agent の持ち物）である。後者は **cx-agent の worker からしか
+ * 触れない**ので、cx-agent 側に `POST /api/erase` が用意され、コードにもこう書いてある —
+ * 「web-app 側の `customers/redact` はここを呼ぶだけにして、『何が消える範囲か』の定義を
+ * 1 か所に集約する」。
+ *
+ * **その呼び出しが一度も書かれていなかった。** 結果、削除要求に対して Firestore だけを
+ * 消して 200 を返し、Supabase 側は丸ごと残ったまま「消しました」と答えていた。
+ *
+ * ## 順番 — cx-agent を先に呼ぶ
+ *
+ * Firestore を先に消すと、cx-agent 側が落ちたときに **Firestore だけ消えた中途半端な状態**が
+ * 残り、しかも再送で cx-agent が消えても Firestore の消去は既に済んでいるので、
+ * 「どこまで消えたか」が経路から読めなくなる。cx-agent を先に通しておけば、失敗した
+ * 時点では**何も消えていない**か、**cx-agent 側だけ消えている**かのどちらかで、
+ * どちらも再送で前に進む（両側とも冪等）。
+ *
+ * ## 消えなかったら 200 を返さない
+ *
+ * G10（成功偽装をしない）。cx-agent が消し残しを検出したら 5xx を返し、Shopify に
+ * 再送させる。冪等なので再送で害は無く、放置すると GDPR 上の実害だけが残る。
+ * 例外は「鍵が無い / 鍵が違う」— これは再送しても直らないので、鳴らしたうえで
+ * 再送を促さない（詳細は `lib/erase/cx-agent.ts` の `retryable`）。
  */
 export async function POST(request: NextRequest) {
   const validation = await validateWebhookRequest(request);
@@ -87,6 +115,37 @@ export async function POST(request: NextRequest) {
         "[Webhook:GDPR] customers/redact missing x-shopify-webhook-id header; idempotency not enforced",
       );
     }
+
+    /* cx-agent 側（Supabase の台帳・会話履歴・カルテ）を先に消す。順番の理由は
+       ファイル冒頭の注記のとおり。202 が返る間は消しきるまで呼び直す —
+       202 は 2xx だが**完了ではない**。 */
+    const cxErase = await eraseInCxAgent({ kind: "shopify", id: customerId });
+    if (!cxErase.ok) {
+      /* ⚠ 顧客 ID はログに載せない（削除要求の対象を痕跡として残さないため）。
+         切り分けに要るのは reason と試行回数だけで、それで足りる。 */
+      console.error(
+        `[Webhook:GDPR] customers/redact aborted — cx-agent erase failed (reason=${cxErase.reason}, attempts=${cxErase.attempts}): ${cxErase.detail}`,
+      );
+      Sentry.captureMessage("GDPR redact: cx-agent erase failed", {
+        level: "error",
+        tags: {
+          subsystem: "gdpr-redact",
+          reason: cxErase.reason,
+          retryable: String(cxErase.retryable),
+        },
+        extra: { attempts: cxErase.attempts, detail: cxErase.detail },
+      });
+
+      /* 冪等ログは**書かない**。書くと再送が「処理済み」で弾かれ、消えていない
+         まま二度と消えなくなる。 */
+      return NextResponse.json(
+        { error: "cx-agent erase failed", reason: cxErase.reason },
+        { status: cxErase.retryable ? 503 : 500 },
+      );
+    }
+    console.log(
+      `[Webhook:GDPR] cx-agent erase completed (attempts=${cxErase.attempts})`,
+    );
 
     // Delete all subcollections in parallel
     const subcollections = [
