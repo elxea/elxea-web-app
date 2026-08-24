@@ -32,6 +32,22 @@ import {
 const ROOT = join(__dirname, "..");
 const read = (relative: string) => readFileSync(join(ROOT, relative), "utf8");
 
+/**
+ * コメントを落としたソース。「この呼び出しが**書かれていない**こと」を縛るときに使う。
+ *
+ * 素のソースを見ると、直した経緯を説明するコメント (「以前はここで
+ * `countFavorites(groups)` を数えていた」等) が本物の呼び出しと区別できず、
+ * 経緯を書いた瞬間にテストが赤くなる。実際 F14 でそれを踏んだので、
+ * 見るのはコメントを除いた側にする。
+ *
+ * 対象はこのリポジトリの `.tsx` / `.ts` だけで、文字列の中の `//` (URL 等) までは
+ * 面倒を見ない。使う前に対象ファイルにそれが無いことを確かめること。
+ */
+const readCode = (relative: string) =>
+  read(relative)
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/\/\/[^\n]*/g, "");
+
 const raw = (over: Partial<FavoriteInput> = {}): FavoriteInput => ({
   id: "f-1",
   type: "article",
@@ -231,5 +247,44 @@ describe("お気に入り一覧ページ", () => {
 
   it("マイページ本体の「すべて見る」がこのページを指している", () => {
     expect(read("app/[locale]/account/page.tsx")).toContain('href: "/account/favorites"');
+  });
+
+  /**
+   * F14 (本番実測 2026-08-25): 3 件のうち 1 件を解除するとカードは即消えるのに、
+   * 見出し脇の合計が「3件」のまま残り、リロードして初めて「2件」に正っていた。
+   *
+   * 原因は件数の出どころが 2 つに割れていたこと — 節の件数は解除の状態
+   * (`FavoritesBoard` の state) から出ていたが、合計だけはこのページが
+   * `countFavorites(groups)` を **サーバで一度** 数えて `AccountTitleBlock` に
+   * 渡していた。サーバ側の値は解除では再計算されないので永久に古いままになる。
+   *
+   * 直し方は「数える側を state を持つ側だけにする」なので、その形をここで縛る。
+   * 描画結果ではなく出どころを見るのは、`countFavorites` がページに戻った瞬間に
+   * 落とすため — 戻ってしまえば、どんな描画テストも初期表示では緑のまま通る
+   * (壊れるのは解除した後だけ) で、取りこぼす。
+   */
+  it("合計件数をサーバで数えない (解除で更新されない値を作らない / F14)", () => {
+    const code = readCode("app/[locale]/account/favorites/page.tsx");
+    expect(code).not.toContain("countFavorites");
+    expect(code).not.toContain("AccountTitleBlock");
+    // 見出し脇の合計の文言もページ側には残らない (残っていれば描いている)。
+    expect(code).not.toContain("favoritesCount");
+  });
+
+  it("合計件数は解除の状態を持つ側が state から数える (F14)", () => {
+    const board = readCode("components/account/favorites-board.tsx");
+    expect(board).toContain("<AccountTitleBlock");
+    // 初期 props (`initialGroups`) ではなく state の `groups` を数える。
+    expect(board).toContain("countFavorites(groups)");
+    expect(board).not.toContain("countFavorites(initialGroups)");
+  });
+
+  /* 検出器の自己点検。`readCode` がコメントごと中身を消してしまうと、上の 2 本は
+     実装が壊れても緑のままになる (「書かれていない」は空文字でも成立する)。 */
+  it("(検出器の自己点検) readCode はコメントだけを落とし、コードは残す", () => {
+    const board = readCode("components/account/favorites-board.tsx");
+    expect(board).toContain('"use client"');
+    expect(board).toContain("export function FavoritesBoard");
+    expect(board).not.toContain("なぜクライアント側なのか");
   });
 });

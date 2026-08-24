@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, userEvent, waitFor, within } from "storybook/test";
 
+import { isolateCookies } from "../../.storybook/story-cookies";
+
 import { BookmarkButton } from "./bookmark-button";
 
 /**
@@ -53,6 +55,10 @@ type Story = StoryObj<typeof meta>;
 
 /** 未ログイン（cookie なし）。押すとログインを促す。 */
 export const LoggedOut: Story = {
+  /* 未ログイン = cookie が無い状態。共有の jar は他のファイルの story が
+     「ログイン済み」を置いている最中かもしれないので、この iframe だけの
+     空の入れ物に差し替えてから描く (`.storybook/story-cookies.ts`)。 */
+  beforeEach: () => isolateCookies(),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await waitFor(async () => {
@@ -109,8 +115,9 @@ export const StaleCheckDoesNotRollBack: Story = {
       releaseStaleCheck = resolve;
     });
 
-    // ログイン済みとして扱わせる（部品は cookie だけを見る）。
-    document.cookie = "shop_auth=1; path=/";
+    // ログイン済みとして扱わせる（部品は cookie だけを見る）。共有の jar を
+    // 汚すと、並行して走る他ファイルの「未ログイン」の story を巻き込む。
+    const restoreCookies = isolateCookies("shop_auth=1");
 
     window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === "string" ? input : input.toString();
@@ -141,8 +148,7 @@ export const StaleCheckDoesNotRollBack: Story = {
       // 保留したままだと fetch が永久に解決せず、後続の story を巻き込む。
       releaseStaleCheck?.();
       window.fetch = originalFetch;
-      document.cookie =
-        "shop_auth=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+      restoreCookies();
     };
   },
   play: async ({ canvasElement, step }) => {
