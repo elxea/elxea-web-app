@@ -113,7 +113,7 @@ describe("buildContinueItems (続き)", () => {
       { id: "f1", type: "product", targetId: "sencha-akane", title: "煎茶 茜", imageUrl: "/a.jpg" },
       { id: "f2", type: "article", targetId: "hiire", title: "火入れという時間のかけ方", imageUrl: null },
     ]);
-    expect(result.map((r) => r.kind)).toEqual(["favorite-article", "favorite-product"]);
+    expect(result.map((r) => r.kind)).toEqual(["article", "product"]);
     expect(result[0]?.href).toBe("/journal/hiire");
     expect(result[1]?.href).toBe("/products/sencha-akane");
   });
@@ -127,14 +127,18 @@ describe("buildContinueItems (続き)", () => {
     ).toEqual([]);
   });
 
-  it("確定版 1 行分 (2 枚) までに切る", () => {
-    const favorites = Array.from({ length: 5 }, (_, i) => ({
+  it("抜粋の枚数までに切る (残りは /account/favorites が受ける)", () => {
+    const favorites = Array.from({ length: ACCOUNT_CONTINUE_LIMIT + 3 }, (_, i) => ({
       id: `f-${i}`,
       type: "article",
       targetId: `t-${i}`,
       title: `記事 ${i}`,
     }));
     expect(buildContinueItems(favorites)).toHaveLength(ACCOUNT_CONTINUE_LIMIT);
+  });
+
+  it("抜粋は 1 行 (2 枚) より多い — 「入れたのに見当たらない」を作らない", () => {
+    expect(ACCOUNT_CONTINUE_LIMIT).toBeGreaterThan(2);
   });
 });
 

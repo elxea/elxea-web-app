@@ -437,7 +437,7 @@
     "upcomingEventMeta": "{date} 開催",
     "upcomingEventNote": "参加予定",
     "continueHeading": "続き",
-    "continueAll": "ジャーナルをすべて見る →",
+    "continueAll": "お気に入りをすべて見る →",
     "continueFavorite": "お気に入り",
     "pastHeading": "これまで",
     "pastAll": "ご注文をすべて見る →",
@@ -537,7 +537,11 @@
     "emailRequiredReason": "ご注文にひもづく情報のため、メールアドレスを連携すると表示されます。",
     "signInRequiredReason": "ログインすると表示されます。",
     "featurePayment": "お支払い方法の確認",
-    "subscriptionsEmailRequired": "定期便の管理には、メールアドレスの連携が必要です。"
+    "subscriptionsEmailRequired": "定期便の管理には、メールアドレスの連携が必要です。",
+    "favoritesCount": "{count}件",
+    "favoriteKindProduct": "お気に入りの商品",
+    "favoriteKindArticle": "お気に入りの読みもの",
+    "favoriteRemoveLabel": "「{title}」をお気に入りから外す"
   },
   "comment": {
     "title": "コメント",

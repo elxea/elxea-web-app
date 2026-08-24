@@ -16,6 +16,12 @@
  *   カードを描かず外部リンクだけを残す。権限が付いたらここに取得を足す。
  */
 
+import {
+  normalizeFavorites,
+  type FavoriteInput,
+  type FavoriteKind,
+} from "@/lib/account-favorites";
+
 export type AccountRecordKind = "subscription" | "event" | "order";
 
 /** 「これから」「これまで」に並ぶ 1 枚 (写真なしカード = Figma RecordCard)。 */
@@ -31,10 +37,17 @@ export type AccountRecord = {
   amount?: { value: string; currencyCode: string };
 };
 
-/** 「続き」に並ぶ 1 枚 (写真つきカード = Figma ExpCard)。 */
+/**
+ * 「続き」に並ぶ 1 枚 (写真つきカード = Figma ExpCard)。
+ *
+ * `kind` は種類 (商品 / 読みもの) をそのまま持つ。画面はこれを見てカードの
+ * 種類ラベルを出す — 以前は全部「お気に入り」と書いていたので、並んだカードの
+ * どれが商品でどれが読みものか、押すまで分からなかった (Setaka 指摘 2026-08-25)。
+ * 種類の正本は `lib/account-favorites.ts`。
+ */
 export type AccountMediaItem = {
   id: string;
-  kind: "favorite-article" | "favorite-product";
+  kind: FavoriteKind;
   title: string;
   imageUrl: string | null;
   href?: string;
@@ -53,9 +66,15 @@ export type AccountView = {
   seeded: boolean;
 };
 
-/** 節ごとの最大枚数。Figma の 1 行分 (PC これから 3 / 続き 2 / これまで 3)。 */
+/** 節ごとの最大枚数。Figma の 1 行分 (PC これから 3 / これまで 3)。 */
 export const ACCOUNT_UPCOMING_LIMIT = 3;
-export const ACCOUNT_CONTINUE_LIMIT = 2;
+/**
+ * 「続き」= お気に入りの抜粋枚数。Figma 確定版は 1 行 (2 枚) だったが、
+ * 2 枚では「お気に入りに入れたのに見当たらない」状態になる (Setaka 指摘
+ * 2026-08-25)。PC 2 列 × 3 行の 6 枚に広げ、全件は
+ * `/account/favorites` (種類別・解除つき) へ送る。
+ */
+export const ACCOUNT_CONTINUE_LIMIT = 6;
 export const ACCOUNT_PAST_LIMIT = 3;
 
 /* -------------------------------------------------------------------------- */
@@ -93,13 +112,11 @@ export type AccountEventInput = {
   eventDate?: unknown;
 };
 
-export type AccountFavoriteInput = {
-  id?: string;
-  type?: unknown;
-  targetId?: unknown;
-  title?: unknown;
-  imageUrl?: unknown;
-};
+/**
+ * お気に入りの生ドキュメント。形の正本は `lib/account-favorites.ts` の
+ * `FavoriteInput` で、ここは既存の呼び出し側のための別名 (二重定義しない)。
+ */
+export type AccountFavoriteInput = FavoriteInput;
 
 function str(value: unknown): string | null {
   return typeof value === "string" && value.trim() !== "" ? value : null;
@@ -164,34 +181,34 @@ export function buildUpcoming({
   return [...fromSubscriptions, ...fromEvents].sort(byDateAsc).slice(0, ACCOUNT_UPCOMING_LIMIT);
 }
 
-/** 「続き」= お気に入り (記事を先、次に商品)。写真が無いものは placeholder に落ちる。 */
+/**
+ * 「続き」= お気に入りの抜粋。
+ *
+ * 正規化 (何を落とすか・遷移先をどう組むか) は `lib/account-favorites.ts` が正本で、
+ * ここは並べ方と枚数だけを決める。以前はこの関数の中に同じ正規化をもう一度
+ * 書いていたので、一覧ページと抜粋で落ちる件が食い違う余地があった。
+ *
+ * 並びは **種類ごとにまとめる** (読みもの → 商品)。混ぜて時系列に並べると、
+ * 6 枚のなかで種類がばらけて「種類別に見たい」という要望から遠ざかる。
+ * 種類の中の順序は入力順 (= createdAt 降順) のまま。
+ */
 export function buildContinueItems(favorites: AccountFavoriteInput[]): AccountMediaItem[] {
-  const items: AccountMediaItem[] = favorites
-    .map((f, i): AccountMediaItem | null => {
-      const type = str(f.type);
-      const targetId = str(f.targetId);
-      const title = str(f.title);
-      if (title === null || (type !== "article" && type !== "product")) return null;
-      return {
-        id: str(f.id) ?? `favorite-${i}`,
-        kind: (type === "article" ? "favorite-article" : "favorite-product") as
-          | "favorite-article"
-          | "favorite-product",
-        title,
-        imageUrl: str(f.imageUrl),
-        href: targetId
-          ? type === "article"
-            ? `/journal/${targetId}`
-            : `/products/${targetId}`
-          : undefined,
-      };
-    })
-    .filter((f): f is AccountMediaItem => f !== null);
+  const entries = normalizeFavorites(favorites);
 
-  // 記事を先に (確定版の 1 枚目は読みもの)。同種の順序は入力順 = createdAt 降順のまま。
-  const articles = items.filter((f) => f.kind === "favorite-article");
-  const products = items.filter((f) => f.kind === "favorite-product");
-  return [...articles, ...products].slice(0, ACCOUNT_CONTINUE_LIMIT);
+  /* 確定版の 1 枚目は読みもの。`FAVORITE_KINDS` の並び (product → article) とは
+     逆向きに読みものを先へ出すので、ここで明示的に並べ替える。 */
+  const order: readonly FavoriteKind[] = ["article", "product"];
+
+  return order
+    .flatMap((kind) => entries.filter((entry) => entry.kind === kind))
+    .slice(0, ACCOUNT_CONTINUE_LIMIT)
+    .map((entry) => ({
+      id: entry.id,
+      kind: entry.kind,
+      title: entry.title,
+      imageUrl: entry.imageUrl,
+      href: entry.href,
+    }));
 }
 
 /** 「これまで」= 注文履歴 (新しい順)。 */
