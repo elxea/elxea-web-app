@@ -143,6 +143,102 @@ describe('matchLogEntry — 実際に出る失敗文字列を拾う', () => {
   });
 });
 
+/**
+ * 連携台帳の**読み取り**失敗 (F5)。
+ *
+ * ここが今まで完全な盲点だった。読み取りは LINE 系 route ではなく
+ * **SSR ページの描画中** (`resolveIdentity` 経由) と `auth-callback` から走るので、
+ * `requestPath` は `/ja/account` や `/api/auth/callback` になる。監視は
+ * `WATCHED_PATH_PREFIXES` で先に落としていたため、cx-agent が落ちて全員が
+ * 「連携済みなのに未連携の棚」に倒れても**一行も拾わなかった**。
+ *
+ * 入力の文字列はすべて現物 (lib/line/linkage-status.ts / lib/auth/identity-link.ts の
+ * console.warn から取得)。
+ */
+describe('matchLogEntry — 連携台帳の読み取り失敗 (path 縛りの免除)', () => {
+  it.each([
+    [
+      '/ja/account',
+      '[line-linkage-status] reverse lookup returned 401',
+      '逆引きが 401 (秘密の不一致)',
+    ],
+    [
+      '/ja/account',
+      '[line-linkage-status] reverse lookup unreachable: The operation was aborted due to timeout',
+      '逆引きが不達 / timeout',
+    ],
+    [
+      '/ja/mypage',
+      '[line-linkage-status] reverse lookup unknown: SYNC_API_SECRET not set',
+      '秘密が未設定',
+    ],
+    [
+      '/ja/account',
+      '[line-linkage-status] reverse lookup: linked without customer id',
+      '応答が壊れている',
+    ],
+    [
+      '/api/auth/callback',
+      '[identity-link] line linkage ledger unreadable; skipping merge (source=auth-callback)',
+      '合体が見送られた',
+    ],
+  ])('%s の %s を拾う (%s)', (requestPath, message) => {
+    const finding = matchLogEntry(
+      logLine({ requestPath, message, responseStatusCode: 200 }),
+    );
+    expect(finding).not.toBeNull();
+    expect(finding!.id).toBe('linkage-read-failed');
+    expect(finding!.severity).toBe('error');
+  });
+
+  it('LINE 系 route 上で出ても同じく拾う', () => {
+    const finding = matchLogEntry(
+      logLine({
+        requestPath: '/api/user/line-link/callback',
+        message:
+          '[identity-link] line linkage ledger unreadable; skipping merge (source=line-link-callback)',
+      }),
+    );
+    expect(finding?.id).toBe('linkage-read-failed');
+  });
+
+  it('秘密未設定は not-configured にも当たる (規則の重複は失報より安全)', () => {
+    // LOG_PATTERNS の先着順で not-configured が先に当たる。どちらでも critical /
+    // error として上がるので、取りこぼしにはならない。
+    const finding = matchLogEntry(
+      logLine({
+        requestPath: '/api/user/line-link/init',
+        message: '[line-linkage-status] reverse lookup unknown: SYNC_API_SECRET not set',
+      }),
+    );
+    expect(finding?.id).toBe('not-configured');
+  });
+
+  it('免除は linkage-read-failed だけ。他の規則は path 縛りのまま', () => {
+    // 無関係な route の "cx-agent returned 401" で鳴らない (誤報の温床)。
+    expect(
+      matchLogEntry(
+        logLine({ requestPath: '/api/chat', message: '[chat] cx-agent returned 401' }),
+      ),
+    ).toBeNull();
+  });
+
+  it('免除しても 5xx フォールバックは path 縛りのまま (サイト全域の 5xx を担当しない)', () => {
+    expect(
+      matchLogEntry(
+        logLine({ requestPath: '/ja/products/foo', responseStatusCode: 500, message: '' }),
+      ),
+    ).toBeNull();
+  });
+
+  it('規則表に anyPath 免除が 1 件だけ載っている (増えたら意図的か確かめる)', () => {
+    const rules = LOG_PATTERNS as { id: string; anyPath?: boolean }[];
+    expect(rules.filter((r) => r.anyPath).map((r) => r.id)).toEqual([
+      'linkage-read-failed',
+    ]);
+  });
+});
+
 describe('matchLogEntry — 正常な離脱で鳴らない (誤報で無視される監視にしない)', () => {
   it.each([
     '[line-link/callback] line returned error: access_denied',

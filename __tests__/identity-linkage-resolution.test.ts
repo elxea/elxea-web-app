@@ -52,6 +52,14 @@ vi.mock("@/lib/chat/proxy", () => ({
   CX_AGENT_BASE_URL: "https://cx-agent.example.test",
 }));
 
+/** 台帳が読めなかったことの**恒久記録**先。実 SDK は動かさず、送った事実だけ観測する。 */
+vi.mock("@sentry/nextjs", () => ({
+  captureMessage: vi.fn(),
+  captureException: vi.fn(),
+}));
+
+import * as Sentry from "@sentry/nextjs";
+
 import { resolveIdentity } from "@/lib/firebase/auth-guard";
 import {
   fetchLineLinkageStatusForLineUser,
@@ -307,6 +315,128 @@ describe("fetchShopifyCustomerIdForLineUser / 読めなかったとき", () => {
     if (!identity.authenticated) return;
     expect(identity.userKey).toBe(`line:${LINE_USER_ID}`);
     expect(identity.provider).toBe("line");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// (c') 読めなかったことが**記録に残る**（F5: 検知の穴）
+//
+// 読めないときに安全側へ倒すこと自体は上で固定済み。問題はその倒れ方が
+// **完全に静か**だったこと。cx-agent が落ちれば全員が「連携済みなのに未連携の棚」
+// に落ちるのに、痕跡は console.warn だけ。本番の Vercel ログ保持は 1 時間しかなく、
+// 監視 cron が遅れれば痕跡ごと消える。恒久記録は Sentry 側に持たせる。
+// ---------------------------------------------------------------------------
+
+describe("読めなかったことを Sentry に残す", () => {
+  const captured = () => vi.mocked(Sentry.captureMessage).mock.calls;
+
+  /** 直近の captureMessage に載った reason タグ。 */
+  const lastReason = () => {
+    const calls = captured();
+    const last = calls.at(-1);
+    return (last?.[1] as { tags?: { reason?: string } } | undefined)?.tags
+      ?.reason;
+  };
+
+  it("非 2xx → reason=upstream-status で残る", async () => {
+    stubUpstream({}, false, 401);
+    await fetchShopifyCustomerIdForLineUser(LINE_USER_ID);
+
+    expect(captured()).toHaveLength(1);
+    expect(lastReason()).toBe("upstream-status");
+  });
+
+  it("不達 / timeout → reason=unreachable で残る", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new Error("network down");
+      }),
+    );
+    await fetchShopifyCustomerIdForLineUser(LINE_USER_ID);
+
+    expect(lastReason()).toBe("unreachable");
+  });
+
+  it("linked=true なのに顧客 ID が無い → reason=linked-without-customer-id で残る", async () => {
+    stubUpstream({ linked: true, shopify_customer_id: null });
+    await fetchShopifyCustomerIdForLineUser(LINE_USER_ID);
+
+    expect(lastReason()).toBe("linked-without-customer-id");
+  });
+
+  it("SYNC_API_SECRET 未設定 → reason=secret-missing で残る", async () => {
+    delete process.env[SECRET_ENV];
+    await fetchShopifyCustomerIdForLineUser(LINE_USER_ID);
+
+    expect(lastReason()).toBe("secret-missing");
+  });
+
+  it("LINE userId も顧客 ID も載せない（最小開示）", async () => {
+    stubUpstream({}, false, 500);
+    await fetchShopifyCustomerIdForLineUser(LINE_USER_ID);
+
+    const serialized = JSON.stringify(captured());
+    expect(serialized).not.toContain(LINE_USER_ID);
+    expect(serialized).not.toContain(SHOPIFY_CUSTOMER_ID);
+    expect(serialized).not.toContain("test-sync-secret");
+  });
+
+  it("subsystem タグで identity-link の他の記録と同じ束に入る", async () => {
+    stubUpstream({}, false, 500);
+    await fetchShopifyCustomerIdForLineUser(LINE_USER_ID);
+
+    const options = captured()[0]?.[1] as {
+      level?: string;
+      tags?: { subsystem?: string };
+    };
+    expect(options.tags?.subsystem).toBe("identity-link");
+    expect(options.level).toBe("warning");
+  });
+
+  it("障害中に鳴らし続けない（同じ理由は 60 秒に 1 回まで）", async () => {
+    /* 逆引きは SSR の広い範囲から呼ばれる。素通しだと 1 画面ごとにイベントが出て
+       Sentry の割り当てを焼き切り、**肝心なときに他の異常が届かなくなる**。
+       知りたいのは「読めない状態が続いている」ことであって回数ではない。 */
+    const t0 = 5_000_000;
+    stubUpstream({}, false, 500);
+
+    await fetchShopifyCustomerIdForLineUser(LINE_USER_ID, t0);
+    await fetchShopifyCustomerIdForLineUser(LINE_USER_ID, t0 + 1_000);
+    await fetchShopifyCustomerIdForLineUser(LINE_USER_ID, t0 + 59_000);
+    expect(captured()).toHaveLength(1);
+
+    // 間隔を越えれば「まだ続いている」がもう一度残る（沈黙させない）。
+    await fetchShopifyCustomerIdForLineUser(LINE_USER_ID, t0 + 60_001);
+    expect(captured()).toHaveLength(2);
+  });
+
+  it("理由が違えば間引かれない（切り分けの材料を落とさない）", async () => {
+    const t0 = 6_000_000;
+    stubUpstream({}, false, 500);
+    await fetchShopifyCustomerIdForLineUser(LINE_USER_ID, t0);
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new Error("network down");
+      }),
+    );
+    await fetchShopifyCustomerIdForLineUser(LINE_USER_ID, t0 + 1);
+
+    expect(captured()).toHaveLength(2);
+    expect(lastReason()).toBe("unreachable");
+  });
+
+  it("読めたときは何も残さない（正常時に鳴る監視にしない）", async () => {
+    stubUpstream({ linked: true, shopify_customer_id: SHOPIFY_CUSTOMER_ID });
+    await fetchShopifyCustomerIdForLineUser(LINE_USER_ID);
+
+    stubUpstream({ linked: false });
+    __clearLinkageCacheForTest();
+    await fetchShopifyCustomerIdForLineUser(LINE_USER_ID);
+
+    expect(captured()).toHaveLength(0);
   });
 });
 

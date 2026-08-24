@@ -76,6 +76,8 @@ vi.mock("@/lib/firebase/admin", () => ({
   getAdminFirestore: () => currentDb(),
 }));
 
+import * as Sentry from "@sentry/nextjs";
+
 import { resolveIdentity } from "@/lib/firebase/auth-guard";
 import { mergeLineIdentityIntoShopify } from "@/lib/auth/identity-merge";
 import {
@@ -510,6 +512,18 @@ describe("B. 連携時のデータの行方", () => {
     expect(outcome).toBe("ledger-unreadable");
     expect(fs.count(favoritesCol(LINE_KEY))).toBe(1);
     expect(fs.count(favoritesCol(CUSTOMER_A))).toBe(0);
+
+    /* F5: 見送ったことが**記録に残る**こと。
+       この分岐は「連携できた」画面を見た人のデータが元の棚に残る場面なのに、
+       以前は console.warn だけで、本番のログ保持 1 時間を過ぎれば痕跡が消えた。
+       再試行される作りなので壊れ方が静かで、何人分積み上がっても気付けない。 */
+    expect(Sentry.captureMessage).toHaveBeenCalledWith(
+      "Identity link ledger unreadable; merge skipped",
+      expect.objectContaining({
+        level: "warning",
+        tags: { subsystem: "identity-link", source: "auth-callback" },
+      }),
+    );
 
     // 台帳が戻れば、次のログインで拾われる（取りこぼしの再試行）。
     ledger.setUnreachable(false);

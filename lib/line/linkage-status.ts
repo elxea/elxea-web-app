@@ -1,3 +1,5 @@
+import * as Sentry from "@sentry/nextjs";
+
 import { CX_AGENT_BASE_URL } from "@/lib/chat/proxy";
 import { extractCustomerId } from "@/lib/firebase/types";
 
@@ -278,9 +280,67 @@ function evictIfNeeded(now: number): void {
   }
 }
 
-/** テスト用。プロセス内キャッシュを空にする。 */
+/* ---------------------------------------------------------------------------
+ * 逆引きが読めなかったことを恒久記録する（検知の穴を塞ぐ）
+ * ------------------------------------------------------------------------- */
+
+/**
+ * 逆引きが読めなかった理由。Sentry のタグにそのまま載せる（本文の文字列で
+ * grep させない）。
+ */
+export type LinkageReadFailure =
+  | "secret-missing"
+  | "upstream-status"
+  | "linked-without-customer-id"
+  | "unreachable";
+
+/**
+ * 同じ理由を鳴らし続けない間隔。
+ *
+ * 逆引きは `resolveIdentity` 経由で **SSR の広い範囲から呼ばれる**。cx-agent が
+ * 落ちている間そのまま送ると、1 画面描くたびにイベントが出て Sentry の割り当てを
+ * 数分で焼き切る（＝肝心なときに他の異常が届かなくなる）。知りたいのは
+ * 「読めない状態が続いている」という事実であって回数ではないので、理由ごとに
+ * この間隔まで間引く。キャッシュ TTL と同じ 60 秒にしてあるのは、これが
+ * 「逆引きが実際に外へ出ていきうる最短間隔」だから。
+ */
+const LINKAGE_REPORT_COOLDOWN_MS = LINKAGE_CACHE_TTL_MS;
+
+/** 理由ごとの最終送信時刻。 */
+const lastReportedAt = new Map<LinkageReadFailure, number>();
+
+/**
+ * 逆引きの失敗を Sentry に残す（console.warn と対で呼ぶ）。
+ *
+ * ## なぜ console.warn だけでは足りないのか
+ *
+ * 本番の Vercel Runtime Logs は **Hobby プランで保持 1 時間**
+ * （`scripts/ops/monitor-line-prod.mjs` 冒頭の注記が出典）。監視 cron が遅れれば
+ * 痕跡ごと消えるので、ログは best-effort の検知路でしかない。連携が読めない
+ * 状態は「連携済みの人が未連携の棚を見る」＝ **お気に入りが消えたように見える**
+ * 事故そのものなので、後から必ず辿れる記録が要る。それを Sentry 側に持たせる。
+ *
+ * ⚠ LINE userId・顧客 ID・秘密は載せない（`extra` を使わないのはそのため）。
+ *   分かるのは「いつ・どの理由で読めなかったか」だけで、原因の切り分けには足りる。
+ */
+function reportLinkageReadFailure(
+  reason: LinkageReadFailure,
+  now: number,
+): void {
+  const last = lastReportedAt.get(reason);
+  if (last !== undefined && now - last < LINKAGE_REPORT_COOLDOWN_MS) return;
+  lastReportedAt.set(reason, now);
+
+  Sentry.captureMessage("LINE linkage reverse lookup failed", {
+    level: "warning",
+    tags: { subsystem: "identity-link", reason },
+  });
+}
+
+/** テスト用。プロセス内キャッシュを空にする（間引きの記録も一緒に捨てる）。 */
 export function __clearLinkageCacheForTest(): void {
   reverseCache.clear();
+  lastReportedAt.clear();
 }
 
 /**
@@ -398,9 +458,14 @@ async function fetchReverseLinkage(
   if (!secret) {
     // 秘密が無ければ cx-agent は 401 を返すので、無駄打ちせず「不明」に倒す。
     // 設定漏れを「未連携」と決めつけない。
+    //
+    // 文言が "reverse lookup" で始まるのは監視の都合（下の 3 か所と揃えてある）。
+    // "SYNC_API_SECRET not set" も残してあるので、監視の not-configured 規則と
+    // 新しい linkage-read-failed 規則の両方に当たる。
     console.warn(
-      "[line-linkage-status] SYNC_API_SECRET not set; reverse linkage unknown.",
+      "[line-linkage-status] reverse lookup unknown: SYNC_API_SECRET not set",
     );
+    reportLinkageReadFailure("secret-missing", now);
     return unknown;
   }
 
@@ -422,6 +487,7 @@ async function fetchReverseLinkage(
       console.warn(
         `[line-linkage-status] reverse lookup returned ${upstream.status}`,
       );
+      reportLinkageReadFailure("upstream-status", now);
       return unknown;
     }
 
@@ -448,6 +514,7 @@ async function fetchReverseLinkage(
       console.warn(
         "[line-linkage-status] reverse lookup: linked without customer id",
       );
+      reportLinkageReadFailure("linked-without-customer-id", now);
       return unknown;
     }
   } catch (err) {
@@ -455,6 +522,7 @@ async function fetchReverseLinkage(
       "[line-linkage-status] reverse lookup unreachable:",
       err instanceof Error ? err.message : err,
     );
+    reportLinkageReadFailure("unreachable", now);
     return unknown;
   }
 
