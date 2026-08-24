@@ -125,14 +125,23 @@ export function BookmarkButton({
   const [checkNonce, setCheckNonce] = useState(0);
   const mountedRef = useRef(true);
   /**
-   * 押下起点の処理が走っている間 true。
+   * 書き込みが何回始まったかの通し番号 (単調増加・巻き戻さない)。
    *
    * ボタンを確認中も押せるようにした結果、マウント時の確認とお客さまの押下が
    * 同時に飛びうる。確認の応答が後から届いて楽観更新を上書きすると、押したのに
-   * 元に戻ったように見える。押下が始まった時点で「状態の持ち主」は押下側に移り、
-   * 飛んでいる確認の応答は捨てる。
+   * 元に戻ったように見える。
+   *
+   * ここが「実行中かどうか」の真偽値ではなく**通し番号**なのが要点。真偽値だと
+   * 「書き込みが終わった**後**に届いた古い応答」を止められない — 書き込み完了で
+   * フラグが false に戻るので、その後に着地した応答は素通りして確定済みの結果を
+   * 巻き戻す (回線が遅くマウント時の確認だけが大きく遅れると実際に起きる)。
+   *
+   * 通し番号なら、確認を投げた時点の番号と着地時点の番号を比べるだけで
+   * 「その間に書き込みが挟まったか」が判る。挟まっていれば、その答えは
+   * **書き込み前の世界**を指しているので捨てる。番号は巻き戻さないので、
+   * 書き込みの最中に着地しても後で着地しても、同じ 1 つの判定で止まる。
    */
-  const writeInFlightRef = useRef(false);
+  const writeEpochRef = useRef(0);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -170,10 +179,15 @@ export function BookmarkButton({
 
     setCheckState("checking");
 
+    /* この確認が「いつの世界の答えか」を刻む。着地したときに番号が変わっていれば、
+       その間に書き込みが挟まった = この答えは書き込み前の状態を指している。 */
+    const epoch = writeEpochRef.current;
+
     (async () => {
       const resolved = await fetchBookmarkState();
-      // 押下が始まっていたら、こちらの答えはもう古い。押下側に譲る。
-      if (cancelled || writeInFlightRef.current) return;
+      /* 書き込みが挟まっていたら、こちらの答えはもう古い。押下側に譲る。
+         書き込みの最中でも、書き込みが終わった後に着地しても、ここで止まる。 */
+      if (cancelled || writeEpochRef.current !== epoch) return;
       if (resolved === null) {
         // 握り潰さない — 「未登録」と見分けがつかない空アイコンを出さず、
         // 状態不明であることを UI とラベルに出して再確認できるようにする。
@@ -204,8 +218,9 @@ export function BookmarkButton({
       return;
     }
 
-    // ここから先はこの押下が状態の持ち主。飛んでいる確認の応答は捨てる。
-    writeInFlightRef.current = true;
+    /* ここから先はこの押下が状態の持ち主。番号を進めた時点で、いま飛んでいる
+       確認の応答は (いつ着地しても) すべて期限切れになる。番号は戻さない。 */
+    writeEpochRef.current += 1;
     setIsPending(true);
 
     try {
@@ -267,7 +282,7 @@ export function BookmarkButton({
         toast.error(errorMessage);
       }
     } finally {
-      writeInFlightRef.current = false;
+      // 番号はここで戻さない。戻すと「書き込み後に着地した古い応答」がまた通る。
       if (mountedRef.current) setIsPending(false);
     }
   }, [
