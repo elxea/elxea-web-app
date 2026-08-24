@@ -101,6 +101,14 @@ export async function POST(request: NextRequest) {
 
     if (!upstream.ok) {
       const detail = await upstream.text().catch(() => "");
+      /* 409 = このメールアドレスには既に別の LINE が連携済み（1 対 1 固定・J-4）。
+         502 に潰すと、画面は「時間をおいてもう一度」に倒れる — **恒久的な衝突を
+         一時エラーとして提示し、永久に成功しない再試行を促す**ことになる。
+         恒久か一時かは呼び出し側が知る必要があるので、そのまま 409 で返す。 */
+      if (upstream.status === 409) {
+        console.warn("[line-link-liff] shopify customer already linked to another LINE");
+        return NextResponse.json({ error: "already_linked" }, { status: 409 });
+      }
       console.error(`[line-link-liff] cx-agent returned ${upstream.status}: ${detail}`);
       return NextResponse.json({ error: "linking_failed" }, { status: 502 });
     }
