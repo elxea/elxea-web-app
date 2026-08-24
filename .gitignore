@@ -113,3 +113,10 @@ c16-*.mjs
 # scripts/storybook-story-shots.mjs の出力 (story の実描画スクショ + report.json)。
 # 目視確認のための使い捨てで、視覚回帰の正本は Chromatic 側にある。
 .storybook-shots/
+
+# Firebase Emulator Suite (ローカル専用・成果物はコミットしない)
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+.emulator-data/

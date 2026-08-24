@@ -15,6 +15,8 @@ import {
 } from "firebase-admin/app";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
 
+import { resolveServerFirestoreTarget } from "./firestore-target";
+
 /**
  * Decode FIREBASE_PRIVATE_KEY from various storage formats:
  * 1. Base64-encoded PEM (recommended for Vercel)
@@ -46,8 +48,27 @@ export function decodePrivateKey(raw: string | undefined): string | undefined {
 }
 
 function getAdminApp(): App {
-  if (getApps().length > 0) {
-    return getApps()[0];
+  /* 既に app が在っても、判定より先には返さない。
+     「app が在れば即返す」を先頭に置くと、誰かが先に app を作った瞬間に
+     下の fail-closed 判定が丸ごと飛ぶ。守りが「初期化されたのが自分が最初か」
+     という順番次第になるのは、守りとして成立していない。判定は毎回通す。 */
+  const existingApp = getApps().length > 0 ? getApps()[0] : null;
+
+  /* エミュレーターが立っているなら、本物の資格情報を読む前に分岐する。
+     エミュレーターは資格情報を要求しないので、ここで先に返さないと
+     「手元で開発したいだけなのに本番の鍵が要る」という妙な依存が残る。
+     Admin SDK は FIRESTORE_EMULATOR_HOST が立っていれば Firestore の通信先を
+     そこへ固定するので、この app から本番へ出て行く経路は無い。 */
+  if (process.env.FIRESTORE_EMULATOR_HOST) {
+    const target = resolveServerFirestoreTarget();
+    if (target.kind === "emulator") {
+      if (existingApp) return existingApp;
+      console.warn(
+        `[firebase/admin] FIRESTORE_EMULATOR_HOST=${target.host} — ` +
+          `エミュレーターに接続します（project=${target.projectId}）。本番 Firestore には触れません。`,
+      );
+      return initializeApp({ projectId: target.projectId });
+    }
   }
 
   const projectId = process.env.FIREBASE_PROJECT_ID;
@@ -60,6 +81,14 @@ function getAdminApp(): App {
         `projectId=${!!projectId}, clientEmail=${!!clientEmail}, privateKey=${!!privateKey}`
     );
   }
+
+  /* ここまで来たということは「本番の資格情報が揃っている」。本番ランタイム
+     （NODE_ENV=production / Vercel）ならそのまま通す＝従来と同じ。手元なら止める。
+     資格情報の有無を見るより後に置いているのは、資格情報が無いときの文言を
+     変えないため（lib/journal/popular-articles.ts がその文言で "未設定" を判定している）。 */
+  resolveServerFirestoreTarget();
+
+  if (existingApp) return existingApp;
 
   return initializeApp({
     credential: cert({
