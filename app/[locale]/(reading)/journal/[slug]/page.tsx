@@ -29,7 +29,7 @@ import {
   TeaDetailSection,
 } from "@/components/journal/article-modal-sections";
 import { ArticleProse } from "@/components/journal/article-blocks";
-import { BookmarkButton } from "@/components/journal/bookmark-button";
+import { FavoriteToggleButton } from "@/components/favorites/favorite-toggle-button";
 import { ArticleReadTracker } from "@/components/journal/article-read-tracker";
 import { ReadingProgress } from "@/components/journal/reading-progress";
 import { formatArticleDate } from "@/lib/format-date";
@@ -226,23 +226,25 @@ export default async function ArticlePage({
                   実装は DS 最大の display (44px / lh 1.2) を正とする。
                   SP は base h1 32px のまま (.page-title は md+ のみ)。 */}
               <h1 className="page-title text-foreground">{article.title}</h1>
-              <BookmarkButton
-                articleSlug={slug}
-                articleTitle={article.title}
-                articleImageUrl={
+              {/* 保存トグルは商品・読みもの・人で 1 実装 (D-12)。読みものは
+                  Figma `BookmarkButton (Module)` 8171:299 と同じ高さ 44 の造作。 */}
+              <FavoriteToggleButton
+                kind="article"
+                targetId={slug}
+                title={article.title}
+                imageUrl={
                   article.mainImage?.asset ? urlFor(article.mainImage).width(200).url() : null
                 }
-                addLabel={t("addToBookmarks")}
-                removeLabel={t("removeFromBookmarks")}
-                savedLabel={t("bookmarkSaved")}
-                loadingLabel={t("bookmarkLoading")}
-                loginRequiredLabel={t("bookmarkLoginToSave")}
-                statusUnknownLabel={t("bookmarkStatusUnknown")}
-                addedMessage={t("addedToBookmarks")}
-                removedMessage={t("removedFromBookmarks")}
-                errorMessage={t("bookmarkError")}
-                loginRequiredMessage={t("loginRequiredForBookmark")}
-                statusRetryMessage={t("bookmarkStatusRetry")}
+                appearance="panel"
+                labels={{
+                  add: t("addToBookmarks"),
+                  remove: t("removeFromBookmarks"),
+                  saved: t("bookmarkSaved"),
+                  added: t("addedToBookmarks"),
+                  removed: t("removedFromBookmarks"),
+                  error: t("bookmarkError"),
+                  loginRequiredMessage: t("loginRequiredForBookmark"),
+                }}
                 className="mt-1 shrink-0"
               />
             </div>

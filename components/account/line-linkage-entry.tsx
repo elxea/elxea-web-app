@@ -44,6 +44,10 @@ const COPY = {
     description:
       "ご利用中の LINE とこのアカウントを結び付けると、あなたの好みに合わせたご案内を LINE のトークで受け取れるようになります。ご注文や定期便の状況も、そのままトークでご確認いただけます。",
     button: "LINEと連携する",
+    /** 連携の準備 (認可 URL の取得) に失敗したとき。押せる状態に戻す。 */
+    buttonRetry: "もう一度試す",
+    /** 同・添える一言。原因は伏せるが、黙って灰色のボタンを残さない。 */
+    buttonFailedNote: "連携の準備ができませんでした。",
     linkedHeading: "LINEと連携済み",
     /** 連携日が分かるとき。`{date}` を実際の日付に差し替える。 */
     linkedWithDate:
@@ -100,6 +104,8 @@ const COPY = {
     description:
       "Connect your LINE with this account to receive suggestions tailored to your taste right in the LINE chat. You can also check your orders and subscription from the chat.",
     button: "Link with LINE",
+    buttonRetry: "Try again",
+    buttonFailedNote: "We could not prepare the link just now.",
     linkedHeading: "Linked with LINE",
     linkedWithDate:
       "Linked with LINE since {date}. We send suggestions tailored to your taste in the LINE chat.",
@@ -308,7 +314,11 @@ export function LineLinkageEntry({
           <p className="text-sm text-muted-foreground leading-relaxed">
             {t.description}
           </p>
-          <LineLinkageCta label={t.button} />
+          <LineLinkageCta
+            label={t.button}
+            retryLabel={t.buttonRetry}
+            failedNote={t.buttonFailedNote}
+          />
         </div>
       </div>
     </AccountPanelSection>

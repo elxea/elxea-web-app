@@ -29,6 +29,38 @@ const coverageEnabled = process.env.VITEST_COVERAGE === '1';
 // More info at: https://storybook.js.org/docs/next/writing-tests/integrations/vitest-addon
 export default defineConfig({
   test: {
+    /**
+     * 1 テストの上限時間。Vitest の既定 5,000ms から引き上げてある。
+     *
+     * このリポジトリでは branch protection が張れないため、壊れたコードが main に
+     * 入るのを止める唯一の機械強制が **pre-push フックの `pnpm test`** である
+     * (CLAUDE.md「ローカル品質ゲート」)。ところが既定の 5,000ms は、テストの中身
+     * ではなく **モジュールの transform / import** で使い切られることがある。実測
+     * (2026-08-25) では全体の transform に 400-1,200 秒かかっており、機械が他の
+     * 作業で混んでいると、単体では 1 秒未満で通るテストが「5,000ms を超えた」で
+     * 落ちる。しかも落ちる顔ぶれが毎回変わる。
+     *
+     * 落ちる理由が変更内容と無関係なので、この状態は 2 つの害しかない —
+     * (1) ゲートが信用できなくなる (2) `--no-verify` (禁止) への圧力になる。
+     * 判定を緩めているのではなく、**待ち時間の上限だけ**を実測に合わせて広げる。
+     * アサーションは 1 つも変えていない。本当に固まったテストは 30 秒で落ちる。
+     */
+    testTimeout: 30_000,
+    hookTimeout: 30_000,
+    /**
+     * 同時に走らせるワーカー数の上限。
+     *
+     * 既定はマシンの CPU 数いっぱいで、しかも**プロジェクトごとに**その数を取る
+     * (unit と storybook で二重に取る)。この機械は複数の作業ツリーが同時に走る
+     * 前提なので、既定のままだと CPU を奪い合って 1 テストあたりの実時間が
+     * 桁で伸びる (2026-08-25 実測: load average 30 / transform 合計 4,378 秒 /
+     * 上限 30,000ms でも毎回違う顔ぶれが時間切れ)。
+     *
+     * 上限を切ると全体の実時間はやや伸びるが、**1 本ずつには確実に CPU が回る**。
+     * pre-push は「壊れたコードを止める」ための関門であって速さを競う場所では
+     * ないので、速さより結果の再現性を採る。
+     */
+    maxWorkers: 4,
     coverage: {
       enabled: coverageEnabled,
       provider: 'v8',

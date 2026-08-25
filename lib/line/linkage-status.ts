@@ -69,6 +69,27 @@ export async function fetchLineLinkageStatus(
 ): Promise<LineLinkageStatus> {
   if (!shopifyCustomerId) return UNKNOWN_LINE_LINKAGE;
 
+  /* 同じ顧客の順引きが同時に 2 本走ったら、後から来たほうは先の答えに相乗りする。
+     キャッシュ (逆引きにはある) を足すのとは別の話で、**同時実行の重複だけ**を
+     畳む。マイページは連携状態の照会と描画モデルの組み立てを並列に始めるので、
+     ここを畳まないと 1 描画で cx-agent への往復が 2 本出うる。 */
+  const inFlight = forwardInFlight.get(shopifyCustomerId);
+  if (inFlight) return inFlight;
+
+  const pending = loadLineLinkageStatus(shopifyCustomerId, now).finally(() => {
+    forwardInFlight.delete(shopifyCustomerId);
+  });
+  forwardInFlight.set(shopifyCustomerId, pending);
+  return pending;
+}
+
+/** 順引きの同時実行を畳む (キャッシュではない — 着地したら消える)。 */
+const forwardInFlight = new Map<string, Promise<LineLinkageStatus>>();
+
+async function loadLineLinkageStatus(
+  shopifyCustomerId: string,
+  now: number,
+): Promise<LineLinkageStatus> {
   const secret = process.env.SYNC_API_SECRET;
   if (!secret) {
     // 秘密が無ければ cx-agent は 401 を返すので、無駄打ちせず「不明」に倒す。
@@ -404,6 +425,10 @@ function reportLinkageReadFailure(
 export function __clearLinkageCacheForTest(): void {
   reverseCache.clear();
   lastReportedAt.clear();
+  /* 走行中の重複畳み込みも捨てる。残すと、前のテストで投げた往復に次のテストが
+     相乗りして「呼ばれた回数」が合わなくなる。 */
+  reverseInFlight.clear();
+  forwardInFlight.clear();
 }
 
 /**
@@ -515,6 +540,27 @@ async function fetchReverseLinkage(
   const cached = reverseCache.get(lineUserId);
   if (cached && cached.expiresAt > now) return cached.value;
 
+  /* キャッシュが冷えているとき、同じ人の逆引きが**同時に**2 本走ることがある。
+     マイページは本人解決 (`resolveIdentity`) と連携状態の照会を並列に始めるので、
+     どちらもキャッシュ未設定の状態で同じ往復を投げる。キャッシュは着地後にしか
+     効かないため、走っている間の重複はここで畳む。 */
+  const inFlight = reverseInFlight.get(lineUserId);
+  if (inFlight) return inFlight;
+
+  const pending = loadReverseLinkage(lineUserId, now).finally(() => {
+    reverseInFlight.delete(lineUserId);
+  });
+  reverseInFlight.set(lineUserId, pending);
+  return pending;
+}
+
+/** 逆引きの同時実行を畳む (キャッシュではない — 着地したら消える)。 */
+const reverseInFlight = new Map<string, Promise<ReverseLinkage>>();
+
+async function loadReverseLinkage(
+  lineUserId: string,
+  now: number,
+): Promise<ReverseLinkage> {
   const unknown: ReverseLinkage = { customer: null, linkedAt: null };
 
   const secret = process.env.SYNC_API_SECRET;

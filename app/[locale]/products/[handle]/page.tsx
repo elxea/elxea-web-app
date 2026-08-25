@@ -9,7 +9,7 @@ import { ImageGallery } from "@/components/product/image-gallery";
 import { VariantSelector } from "@/components/product/variant-selector";
 import { AddToCartButton } from "@/components/product/add-to-cart-button";
 import { ProductPurchaseOptions } from "@/components/product/product-purchase-options";
-import { FavoriteButton } from "@/components/product/favorite-button";
+import { FavoriteToggleButton } from "@/components/favorites/favorite-toggle-button";
 import { TasteMap, type TastePoint } from "@/components/product/taste-map";
 import { Breadcrumb } from "@/components/seo/breadcrumb";
 import { CatalogCard, CatalogGrid } from "@/components/catalog/catalog-list";
@@ -306,17 +306,23 @@ export default async function ProductPage({
               />
             )}
 
-            <FavoriteButton
-              productHandle={product.handle}
-              productTitle={product.title}
-              productImageUrl={product.featuredImage?.url ?? null}
-              addLabel={t("addToFavorites")}
-              removeLabel={t("removeFromFavorites")}
-              addedMessage={t("addedToFavorites")}
-              removedMessage={t("removedFromFavorites")}
-              errorMessage={t("favoriteError")}
-              loginRequiredMessage={t("loginRequiredForFavorite")}
-              variant="text"
+            {/* 保存トグルは商品・読みもの・人で 1 実装 (D-12)。見た目だけ
+                `appearance` で選ぶ (ここは購入カラムの outline 小ボタン)。 */}
+            <FavoriteToggleButton
+              kind="product"
+              targetId={product.handle}
+              title={product.title}
+              imageUrl={product.featuredImage?.url ?? null}
+              appearance="product"
+              labels={{
+                add: t("addToFavorites"),
+                remove: t("removeFromFavorites"),
+                saved: t("removeFromFavorites"),
+                added: t("addedToFavorites"),
+                removed: t("removedFromFavorites"),
+                error: t("favoriteError"),
+                loginRequiredMessage: t("loginRequiredForFavorite"),
+              }}
               className="w-full"
             />
           </div>

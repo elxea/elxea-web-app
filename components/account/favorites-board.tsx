@@ -23,6 +23,7 @@ import {
   type FavoriteEntry,
   type FavoriteGroup,
 } from "@/lib/account-favorites";
+import { applyLocalFavorite } from "@/lib/favorites/client-store";
 import { cn } from "@/lib/utils";
 
 /**
@@ -76,6 +77,9 @@ export function FavoritesBoard({ groups: initialGroups }: { groups: FavoriteGrou
        持たない (連続で解除したとき、古いコピーで全体を巻き戻さないため)。 */
     const originalIndex = indexOfFavorite(groups, entry);
     setGroups((current) => removeFavoriteFromGroups(current, entry.id));
+    /* 保存トグルが読む倉庫にも同じことを伝える。伝えないと、ここで外した直後に
+       商品ページへ移ったとき「保存済み」のままに見える (事実が 2 か所に割れる)。 */
+    applyLocalFavorite(entry.kind, entry.targetId, false);
 
     try {
       const res = await fetch("/api/user/favorites", {
@@ -87,6 +91,7 @@ export function FavoritesBoard({ groups: initialGroups }: { groups: FavoriteGrou
       toast(t("removedFromFavorites"));
     } catch {
       setGroups((current) => insertFavoriteIntoGroups(current, entry, originalIndex));
+      applyLocalFavorite(entry.kind, entry.targetId, true);
       toast.error(t("actionError"));
     } finally {
       setPendingId(null);
