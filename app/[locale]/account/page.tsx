@@ -24,6 +24,7 @@ import {
   fetchLineLinkageStatus,
   fetchLineLinkageStatusForLineUser,
   UNKNOWN_LINE_LINKAGE,
+  type LineLinkageStatus,
 } from "@/lib/line/linkage-status";
 import { readVerifiedLineUserId } from "@/lib/line/session";
 import { LINK_RESULT_PARAM } from "@/lib/line/link-flow";
@@ -148,22 +149,40 @@ export default async function AccountPage({
     );
   }
 
-  const view: AccountView = customer
-    ? await loadAccountView(customer)
-    : (seeded ?? (await loadLineOnlyAccountView(getLineDisplayName(cookieStore.get("line_user")?.value))));
-
   /* LINE 連携状態 (P1)。識別子は **サーバセッション由来の値だけ** を使う
      (URL パラメータ等からは受けない — 他人の連携状態を覗ける穴になる)。
        - メールでログイン中 … customer.id で順引き
        - LINE でログイン中   … 暗号化 cookie の復号結果 (サーバ確定の LINE userId) で逆引き
      PREVIEW_SEED の見本表示では実セッションが無いので問い合わせず「不明」のままにする。
-     読み取りは never throw で、失敗しても linked=null になるだけ (マイページは落ちない)。 */
+     読み取りは never throw で、失敗しても linked=null になるだけ (マイページは落ちない)。
+
+     ## 描画モデルの組み立てと**並列**に始める (直列チェーンの解消 / F15)
+
+     ここは以前、`loadAccountView()` を待ち切ってから連携照会を投げていた。両者に
+     依存関係は無い (連携状態はお気に入りにも定期便にも影響しない) のに直列だったので、
+     マイページの表示までの時間が「Shopify の往復 + Firestore の読み + cx-agent の往復」
+     の**足し算**になっていた。cx-agent が遅い日はその 3000ms がまるごと上乗せされる。
+     いま両方を先に走らせて最後に待つので、待ち時間は足し算ではなく**いちばん長い 1 本**
+     になる。
+
+     逆引きは `resolveIdentity()` (描画モデル側) も同じ往復を使うため、並列化すると
+     キャッシュが冷えている初回に 2 本同時に出うる。`lib/line/linkage-status.ts` の
+     走行中重複の畳み込みがそれを 1 本にまとめている (1 描画あたり cx-agent 往復 1 回)。 */
   const lineUserId = customer ? null : auth.line ? await readVerifiedLineUserId() : null;
-  const lineLinkage = customer
-    ? await fetchLineLinkageStatus(customer.id)
+
+  const linkagePromise: Promise<LineLinkageStatus> = customer
+    ? fetchLineLinkageStatus(customer.id)
     : lineUserId
-      ? await fetchLineLinkageStatusForLineUser(lineUserId)
-      : UNKNOWN_LINE_LINKAGE;
+      ? fetchLineLinkageStatusForLineUser(lineUserId)
+      : Promise.resolve(UNKNOWN_LINE_LINKAGE);
+
+  const viewPromise: Promise<AccountView> = customer
+    ? loadAccountView(customer)
+    : seeded
+      ? Promise.resolve(seeded)
+      : loadLineOnlyAccountView(getLineDisplayName(cookieStore.get("line_user")?.value));
+
+  const [view, lineLinkage] = await Promise.all([viewPromise, linkagePromise]);
 
   /* 連携フロー (P2) から戻ってきた直後の結果。値は 2 つだけを許し、それ以外は無視する
      (任意の文字列を画面の分岐に持ち込ませない)。表示は LineLinkageEntry の中に閉じ、

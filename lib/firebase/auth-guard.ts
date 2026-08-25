@@ -6,6 +6,7 @@
  * the Shopify Customer API call is skipped entirely. This reduces p50 latency
  * for authenticated API routes from ~400ms to ~5ms.
  */
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { getSession } from "@/lib/shopify/auth";
 import { getCustomer, decryptToken } from "@/lib/shopify/customer";
@@ -118,8 +119,18 @@ export async function requireAuth(): Promise<AuthResult> {
  *   Shopify 顧客トークンを要する操作は、この関数ではなく `requireAuth()`
  *   （Shopify セッション専用）で守ること。本関数が守るのは Firestore 上の
  *   お気に入り / フォロー / イベント / 行動ログの棚だけ。
+ *
+ * ## 1 リクエスト 1 回に畳んである（`React.cache`）
+ *
+ * この関数は 1 枚の画面から何度も呼ばれる（お気に入り・イベント・行動ログの
+ * それぞれが自分で本人解決をする）。中身は `getSession()` と cx-agent への逆引きで、
+ * どちらも外向きの往復を含む。リクエスト単位でメモ化しておけば、**同じ描画の中で
+ * 同じ答えを何度も取りに行かない**。リクエストの外（テスト・スクリプト）では
+ * メモ化されず素通しになるので、呼び出し側の意味は変わらない。
  */
-export async function resolveIdentity(): Promise<Identity> {
+export const resolveIdentity: () => Promise<Identity> = cache(loadIdentity);
+
+async function loadIdentity(): Promise<Identity> {
   try {
     const cookieStore = await cookies();
 

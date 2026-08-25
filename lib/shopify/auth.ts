@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { cookies } from "next/headers";
 
 import {
@@ -62,8 +63,23 @@ type Session = {
  *   Shopify はリフレッシュのたびに新しい refresh token を返すため、書き戻しが
  *   ずっと失敗し続ける構成にしてはいけない (だから middleware ではなく、cookie を
  *   実際に書ける経路で必ず 1 回は通るようにしてある)。
+ *
+ * ## 1 リクエスト 1 回に畳んである (`React.cache`)
+ *
+ * マイページ 1 枚を描くだけで、この関数は **3 回**呼ばれていた
+ * (`getCustomerFromSession` / `getSubscriptionsFromSession` / `resolveIdentity`)。
+ * cookie を読むだけなら安いが、access token が切れている描画では **3 回とも
+ * リフレッシュ分岐に入る** — Shopify への往復が 3 本走り、しかも Shopify は
+ * リフレッシュのたびに refresh token を回すので、**同じ refresh token を 3 本が
+ * 同時に使う競合**になる (先に着いた 1 本以外が無効なトークンを掴む)。
+ *
+ * `React.cache` はリクエスト単位のメモ化なので、同じ描画の中では最初の 1 回だけが
+ * 実体を走らせ、残りはその結果を共有する。リクエストの外 (テスト・スクリプト) では
+ * メモ化されず素通しになるため、呼び出し側の意味は変わらない。
  */
-export async function getSession(): Promise<Session | null> {
+export const getSession: () => Promise<Session | null> = cache(loadSession);
+
+async function loadSession(): Promise<Session | null> {
   const cookieStore = await cookies();
   const atEnc = cookieStore.get(ACCESS_TOKEN_COOKIE)?.value;
   const rtEnc = cookieStore.get(REFRESH_TOKEN_COOKIE)?.value;
@@ -126,7 +142,16 @@ export async function isAuthenticated(): Promise<boolean> {
   return session !== null;
 }
 
-export async function getCustomerFromSession(): Promise<Customer | null> {
+/**
+ * ログイン中の顧客。**1 リクエスト 1 回に畳んである** (`getSession` と同じ理由)。
+ *
+ * 顧客の取得は Shopify Customer Account API への往復なので、1 枚の画面で 2 回呼ぶと
+ * そのまま 2 往復になる。値はリクエストの中で変わらないため、共有して差し支えない。
+ */
+export const getCustomerFromSession: () => Promise<Customer | null> =
+  cache(loadCustomerFromSession);
+
+async function loadCustomerFromSession(): Promise<Customer | null> {
   try {
     const session = await getSession();
     if (!session) return null;
@@ -137,7 +162,11 @@ export async function getCustomerFromSession(): Promise<Customer | null> {
   }
 }
 
-export async function getSubscriptionsFromSession(): Promise<SubscriptionContract[]> {
+/** 定期便契約。理由は `getCustomerFromSession` と同じ (1 リクエスト 1 往復)。 */
+export const getSubscriptionsFromSession: () => Promise<SubscriptionContract[]> =
+  cache(loadSubscriptionsFromSession);
+
+async function loadSubscriptionsFromSession(): Promise<SubscriptionContract[]> {
   try {
     const session = await getSession();
     if (!session) return [];
