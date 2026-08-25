@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, userEvent, waitFor, within } from "storybook/test";
 
 import { isolateCookies } from "../../.storybook/story-cookies";
+import { __resetFavoritesStoreForTest } from "@/lib/favorites/client-store";
 
 import { FavoriteToggleButton } from "./favorite-toggle-button";
 
@@ -10,15 +11,20 @@ import { FavoriteToggleButton } from "./favorite-toggle-button";
  *
  * ## なぜ story で検査するのか
  *
- * この部品の壊れ方は時間の中にある。「マウント時の確認」「押下」「書き込み」が
+ * この部品の壊れ方は時間の中にある。「一覧の取り込み」「押下」「書き込み」が
  * 非同期に走り、着地の順番がずれたときだけ画面が嘘をつく。unit 側
  * (`__tests__/favorite-toggle-button.test.tsx`) は node で静的に描くので
  * effect が走らず、順番の問題は原理的に見えない。
  *
  * 加えてここでは **どんな要求を投げているか** も見る。人の保存は「種類 = person /
  * 識別子 = 人の slug」で書けていないと、保存できたように見えてマイページに出ない
- * (種類違い) か、別人が保存される (識別子違い) 事故になる。要求の中身は静的な
- * 描画では見えないので、実クリックできるここが唯一の検査場所になる。
+ * (種類違い) か、別人が保存される (識別子違い) 事故になる。
+ *
+ * ## 倉庫はモジュール変数なので、story ごとに空にする
+ *
+ * 登録状態は `lib/favorites/client-store.ts` が**タブに 1 つ**持つ。story は同じ
+ * iframe を共有して走るので、前の story が残した状態を引き継ぐと結果が順番に
+ * 依存する。`beforeEach` で必ず空にする。
  */
 const meta = {
   title: "Favorites/FavoriteToggleButton",
@@ -33,21 +39,17 @@ const meta = {
       add: "この人を保存",
       remove: "保存をやめる",
       saved: "保存済み",
-      loading: "保存の状態を確認しています",
-      loginRequired: "ログインすると保存できます",
-      statusUnknown: "保存の状態を取得できませんでした",
       added: "マイページに保存しました",
       removed: "保存をやめました",
       error: "操作に失敗しました",
       loginRequiredMessage: "保存するにはログインが必要です",
-      statusRetry: "保存の状態をもう一度確認しています",
     },
   },
   parameters: {
     docs: {
       description: {
         component:
-          "商品・読みもの・人で共通の保存トグル。種類は引数で受け取る。確認が終わる前でも押せる（押下時に確認してから実行する）。",
+          "商品・読みもの・人で共通の保存トグル。種類も見た目も引数で受け取る。状態はタブに 1 つの倉庫から読むので、途中の文言も途中の見た目も無い。",
       },
     },
   },
@@ -57,34 +59,30 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /**
- * 未ログイン。押すとログインを促す。
+ * 未ログイン。**素の「保存する」のまま**で、押すとログインを促す。
+ *
+ * 以前ここは「ログインすると保存できます」という別のラベルに差し替わっていた。
+ * cookie はブラウザでしか読めないので最初の描画では分からず、後から文字が
+ * 差し替わってその場のレイアウトが動いていた。ログインしていない人にとって
+ * 押す前に知る必要のない事実なので、押したときに伝える。
  *
  * ## cookie を「無いはず」に頼らない
  *
- * story はブラウザの 1 ページを共有して走るので、**別の story が置いた cookie が
- * 残っている**ことがある (ログイン済みを装う story がこのファイルにも他のファイル
- * にもある)。残っていると部品は「ログイン済み」と判断して登録状態の確認に出かけ、
- * 実 API が無い story 環境では失敗して `unknown` (状態不明) の見た目になる。
- *
- * 実際 CI ではこれで落ちた (期待「ログインすると保存できます」/ 実際「保存の状態を
- * 取得できませんでした」)。手元では story の走る順が違って通るので、順番に依存した
- * 見つけにくい壊れ方をする。
- *
- * かつては「自分で消してから描く」で凌いでいたが、それでは**並行して走る別ファイル
- * が消した直後に置き直す**ので直りきらない (F14 の作業中に `Journal/BookmarkButton
- * > Logged Out` が同じ原因で落ちた — 2 回連続実行して 1 回だけ赤)。いまは共有の
- * cookie jar を使うのをやめ、この iframe だけの入れ物に差し替えている
- * (`.storybook/story-cookies.ts`)。他の story が何を置いていても影響を受けない。
+ * story はブラウザの 1 ページを共有して走るので、別の story が置いた cookie が
+ * 残っていることがある。共有の jar を使わず、この iframe だけの入れ物に差し替える
+ * (`.storybook/story-cookies.ts`)。
  */
 export const LoggedOut: Story = {
-  beforeEach: () => isolateCookies(),
+  beforeEach: () => {
+    __resetFavoritesStoreForTest();
+    return isolateCookies();
+  },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await waitFor(async () => {
-      await expect(canvas.getByRole("button")).toHaveTextContent(
-        "ログインすると保存できます"
-      );
+      await expect(canvas.getByRole("button")).toHaveTextContent("この人を保存");
     });
+    await expect(canvas.getByRole("button")).toBeEnabled();
   },
 };
 
@@ -94,22 +92,23 @@ let lastPostBody: Record<string, unknown> | null = null;
 /**
  * **人として保存され、押した結果がそのまま残ること。**
  *
- * 見ているのは 2 つ:
+ * 見ているのは 3 つ:
  *
- * 1. 書き込み要求が `type: "person"` / `targetId: 人の slug` であること
- *    (ここが違うと、保存できたように見えてマイページの「お気に入りの人」に出ない)
- * 2. 遅れて届いた確認応答が、確定した「保存済み」を巻き戻さないこと
- *    (記事の保存ボタンで実際に起きた事故。通し番号のガードが効いているか)
+ * 1. 一覧の取り込みが終わる前でも押せて、**途中の文言が出ない**
+ *    (以前は「保存の状態を確認しています」に差し替わり、幅が変わっていた)
+ * 2. 書き込み要求が `type: "person"` / `targetId: 人の slug` であること
+ * 3. 遅れて届いた取り込み結果が、確定した「保存済み」を巻き戻さないこと
+ *    (記事の保存ボタンで実際に起きた事故)
  */
 export const SavesAsPerson: Story = {
   beforeEach: async () => {
     const originalFetch = window.fetch;
 
+    __resetFavoritesStoreForTest();
     lastPostBody = null;
-    let getCount = 0;
-    let releaseStaleCheck: (() => void) | undefined;
-    const staleCheckLanded = new Promise<void>((resolve) => {
-      releaseStaleCheck = resolve;
+    let releaseListing: (() => void) | undefined;
+    const listingLanded = new Promise<void>((resolve) => {
+      releaseListing = resolve;
     });
 
     // ログイン済みとして扱わせる (部品は cookie だけを見る)。共有の jar を
@@ -122,13 +121,14 @@ export const SavesAsPerson: Story = {
 
       if (url.includes("/api/user/favorites")) {
         if (method === "GET") {
-          getCount += 1;
-          // 1 本目 = マウント時の確認。押下と書き込みが終わるまで着地させない。
-          if (getCount === 1) await staleCheckLanded;
-          return new Response(JSON.stringify({ favorited: false }), {
-            status: 200,
-            headers: { "Content-Type": "application/json" },
-          });
+          // 一覧の取り込み / 1 件の確認。押下と書き込みが終わるまで着地させない。
+          await listingLanded;
+          return new Response(
+            url.includes("check=")
+              ? JSON.stringify({ favorited: false })
+              : JSON.stringify({ favorites: [] }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
         }
         if (method === "POST") {
           lastPostBody = JSON.parse(String(init?.body ?? "{}"));
@@ -140,27 +140,30 @@ export const SavesAsPerson: Story = {
       return new Response("{}", { status: 200 });
     }) as typeof window.fetch;
 
-    // play が終わったら必ず解放する (保留のままだと後続 story を巻き込む)。
-    (window as unknown as { __releaseStaleCheck?: () => void }).__releaseStaleCheck =
-      releaseStaleCheck;
+    (window as unknown as { __releaseListing?: () => void }).__releaseListing =
+      releaseListing;
 
     return () => {
-      releaseStaleCheck?.();
+      releaseListing?.();
       window.fetch = originalFetch;
       restoreCookies();
+      __resetFavoritesStoreForTest();
     };
   },
   play: async ({ canvasElement, step }) => {
     const canvas = within(canvasElement);
     const button = canvas.getByRole("button");
 
-    await step("確認が返る前でもボタンは押せる", async () => {
+    await step("取り込みが返る前でも押せて、途中の文言は出ない", async () => {
       await expect(button).toBeEnabled();
-      await expect(button).toHaveAttribute("data-state", "loading");
+      await expect(button).toHaveTextContent("この人を保存");
+      await expect(button).toHaveAttribute("data-state", "unknown");
       await userEvent.click(button);
     });
 
-    await step("人として保存され「保存済み」で確定する", async () => {
+    await step("取り込みを着地させると、人として保存され確定する", async () => {
+      (window as unknown as { __releaseListing?: () => void }).__releaseListing?.();
+
       await waitFor(async () => {
         await expect(button).toHaveTextContent("保存済み");
       });
@@ -171,10 +174,9 @@ export const SavesAsPerson: Story = {
       });
     });
 
-    await step("遅れていた確認応答が着地しても巻き戻らない", async () => {
-      (window as unknown as { __releaseStaleCheck?: () => void }).__releaseStaleCheck?.();
+    await step("遅れていた取り込み結果が着地しても巻き戻らない", async () => {
       // 着地を処理する猶予を与える (採用されるなら、この間に巻き戻る)。
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      await new Promise((resolve) => setTimeout(resolve, 80));
 
       await expect(button).toHaveTextContent("保存済み");
       await expect(button).toHaveAttribute("aria-pressed", "true");

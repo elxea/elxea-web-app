@@ -3,10 +3,12 @@ import { cookies } from "next/headers";
 import { getLocale, getTranslations } from "next-intl/server";
 
 import { FavoritesBoard } from "@/components/account/favorites-board";
+import { FavoritesSeed } from "@/components/favorites/favorites-seed";
 import { captionClass } from "@/components/editorial/rule-list";
 import { Button } from "@/components/ui/button";
 import { isSignedIn, type AccountAuth } from "@/lib/account-capabilities";
 import {
+  favoriteKey,
   groupFavorites,
   normalizeFavorites,
   type FavoriteGroup,
@@ -91,11 +93,19 @@ export default async function FavoritesPage() {
     );
   }
 
-  const groups: FavoriteGroup[] = groupFavorites(
-    normalizeFavorites(seeded ?? (await loadFavorites()))
-  );
+  const entries = normalizeFavorites(seeded ?? (await loadFavorites()));
+  const groups: FavoriteGroup[] = groupFavorites(entries);
 
-  return <FavoritesBoard groups={groups} />;
+  return (
+    <>
+      {/* 保存トグルへ渡す初期値 (描画はしない)。この画面の一覧はサーバで数えて
+          いるので、同じ事実をブラウザ側の倉庫にも渡しておく。 */}
+      <FavoritesSeed
+        keys={entries.map((entry) => favoriteKey(entry.kind, entry.targetId))}
+      />
+      <FavoritesBoard groups={groups} />
+    </>
+  );
 }
 
 /**

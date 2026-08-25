@@ -152,10 +152,6 @@
     "removedFromBookmarks": "ブックマークから削除しました",
     "bookmarkError": "操作に失敗しました。もう一度お試しください。",
     "loginRequiredForBookmark": "ブックマークに追加するにはログインが必要です。",
-    "bookmarkLoading": "ブックマークの状態を確認しています",
-    "bookmarkLoginRequired": "ログインするとブックマークできます",
-    "bookmarkStatusUnknown": "ブックマークの状態を取得できませんでした。押すともう一度確認します。",
-    "bookmarkStatusRetry": "ブックマークの状態をもう一度確認しています。",
     "featured": "特集",
     "popular": "人気の記事",
     "categories": "カテゴリ",
@@ -364,14 +360,10 @@
     "saveAdd": "この人を保存",
     "saveRemove": "保存をやめる",
     "saveSaved": "保存済み",
-    "saveLoading": "保存の状態を確認しています",
-    "saveLoginRequired": "ログインすると保存できます",
-    "saveStatusUnknown": "保存の状態を取得できませんでした。押すともう一度確認します。",
     "saveAddedMessage": "マイページに保存しました",
     "saveRemovedMessage": "保存をやめました",
     "saveErrorMessage": "操作に失敗しました。もう一度お試しください。",
-    "saveLoginRequiredMessage": "保存するにはログインが必要です。",
-    "saveStatusRetryMessage": "保存の状態をもう一度確認しています。"
+    "saveLoginRequiredMessage": "保存するにはログインが必要です。"
   },
   "farmer": {
     "heading": "茶畑をたずねて",

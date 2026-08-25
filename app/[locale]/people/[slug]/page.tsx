@@ -325,14 +325,10 @@ export default async function PeoplePage({
               add: t("saveAdd"),
               remove: t("saveRemove"),
               saved: t("saveSaved"),
-              loading: t("saveLoading"),
-              loginRequired: t("saveLoginRequired"),
-              statusUnknown: t("saveStatusUnknown"),
               added: t("saveAddedMessage"),
               removed: t("saveRemovedMessage"),
               error: t("saveErrorMessage"),
               loginRequiredMessage: t("saveLoginRequiredMessage"),
-              statusRetry: t("saveStatusRetryMessage"),
             }}
           />
         }
