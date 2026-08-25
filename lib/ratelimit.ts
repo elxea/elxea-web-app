@@ -13,6 +13,20 @@
  * contact-form) through Upstash. High-volume non-critical limiters
  * (public-read) stay in-memory to avoid burning the command budget.
  *
+ * ## Failure semantics
+ *
+ * When Upstash is unreachable the limiter **degrades to the in-memory
+ * backend** rather than failing open. Per-instance counting is weaker than
+ * shared counting, but it is strictly better than serving with no gate at
+ * all — which is what a bare fail-open does on a *sustained* outage (e.g.
+ * the Redis instance being deleted, leaving the hostname NXDOMAIN).
+ *
+ * A circuit breaker stops re-dialing a known-dead Upstash on every request:
+ * after `UPSTASH_FAILURE_THRESHOLD` consecutive failures the breaker opens
+ * for `UPSTASH_COOLDOWN_MS`, during which requests go straight to memory.
+ * After the cooldown a single half-open probe decides whether to close.
+ * Without this, every authed/contact request pays a failed DNS lookup.
+ *
  * ## Semantics note
  *
  * `@upstash/ratelimit`'s `slidingWindow` is an **approximated** sliding
@@ -90,6 +104,27 @@ const redis = USE_UPSTASH
 
 const upstashLimiters = new Map<string, Ratelimit>();
 
+/**
+ * Minimal surface the enforcement path needs from an Upstash limiter.
+ * Declared structurally so tests can substitute a fake without pulling in
+ * the real `Ratelimit` class.
+ */
+export interface UpstashLike {
+  limit(key: string): Promise<{
+    success: boolean;
+    remaining: number;
+    reset: number;
+  }>;
+}
+
+/**
+ * Indirection point for the Upstash limiter lookup. Production uses
+ * `getUpstashLimiter`; tests swap this to exercise the failure/degradation
+ * path without a live Redis. See `__setUpstashResolverForTests`.
+ */
+let resolveUpstash: (limiter: Ratelimiter) => UpstashLike | null =
+  getUpstashLimiter;
+
 function getUpstashLimiter(limiter: Ratelimiter): Ratelimit | null {
   if (!redis) return null;
   let inst = upstashLimiters.get(limiter.name);
@@ -131,6 +166,72 @@ export function millisecondsToDuration(
     return `${ms / (60 * 60 * 1000)} h` as const;
   if (ms % (60 * 1000) === 0) return `${ms / (60 * 1000)} m` as const;
   return `${Math.round(ms / 1000)} s` as const;
+}
+
+// ---------------------------------------------------------------------------
+// Upstash circuit breaker
+// ---------------------------------------------------------------------------
+
+/** Consecutive failures before the breaker opens. */
+const UPSTASH_FAILURE_THRESHOLD = 3;
+/** How long the breaker stays open before allowing a half-open probe. */
+const UPSTASH_COOLDOWN_MS = 30_000;
+
+let upstashConsecutiveFailures = 0;
+/** Epoch ms until which the breaker is open. `0` means closed. */
+let upstashOpenUntil = 0;
+let upstashHalfOpen = false;
+/** Ensures one Sentry event per outage per instance, not one per request. */
+let upstashOutageReported = false;
+
+/** True when the enforcement path may attempt Upstash. */
+function upstashCircuitAllows(): boolean {
+  if (upstashOpenUntil === 0) return true;
+  if (Date.now() < upstashOpenUntil) return false;
+  // Cooldown elapsed: let exactly one request through as a probe.
+  upstashHalfOpen = true;
+  return true;
+}
+
+function onUpstashSuccess(): void {
+  if (upstashOutageReported) {
+    console.log(
+      `[ratelimit] Upstash reachable again; resuming shared counters.`
+    );
+  }
+  upstashConsecutiveFailures = 0;
+  upstashOpenUntil = 0;
+  upstashHalfOpen = false;
+  upstashOutageReported = false;
+}
+
+function onUpstashFailure(
+  limiter: Ratelimiter,
+  keyHash: string,
+  err: unknown
+): void {
+  upstashConsecutiveFailures += 1;
+  const wasHalfOpen = upstashHalfOpen;
+  upstashHalfOpen = false;
+
+  // A failed half-open probe re-opens immediately; otherwise wait for the
+  // threshold so a single transient blip does not disable shared counting.
+  if (wasHalfOpen || upstashConsecutiveFailures >= UPSTASH_FAILURE_THRESHOLD) {
+    upstashOpenUntil = Date.now() + UPSTASH_COOLDOWN_MS;
+  }
+
+  if (!upstashOutageReported) {
+    upstashOutageReported = true;
+    console.error(
+      `[ratelimit] Upstash limit() failed for ${limiter.name}:${keyHash}; ` +
+        `degrading to in-memory counters (per-instance).`,
+      err
+    );
+    Sentry.captureException(err, {
+      tags: { subsystem: "ratelimit", limiter: limiter.name },
+      extra: { keyHash, degradedTo: "memory" },
+    });
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -291,54 +392,56 @@ function hashKey(key: string): string {
  * NextResponse with Retry-After + RateLimit-* headers. On success, returns
  * null (the caller should continue handling).
  *
- * Upstash errors fail open: rate limiting is defensive, and 503ing
- * legitimate traffic on transient Redis unavailability is worse than
- * temporarily serving without the gate. Errors are reported to Sentry so
- * sustained Upstash outages are visible to ops.
+ * Upstash errors do **not** fail open. Rate limiting is defensive, so 503ing
+ * legitimate traffic on transient Redis unavailability would be wrong — but
+ * so is dropping the gate entirely. Instead the request falls through to the
+ * in-memory backend, which still bounds a single caller per instance. Errors
+ * are reported to Sentry (once per outage per instance) so sustained Upstash
+ * outages stay visible to ops.
  */
 export async function enforceRateLimit(
   _request: NextRequest,
   limiter: Ratelimiter,
   key: string
 ): Promise<NextResponse | null> {
-  let ok: boolean;
-  let remaining: number;
-  let reset: number; // unix seconds
-  let retryAfter: number; // seconds until retry succeeds
-
   // Default to "memory" when backend is unspecified (backwards compat).
   const backend = limiter.backend ?? "memory";
-  const upstash = backend === "upstash" ? getUpstashLimiter(limiter) : null;
+  const upstash =
+    backend === "upstash" && upstashCircuitAllows()
+      ? resolveUpstash(limiter)
+      : null;
+
+  let outcome: {
+    ok: boolean;
+    remaining: number;
+    reset: number; // unix seconds
+    retryAfter: number; // seconds until retry succeeds
+  } | null = null;
 
   if (upstash) {
     try {
       const result = await upstash.limit(key);
-      ok = result.success;
-      remaining = result.remaining;
-      reset = Math.ceil(result.reset / 1000);
-      retryAfter = ok
-        ? 0
-        : Math.max(1, Math.ceil((result.reset - Date.now()) / 1000));
+      onUpstashSuccess();
+      outcome = {
+        ok: result.success,
+        remaining: result.remaining,
+        reset: Math.ceil(result.reset / 1000),
+        retryAfter: result.success
+          ? 0
+          : Math.max(1, Math.ceil((result.reset - Date.now()) / 1000)),
+      };
     } catch (err) {
-      const hashed = hashKey(key);
-      console.error(
-        `[ratelimit] Upstash limit() failed for ${limiter.name}:${hashed}; failing open.`,
-        err
-      );
-      Sentry.captureException(err, {
-        tags: { subsystem: "ratelimit", limiter: limiter.name },
-        extra: { keyHash: hashed },
-      });
-      return null;
+      onUpstashFailure(limiter, hashKey(key), err);
+      // Fall through to the in-memory backend below.
     }
-  } else {
-    maybeCleanup();
-    const result = consume(limiter, key);
-    ok = result.ok;
-    remaining = result.remaining;
-    reset = result.reset;
-    retryAfter = result.retryAfter;
   }
+
+  if (!outcome) {
+    maybeCleanup();
+    outcome = consume(limiter, key);
+  }
+
+  const { ok, remaining, reset, retryAfter } = outcome;
 
   if (ok) return null;
 
@@ -357,6 +460,41 @@ export async function enforceRateLimit(
       },
     }
   );
+}
+
+// ---------------------------------------------------------------------------
+// Test-only hooks
+// ---------------------------------------------------------------------------
+
+/**
+ * Substitute the Upstash limiter lookup. Pass `null` to restore the real one.
+ * Test-only: production code must never call this.
+ */
+export function __setUpstashResolverForTests(
+  fn: ((limiter: Ratelimiter) => UpstashLike | null) | null
+): void {
+  resolveUpstash = fn ?? getUpstashLimiter;
+}
+
+/** Reset circuit-breaker state between tests. Test-only. */
+export function __resetUpstashCircuitForTests(): void {
+  upstashConsecutiveFailures = 0;
+  upstashOpenUntil = 0;
+  upstashHalfOpen = false;
+  upstashOutageReported = false;
+}
+
+/** Inspect circuit-breaker state. Test-only. */
+export function __getUpstashCircuitStateForTests(): {
+  consecutiveFailures: number;
+  open: boolean;
+  outageReported: boolean;
+} {
+  return {
+    consecutiveFailures: upstashConsecutiveFailures,
+    open: upstashOpenUntil !== 0 && Date.now() < upstashOpenUntil,
+    outageReported: upstashOutageReported,
+  };
 }
 
 // Startup signal. Log once so ops knows which backend is active per
