@@ -149,36 +149,31 @@ test.describe("Community API — Unauthenticated", () => {
   });
 
   // ---------------------------------------------------------------------------
-  // Follows API
+  // Follows API — 廃止済み (J-5)
+  //
+  // 農家は「フォロー」ではなく「お気に入り」の 4 分類目 (`type: "farmer"`) に
+  // なったので、`/api/user/follows` は無い。受け口が 1 本になったことを縛る
+  // (復活すると、農家だけ別の動詞・別のコレクションに戻る)。
   // ---------------------------------------------------------------------------
-  test("GET /api/user/follows returns 401 without auth", async ({
+  test("/api/user/follows はもう無い (お気に入りへ統合・J-5)", async ({
     request,
   }) => {
-    const res = await request.get("/api/user/follows");
-    expect(res.status()).toBe(401);
+    for (const res of [
+      await request.get("/api/user/follows"),
+      await request.post("/api/user/follows", { data: { farmerSlug: "x" } }),
+      await request.delete("/api/user/follows", { data: { farmerSlug: "x" } }),
+    ]) {
+      /* 401 だと「認証すれば使える受け口」がまだある = 撤去が中途半端。
+         404 (ルート自体が無い) であることを見る。 */
+      expect(res.status()).toBe(404);
+    }
   });
 
-  test("POST /api/user/follows returns 401 without auth", async ({
-    request,
-  }) => {
-    const res = await request.post("/api/user/follows", {
-      data: {
-        farmerSlug: "test-farmer",
-        farmerName: "Test Farmer",
-        farmerImageUrl: null,
-      },
-    });
-    expect(res.status()).toBe(401);
-  });
-
-  test("DELETE /api/user/follows returns 401 without auth", async ({
-    request,
-  }) => {
-    const res = await request.delete("/api/user/follows", {
-      data: { farmerSlug: "test-farmer" },
-    });
-    expect(res.status()).toBe(401);
-  });
+  /* 農家がお気に入りの受け口 (`type: "farmer"`) で通ることは、ここでは見ない。
+     この API は認証をスキーマ検証より先に見るので、未ログインでは種類が何であれ
+     401 になり、`farmer` が受理されるかを区別できない。受け口が種類の正本
+     (`z.enum(FAVORITE_KINDS)`) から導かれていることは
+     `__tests__/account-favorites.test.ts` が縛る。 */
 
   // ---------------------------------------------------------------------------
   // Events API
