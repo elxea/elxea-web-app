@@ -337,6 +337,46 @@ test.describe.serial("LINE ログイン・メール連携・合体", () => {
     expect(await listFavoriteTitles(page)).toContain("ステップ1の茶");
   });
 
+  /**
+   * ①' 未連携のマイページに、連携の入口は **1 つだけ**。
+   *
+   * ## 塞ぐ穴
+   *
+   * LINE だけでログインしている人は、Shopify の顧客トークンが要る 3 項目 (定期便・
+   * 注文履歴・お支払い方法) が同時に locked になる。以前はその 3 枚のカードが
+   * 1 枚ずつ「メールアドレスでログイン」の導線を持っていたため、画面末尾の
+   * `LineLinkageEntry` と合わせて **同じ入口が 1 画面に 4 本** 並んでいた
+   * (Setaka 実機指摘 2026-08-25「連携する箇所って 1 箇所だけでいい。3 箇所ぐらい
+   * ある。使いにくい」)。
+   *
+   * 数は目で見ないと戻る。カタログに Shopify が要る項目を 1 つ足すと、locked カードに
+   * 導線を復活させたくなる誘惑がその瞬間に生まれるので、ここで本数を固定する。
+   */
+  test("①' 未連携のマイページに、連携の入口は 1 つだけ", async ({ page, request }) => {
+    const user = { userId: lineUserId("step1b"), displayName: "ステップ1B太郎" };
+    await control(request).setLineUser(user);
+
+    await loginWithLine(page);
+    await page.goto("/ja/account");
+
+    const main = page.locator("main");
+
+    /* 連携の節そのものは必ず 1 つある (0 でも 2 でもない)。 */
+    await expect(main.getByTestId("line-linkage-entry")).toHaveCount(1);
+    await expect(main.getByTestId("line-linkage-one-tap-cta")).toHaveCount(1);
+
+    /* 使えない項目のカードは残っている (項目ごと消すと存在が見えなくなる)。
+       ただし **行動リンクは持たない** — 行動は上の 1 か所に集約した。 */
+    await expect(main.locator('[data-slot="account-locked-card"]')).not.toHaveCount(0);
+    await expect(main.locator('[data-slot="account-locked-action"]')).toHaveCount(0);
+
+    /* 本文中で連携・ログインを始めるリンクの総数。ヘッダー / フッターは main の外。 */
+    await expect(
+      main.locator('a[href*="/api/user/line-link/"], a[href*="/api/auth/login"]'),
+      "マイページに連携・ログインの入口が 1 本より多い",
+    ).toHaveCount(1);
+  });
+
   test("② メールでログインし、マイページから LINE を連携できる", async ({ page, request }) => {
     const user = { userId: lineUserId("step2"), displayName: "ステップ2太郎" };
     const customer = { id: "9002", email: "step2@example.test" };

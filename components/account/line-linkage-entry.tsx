@@ -131,6 +131,22 @@ const COPY = {
 type Locale = keyof typeof COPY;
 
 /**
+ * 説明文とボタンを並べる 1 行。**SP では縦に積む**。
+ *
+ * ここは以前 `flex items-start justify-between gap-6` の 1 通りだけで、幅の狭い
+ * 端末でも横並びのままだった。ボタンは `shrink-0` なので縮まず、余りが全部
+ * 説明文に押し付けられて、SP 390 では本文が 1 行 10 文字ほどの細い柱になっていた
+ * (実測 2026-08-25)。この節はマイページで連携の話をする唯一の場所になったので、
+ * ここが読めないと連携の説明そのものが読めない。
+ *
+ * 折り返しの breakpoint と積み方はマイページの `AccountOpsBand`
+ * (`components/account/account-parts.tsx`) と同じ `lg:` に揃える — 同じ画面の中で
+ * 帯ごとに折り返し幅が違うと、横幅を変えたときに節の順にガタつく。
+ */
+const ENTRY_ROW =
+  "flex flex-col items-start gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-6";
+
+/**
  * @param status 連携状態（P1）。`linked` は 3 値。
  *   - `true`  … 連携済み。日付を出し、連携ボタンは出さない
  *   - `false` … 未連携。従来どおり連携ボタンを出す
@@ -225,7 +241,7 @@ export function LineLinkageEntry({
       <AccountPanelSection title={t.linkedHeading} testId="line-linkage-entry">
         <div className="space-y-2">
           {notice}
-          <div className="flex items-start justify-between gap-6">
+          <div className={ENTRY_ROW}>
             <p
               className="text-sm text-muted-foreground leading-relaxed"
               data-testid="line-linkage-linked"
@@ -272,7 +288,7 @@ export function LineLinkageEntry({
               {t.statusUnknownNoCta}
             </p>
           ) : null}
-          <div className="flex items-start justify-between gap-6">
+          <div className={ENTRY_ROW}>
             <p className="text-sm text-muted-foreground leading-relaxed">
               {t.oneTapDescription}
             </p>
@@ -310,7 +326,7 @@ export function LineLinkageEntry({
             {t.statusUnknown}
           </p>
         ) : null}
-        <div className="flex items-start justify-between gap-6">
+        <div className={ENTRY_ROW}>
           <p className="text-sm text-muted-foreground leading-relaxed">
             {t.description}
           </p>

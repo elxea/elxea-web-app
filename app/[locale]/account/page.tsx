@@ -38,7 +38,6 @@ import {
 } from "@/lib/account-favorites";
 import {
   ACCOUNT_SECTION_ORDER,
-  accountActionHref,
   isAvailable,
   isSignedIn,
   splitSectionItems,
@@ -77,7 +76,15 @@ export async function generateMetadata(): Promise<Metadata> {
  *   4. お気に入り          商品 / 読みもの / 人 / 農家を分類ごとに全件 + 解除
  *   5. これまで            注文履歴 (RecordCard)
  *   6. お支払い方法        ご登録のカード (PaymentMethodCard) + 変更は外部リンク 1 本
- *   7. AccountOpsBand      契約・お支払い・お届け先の案内 + CTA
+ *   7. LINE 連携           連携状態 + 入口 or 解除 (LineLinkageEntry)
+ *   8. AccountOpsBand      契約・お支払い・お届け先の案内 + CTA
+ *
+ * ## 連携の入口はこの画面に 1 つだけ (F16)
+ *
+ * 連携・ログインを促す導線は 7 の `LineLinkageEntry` **だけ** が持つ。使えない項目の
+ * カード (`AccountLockedCard`) は理由だけを言い、行動リンクを持たない。以前は
+ * Shopify が要る 3 項目それぞれが同じ導線を 1 本ずつ持っていたため、LINE だけで
+ * 使っている人の画面に同じ入口が 4 本並んでいた (Setaka 実機指摘 2026-08-25)。
  *
  * ## ログイン経路で画面を切り替えない
  *
@@ -224,24 +231,36 @@ export default async function AccountPage({
 
   const recordDate = (record: AccountRecord) => formatRecordDate(record.date, locale);
 
-  /** 使えない項目 1 件をグレーのカードにする。文言も行き先もカタログ経由。
+  /** 使えない項目 1 件をグレーのカードにする。**理由だけを言い、行動は持たない。**
    *
-   * 行き先をここで組み立てない — 以前は `lockedActionKey` が何であっても
-   * `/api/auth/login` に直書きで送っていた (as-is D-18)。ラベルと行き先は
-   * カタログで対になっており、URL への変換は `accountActionHref` の 1 箇所だけ。 */
+   * ## なぜ行動リンクを外したか (連携の入口は 1 つ / F16)
+   *
+   * Shopify の顧客トークンが要る項目は 3 つある (定期便・注文履歴・お支払い方法)。
+   * LINE だけでログインしている人にはその 3 つが同時に locked になるので、以前は
+   * **同じ導線が 1 画面に 3 本並んでいた** — 文言も行き先も 1 文字違わず同じ
+   * (`connectShopifyButton` → `/api/auth/login`)。加えて画面末尾の
+   * `LineLinkageEntry` にも入口があるので、実測で 1 画面に 4 本 (Setaka 実機指摘
+   * 2026-08-25「連携する箇所って 1 箇所だけでいい。3 箇所ぐらいある。使いにくい」)。
+   *
+   * しかも 3 本のほうは **劣ったコピー** だった。行き先の `/api/auth/login` は
+   * Shopify にログインさせるだけで連携は起こさない (だから J-1 案B でラベルから
+   * 「連携」を外した経緯がある) のに対し、`LineLinkageEntry` のワンタップ
+   * (`/api/user/line-link/intent`, J-1 案A) は戻ってきた時点で台帳に行が立つ。
+   * 残すなら後者で、消えるのは前者。ワンタップの決裁済みフローは触っていない
+   * (入口が 1 つになるだけ)。
+   *
+   * カードそのものは消さない。「なぜ今これが見えないのか」をその場で言う役目は
+   * 変わらず要る (項目を消すと、存在自体が見えなくなる)。理由だけを残し、
+   * 「では何をすればよいか」は画面に 1 つだけある入口が引き受ける。
+   *
+   * カタログの `lockedAction` は残してある — 定期便の専用ページ
+   * (`/account/subscriptions`) は 1 画面 1 項目で重複が起きず、そこでは行動を
+   * 出すのが正しいため。`lockedActionFor("subscriptions")` がそれを引く唯一の口。 */
   const lockedCard = (item: AccountItem) => (
     <AccountLockedCard
       key={item.id}
       title={t(item.lockedTitleKey)}
       reason={t(item.lockedReasonKey)}
-      action={
-        item.lockedAction
-          ? {
-              label: t(item.lockedAction.labelKey),
-              href: accountActionHref(item.lockedAction.target, locale),
-            }
-          : undefined
-      }
     />
   );
 
@@ -420,15 +439,9 @@ export default async function AccountPage({
         <div key={section}>{sections[section]}</div>
       ))}
 
-      {/* 8. 末尾の案内帯。定期便を触れない人に「管理する」ボタンは出さない
-          (押した先で「連携が必要です」に当たるだけなので)。 */}
-      <AccountOpsBand note={t("opsNote")}>
-        {isAvailable("subscriptions", auth) ? (
-          <AccountCta label={t("manageSubscription")} href="/account/subscriptions" />
-        ) : null}
-      </AccountOpsBand>
+      {/* 8. LINE 連携 —— **この画面で連携の話をする唯一の場所** (F16)。
 
-      {/* LINE 連携エントリ (Web 側導線 / Phase 2 + 連携状態表示 / P1 + LINE ログイン中の
+          LINE 連携エントリ (Web 側導線 / Phase 2 + 連携状態表示 / P1 + LINE ログイン中の
           解除導線 / A 案)。**ログイン経路で節ごと消さない** — 以前はここが `auth.shopify`
           だったため、LINE で入っている人は連携済みでも解除に到達できなかった。
 
@@ -436,7 +449,19 @@ export default async function AccountPage({
           以前は「LINE セッションで未連携」のときだけ節ごと畳んでいた (`hidden`) が、
           その結果 LINE だけで使っている人のマイページに連携の入口が 1 つも無かった。
           何をどう出すかの判断は 1 か所 (`resolveLineLinkageEntryMode`) が持ち、
-          ここは枠を置くだけにする。 */}
+          ここは枠を置くだけにする。
+
+          ## なぜここ (お支払い方法の下・締めの案内帯の上) なのか
+
+          連携の入口は **状態と対で置く**。この節は「連携済みか / いつからか / 解除」を
+          同時に持つ唯一の節で、状態を出せない場所 (locked カード) に入口だけを置くと、
+          連携済みの人にも同じボタンが見える or 状態が 2 か所に分かれてずれる。
+
+          位置は「アカウントの設定ゾーン」に寄せた。ページ冒頭のバナーにはしない
+          (押し売りにしない・確定版 Figma の節構成を頭から崩さない)。末尾の案内帯
+          (`AccountOpsBand`) は締めの一言なので、その **上** に置いて設定ゾーンを
+          連続させる。以前はこの節が案内帯の後ろに独りで置かれていて、締めたあとに
+          もう 1 節続く読み味になっていた。 */}
       <div className="page-container">
         <LineLinkageEntry
           locale={locale}
@@ -445,6 +470,14 @@ export default async function AccountPage({
           canLink={auth.shopify}
         />
       </div>
+
+      {/* 9. 末尾の案内帯。定期便を触れない人に「管理する」ボタンは出さない
+          (押した先で「連携が必要です」に当たるだけなので)。 */}
+      <AccountOpsBand note={t("opsNote")}>
+        {isAvailable("subscriptions", auth) ? (
+          <AccountCta label={t("manageSubscription")} href="/account/subscriptions" />
+        ) : null}
+      </AccountOpsBand>
     </>
   );
 }

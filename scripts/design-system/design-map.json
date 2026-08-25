@@ -932,7 +932,7 @@
       "figma_name": "マイページ (トップ) / R2: 確定版",
       "code_path": "app/[locale]/account/page.tsx",
       "kind": "module",
-      "notes": "【R2: 確定版】マイページの section。PC 8095:733 / SP 8095:792。7 ブロック (TitleBlock / GreetingBand / これから / 続き / これまで / お支払い方法 / OpsBand) を組む。部品は components/account/account-parts.tsx。"
+      "notes": "【R2: 確定版】マイページの section。PC 8095:733 / SP 8095:792。8 ブロック (TitleBlock / GreetingBand / これから / お気に入り / これまで / お支払い方法 / LINE連携 / OpsBand) を組む。部品は components/account/account-parts.tsx。F16: 連携・ログインの導線はこの画面に 1 本だけ (LINE連携ブロック)。使えない項目の AccountLockedCard は理由だけを出し行動リンクを持たない (以前は Shopify が要る 3 項目それぞれが同じ導線を持ち、末尾の LINE連携と合わせて 1 画面に 4 本並んでいた)。"
     },
     {
       "figma_node_id": "8095:735",
