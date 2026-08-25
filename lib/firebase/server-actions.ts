@@ -3,6 +3,10 @@
  * These are called from API routes (not directly from client components).
  */
 import { FieldValue, type Query } from "firebase-admin/firestore";
+import {
+  favoriteDocId,
+  partitionFavoriteDuplicates,
+} from "@/lib/account-favorites";
 import { getAdminFirestore } from "./admin";
 import { COLLECTIONS, favoritesCol, followsCol, eventRegistrationsCol, behaviorLogCol, userDoc } from "./collections";
 import type {
@@ -20,6 +24,18 @@ const COMMENT_MAX_LENGTH = 500;
 // Favorites
 // ---------------------------------------------------------------------------
 
+/**
+ * お気に入りを 1 件保存する。
+ *
+ * 書き込み先のドキュメント ID は内容から決まる (`favoriteDocId`)。同じものを
+ * 同時に 2 回書いても**同じ 1 ドキュメントを上書きする**だけなので、重複が
+ * 生まれる余地が無い。以前の「問い合わせて無ければ `add()`」は、その 2 手の
+ * あいだに割り込まれると 2 件できる形だった (F16 の原因)。
+ *
+ * 問い合わせ自体は残す。ID が自動採番だった時代に書かれた既存のドキュメントは
+ * 内容でしか見つけられず、それを見ずに新しい ID で書くと**古い 1 件 + 新しい
+ * 1 件**でかえって増えるため。
+ */
 export async function addFavorite(
   customerId: string,
   data: {
@@ -32,7 +48,7 @@ export async function addFavorite(
   const db = getAdminFirestore();
   const colPath = favoritesCol(customerId);
 
-  // Check for duplicate (same type + targetId)
+  // 旧採番 (自動 ID) で既に入っていないか。内容でしか照合できない。
   const existing = await db
     .collection(colPath)
     .where("type", "==", data.type)
@@ -44,14 +60,22 @@ export async function addFavorite(
     return { success: true, action: "already_exists" as const };
   }
 
-  const docRef = await db.collection(colPath).add({
-    ...data,
-    createdAt: new Date(),
-  });
+  const docId = favoriteDocId(data.type, data.targetId);
+  await db
+    .collection(colPath)
+    .doc(docId)
+    .set({ ...data, createdAt: new Date() });
 
-  return { success: true, action: "created" as const, id: docRef.id };
+  return { success: true, action: "created" as const, id: docId };
 }
 
+/**
+ * お気に入りを解除する。**一致するものは全部消す**。
+ *
+ * 1 件だけ消していたころは、棚に重複が残っていると解除しても片割れが残り、
+ * 画面を開き直すと「消したはずのものが戻ってくる」ように見えた。解除の意思は
+ * 「この記事を保存しない」であって「このドキュメントを 1 つ消す」ではない。
+ */
 export async function removeFavorite(
   customerId: string,
   type: FavoriteType,
@@ -64,17 +88,29 @@ export async function removeFavorite(
     .collection(colPath)
     .where("type", "==", type)
     .where("targetId", "==", targetId)
-    .limit(1)
     .get();
 
   if (snapshot.empty) {
     return { success: true, action: "not_found" as const };
   }
 
-  await snapshot.docs[0].ref.delete();
-  return { success: true, action: "removed" as const };
+  for (const doc of snapshot.docs) {
+    await doc.ref.delete();
+  }
+  return { success: true, action: "removed" as const, removed: snapshot.docs.length };
 }
 
+/**
+ * お気に入りの一覧。**読むついでに棚の重複を片付ける**。
+ *
+ * 書き込み側を一意キーに直しても、それ以前に作られた重複は棚に残ったままで、
+ * 放っておくと利用者にはいつまでも 2 件に見える。持ち主が自分のマイページを
+ * 開いた瞬間に、その人の棚だけを直す。件数が極小 (数十件) なので読み出しへの
+ * 影響は無視でき、重複が無ければ書き込みは 1 件も起きない。
+ *
+ * 片付けに失敗しても読み出しは成功させる (画面は `partitionFavoriteDuplicates`
+ * が返した「残す側」だけを見るので、棚が直らなくても 2 件には見えない)。
+ */
 export async function getFavorites(customerId: string, type?: FavoriteType) {
   const db = getAdminFirestore();
   const colPath = favoritesCol(customerId);
@@ -87,11 +123,28 @@ export async function getFavorites(customerId: string, type?: FavoriteType) {
   query = query.orderBy("createdAt", "desc");
 
   const snapshot = await query.get();
-  return snapshot.docs.map((doc) => ({
+  const rows = snapshot.docs.map((doc) => ({
     id: doc.id,
     ...doc.data(),
     createdAt: doc.data().createdAt?.toDate?.()?.toISOString() ?? null,
   }));
+
+  const { kept, duplicates } = partitionFavoriteDuplicates(rows);
+
+  if (duplicates.length > 0) {
+    try {
+      for (const duplicate of duplicates) {
+        await db.collection(colPath).doc(duplicate.id).delete();
+      }
+      console.warn(
+        `[favorites] removed ${duplicates.length} duplicate document(s) while reading a favorites shelf`,
+      );
+    } catch (err) {
+      console.error("[favorites] duplicate cleanup failed:", err);
+    }
+  }
+
+  return kept;
 }
 
 export async function isFavorited(
