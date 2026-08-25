@@ -1,72 +1,14 @@
 /**
- * Tests for the cart optimistic reducer logic.
+ * カートの楽観更新の規則のテスト。
  *
- * The reducer is defined inside cart-context.tsx as `cartReducer`.
- * Since it is not exported, we replicate the logic here to test
- * the same algorithm without importing React components.
+ * **実体をそのまま読む** (`components/cart/cart-reducer.ts`)。以前はここに同じ
+ * 規則の写しを置き「手で同期する」運用にしていたが、写しは実体と一緒にずれる。
+ * 実際「カートがまだ無いときの 1 個目」を捨てる不具合は写しにも同じように
+ * 書かれていたので、テストは緑のまま本番だけが 8.9 秒無言だった (監査 P1-1)。
  */
 import { describe, it, expect } from "vitest";
 import type { Cart, CartItem } from "@/lib/shopify/types";
-
-type CartAction =
-  | { type: "ADD"; item: CartItem }
-  | { type: "UPDATE"; lineId: string; quantity: number }
-  | { type: "REMOVE"; lineId: string };
-
-/**
- * Replica of cartReducer from cart-context.tsx.
- * Kept in sync manually — any divergence indicates a regression.
- */
-function cartReducer(state: Cart | null, action: CartAction): Cart | null {
-  if (!state) return state;
-
-  switch (action.type) {
-    case "ADD": {
-      const existingLine = state.lines.find(
-        (l) => l.merchandise.id === action.item.merchandise.id,
-      );
-      if (existingLine) {
-        return {
-          ...state,
-          totalQuantity: state.totalQuantity + action.item.quantity,
-          lines: state.lines.map((l) =>
-            l.id === existingLine.id
-              ? { ...l, quantity: l.quantity + action.item.quantity }
-              : l,
-          ),
-        };
-      }
-      return {
-        ...state,
-        totalQuantity: state.totalQuantity + action.item.quantity,
-        lines: [...state.lines, action.item],
-      };
-    }
-    case "UPDATE": {
-      const line = state.lines.find((l) => l.id === action.lineId);
-      if (!line) return state;
-      const diff = action.quantity - line.quantity;
-      return {
-        ...state,
-        totalQuantity: state.totalQuantity + diff,
-        lines: state.lines.map((l) =>
-          l.id === action.lineId ? { ...l, quantity: action.quantity } : l,
-        ),
-      };
-    }
-    case "REMOVE": {
-      const removedLine = state.lines.find((l) => l.id === action.lineId);
-      if (!removedLine) return state;
-      return {
-        ...state,
-        totalQuantity: state.totalQuantity - removedLine.quantity,
-        lines: state.lines.filter((l) => l.id !== action.lineId),
-      };
-    }
-    default:
-      return state;
-  }
-}
+import { cartReducer } from "@/components/cart/cart-reducer";
 
 // Helpers
 function makeCartItem(overrides: Partial<CartItem> = {}): CartItem {
@@ -108,8 +50,31 @@ function makeCart(lines: CartItem[] = []): Cart {
 }
 
 describe("cartReducer", () => {
-  it("returns null when state is null", () => {
-    expect(cartReducer(null, { type: "ADD", item: makeCartItem() })).toBeNull();
+  describe("カートがまだ無いとき (初回追加)", () => {
+    it("1 個目でも数が増える (サーバの応答を待たない)", () => {
+      /* 監査 P1-1 の回帰テスト。ここが null を返していたので、1 個目だけ
+         楽観更新が丸ごと捨てられ、ヘッダーのバッジが 8.9 秒動かなかった。 */
+      const item = makeCartItem({ id: "new-line", quantity: 2 });
+      const result = cartReducer(null, { type: "ADD", item });
+
+      expect(result).not.toBeNull();
+      expect(result!.totalQuantity).toBe(2);
+      expect(result!.lines).toHaveLength(1);
+    });
+
+    it("仮のカートは決済 URL を持たない (仮の値で決済へ飛ばさない)", () => {
+      const result = cartReducer(null, { type: "ADD", item: makeCartItem() });
+
+      expect(result!.id).toBe("");
+      expect(result!.checkoutUrl).toBe("");
+    });
+
+    it("UPDATE / REMOVE は何もしない (指す行が存在しない)", () => {
+      expect(
+        cartReducer(null, { type: "UPDATE", lineId: "line-1", quantity: 2 }),
+      ).toBeNull();
+      expect(cartReducer(null, { type: "REMOVE", lineId: "line-1" })).toBeNull();
+    });
   });
 
   describe("ADD", () => {

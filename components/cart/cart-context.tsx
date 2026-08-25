@@ -7,74 +7,30 @@ import {
   useTransition,
   type ReactNode,
 } from "react";
-import type { Cart, CartItem } from "@/lib/shopify/types";
+import type { Cart } from "@/lib/shopify/types";
 import { addItem, updateItem, removeItem } from "@/lib/shopify/cart-actions";
+import { cartReducer, type CartAction } from "./cart-reducer";
 
-type CartAction =
-  | { type: "ADD"; item: CartItem }
-  | { type: "UPDATE"; lineId: string; quantity: number }
-  | { type: "REMOVE"; lineId: string };
+/** 書き込みが着地したかどうか。呼び出し側がその場で知らせ分けるために返す。 */
+export type CartWriteOutcome = "ok" | "failed";
 
 type CartContextType = {
   cart: Cart | null;
   isPending: boolean;
-  addToCart: (merchandiseId: string, quantity?: number, sellingPlanId?: string) => Promise<void>;
-  updateQuantity: (lineId: string, merchandiseId: string, quantity: number) => Promise<void>;
-  removeFromCart: (lineId: string) => Promise<void>;
+  addToCart: (
+    merchandiseId: string,
+    quantity?: number,
+    sellingPlanId?: string,
+  ) => Promise<CartWriteOutcome>;
+  updateQuantity: (
+    lineId: string,
+    merchandiseId: string,
+    quantity: number,
+  ) => Promise<CartWriteOutcome>;
+  removeFromCart: (lineId: string) => Promise<CartWriteOutcome>;
 };
 
 const CartContext = createContext<CartContextType | null>(null);
-
-function cartReducer(state: Cart | null, action: CartAction): Cart | null {
-  if (!state) return state;
-
-  switch (action.type) {
-    case "ADD": {
-      const existingLine = state.lines.find(
-        (l) => l.merchandise.id === action.item.merchandise.id
-      );
-      if (existingLine) {
-        return {
-          ...state,
-          totalQuantity: state.totalQuantity + action.item.quantity,
-          lines: state.lines.map((l) =>
-            l.id === existingLine.id
-              ? { ...l, quantity: l.quantity + action.item.quantity }
-              : l
-          ),
-        };
-      }
-      return {
-        ...state,
-        totalQuantity: state.totalQuantity + action.item.quantity,
-        lines: [...state.lines, action.item],
-      };
-    }
-    case "UPDATE": {
-      const line = state.lines.find((l) => l.id === action.lineId);
-      if (!line) return state;
-      const diff = action.quantity - line.quantity;
-      return {
-        ...state,
-        totalQuantity: state.totalQuantity + diff,
-        lines: state.lines.map((l) =>
-          l.id === action.lineId ? { ...l, quantity: action.quantity } : l
-        ),
-      };
-    }
-    case "REMOVE": {
-      const removedLine = state.lines.find((l) => l.id === action.lineId);
-      if (!removedLine) return state;
-      return {
-        ...state,
-        totalQuantity: state.totalQuantity - removedLine.quantity,
-        lines: state.lines.filter((l) => l.id !== action.lineId),
-      };
-    }
-    default:
-      return state;
-  }
-}
 
 export function CartProvider({
   children,
@@ -89,9 +45,35 @@ export function CartProvider({
   );
   const [isPending, startTransition] = useTransition();
 
-  async function handleAddToCart(merchandiseId: string, quantity = 1, sellingPlanId?: string) {
-    startTransition(async () => {
-      setOptimisticCart({
+  /**
+   * 「先に画面を書き換え、そのあとサーバへ送る」を 1 つの遷移にまとめる。
+   *
+   * `startTransition` は戻り値を返さないので、着地は別の Promise で渡す。
+   * こうしておくと呼び出し側は**押した瞬間に知らせを出し**、ここが `failed` を
+   * 返したときだけ言い直せる — 成功を待ってから知らせる作りだと、1 個目の
+   * 追加では知らせ自体が 8.9 秒遅れて出ていた (監査 P1-1)。
+   */
+  function write(
+    optimistic: CartAction,
+    send: () => Promise<unknown>,
+  ): Promise<CartWriteOutcome> {
+    return new Promise<CartWriteOutcome>((resolve) => {
+      startTransition(async () => {
+        setOptimisticCart(optimistic);
+        try {
+          await send();
+          resolve("ok");
+        } catch (e) {
+          console.error("Cart write failed:", e);
+          resolve("failed");
+        }
+      });
+    });
+  }
+
+  function handleAddToCart(merchandiseId: string, quantity = 1, sellingPlanId?: string) {
+    return write(
+      {
         type: "ADD",
         item: {
           id: `optimistic-${Date.now()}`,
@@ -106,43 +88,26 @@ export function CartProvider({
           cost: { totalAmount: { amount: "0", currencyCode: "JPY" } },
           sellingPlanAllocation: null,
         },
-      });
-      try {
-        await addItem(merchandiseId, quantity, sellingPlanId);
-      } catch (e) {
-        console.error("Failed to add to cart:", e);
-      }
-    });
+      },
+      () => addItem(merchandiseId, quantity, sellingPlanId),
+    );
   }
 
-  async function handleUpdateQuantity(
+  function handleUpdateQuantity(
     lineId: string,
     merchandiseId: string,
     quantity: number
   ) {
-    startTransition(async () => {
-      if (quantity === 0) {
-        setOptimisticCart({ type: "REMOVE", lineId });
-      } else {
-        setOptimisticCart({ type: "UPDATE", lineId, quantity });
-      }
-      try {
-        await updateItem(lineId, merchandiseId, quantity);
-      } catch (e) {
-        console.error("Failed to update cart:", e);
-      }
-    });
+    return write(
+      quantity === 0
+        ? { type: "REMOVE", lineId }
+        : { type: "UPDATE", lineId, quantity },
+      () => updateItem(lineId, merchandiseId, quantity),
+    );
   }
 
-  async function handleRemoveFromCart(lineId: string) {
-    startTransition(async () => {
-      setOptimisticCart({ type: "REMOVE", lineId });
-      try {
-        await removeItem(lineId);
-      } catch (e) {
-        console.error("Failed to remove from cart:", e);
-      }
-    });
+  function handleRemoveFromCart(lineId: string) {
+    return write({ type: "REMOVE", lineId }, () => removeItem(lineId));
   }
 
   return (
