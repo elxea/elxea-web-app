@@ -27,7 +27,7 @@ import {
   articlePagePadding,
 } from "@/components/journal/article-blocks";
 import { Link } from "@/i18n/navigation";
-import { filterOutFictional, isFictionalSlug } from "@/lib/fictional-content";
+import { filterOutFictional } from "@/lib/fictional-content";
 import {
   previewImageForKey,
   previewSeedEnabled,
@@ -188,19 +188,19 @@ export default async function ElxeaJournalDetailPage({
 
   if (!journal) notFound();
 
-  // The journal issue itself is real content, but its referenced tea menus and
-  // playlist can still point at the fictional/seed docs left in the production
-  // dataset. Drop those references at the read layer (no Sanity mutation) so a
-  // real issue never links to invented tea or a placeholder audio track.
+  // The journal issue itself is real content, but its referenced tea menus can
+  // still point at the fictional/seed docs left in the production dataset. Drop
+  // those references at the read layer (no Sanity mutation) so a real issue
+  // never links to invented tea.
+  //
+  // プレイリストは 8/22 に同じ理由で落としていたが、Setaka が 2026-08-26 に
+  // 判断を上書きした (「以前あげた音源を自前プレイヤーで聴けるように戻す」)。
+  // よってここでも素通しする。詳細は lib/fictional-content.ts。
   const journalTeaMenus: typeof journal.teaMenus = filterOutFictional(
     "teaMenu",
     journal.teaMenus,
   );
-  const journalPlaylist =
-    journal.playlist &&
-    !isFictionalSlug("playlist", journal.playlist.slug?.current)
-      ? journal.playlist
-      : null;
+  const journalPlaylist = journal.playlist ?? null;
 
   // Preview-only: production dataset の journal は確定版のフィールドを持たない
   // ため、フラグが立っているときだけ未入力欄を見本で埋めて実寸を確認できる
@@ -357,7 +357,11 @@ export default async function ElxeaJournalDetailPage({
                   }
                   imageAlt={journalPlaylist.title}
                   title={journalPlaylist.title}
-                  meta={journalPlaylist.spotifyUrl ? "Spotify" : undefined}
+                  // 配信サービス名は出さない。elxea は音源を自前プレイヤーで
+                  // 聴かせる方針で、Spotify 等へは上げない (Setaka 2026-08-11 /
+                  // 再確認 2026-08-26)。seed の `spotifyUrl` は実在しない
+                  // example URL なので、あることを根拠に「Spotify」と書くと
+                  // 存在しない配信先を読者に断言することになる。
                   href={`/playlists/${journalPlaylist.slug.current}`}
                   linkLabel={t("teaDetailLink")}
                 />

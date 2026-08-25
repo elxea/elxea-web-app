@@ -14,9 +14,6 @@
  * seed-script output but are equally invented — Setaka confirmed on 2026-08-22
  * that elxea has no real producer profiles published yet, so every farmer doc
  * currently in production is fictional. They are listed below too.
- *                                   playlist (Morning Forest / Rain on Tea Leaves —
- *                                             tracks point at a placeholder bgm.mp3
- *                                             titled "テスト音源")
  *                                   event   (both bodies literally contain "ダミー")
  *
  * These docs describe invented producers, invented tea and invented events that
@@ -36,6 +33,15 @@
  *   - `author` (author-setaka / author-roji): "Setaka" may be a real person, so
  *     these are left visible pending Setaka's confirmation.
  *   - `article` / `journal` seed docs: not confirmed fictional by observation.
+ *   - `playlist` (Morning Forest / Rain on Tea Leaves): these WERE denied here
+ *     between 2026-08-22 and 2026-08-26 because their tracks point at a
+ *     placeholder bgm.mp3 titled "テスト音源". Setaka reversed that call on
+ *     2026-08-26 — the playlists and the self-built SoundCloud-style player are
+ *     what he wants back on the site, and the uploaded audio is the audio he
+ *     means. `playlist` is therefore absent from `FictionalDocType` entirely
+ *     rather than kept as an empty entry, so no read path can quietly re-hide
+ *     it without an explicit type change. Guarded by
+ *     __tests__/fictional-content.test.ts ("playlist is deliberately visible").
  *
  * This module replaces the former `lib/fictional-farmers.ts`. It started out
  * byte-identical for `farmer`; the two 2026-03-07 docs above are the only
@@ -45,7 +51,7 @@
  */
 
 /** Sanity `_type`s that currently have known fictional seed documents. */
-export type FictionalDocType = "farmer" | "teaMenu" | "playlist" | "event";
+export type FictionalDocType = "farmer" | "teaMenu" | "event";
 
 type DenyEntry = { readonly ids: readonly string[]; readonly slugs: readonly string[] };
 
@@ -86,11 +92,6 @@ const FICTIONAL_DOCS: Readonly<Record<FictionalDocType, DenyEntry>> = {
     // scripts/seed-dummy-content.ts — all three teaMenu docs in production are seeds
     ids: ["tea-sencha-spring", "tea-gyokuro", "tea-hojicha"],
     slugs: ["spring-sencha", "uji-gyokuro", "kaga-hojicha"],
-  },
-  playlist: {
-    // scripts/seed-dummy-content.ts — tracks are the placeholder bgm.mp3
-    ids: ["playlist-morning-forest", "playlist-rain-on-leaves"],
-    slugs: ["morning-forest", "rain-on-tea-leaves"],
   },
   event: {
     // scripts/seed-dummy-content.ts — bodies contain the word "ダミー"
