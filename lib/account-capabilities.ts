@@ -185,6 +185,29 @@ export function isSignedIn(auth: AccountAuth): boolean {
   return auth.shopify || auth.line;
 }
 
+/**
+ * マイページの **骨格を描き始めてよいか**。cookie の有無だけで決まる。
+ *
+ * 中身 (`AccountBody`) は Shopify / Firestore / cx-agent への往復を待つので
+ * `<Suspense>` の内側に置いてある。その外側で「そもそもマイページを出す画面か、
+ * ログインを促す画面か」を決めるのがこの判定で、`middleware.ts` の /account
+ * ガードと **同じ cookie・同じ条件** を見る (認証を緩めるものではない)。
+ *
+ * `line` を落としてはいけない: LINE だけでログインしている人は `shop_at` /
+ * `shop_rt` を構造上持たないので、Shopify の cookie だけで判定すると
+ * middleware は通すのに画面だけ「ログインが必要です」に落ちる。
+ *
+ * `previewSeed` は計測用の見本表示 (PREVIEW_SEED=1)。実セッションを持たないので
+ * cookie が 1 つも無くても骨格を出す必要がある。
+ */
+export function canRenderAccountShell(input: {
+  hasShopifySession: boolean;
+  hasLineSession: boolean;
+  previewSeed: boolean;
+}): boolean {
+  return input.hasShopifySession || input.hasLineSession || input.previewSeed;
+}
+
 /** その項目を今の認証状態で使えるか。 */
 export function isItemAvailable(item: AccountItem, auth: AccountAuth): boolean {
   return item.requires === "shopify" ? auth.shopify : isSignedIn(auth);
