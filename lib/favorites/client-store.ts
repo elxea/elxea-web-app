@@ -332,9 +332,25 @@ export function readFavoriteState(
   kind: FavoriteKind,
   targetId: string,
 ): FavoriteState {
+  const key = favoriteKey(kind, targetId);
+
+  /* **自分が押した結果は、一覧が届く前でも確定した事実**。
+   *
+   * これが無いと、一覧の取り込みが遅いあいだに保存した人は「保存できました」の
+   * トーストを見たのに、ボタンは「ブックマークに追加」のまま — 一覧が着くまで
+   * 表示と実状態が食い違い、もう一度押したくなる (監査 P1-2 で見えていた乖離の
+   * 残り。本番実測: 一覧を 10 秒遅らせた条件でラベルの反映が 7,493ms 遅れた)。
+   *
+   * ここで信じるのは楽観更新と同じ約束で、**失敗したら戻す**
+   * (`toggleFavorite` の catch が `localWrites` を押す前の値へ書き戻す)。
+   * しかも cold のまま押されたときは向きを `fetchOne` で確かめてから書いて
+   * いるので、「未登録なのに保存済みと出る」向きの取り違えは起きない。 */
+  const own = localWrites.get(key);
+  if (own) return own.value ? "saved" : "unsaved";
+
   if (current.phase === "signed-out") return "unsaved";
   if (current.phase === "ready") {
-    return current.keys.has(favoriteKey(kind, targetId)) ? "saved" : "unsaved";
+    return current.keys.has(key) ? "saved" : "unsaved";
   }
   /* `cold` (まだ 1 回目が着いていない) / `error` (読めなかった)。
      ここで `unsaved` と言い切ると「登録済みなのに空アイコン」が黙って出る。 */

@@ -220,6 +220,88 @@ describe("押されたとき", () => {
     ).toBe("unsaved");
   });
 
+  it("一覧がまだ届かなくても、自分が保存した結果はその場でボタンに出る", async () => {
+    /* 監査 P1-2 の残り。cold のまま押して保存できたのに、`readFavoriteState` が
+       phase を見て `unknown` を返していたため、ボタンは「保存する」のままだった。
+       本番実測 (一覧を 10 秒遅らせた条件) でラベルの反映が 7,493ms 遅れていた。 */
+    const store = await loadStore();
+
+    let releaseListing: (() => void) | undefined;
+    const listingLanded = new Promise<void>((resolve) => {
+      releaseListing = resolve;
+    });
+
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = (init?.method ?? "GET").toUpperCase();
+      if (method === "GET" && !url.includes("check=")) {
+        await listingLanded; // 一覧はまだ届かない
+        return { ok: true, status: 200, json: async () => ({ favorites: [] }) };
+      }
+      if (url.includes("check=")) {
+        return { ok: true, status: 200, json: async () => ({ favorited: false }) };
+      }
+      return { ok: true, status: 200, json: async () => ({ ok: true }) };
+    }) as unknown as typeof fetch;
+
+    store.ensureFavoritesHydrated();
+
+    // 押す前は「まだ分からない」(登録なしと言い切らない・G3)
+    expect(
+      store.readFavoriteState(store.getFavoritesSnapshot(), "product", "sencha"),
+    ).toBe("unknown");
+
+    const outcome = await store.toggleFavorite({
+      kind: "product",
+      targetId: "sencha",
+      title: "煎茶",
+      imageUrl: null,
+    });
+    expect(outcome).toBe("added");
+
+    // 一覧はまだ届いていないが、自分の書き込みは確定している
+    expect(store.getFavoritesSnapshot().phase).not.toBe("ready");
+    expect(
+      store.readFavoriteState(store.getFavoritesSnapshot(), "product", "sencha"),
+    ).toBe("saved");
+
+    // 押していないものは「まだ分からない」のまま (全部を saved に化けさせない)
+    expect(
+      store.readFavoriteState(store.getFavoritesSnapshot(), "product", "matcha"),
+    ).toBe("unknown");
+
+    releaseListing?.();
+  });
+
+  it("保存に失敗したら、ボタンも押す前に戻る (cold のまま押した場合)", async () => {
+    const store = await loadStore();
+
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = (init?.method ?? "GET").toUpperCase();
+      if (url.includes("check=")) {
+        return { ok: true, status: 200, json: async () => ({ favorited: false }) };
+      }
+      if (method === "POST") return { ok: false, status: 500, json: async () => ({}) };
+      return new Promise(() => {}); // 一覧は永久に届かない
+    }) as unknown as typeof fetch;
+
+    store.ensureFavoritesHydrated();
+
+    const outcome = await store.toggleFavorite({
+      kind: "product",
+      targetId: "sencha",
+      title: "煎茶",
+      imageUrl: null,
+    });
+
+    expect(outcome).toBe("failed");
+    /* 失敗したので「押す前」に戻す。実体は未登録と分かっているので `unsaved`。 */
+    expect(
+      store.readFavoriteState(store.getFavoritesSnapshot(), "product", "sencha"),
+    ).toBe("unsaved");
+  });
+
   it("書き込みの最中に取り込みが着地しても、確定した値を巻き戻さない", async () => {
     const store = await loadStore();
 
