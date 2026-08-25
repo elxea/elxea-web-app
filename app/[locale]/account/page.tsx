@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { cache } from "react";
+import { cache, Suspense } from "react";
 import { cookies } from "next/headers";
 import { getLocale, getTranslations } from "next-intl/server";
 
@@ -54,7 +54,8 @@ import {
 } from "@/lib/account-view";
 import { resolveIdentity } from "@/lib/firebase/auth-guard";
 import { getEventRegistrations, getFavorites } from "@/lib/firebase/server-actions";
-import { seedAccountView } from "@/lib/preview-seed";
+import { previewSeedEnabled, seedAccountView } from "@/lib/preview-seed";
+import { AccountPageSkeleton } from "@/components/account/account-skeleton";
 import type { Customer } from "@/lib/shopify/customer";
 import { getCustomerFromSession, getSubscriptionsFromSession } from "@/lib/shopify/auth";
 import { cn, formatPrice } from "@/lib/utils";
@@ -105,11 +106,95 @@ export async function generateMetadata(): Promise<Metadata> {
  * お届け先・お支払い方法・注文明細は Shopify の顧客アカウントポータルへ 1 本の
  * 外部リンクで送る設計 (AccountOpsBand 8095:788 の本文がそう言っている)。
  */
+/**
+ * ## 画面の骨格は待たずに返す (TTFB / W-B)
+ *
+ * この関数は **cookie しか読まない**。Shopify / Firestore / cx-agent への往復は
+ * すべて `<Suspense>` の内側 (`AccountBody`) に落としてあるので、サーバは見出しと
+ * 骨組みを先に流し、中身は届いた順に差し込む。
+ *
+ * 以前はここで `getCustomerFromSession()` を待ち切ってから HTML を書き始めていた。
+ * Shopify の顧客照会 1 往復がまるごと TTFB に乗るので、実測で 2.2〜3.2 秒のあいだ
+ * **前のページが出たまま何も起きない**状態が続いていた (監査 #5 / 2026-08-25)。
+ * 待ち時間そのものが短くなるわけではないが、待っている場所が「白紙の前」から
+ * 「マイページの骨格の中」に移る。
+ *
+ * ログイン判定をここで cookie だけに落としても認証は緩まない。`middleware.ts` の
+ * /account ガードが見ているのと同じ cookie を、同じ条件で見ているだけで、
+ * **何を出してよいか**の判定 (`AccountAuth`) は従来どおり `AccountBody` の中で
+ * 実データ (`customer`) を得てから行う。ここは「マイページを描き始めてよいか」
+ * だけを決める。
+ */
 export default async function AccountPage({
   searchParams,
 }: {
   /* Next 15+ では searchParams は Promise。連携フローからの復帰結果
      (`?line_link=success|error|conflict|line-conflict`) を受け取るためだけに使う。 */
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const t = await getTranslations("account");
+  const tCommon = await getTranslations("common");
+  const locale = await getLocale();
+  const cookieStore = await cookies();
+
+  /* middleware の /account ガードと同じ cookie・同じ条件。ここを通っても
+     「ログイン済み」と断定はしない (下の AccountBody が実データで確定する)。 */
+  const hasShopifySession =
+    cookieStore.has("shop_at") && cookieStore.has("shop_rt");
+  const hasLineSession = cookieStore.has("line_session");
+
+  /* 計測用の見本 (PREVIEW_SEED=1 のときだけ) は実セッションを持たないので、
+     cookie が 1 つも無くても骨格を出す必要がある。 */
+  if (!hasShopifySession && !hasLineSession && !previewSeedEnabled()) {
+    return (
+      <AccountLoginPrompt
+        title={tCommon("account")}
+        body={t("loginRequired")}
+        loginLabel={tCommon("login")}
+        locale={locale}
+      />
+    );
+  }
+
+  return (
+    <Suspense fallback={<AccountPageSkeleton title={tCommon("account")} loadingLabel={t("loading")} />}>
+      <AccountBody searchParams={searchParams} />
+    </Suspense>
+  );
+}
+
+/** ログインを促す画面。骨格側と本体側の両方が使うので 1 か所に置く。 */
+function AccountLoginPrompt({
+  title,
+  body,
+  loginLabel,
+  locale,
+}: {
+  title: string;
+  body: string;
+  loginLabel: string;
+  locale: string;
+}) {
+  return (
+    <div className="flex min-h-[70vh] items-center justify-center px-4 py-24">
+      <div className="max-w-sm text-center">
+        <h1 className="page-title mb-4 text-foreground">{title}</h1>
+        <p className={cn(captionClass, "mb-8 text-muted-foreground")}>{body}</p>
+        <Button variant="outline" asChild>
+          <a href={`/${locale}/login`}>{loginLabel}</a>
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * マイページの中身。**外部往復はすべてここから下**にある。
+ * 判定・描画の中身は従来と 1 行も変えていない (置き場所だけを Suspense の内側に移した)。
+ */
+async function AccountBody({
+  searchParams,
+}: {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const t = await getTranslations("account");
@@ -147,17 +232,12 @@ export default async function AccountPage({
 
   if (!isSignedIn(auth)) {
     return (
-      <div className="flex min-h-[70vh] items-center justify-center px-4 py-24">
-        <div className="max-w-sm text-center">
-          <h1 className="page-title mb-4 text-foreground">{tCommon("account")}</h1>
-          <p className={cn(captionClass, "mb-8 text-muted-foreground")}>
-            {t("loginRequired")}
-          </p>
-          <Button variant="outline" asChild>
-            <a href={`/${locale}/login`}>{tCommon("login")}</a>
-          </Button>
-        </div>
-      </div>
+      <AccountLoginPrompt
+        title={tCommon("account")}
+        body={t("loginRequired")}
+        loginLabel={tCommon("login")}
+        locale={locale}
+      />
     );
   }
 
