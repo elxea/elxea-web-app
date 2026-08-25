@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 
 import { requireAuth } from "@/lib/firebase/auth-guard";
-import { applyLinkageEstablished } from "@/lib/auth/identity-link";
+import { applyLinkageEstablishedWithinBudget } from "@/lib/auth/linkage-merge-handoff";
 import { getBaseUrl, getRequestOrigin } from "@/lib/base-url";
 import { getCookieSpec, resolveCookieDomain } from "@/lib/auth/cookies";
 import { CX_AGENT_BASE_URL } from "@/lib/chat/proxy";
@@ -51,8 +51,37 @@ import {
  *
  * token 交換の client_secret も cx-agent の `SYNC_API_SECRET` も **サーバ環境変数のみ**。
  * ブラウザには一切出さない。LINE の userId もクエリや cookie に出さない（P1 の最小開示と同じ）。
+ *
+ * ## 所要時間は必ず内訳ごと残す（2026-08-25）
+ *
+ * この route は成功したとき **何も記録していなかった**。そのため本番で
+ * 「認可のあと真っ白な画面が続く」と報告されたとき、どの段が遅いのかを
+ * 手元から知る方法が無く、Vercel の request log にある関数全体の 20.1 秒
+ * （hot start）という 1 つの数字から先へ進めなかった。
+ *
+ * いま各段の ms を 1 行にまとめて出す。**識別子は一切載せない**（顧客 ID も
+ * LINE userId も出さない = P1 の最小開示と同じ）。載せるのは段の名前と数字だけ。
+ * これは「静かに成功して、静かに遅い」を無くすための計装であって、
+ * 判断には使わない。
  */
 export async function GET(request: NextRequest) {
+  const startedAt = Date.now();
+  /** 段ごとの所要 ms。値は数字だけで、識別子は入れない。 */
+  const phases: Record<string, number> = {};
+  /** `phase("auth", () => ...)` で包んだ区間の所要時間を `phases` に貯める。 */
+  const phase = async <T,>(name: string, run: () => Promise<T>): Promise<T> => {
+    const from = Date.now();
+    try {
+      return await run();
+    } finally {
+      phases[name] = Date.now() - from;
+    }
+  };
+  const timings = () =>
+    Object.entries(phases)
+      .map(([name, ms]) => `${name}=${ms}ms`)
+      .join(" ");
+
   const locale = resolveLocale(request);
   const fallbackReturn = defaultReturnTo(locale);
 
@@ -90,7 +119,11 @@ export async function GET(request: NextRequest) {
   };
 
   const fail = (returnTo: string, reason: string) => {
-    console.warn(`[line-link/callback] ${reason}`);
+    /* 失敗のときも所要時間の内訳を添える。「遅くて落ちた」と「速く落ちた」は
+       原因がまるで違うのに、理由だけだと区別がつかない。 */
+    console.warn(
+      `[line-link/callback] ${reason} (total=${Date.now() - startedAt}ms ${timings()})`,
+    );
     clearState();
     return NextResponse.redirect(new URL(returnUrlWithResult(returnTo, "error"), requestOrigin));
   };
@@ -98,7 +131,7 @@ export async function GET(request: NextRequest) {
   /* 顧客 ID はここでも **その場のセッション**から取り直す。cookie に封じた値を
    * そのまま信じないのは、往復中にログアウト・別アカウントへの切替が起こりうるため。
    * 一致しなければ連携しない（それが state 束縛の 3 番目の条件）。 */
-  const auth = await requireAuth();
+  const auth = await phase("auth", requireAuth);
   if (!auth.authenticated) {
     return fail(fallbackReturn, "no shopify session on return");
   }
@@ -149,19 +182,21 @@ export async function GET(request: NextRequest) {
 
   let idToken: string | undefined;
   try {
-    const tokenRes = await fetch(`${lineApiBaseUrl()}/oauth2/v2.1/token`, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        grant_type: "authorization_code",
-        code,
-        /* 認可時と **完全一致**の redirect_uri でなければ LINE は交換を拒む。
-         * 両方 `getBaseUrl(request)` から作ることで、apex / www の食い違いを生まない。 */
-        redirect_uri: `${getBaseUrl(request)}/api/user/line-link/callback`,
-        client_id: channelId,
-        client_secret: channelSecret,
+    const tokenRes = await phase("token", () =>
+      fetch(`${lineApiBaseUrl()}/oauth2/v2.1/token`, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          grant_type: "authorization_code",
+          code,
+          /* 認可時と **完全一致**の redirect_uri でなければ LINE は交換を拒む。
+           * 両方 `getBaseUrl(request)` から作ることで、apex / www の食い違いを生まない。 */
+          redirect_uri: `${getBaseUrl(request)}/api/user/line-link/callback`,
+          client_id: channelId,
+          client_secret: channelSecret,
+        }),
       }),
-    });
+    );
     if (!tokenRes.ok) {
       /* ステータスコードだけでは「なぜ落ちたか」が分からない。LINE は 400 に
        * `error` / `error_description` を載せてくるので、その 2 つだけを読む
@@ -192,31 +227,36 @@ export async function GET(request: NextRequest) {
   }
 
   if (!idToken) return fail(returnTo, "no id_token in token response");
+  const issuedIdToken = idToken;
 
   /* LINE 自身に検証させて `sub` を得る。ブラウザ経由で来た値は何一つ信じない。
    *
    * `expectedNonce` を渡すことで、検証は「LINE が署名した有効なトークンか」から
    * 「**この認可要求で発行された**トークンか」に上がる（D11）。state が守るのは応答の
    * 宛先だけで、id_token そのものの出所は nonce でしか縛れない。 */
-  const verified = await verifyLineIdToken(idToken, channelId, { expectedNonce });
+  const verified = await phase("verify", () =>
+    verifyLineIdToken(issuedIdToken, channelId, { expectedNonce }),
+  );
   if (!verified.ok) {
     return fail(returnTo, `id_token verification failed: ${verified.reason}`);
   }
 
   try {
-    const upstream = await fetch(`${CX_AGENT_BASE_URL}/api/identity/link-liff`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-API-Key": syncSecret,
-      },
-      body: JSON.stringify({
-        line_messaging_user_id: verified.messagingUserId,
-        /* 連携キーの顧客側は **サーバ確定 customerId**。ブラウザ由来の値は使わない。 */
-        shopify_customer_id: auth.customerId,
-        shopify_email: verified.email,
+    const upstream = await phase("ledger", () =>
+      fetch(`${CX_AGENT_BASE_URL}/api/identity/link-liff`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-API-Key": syncSecret,
+        },
+        body: JSON.stringify({
+          line_messaging_user_id: verified.messagingUserId,
+          /* 連携キーの顧客側は **サーバ確定 customerId**。ブラウザ由来の値は使わない。 */
+          shopify_customer_id: auth.customerId,
+          shopify_email: verified.email,
+        }),
       }),
-    });
+    );
     if (!upstream.ok) {
       const detail = await upstream.text().catch(() => "");
       /* 409 = このメールアドレスには既に別の LINE が連携済み（1 対 1 固定・J-4）。
@@ -250,12 +290,26 @@ export async function GET(request: NextRequest) {
    *
    * `applyLinkageEstablished` は throw しない。合体が転んでも連携は成立している
    * ので、リダイレクトは成功のまま返す — ここで error に倒すと、実際には
-   * 連携できている人に「連携できませんでした」と言うことになる。 */
-  await applyLinkageEstablished({
-    lineUserId: verified.messagingUserId,
-    shopifyCustomerId: auth.customerId,
-    source: "line-link-callback",
-  });
+   * 連携できている人に「連携できませんでした」と言うことになる。
+   *
+   * **合体の完了は待ち切らない**（2026-08-25）。リダイレクトの中身は合体の結果に
+   * 依存しない（上記のとおり成功で固定）のに、Firestore への往復をぜんぶ待って
+   * いたせいで、その時間がそのまま白画面の長さになっていた。予算内に終われば
+   * その場で終わらせ、超えたらレスポンス送出後に continue する。判断の理由と
+   * 途中離脱時の安全性は `lib/auth/linkage-merge-handoff.ts` に書いてある。 */
+  const mergeState = await phase("merge", () =>
+    applyLinkageEstablishedWithinBudget({
+      lineUserId: verified.messagingUserId,
+      shopifyCustomerId: auth.customerId,
+      source: "line-link-callback",
+    }),
+  );
+
+  /* 成功したときも 1 行だけ残す。**識別子は載せない**（段の名前と ms だけ）。
+     これが無かったせいで「遅い」の内訳を本番から取れなかった。 */
+  console.info(
+    `[line-link/callback] linked (total=${Date.now() - startedAt}ms ${timings()} mergeState=${mergeState})`,
+  );
 
   clearState();
   return NextResponse.redirect(new URL(returnUrlWithResult(returnTo, "success"), requestOrigin));
