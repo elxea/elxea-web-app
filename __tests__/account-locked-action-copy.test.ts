@@ -49,15 +49,29 @@ describe("使えない項目の導線は「連携する」を名乗らない (J-
     expect(en.connectShopifyButton.toLowerCase()).toContain("sign in");
   });
 
-  it("理由の文言はログイン後に LINE と連携できることまで案内する (2 段階)", () => {
+  /**
+   * ここは以前「理由の文言はログイン後に LINE と連携できることまで案内する」だった。
+   * 意図 (2 段階だと分かるようにする) は正しかったが、この 1 文が **3 か所に同時に
+   * 出る** ことが見落とされていた。`emailRequiredReason` は Shopify が要る 3 項目
+   * (定期便・注文履歴・お支払い方法) 共通の理由文で、LINE だけでログインしている人の
+   * マイページではその 3 つが同時に locked になるため、同じ連携の案内が 3 回続けて
+   * 並ぶ (Setaka 実機指摘 2026-08-25「使いにくい」)。
+   *
+   * 2 段階であることを伝える役目は `LineLinkageEntry` が持つ (画面に 1 つだけある
+   * 連携の節)。理由文は理由だけを言う。
+   */
+  it("理由は理由だけを言う。連携の案内を重ねない (F16 / 入口は 1 か所)", () => {
     const ja = account("ja");
     const en = account("en");
 
     expect(ja.emailRequiredReason).toContain("ログイン");
-    expect(ja.emailRequiredReason).toContain("LINE");
-
     expect(en.emailRequiredReason.toLowerCase()).toContain("sign in");
-    expect(en.emailRequiredReason).toContain("LINE");
+
+    /* 3 項目に同時に出る文なので、ここに連携の勧誘を載せない。 */
+    expect(ja.emailRequiredReason).not.toContain("LINE");
+    expect(ja.emailRequiredReason).not.toContain("連携");
+    expect(en.emailRequiredReason).not.toContain("LINE");
+    expect(en.emailRequiredReason.toLowerCase()).not.toContain("link");
   });
 
   it("定期便ページの案内も「連携が必要」ではなく「ログインが必要」と言う", () => {
@@ -93,7 +107,7 @@ describe("行き先はカタログが持つ (as-is D-18 のハードコード解
     );
   });
 
-  it("マイページと定期便ページは行き先を自前で組み立てない", () => {
+  it("どちらのページも行き先を自前で組み立てない", () => {
     for (const relative of [
       "app/[locale]/account/page.tsx",
       "app/[locale]/account/subscriptions/page.tsx",
@@ -101,8 +115,17 @@ describe("行き先はカタログが持つ (as-is D-18 のハードコード解
       const source = read(relative);
       /* 経緯を書いたコメントでの言及は許す。禁じるのは href への直書き。 */
       expect(source, relative).not.toMatch(/href\s*[:=]\s*\{?\s*[`"']\/api\/auth\/login/);
-      expect(source, relative).toContain("accountActionHref");
     }
+  });
+
+  it("定期便ページだけがカタログの行き先を読む (マイページは導線を持たない / F16)", () => {
+    /* マイページ本体の locked カードは理由だけを言う。行動を出すと Shopify が要る
+       3 項目それぞれに同じ導線が付き、1 画面に同じ入口が 3 本並ぶ。連携・ログインの
+       入口はあの画面では `LineLinkageEntry` の 1 か所だけ。 */
+    expect(read("app/[locale]/account/page.tsx")).not.toContain("accountActionHref(");
+    expect(read("app/[locale]/account/subscriptions/page.tsx")).toContain(
+      "accountActionHref("
+    );
   });
 
   it("定期便ページはカタログの subscriptions 項目と同じ導線を使う", () => {
