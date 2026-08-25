@@ -5,7 +5,8 @@ import { getProducts } from "@/lib/shopify";
 import { Link } from "@/i18n/navigation";
 import { ImageCard } from "@/components/media/image-card";
 import { VariantSelector } from "@/components/product/variant-selector";
-import { ProductPurchaseOptions } from "@/components/product/product-purchase-options";
+import { VariantPurchase } from "@/components/product/variant-purchase";
+import { VariantSelectionProvider } from "@/components/product/variant-selection-context";
 import { bodySmClass, captionClass, h4Class, overlineClass } from "@/components/editorial/rule-list";
 import {
   Ledger,
@@ -287,22 +288,23 @@ export default async function SubscriptionLPPage() {
             {t("planLead", { monthlyPrice: MONTHLY_PRICE })}
           </p>
 
-          {detail && selectedVariant ? (
-            <div className="mt-8 flex flex-col gap-6 text-left">
-              <Suspense fallback={null}>
-                <VariantSelector options={detail.options} variants={detail.variants} />
-              </Suspense>
-              <ProductPurchaseOptions
-                merchandiseId={selectedVariant.id}
-                availableForSale={selectedVariant.availableForSale}
-                sellingPlanGroups={detail.sellingPlanGroups}
-                sellingPlanAllocations={selectedVariant.sellingPlanAllocations}
-                productName={detail.title}
-                price={selectedVariant.price.amount}
-                currencyCode={selectedVariant.price.currencyCode}
-                subscriptionOnly
-              />
-            </div>
+          {detail ? (
+            /* 選択はブラウザ側で確定する (商品詳細と同じ入れ物)。
+               ここは以前 `detail.variants[0]` を購入先に固定していたため、
+               サイズやタイプを選び直しても投入される変種が変わらなかった。 */
+            <VariantSelectionProvider
+              options={detail.options}
+              variants={detail.variants}
+              initialSelection={{}}
+            >
+              <div className="mt-8 flex flex-col gap-6 text-left">
+                <VariantSelector options={detail.options} />
+                <VariantPurchase
+                  sellingPlanGroups={detail.sellingPlanGroups}
+                  productName={detail.title}
+                />
+              </div>
+            </VariantSelectionProvider>
           ) : (
             <Link
               href="/products"
