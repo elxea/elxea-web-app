@@ -563,6 +563,7 @@
     "or": "or",
     "shopifyButton": "Sign in with Email",
     "terms": "By signing in, you agree to our <terms>Terms of Service</terms> and <privacy>Privacy Policy</privacy>.",
+    "alreadySignedInWithLine": "You are already signed in with LINE. Signing in with email links it to the same account.",
     "linkedSuccess": "Your LINE account has been linked",
     "errorLineAuthFailed": "LINE sign-in failed. Please try again.",
     "errorStateMismatch": "Your session has expired. Please try again.",

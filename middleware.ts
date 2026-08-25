@@ -244,15 +244,23 @@ export default async function middleware(request: NextRequest) {
     }
   }
 
-  /* ログイン済みで /login を開いたときはマイページへ送る。
+  /* Shopify のセッションを持ったまま /login を開いたときはマイページへ送る。
    *
    * ## なぜ素通しではいけないのか
    *
    * 素通しすると「LINE でログイン」「メールアドレスでログイン」がそのまま出る。
    * 既に入っている人がそこで別の方法を押すと **もう 1 つアカウントを作る** 経路に
    * 入ってしまう (二重アカウント)。ログイン中であることも告げないので、押す前に
-   * 気づく手がかりも無い。判定は上の /account ガードと同じ 2 つの cookie を使う
-   * (判定が 2 か所に割れると「門は開くのに画面は閉じる」ずれが生まれる)。
+   * 気づく手がかりも無い。
+   *
+   * ## なぜ LINE だけの人は飛ばさないのか (ここを間違えると連携が死ぬ)
+   *
+   * LINE だけで入っている人にとって、この画面の「メールアドレスでログイン」は
+   * **アカウントを連携する唯一の入口**である (LINE ログイン → メールログイン →
+   * 合体、が正規の連携経路)。ここで飛ばすと連携そのものに到達できなくなる。
+   * よって門を閉じるのは「もう得るものが無い = Shopify セッションがある」ときだけに
+   * 限り、LINE だけの人には画面の上で「もう LINE で入っている」と伝える
+   * (`app/[locale]/login/page.tsx` の案内)。
    *
    * ## 例外: 認証フローの戻り先としての /login
    *
@@ -266,9 +274,7 @@ export default async function middleware(request: NextRequest) {
     const isAuthFlowReturn =
       request.nextUrl.searchParams.has("error") ||
       request.nextUrl.searchParams.has("linked");
-    const signedIn =
-      hasShopifySessionCookies((name) => request.cookies.has(name)) ||
-      request.cookies.has("line_session");
+    const signedIn = hasShopifySessionCookies((name) => request.cookies.has(name));
     if (signedIn && !isAuthFlowReturn) {
       const locale = loginMatch[1];
       const target = new URL(`/${locale}/account`, request.url);

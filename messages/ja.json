@@ -563,6 +563,7 @@
     "or": "または",
     "shopifyButton": "メールアドレスでログイン",
     "terms": "ログインすることで、<terms>利用規約</terms>と<privacy>プライバシーポリシー</privacy>に同意したものとみなされます。",
+    "alreadySignedInWithLine": "すでに LINE でログインしています。メールアドレスで入ると同じアカウントにまとまります。",
     "linkedSuccess": "LINE アカウントと連携しました",
     "errorLineAuthFailed": "LINE ログインに失敗しました。もう一度お試しください。",
     "errorStateMismatch": "セッションの有効期限が切れました。もう一度お試しください。",
