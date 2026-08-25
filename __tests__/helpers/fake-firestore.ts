@@ -54,6 +54,22 @@ export type FakeFirestoreHooks = {
    * 「ack されたから消してよい」と「読み戻せたから消してよい」の差を撃つ。
    */
   dropWrite?: (path: string, data: DocData) => boolean;
+  /**
+   * 1 往復にかかる時間（ms）。既定 0。
+   *
+   * ## なぜ偽物が「遅さ」まで真似る必要があるのか
+   *
+   * 本番の Firestore は `asia-northeast1`、合体を走らせる関数は Vercel の
+   * `iad1` にある。**1 往復ごとに太平洋を横断**していて、往復 170〜200ms する。
+   * 往復の「回数」ではなく「直列に並んだ回数」がそのまま待ち時間になる。
+   *
+   * 2026-08-25 の本番障害（連携 callback が 20.1 秒 = 認可の承認後に真っ白な
+   * 画面が 20 秒）はこれが原因だったが、**往復が即座に解決する偽物では
+   * どのテストも落ちなかった**。中身が正しいことだけを見ていて、待ち方を
+   * 見ていなかった。ここに遅延と同時実行数の観測を置くことで、「直列に戻す」
+   * 変更が `stats.maxInFlight` の低下として見える。
+   */
+  latencyMs?: number;
 };
 
 function splitDocPath(fullPath: string): { colPath: string; id: string } {
@@ -95,6 +111,34 @@ export function createFakeFirestore(seed: Seed = {}, hooks: FakeFirestoreHooks =
   const store = new Map<string, Map<string, DocData>>();
   let counter = 0;
 
+  /* 往復の観測。`operations` は総往復数、`maxInFlight` は同時に開いていた
+     往復の最大数（1 なら完全に直列だったということ）。 */
+  const stats = { operations: 0, maxInFlight: 0 };
+  let inFlight = 0;
+
+  /** 1 往復ぶんの「行って帰ってくる」を挟む。すべての非同期 API がこれを通る。 */
+  async function roundTrip<T>(run: () => T): Promise<T> {
+    stats.operations += 1;
+    inFlight += 1;
+    if (inFlight > stats.maxInFlight) stats.maxInFlight = inFlight;
+    try {
+      const latency = hooks.latencyMs ?? 0;
+      /* 0ms でも 1 tick は挟む。挟まないと「並行に投げた」ことがそもそも
+         観測できない（同期に解決してしまい inFlight が 1 を超えない）。
+         **既定はマイクロタスク**であって `setTimeout(…, 0)` ではない:
+         `vi.useFakeTimers()` を使うテスト（連携キャッシュの TTL 等）では
+         タイマーが進まないので、0ms のつもりが永久に解決しなくなる。 */
+      if (latency > 0) {
+        await new Promise((resolve) => setTimeout(resolve, latency));
+      } else {
+        await Promise.resolve();
+      }
+      return run();
+    } finally {
+      inFlight -= 1;
+    }
+  }
+
   const colOf = (path: string) => {
     let col = store.get(path);
     if (!col) {
@@ -112,41 +156,49 @@ export function createFakeFirestore(seed: Seed = {}, hooks: FakeFirestoreHooks =
   function makeDocRef(colPath: string, id: string) {
     return {
       id,
-      async get() {
-        const data = colOf(colPath).get(id);
-        return {
-          exists: data !== undefined,
-          id,
-          data: () => (data === undefined ? undefined : { ...data }),
-        };
+      get() {
+        return roundTrip(() => {
+          const data = colOf(colPath).get(id);
+          return {
+            exists: data !== undefined,
+            id,
+            data: () => (data === undefined ? undefined : { ...data }),
+          };
+        });
       },
-      async set(data: DocData, options?: { merge?: boolean }) {
-        hooks.beforeWrite?.(colPath, data);
-        if (hooks.dropWrite?.(colPath, data)) return;
-        const existing = options?.merge ? (colOf(colPath).get(id) ?? {}) : {};
-        colOf(colPath).set(id, { ...existing, ...data });
+      set(data: DocData, options?: { merge?: boolean }) {
+        return roundTrip(() => {
+          hooks.beforeWrite?.(colPath, data);
+          if (hooks.dropWrite?.(colPath, data)) return;
+          const existing = options?.merge ? (colOf(colPath).get(id) ?? {}) : {};
+          colOf(colPath).set(id, { ...existing, ...data });
+        });
       },
       /**
        * 本物の `update` は「無いドキュメントには失敗する」「`FieldValue.delete()` の
        * フィールドは消える」の 2 点が `set(..., {merge:true})` と違う。どちらも
        * `unlinkLineUser` の挙動そのものなので、その 2 点だけ真似る。
        */
-      async update(data: DocData) {
-        hooks.beforeWrite?.(colPath, data);
-        const existing = colOf(colPath).get(id);
-        if (existing === undefined) {
-          throw new Error(`no document to update: ${colPath}/${id}`);
-        }
-        const next: DocData = { ...existing };
-        for (const [field, value] of Object.entries(data)) {
-          if (isDeleteSentinel(value)) delete next[field];
-          else next[field] = value;
-        }
-        colOf(colPath).set(id, next);
+      update(data: DocData) {
+        return roundTrip(() => {
+          hooks.beforeWrite?.(colPath, data);
+          const existing = colOf(colPath).get(id);
+          if (existing === undefined) {
+            throw new Error(`no document to update: ${colPath}/${id}`);
+          }
+          const next: DocData = { ...existing };
+          for (const [field, value] of Object.entries(data)) {
+            if (isDeleteSentinel(value)) delete next[field];
+            else next[field] = value;
+          }
+          colOf(colPath).set(id, next);
+        });
       },
-      async delete() {
-        hooks.beforeDelete?.(colPath, id);
-        colOf(colPath).delete(id);
+      delete() {
+        return roundTrip(() => {
+          hooks.beforeDelete?.(colPath, id);
+          colOf(colPath).delete(id);
+        });
       },
     };
   }
@@ -177,33 +229,37 @@ export function createFakeFirestore(seed: Seed = {}, hooks: FakeFirestoreHooks =
       doc(id: string) {
         return makeDocRef(path, id);
       },
-      async get() {
-        let entries = [...colOf(path).entries()];
-        for (const [field, value] of clauses) {
-          entries = entries.filter(([, data]) => data[field] === value);
-        }
-        if (order) {
-          const sign = order.direction === "desc" ? -1 : 1;
-          entries = [...entries].sort(
-            ([, a], [, b]) => sign * compareValues(a[order.field], b[order.field]),
-          );
-        }
-        if (limit !== null) entries = entries.slice(0, limit);
-        return {
-          empty: entries.length === 0,
-          docs: entries.map(([id, data]) => ({
-            id,
-            data: () => ({ ...data }),
-            ref: makeDocRef(path, id),
-          })),
-        };
+      get() {
+        return roundTrip(() => {
+          let entries = [...colOf(path).entries()];
+          for (const [field, value] of clauses) {
+            entries = entries.filter(([, data]) => data[field] === value);
+          }
+          if (order) {
+            const sign = order.direction === "desc" ? -1 : 1;
+            entries = [...entries].sort(
+              ([, a], [, b]) => sign * compareValues(a[order.field], b[order.field]),
+            );
+          }
+          if (limit !== null) entries = entries.slice(0, limit);
+          return {
+            empty: entries.length === 0,
+            docs: entries.map(([id, data]) => ({
+              id,
+              data: () => ({ ...data }),
+              ref: makeDocRef(path, id),
+            })),
+          };
+        });
       },
-      async add(data: DocData) {
-        hooks.beforeWrite?.(path, data);
-        if (hooks.dropWrite?.(path, data)) return { id: "dropped" };
-        const id = `added-${++counter}`;
-        colOf(path).set(id, { ...data });
-        return { id };
+      add(data: DocData) {
+        return roundTrip(() => {
+          hooks.beforeWrite?.(path, data);
+          if (hooks.dropWrite?.(path, data)) return { id: "dropped" };
+          const id = `added-${++counter}`;
+          colOf(path).set(id, { ...data });
+          return { id };
+        });
       },
     };
   }
@@ -218,6 +274,11 @@ export function createFakeFirestore(seed: Seed = {}, hooks: FakeFirestoreHooks =
 
   return {
     db,
+    /**
+     * 往復の観測値。`maxInFlight === 1` は「1 件ずつ順番に待った」の証拠で、
+     * それがそのまま本番の待ち時間（= 白画面の長さ）になる。
+     */
+    stats,
     /** その棚の中身（順不同・ID は含まない）。 */
     contents: (path: string) => [...(store.get(path)?.values() ?? [])],
     /** その棚に今いくつ入っているか。中身（PII）ではなく件数で語りたいとき。 */
