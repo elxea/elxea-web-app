@@ -21,7 +21,7 @@
  */
 
 import type { FavoriteInput } from "@/lib/account-favorites";
-import { buildContinueItems, type AccountView } from "@/lib/account-view";
+import { type AccountView } from "@/lib/account-view";
 import type { SubscriptionContract } from "@/lib/shopify/customer";
 import type { Cart } from "@/lib/shopify/types";
 
@@ -947,7 +947,6 @@ export function seedAccountView(): AccountView | null {
     /* 「続き」は見本のお気に入り (`seedFavorites`) から組む。一覧ページ
        (/account/favorites) と同じ素材を使うので、抜粋 6 枚と一覧の中身が
        食い違わない。 */
-    continueItems: buildContinueItems(seedFavorites() ?? []),
     past: [
       {
         id: `${SEED_ID_PREFIX}account-order-1`,

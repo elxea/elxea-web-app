@@ -5,7 +5,6 @@ import { describe, expect, it } from "vitest";
 
 import {
   FAVORITES_KIND_LIMIT,
-  FAVORITE_CONTINUE_ORDER,
   FAVORITE_KINDS,
   FAVORITE_KIND_META,
   countFavorites,
@@ -74,7 +73,9 @@ describe("normalizeFavorites", () => {
       normalizeFavorites([
         raw({ id: "a", title: null }),
         raw({ id: "b", targetId: "  " }),
-        raw({ id: "c", type: "farmer" }),
+        /* 種類の正本 (`FAVORITE_KINDS`) に無い語。農家は 4 分類目になったので
+           ここでは使えない — 未知の種類の例には、いま実在しない語を使う。 */
+        raw({ id: "c", type: "brewery" }),
         raw({ id: "d", type: undefined }),
       ])
     ).toEqual([]);
@@ -187,10 +188,53 @@ describe("種類カタログ", () => {
     }
   });
 
-  it("抜粋の並びはすべての種類を含む (新しい種類が黙って漏れない)", () => {
-    expect([...FAVORITE_CONTINUE_ORDER].sort()).toEqual([...FAVORITE_KINDS].sort());
-    // 確定版の 1 枚目は読みもの。
-    expect(FAVORITE_CONTINUE_ORDER[0]).toBe("article");
+  /**
+   * 分類は 4 つ (商品・読みもの・人・農家) で確定 (J-5 決裁)。
+   *
+   * 農家は以前「フォロー中の農家」という別の動詞・別のコレクションだったが、
+   * 4 分類目としてお気に入りへ統合した。ここが 3 に戻る = 農家の行き先が
+   * また消える、5 になる = 決裁を経ずに分類が増えた、のどちらかなので縛る。
+   */
+  it("分類は商品・読みもの・人・農家の 4 つ", () => {
+    expect([...FAVORITE_KINDS]).toEqual(["product", "article", "person", "farmer"]);
+  });
+
+  /**
+   * マイページは抜粋ではなく **4 分類をそのまま** 見せる (Setaka 実機指示
+   * 2026-08-25)。「続き」の抜粋・優先順位 (`continueRank` /
+   * `FAVORITE_CONTINUE_ORDER`) と「お気に入りをすべて見る」リンクは、
+   * その結果として行き先が無くなったので撤去した。
+   * 復活すると「入れたのに見当たらない」が戻るので、書かれていないことを縛る。
+   */
+  it("抜粋の優先順位はもう持たない (マイページが 4 分類をそのまま出すため)", () => {
+    const source = readCode("lib/account-favorites.ts");
+    expect(source).not.toContain("continueRank");
+    expect(source).not.toContain("FAVORITE_CONTINUE_ORDER");
+  });
+
+  /**
+   * どの種類も、少なくとも 1 つの保存の入口 (`FavoriteToggleButton`) を持つ
+   * ページから保存できなければ、節だけが残って中身が増えない
+   * (旧「フォロー中の農家」が実際にそうなっていた)。
+   */
+  it("すべての種類に保存の入口がある (節だけ残って増えない状態を作らない)", () => {
+    const entryPoints: Record<string, string> = {
+      product: "app/[locale]/products/[handle]/page.tsx",
+      article: "app/[locale]/(reading)/journal/[slug]/page.tsx",
+      person: "app/[locale]/people/[slug]/page.tsx",
+      farmer: "app/[locale]/(reading)/farmers/[slug]/page.tsx",
+    };
+
+    for (const kind of FAVORITE_KINDS) {
+      const path = entryPoints[kind];
+      expect(path, `${kind}: 保存の入口となるページが決まっていない`).toBeDefined();
+      expect(existsSync(join(ROOT, path)), `${kind}: ${path} が無い`).toBe(true);
+      const page = readCode(path);
+      expect(page, `${kind}: ${path} に保存ボタンが無い`).toContain("FavoriteToggleButton");
+      expect(page, `${kind}: ${path} の保存ボタンが種類を渡していない`).toContain(
+        `kind="${kind}"`
+      );
+    }
   });
 
   /**
@@ -232,21 +276,40 @@ describe("種類カタログ", () => {
   });
 });
 
-describe("お気に入り一覧ページ", () => {
-  const page = read("app/[locale]/account/favorites/page.tsx");
+describe("お気に入りはマイページ本体で見る", () => {
+  const page = read("app/[locale]/account/page.tsx");
 
-  it("ログインしていない人には一覧を組まない", () => {
-    expect(page).toContain("isSignedIn");
-    expect(page).toContain("loginRequired");
+  /**
+   * 一覧は独立ページ (`/account/favorites`) から **マイページ本体へ移した**
+   * (Setaka 実機指摘 2026-08-25)。自分が保存したものを見るのに 1 回よけいな
+   * 遷移が要り、抜粋 6 枚に入らなかった種類はマイページから存在ごと見えなかった。
+   */
+  it("分類ごとの一覧はマイページ本体が描く", () => {
+    const code = readCode("app/[locale]/account/page.tsx");
+    expect(code).toContain("<FavoritesBoard groups={favoriteGroups} />");
+    expect(code).toContain("groupFavorites");
   });
 
   it("識別子をクライアントへ渡さない (渡すのは正規化済みの一覧だけ)", () => {
     expect(page).not.toMatch(/userKey=\{/);
-    expect(page).toContain("<FavoritesBoard groups={groups} />");
   });
 
-  it("マイページ本体の「すべて見る」がこのページを指している", () => {
-    expect(read("app/[locale]/account/page.tsx")).toContain('href: "/account/favorites"');
+  /**
+   * 旧ページは **消さずに恒久リダイレクト**にする。ブックマーク・過去の案内・
+   * 検索結果からの流入を 404 にしないため。中身を二重に持たせない
+   * (両方が一覧を描くと、直した側だけが直る状態に戻る)。
+   */
+  it("旧ページはマイページ本体への転送だけを残す (404 にしない / 二重に描かない)", () => {
+    const legacy = readCode("app/[locale]/account/favorites/page.tsx");
+    expect(legacy).toContain("redirect");
+    expect(legacy).toContain('"/account"');
+    expect(legacy).not.toContain("FavoritesBoard");
+    expect(legacy).not.toContain("groupFavorites");
+  });
+
+  it("マイページ本体に「すべて見る」の外向きリンクは残っていない", () => {
+    const code = readCode("app/[locale]/account/page.tsx");
+    expect(code).not.toContain('href: "/account/favorites"');
   });
 
   /**
@@ -264,16 +327,18 @@ describe("お気に入り一覧ページ", () => {
    * (壊れるのは解除した後だけ) で、取りこぼす。
    */
   it("合計件数をサーバで数えない (解除で更新されない値を作らない / F14)", () => {
-    const code = readCode("app/[locale]/account/favorites/page.tsx");
+    const code = readCode("app/[locale]/account/page.tsx");
     expect(code).not.toContain("countFavorites");
-    expect(code).not.toContain("AccountTitleBlock");
     // 見出し脇の合計の文言もページ側には残らない (残っていれば描いている)。
     expect(code).not.toContain("favoritesCount");
   });
 
   it("合計件数は解除の状態を持つ側が state から数える (F14)", () => {
     const board = readCode("components/account/favorites-board.tsx");
-    expect(board).toContain("<AccountTitleBlock");
+    /* 見出しは節見出し (`AccountSectionHeader`)。マイページ本体の 1 節になったので
+       ページ見出し (`AccountTitleBlock` = 戻るリンク付き) はもう使わない。 */
+    expect(board).toContain("<AccountSectionHeader");
+    expect(board).not.toContain("<AccountTitleBlock");
     // 初期 props (`initialGroups`) ではなく state の `groups` を数える。
     expect(board).toContain("countFavorites(groups)");
     expect(board).not.toContain("countFavorites(initialGroups)");

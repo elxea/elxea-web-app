@@ -113,10 +113,10 @@ process.env.E2E_WARMUP_PATHS = [
   "/api/auth/callback",
   "/api/auth/logout",
   /* マイページが描画時・描画後に叩くもの */
+  /* 農家も `favorites` の 4 分類目になったので `/api/user/follows` は無い (J-5)。 */
   "/api/user/favorites",
   "/api/user/dashboard",
   "/api/user/events",
-  "/api/user/follows",
   /* 連携・解除 */
   "/api/user/line-link",
   "/api/user/line-link/init",
