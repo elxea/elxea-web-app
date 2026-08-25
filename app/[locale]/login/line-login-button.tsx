@@ -1,10 +1,28 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { buildChatSessionCookie } from "@/lib/chat/session-cookie";
 import { autoLoginFailedInSearch } from "@/lib/line/auto-login";
+
+import { channelMisconfiguredInSearch } from "./auth-error-keys";
+
+/**
+ * Suspense の fallback 用。`LineLoginButton` は `useSearchParams` を使うため
+ * 境界が要り、その間も同じ形のボタンが出ていないと画面が跳ねる。
+ *
+ * 中身を `LineLoginButton` の loading 分岐と揃えてあるのは意図的で、境界が解ける
+ * 瞬間に見た目が変わらないようにするため。
+ */
+export function LineLoginButtonFallback({ children }: { children: React.ReactNode }) {
+  return (
+    <Button disabled aria-busy="true" className="w-full shadow-xs">
+      {children}
+    </Button>
+  );
+}
 
 /**
  * LINE Login button — Direct OAuth 2.0 via <a href> to access.line.me.
@@ -51,8 +69,27 @@ export function LineLoginButton({ children }: { children: React.ReactNode }) {
    * that never resolved, which reads as a hang rather than as a state. */
   const [unavailable, setUnavailable] = useState(false);
 
+  /* 直前の往復が `invalid_client` で落ちていたなら、押せるボタンを出さない。
+   *
+   * `/api/line-login/init` は **チャネル ID だけ**で認可 URL を組み立てられるので、
+   * Channel Secret が壊れていても 200 を返す。つまり下の 503 判定はこの壊れ方を
+   * 拾えない — 失敗は 1 往復先の token 交換まで進まないと現れない。バナーで
+   * 「復旧作業中」と伝えたうえでボタンを押せるままにすると、人は押し、必ず同じ
+   * ところで落ちて、同じ画面に戻ってくる。それが 2026-08-22 / 2026-08-25 に実際に
+   * 起きていた無限リトライで、止めるには入口を閉じるしかない。
+   *
+   * これは URL から**導出される値**なので state に持たず、レンダー中に計算する
+   * (effect で setState すると連鎖レンダーになる / react-hooks の
+   * `set-state-in-effect`)。`/login` を開き直せば通常状態に戻るので、復旧後に
+   * 画面が固まったままになることもない。 */
+  const searchParams = useSearchParams();
+  const channelMisconfigured = channelMisconfiguredInSearch(searchParams.toString());
+
   useEffect(() => {
     let cancelled = false;
+
+    // 押せないと決まっている回は、init を呼ぶ意味が無い。
+    if (channelMisconfigured) return;
 
     // Save chat session_id cookie for identity linking in the Auth.js callback.
     try {
@@ -96,7 +133,7 @@ export function LineLoginButton({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [channelMisconfigured]);
 
   const handleClick = () => {
     // Refresh session_id cookie immediately before navigation.
@@ -112,7 +149,10 @@ export function LineLoginButton({ children }: { children: React.ReactNode }) {
     }
   };
 
-  if (unavailable) {
+  /* 押しても直らないと分かっている状態は、押せない見た目にする。`unavailable`
+     (init が 503) と `channelMisconfigured` (token 交換が invalid_client) は
+     起点が違うが、利用者にとっては同じ「今は使えない」なので同じ姿にする。 */
+  if (unavailable || channelMisconfigured) {
     return (
       <Button disabled className="w-full shadow-xs">
         {t("lineButtonUnavailable")}

@@ -26,7 +26,7 @@ import {
 } from "@/components/auth/auth-card";
 import { Button } from "@/components/ui/button";
 import { Link } from "@/i18n/navigation";
-import { LineLoginButton } from "./line-login-button";
+import { LineLoginButton, LineLoginButtonFallback } from "./line-login-button";
 import { LinkSuccessBanner } from "./link-success-banner";
 import { AuthErrorBanner } from "./auth-error-banner";
 
@@ -61,7 +61,13 @@ export default async function LoginPage() {
 
         {/* Actions 6702:9014 */}
         <AuthCardActions>
-          <LineLoginButton>{t("lineButton")}</LineLoginButton>
+          {/* ボタンは `?error=` を読んで「押しても直らない失敗」のときに自分を
+            * 無効化する (line-login-button の解説)。`useSearchParams` を使うので
+            * バナーと同じく Suspense 境界が要る。fallback は押せない同型のボタン —
+            * null にすると境界が解けるまでボタンごと消えて画面が跳ねる。 */}
+          <Suspense fallback={<LineLoginButtonFallback>{t("lineButton")}</LineLoginButtonFallback>}>
+            <LineLoginButton>{t("lineButton")}</LineLoginButton>
+          </Suspense>
 
           {/* LINE のメールアドレス取得についての説明 (M-0 の前提整備)。
             *
