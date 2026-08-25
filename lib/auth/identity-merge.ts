@@ -71,6 +71,40 @@ import {
  * deleting anything: every failure path retains its source, so a later run
  * merges it (step 2 makes that safe to repeat).
  *
+ * ## 4 段は「1 件ずつ順番に」やる必要が無い（2026-08-25 / 白画面 20 秒の直し）
+ *
+ * 上の 4 段は **1 ドキュメントの中での順序**であって、ドキュメント同士の順序では
+ * ない。にもかかわらず実装は `for (const doc of ...)` で 1 件ずつ待っており、
+ * さらに 6 つのサブコレクションまで直列だった。Firestore への往復は
+ * **1 ドキュメントあたり 4 回**（存在確認 → 書く → 読み戻す → 消す）なので、
+ * 総往復数は `6 + 4n + α` になる。この往復が安いなら誰も気付かないが、実際は:
+ *
+ *   - 関数は Vercel の `iad1`（米国東部）で動く
+ *   - Firestore は `asia-northeast1`（東京）にある（実測 / 2026-08-25）
+ *
+ * ——つまり **1 往復ごとに太平洋を横断**しており、往復 170〜200ms かかる。
+ * 本番実測では連携 callback 全体が **20.1 秒**（hot start・コールドスタート無し）で、
+ * その大半がこのループだった。お客さまから見ると認可の承認後に **真っ白な画面が
+ * 20 秒**続く。普通は離脱する。
+ *
+ * 直し方は「往復を速くする」ではなく **「待ち方をやめる」**。各ドキュメントの
+ * 4 段は互いに独立なので、上限付きの並行実行にする。壁時計時間は
+ * `4n 往復` から `4 × ceil(n / 同時実行数) 往復` に落ち、サブコレクション 6 つも
+ * 並行に走らせるので、全体では「いちばん重いコレクション 1 本ぶん」で済む。
+ *
+ * **4 段の順序そのものは 1 ミリも緩めていない。** 並行になったのは
+ * 「別のドキュメント同士」だけで、あるドキュメントの delete は依然として
+ * **そのドキュメントの** verify が通ったあとにしか走らない。
+ *
+ * ### 並行にしたことで新しく塞ぐ必要が出た穴（source 内の重複）
+ *
+ * 直列なら、同じ dedupe キーを持つ source が 2 件あっても 1 件目のコピーが
+ * 2 件目の存在確認に見えるので、引っ越し先には 1 件しか増えなかった。並行だと
+ * 2 件が同時に「まだ無い」を見て **両方書く**。よって dispatch の前に
+ * source を dedupe キーで畳み、キーごとに代表 1 件だけをコピー経路へ通す
+ * （残りは代表の着地を確認したあと `deduped` として消す）。`preserve-doc-id`
+ * 側はドキュメント ID がコレクション内で一意なので、この畳み込みは要らない。
+ *
  * ## 運ぶ荷物は `collections.ts` から導出する（書き忘れを型で止める）
  *
  * かつては favorites / follows / eventRegistrations の 3 つを本ファイルに直接
@@ -228,6 +262,47 @@ const STRATEGIES: Record<UserSubcollection, MergeStrategy> = {
   orders: { kind: "preserve-doc-id" },
 };
 
+/**
+ * 同時に投げてよい Firestore 往復の上限。
+ *
+ * 上限を置かない（= 全ドキュメントを一斉に `Promise.all`）と、棚が大きい人ほど
+ * 一度に数百の往復を開くことになり、gRPC のストリーム上限や Firestore 側の
+ * スロットリングに当たる。当たった往復は `failed` になり、**そのドキュメントは
+ * 運ばれずに残る** — 速くするための変更が取りこぼしを増やすのでは本末転倒。
+ *
+ * 24 という数字は「往復 200ms を前提に、100 件を 4 波 = 0.8 秒で捌ける」ところ
+ * から採った。上げれば壁時計時間は縮むが、上の失敗モードに近づく。
+ */
+const MERGE_CONCURRENCY = 24;
+
+/**
+ * `items` を上限付きの並行度で `worker` に流す。**worker は throw しない前提**
+ * （各 worker が自分の失敗を counters に畳んで返す）。
+ *
+ * `Promise.all` に丸ごと渡さないのは上の `MERGE_CONCURRENCY` の理由による。
+ */
+async function mapWithConcurrency<T>(
+  items: T[],
+  limit: number,
+  worker: (item: T) => Promise<void>,
+): Promise<void> {
+  if (items.length === 0) return;
+
+  let next = 0;
+  const runners = Array.from(
+    { length: Math.min(limit, items.length) },
+    async () => {
+      for (;;) {
+        const index = next++;
+        if (index >= items.length) return;
+        await worker(items[index]!);
+      }
+    },
+  );
+
+  await Promise.all(runners);
+}
+
 function emptyCounters(): MergeCounters {
   return { copied: 0, deduped: 0, skippedInvalid: 0, failed: 0 };
 }
@@ -255,11 +330,27 @@ async function destinationHas(
   return !snap.empty;
 }
 
+/** 1 つの dedupe キーを共有する source ドキュメントの束。 */
+type DedupeGroup = {
+  key: DedupeClause[];
+  /** 同じキーを持つ source。引っ越すのは 1 件で、残りは重複として消す。 */
+  docs: { ref: { delete: () => Promise<unknown> }; data: DocumentData }[];
+};
+
 /**
  * 内容で重複判定して運ぶ。
  *
  * `docIdOf` があるコレクションは引っ越し先の ID も内容から決める。無い
  * コレクション（follows / eventRegistrations）は従来どおり引っ越し先で振り直す。
+ *
+ * 重複を防ぐ手立ては 2 段あり、**塞いでいる穴が違う**。
+ *
+ *   - 束ねる（下の `groups`）… **1 回の合体の中**で同じキーが 2 件ある場合。
+ *     並行化したことで、直列なら効いていた「1 件目のコピーが 2 件目の存在確認
+ *     から見える」が失われたぶんを埋める
+ *   - ID を内容から決める（`docIdOf`）… **合体どうしが同時に走る**場合。束ねても
+ *     別プロセスの合体までは見えないので、2 つが同時に「まだ無い」を見れば
+ *     2 件書く。同じ ID へ書けば上書きになり、増えない（F16 で本番に出た形）
  */
 async function mergeByFields(
   db: Firestore,
@@ -271,52 +362,81 @@ async function mergeByFields(
   const counters = emptyCounters();
   const srcSnap = await db.collection(srcPath).get();
 
+  /* Step 1 — validate、そして **同じキーの source を畳む**。
+   *
+   * validate 段の意味は元のまま: キーを作れないドキュメントは「コピーできたと
+   * 確認しようがない」ので絶対に消さない（D2 の修正）。
+   *
+   * 畳み込みのほうは並行化のために増えた段。直列だった頃は 1 件目のコピーが
+   * 2 件目の存在確認から見えたので、同じキーが 2 件あっても引っ越し先には
+   * 1 件しか増えなかった。並行だと両方が同時に「まだ無い」を見て 2 件書く。
+   * ここで畳んでおけば、その競合はそもそも発生しない。 */
+  const groups = new Map<string, DedupeGroup>();
   for (const doc of srcSnap.docs) {
     const data = doc.data();
-
-    /* Step 1 — validate. A document we cannot key is a document we cannot
-     * confirm we copied, so it is never deleted. This is the D2 fix. */
     const key = dedupeKeyOf(data);
     if (!key) {
       counters.skippedInvalid += 1;
       continue;
     }
-
-    try {
-      // Step 2 — copy only when the destination does not already hold it.
-      const alreadyPresent = await destinationHas(db, dstPath, key);
-      if (alreadyPresent) {
-        counters.deduped += 1;
-      } else {
-        /* 内容から決まる ID があるなら、その 1 件を上書きする。同時に走った
-           もう 1 つの合体も同じ ID へ書くので、2 件にはならない（F16）。 */
-        const dstId = docIdOf?.(data) ?? null;
-        if (dstId === null) {
-          await db.collection(dstPath).add(data);
-        } else {
-          await db.collection(dstPath).doc(dstId).set(data);
-        }
-
-        /* Step 3 — verify. `add` resolving means the server acknowledged the
-         * write; reading it back is what lets the delete below be justified by
-         * an observation rather than by an assumption. */
-        const confirmed = await destinationHas(db, dstPath, key);
-        if (!confirmed) {
-          counters.failed += 1;
-          continue;
-        }
-        counters.copied += 1;
-      }
-
-      // Step 4 — the source is redundant now, and only now.
-      await doc.ref.delete();
-    } catch {
-      /* Retain the source. A throw anywhere above (copy, verify, or delete)
-       * leaves this document under the LINE key; the next run re-runs the
-       * merge and step 2 makes that idempotent. */
-      counters.failed += 1;
-    }
+    const identity = JSON.stringify(key);
+    const existing = groups.get(identity);
+    if (existing) existing.docs.push({ ref: doc.ref, data });
+    else groups.set(identity, { key, docs: [{ ref: doc.ref, data }] });
   }
+
+  await mapWithConcurrency(
+    [...groups.values()],
+    MERGE_CONCURRENCY,
+    async (group) => {
+      try {
+        // Step 2 — copy only when the destination does not already hold it.
+        const alreadyPresent = await destinationHas(db, dstPath, group.key);
+        if (alreadyPresent) {
+          counters.deduped += group.docs.length;
+        } else {
+          /* 内容から決まる ID があるなら、その 1 件を上書きする。同時に走った
+             もう 1 つの合体も同じ ID へ書くので、2 件にはならない（F16）。 */
+          const data = group.docs[0]!.data;
+          const dstId = docIdOf?.(data) ?? null;
+          if (dstId === null) {
+            await db.collection(dstPath).add(data);
+          } else {
+            await db.collection(dstPath).doc(dstId).set(data);
+          }
+
+          /* Step 3 — verify. `add` resolving means the server acknowledged the
+           * write; reading it back is what lets the delete below be justified by
+           * an observation rather than by an assumption. */
+          const confirmed = await destinationHas(db, dstPath, group.key);
+          if (!confirmed) {
+            counters.failed += group.docs.length;
+            return;
+          }
+          counters.copied += 1;
+          /* 代表以外は「引っ越し先に同じ内容が既にある」状態になった。直列版が
+             2 件目以降をそう数えていたのと同じく `deduped`。 */
+          counters.deduped += group.docs.length - 1;
+        }
+
+        /* Step 4 — the source is redundant now, and only now.
+           束のうち 1 件の delete が転んでも残りは消せる（消せなかったぶんだけ
+           `failed` = 元の場所に残る）。 */
+        await mapWithConcurrency(group.docs, MERGE_CONCURRENCY, async (doc) => {
+          try {
+            await doc.ref.delete();
+          } catch {
+            counters.failed += 1;
+          }
+        });
+      } catch {
+        /* Retain the source. A throw anywhere above (copy or verify) leaves
+         * these documents under the LINE key; the next run re-runs the merge
+         * and step 2 makes that idempotent. */
+        counters.failed += group.docs.length;
+      }
+    },
+  );
 
   return counters;
 }
@@ -341,7 +461,10 @@ async function mergeByDocId(
   const counters = emptyCounters();
   const srcSnap = await db.collection(srcPath).get();
 
-  for (const doc of srcSnap.docs) {
+  /* ドキュメント ID はコレクション内で一意なので、`mergeByFields` のような
+     source 内の畳み込みは要らない（同じ ID の source が 2 件あることは無い）。
+     よってそのまま並行に流せる。 */
+  await mapWithConcurrency(srcSnap.docs, MERGE_CONCURRENCY, async (doc) => {
     try {
       const dstRef = db.collection(dstPath).doc(doc.id);
 
@@ -354,7 +477,7 @@ async function mergeByDocId(
         const confirmed = await dstRef.get();
         if (!confirmed.exists) {
           counters.failed += 1;
-          continue;
+          return;
         }
         counters.copied += 1;
       }
@@ -363,7 +486,7 @@ async function mergeByDocId(
     } catch {
       counters.failed += 1;
     }
-  }
+  });
 
   return counters;
 }
@@ -388,12 +511,14 @@ async function mergeUserDocument(
 
   try {
     const srcRef = db.doc(srcPath);
-    const srcSnap = await srcRef.get();
+    const dstRef = db.doc(dstPath);
+
+    /* 2 つの読みは互いに独立なので同時に投げる。直列に待つと、この関数だけで
+       太平洋往復が 1 回よけいに増える（上の「4 段は直列でなくてよい」参照）。 */
+    const [srcSnap, dstSnap] = await Promise.all([srcRef.get(), dstRef.get()]);
     if (!srcSnap.exists) return counters;
 
     const srcData = (srcSnap.data() ?? {}) as Record<string, unknown>;
-    const dstRef = db.doc(dstPath);
-    const dstSnap = await dstRef.get();
     const dstData = (dstSnap.exists ? (dstSnap.data() ?? {}) : {}) as Record<
       string,
       unknown
@@ -473,7 +598,13 @@ export async function mergeLineIdentityIntoShopify(
    * after "finding" it at the destination — the same document. */
   if (lineUserKey === shopifyCustomerId) return result();
 
-  for (const name of USER_SUBCOLLECTIONS) {
+  /* 6 つのサブコレクションとユーザードキュメント本体は互いに独立している
+     （別のコレクションを読み書きする）ので、直列に待つ理由が無い。ここを
+     `for await` で回していたぶんだけ、往復が素直に足し算されていた。
+     ユーザードキュメント本体も同時に走らせてよい: サブコレクションは
+     Firestore では親ドキュメントから独立しているため、`users/line:{id}` の
+     削除が `users/line:{id}/favorites` の読み書きに影響しない。 */
+  const subcollectionMerges = USER_SUBCOLLECTIONS.map(async (name) => {
     const strategy = STRATEGIES[name];
     const srcPath = userSubcollection(lineUserKey, name);
     const dstPath = userSubcollection(shopifyCustomerId, name);
@@ -488,13 +619,17 @@ export async function mergeLineIdentityIntoShopify(
             strategy.docIdOf,
           )
         : await mergeByDocId(db, srcPath, dstPath);
-  }
+  });
 
-  userDocument = await mergeUserDocument(
+  const userDocumentMerge = mergeUserDocument(
     db,
     userDoc(lineUserKey),
     userDoc(shopifyCustomerId),
-  );
+  ).then((counters) => {
+    userDocument = counters;
+  });
+
+  await Promise.all([...subcollectionMerges, userDocumentMerge]);
 
   const merged = result();
   reportMergeOutcome(merged);

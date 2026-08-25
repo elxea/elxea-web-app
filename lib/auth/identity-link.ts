@@ -377,13 +377,16 @@ export async function applyLinkageEstablished({
        ⚠ 引き直しはしない — それが M-2 で廃止した構造そのもの。 */
     invalidateReverseLinkage(lineUserId);
 
-    await mirrorLineUserId(lineUserId, shopifyCustomerId, source, db);
-
-    const merge = await mergeLineIdentityIntoShopify(
-      lineUserId,
-      shopifyCustomerId,
-      db,
-    );
+    /* 写しと合体は互いに独立なので同時に走らせる（写しは `users/{customerId}` の
+       1 フィールドを `merge:true` で足すだけで、合体が読む source 側とは別の棚）。
+       直列に待つと、Firestore が東京・関数が iad1 という配置のぶんだけ
+       太平洋往復が 1 回まるごと足される（`identity-merge.ts` の同名の節を参照）。
+       `mirrorLineUserId` は自前で握り潰すので、この `Promise.all` は写しの失敗で
+       reject しない = 合体の結果を落とさない。 */
+    const [, merge] = await Promise.all([
+      mirrorLineUserId(lineUserId, shopifyCustomerId, source, db),
+      mergeLineIdentityIntoShopify(lineUserId, shopifyCustomerId, db),
+    ]);
     return { outcome: "merged", merge };
   } catch (err) {
     console.error(`[identity-link] merge threw (source=${source}):`, err);
