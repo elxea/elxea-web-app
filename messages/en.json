@@ -49,19 +49,6 @@
   "cart": {
     "subtitle": "Items in your cart"
   },
-  "audio": {
-    "statePlay": "play",
-    "statePause": "pause",
-    "stateLoading": "loading",
-    "stateRetry": "retry",
-    "ariaPlay": "Play background music",
-    "ariaPause": "Pause background music",
-    "ariaLoading": "Loading background music",
-    "ariaError": "Background music failed to play — press to retry",
-    "noteDefault": "sound from nature",
-    "noteBlocked": "tap to allow sound",
-    "noteUnavailable": "sound unavailable"
-  },
   "home": {
     "tagline": "Single-Origin Japanese Tea",
     "hero": "Single-Origin Japanese Tea",

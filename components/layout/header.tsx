@@ -13,7 +13,6 @@ import {
 } from "@/components/ui/sheet";
 import { useCart } from "@/components/cart/cart-context";
 import { cn } from "@/lib/utils";
-import { AudioToggle } from "@/components/audio/audio-toggle";
 import { Logo } from "./logo";
 import { ChevronRight, Menu, X } from "lucide-react";
 
@@ -99,7 +98,9 @@ export function Header({ navItems: externalNavItems }: HeaderProps) {
         - Header / Right Cluster  x=237 w=1139 右端 1376 (= 1440 - 64) …… 右寄せ 1 段
           - Header / Nav     w=706、項目間 8px (spacing.2)、項目高 36px (spacing.9)
           - Header / Actions x=730 (Nav 右端 706 との差 = 24px / spacing.6)、項目間 8px
-            順序: Audio Toggle → 検索 → ログイン → カート
+            順序: 検索 → ログイン → カート
+            (2026-08-25 に先頭の BGM トグルを撤去。Setaka「メニュー内の再生機能は
+             いらない」。Figma 側の Actions 4 項目は次回の SoT 更新で 3 項目にする)
 
         SP 375 実測: ロゴ x=16 (= layout.grid.margin.mobile) 左 / MenuTrigger 右端 359。
 
@@ -142,7 +143,6 @@ export function Header({ navItems: externalNavItems }: HeaderProps) {
 
             {/* Header / Actions — 項目間 8px (spacing.2) */}
             <div className="flex items-center gap-2">
-              <AudioToggle className="hidden sm:flex" />
               <Button
                 variant="ghost"
                 size="sm"
@@ -220,8 +220,6 @@ export function Header({ navItems: externalNavItems }: HeaderProps) {
                     4. アカウント導線      7967:42101 px-16 pt-24 pb-32 / gap-24
 
                   Figma との意図的な差分:
-                  - AudioToggle: Figma フレームに無いが SP からの唯一の導線のため
-                    アカウント導線の末尾に残す (機能欠落を避ける)。
                   - Nav 項目: Figma は 6 件 (About を含む) のサンプルだが、実装は
                     ルートが実在する navItems を SoT とする (IA は別判断)。
                   - 「タップで閉じる: …」注記は Figma 上の仕様注記であり UI コピーでは
@@ -318,7 +316,6 @@ export function Header({ navItems: externalNavItems }: HeaderProps) {
                     <Link href="/cart" onClick={() => setMobileOpen(false)}>
                       {t("cart")} ({cartCount})
                     </Link>
-                    <AudioToggle />
                   </div>
                 </SheetContent>
               </Sheet>

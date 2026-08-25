@@ -15,7 +15,7 @@
       "figma_name": "Header (Module)",
       "code_path": "components/layout/header.tsx",
       "kind": "module",
-      "notes": "共通 chrome。AudioToggle/auth-status/language-switcher を内包。"
+      "notes": "共通 chrome。auth-status/language-switcher を内包 (BGM トグルは 2026-08-25 に撤去)。"
     },
     {
       "figma_node_id": "5662:49",
@@ -23,13 +23,6 @@
       "code_path": "components/layout/footer.tsx",
       "kind": "module",
       "notes": "共通 chrome。"
-    },
-    {
-      "figma_node_id": "6820:120",
-      "figma_name": "AudioToggle",
-      "code_path": "components/audio/audio-toggle.tsx",
-      "kind": "ds-component",
-      "notes": "Figma 上は Header 5653:29 内。コードは独立ファイル。"
     },
     {
       "figma_node_id": "6821:124",
@@ -736,7 +729,7 @@
       "figma_name": "開閉UI / R1: SPメニュー展開 — SP 375",
       "code_path": "components/layout/header.tsx",
       "kind": "module",
-      "notes": "SP ハンバーガー展開時の全幅オーバーレイ (Sheet)。ヘッダー56 / Nav行56 / 検索(下線2px) / アカウント導線の4ブロック。AudioToggle は Figma 非掲載だが機能維持のため末尾に残す (意図的差分)。"
+      "notes": "SP ハンバーガー展開時の全幅オーバーレイ (Sheet)。ヘッダー56 / Nav行56 / 検索(下線2px) / アカウント導線の4ブロック。BGM トグルは 2026-08-25 に撤去 (Setaka 指示)。"
     },
     {
       "figma_node_id": "8079:3748",
