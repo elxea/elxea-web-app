@@ -18,8 +18,15 @@
  * 作る正規手段は Multipass だけで、Plus プラン + legacy 会員に限られる)。
  * つまり「権限を絞っている」のではなく **構造上取れない**。ここは変えない。
  *
- * 逆に、お気に入り・フォロー・イベント申込は Firestore 側にあり、
+ * 逆に、お気に入り・イベント申込は Firestore 側にあり、
  * `resolveIdentity()` が LINE の識別子でも解決するので両方の経路で使える。
+ *
+ * ## 「フォロー中の農家」の節はもう無い (J-5 決裁)
+ *
+ * 農家は「お気に入り」の 4 分類目になったので、独立した節を持たない。以前の
+ * `follows` 節は、農家をフォローする入口が失われたまま枠だけが残っており、
+ * しかもこの節だけ `splitSectionItems` を通らず無条件に描かれていた
+ * (カタログ側の `follows` 項目はどこからも参照されない死んだ設定だった)。
  *
  * 設計レビュー: https://www.notion.so/3c170c9d064c81029b17d29d86739c21
  */
@@ -72,13 +79,12 @@ export function accountActionHref(target: AccountActionTarget, locale: string): 
 }
 
 /** マイページの節。並び順は `ACCOUNT_SECTION_ORDER`。 */
-export type AccountSectionId = "upcoming" | "continue" | "follows" | "past" | "payment";
+export type AccountSectionId = "upcoming" | "favorites" | "past" | "payment";
 
 export type AccountItemId =
   | "subscriptions"
   | "events"
   | "favorites"
-  | "follows"
   | "orders"
   | "payment";
 
@@ -130,17 +136,9 @@ export const ACCOUNT_ITEMS = [
   },
   {
     id: "favorites",
-    section: "continue",
+    section: "favorites",
     requires: "signed-in",
     lockedTitleKey: "favorites",
-    lockedReasonKey: "signInRequiredReason",
-    lockedAction: null,
-  },
-  {
-    id: "follows",
-    section: "follows",
-    requires: "signed-in",
-    lockedTitleKey: "followingFarmers",
     lockedReasonKey: "signInRequiredReason",
     lockedAction: null,
   },
@@ -165,8 +163,7 @@ export const ACCOUNT_ITEMS = [
 /** 節の並び順 (確定版 Figma 8095:731 の順)。 */
 export const ACCOUNT_SECTION_ORDER = [
   "upcoming",
-  "continue",
-  "follows",
+  "favorites",
   "past",
   "payment",
 ] as const satisfies readonly AccountSectionId[];

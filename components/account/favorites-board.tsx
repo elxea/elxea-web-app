@@ -9,11 +9,9 @@ import {
   AccountCardGrid,
   AccountExpCard,
   AccountSectionHeader,
-  AccountTitleBlock,
 } from "@/components/account/account-parts";
 import { captionClass } from "@/components/editorial/rule-list";
 import { Button } from "@/components/ui/button";
-import { Link } from "@/i18n/navigation";
 import {
   FAVORITE_KIND_META,
   countFavorites,
@@ -27,7 +25,15 @@ import { applyLocalFavorite } from "@/lib/favorites/client-store";
 import { cn } from "@/lib/utils";
 
 /**
- * お気に入り一覧 (/ja/account/favorites) の本体。
+ * お気に入り (マイページ本体の 1 節)。
+ *
+ * ## 別ページのワンクッションをやめた (Setaka 実機指摘 2026-08-25)
+ *
+ * ここは以前 `/ja/account/favorites` という**別ページ**で、マイページ本体には
+ * 抜粋 6 枚と「お気に入りをすべて見る」というリンクだけが載っていた。自分が
+ * 保存したものを見るのに 1 回よけいに遷移が要り、しかも抜粋に入らなかった種類は
+ * マイページから存在ごと見えなかった。いまはマイページの中で **分類ごとに直接**
+ * 出す (`/account/favorites` は本ページへの恒久リダイレクト)。
  *
  * ## なぜクライアント側なのか
  *
@@ -100,10 +106,17 @@ export function FavoritesBoard({ groups: initialGroups }: { groups: FavoriteGrou
 
   return (
     <>
-      <AccountTitleBlock
-        title={t("favorites")}
-        identity={total > 0 ? t("favoritesCount", { count: total }) : t("noFavorites")}
-        back={{ label: t("backToAccountLink"), href: "/account" }}
+      {/* 節の見出しと総件数。総件数も state の `groups` から数える (出どころを
+          1 本にしておかないと、解除したのに件数だけ古いままになる = F14)。 */}
+      <AccountSectionHeader
+        title={
+          <span className="flex items-baseline gap-3">
+            {t("favoritesHeading")}
+            <span className={cn(captionClass, "text-muted-foreground")}>
+              {total > 0 ? t("favoritesCount", { count: total }) : t("noFavorites")}
+            </span>
+          </span>
+        }
       />
 
       {groups.map((group) => {
@@ -170,17 +183,6 @@ export function FavoritesBoard({ groups: initialGroups }: { groups: FavoriteGrou
         );
       })}
 
-      <div className="page-container pt-6 pb-16 lg:pt-8 lg:pb-24">
-        <Link
-          href="/account"
-          className={cn(
-            captionClass,
-            "text-muted-foreground transition-colors hover:text-foreground"
-          )}
-        >
-          {t("backToAccountLink")}
-        </Link>
-      </div>
     </>
   );
 }

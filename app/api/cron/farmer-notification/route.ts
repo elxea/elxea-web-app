@@ -144,29 +144,70 @@ type FollowerDoc = {
   customerName: string;
 };
 
+/**
+ * この農家を保存している人を集める。
+ *
+ * ## 2 か所を見て 1 つに束ねる (移行期の必須処理)
+ *
+ * 農家の保存先は `follows` から `favorites` (`type: "farmer"`) へ移した (J-5)。
+ * 移行スクリプトは**元の `follows` を消さない**ので、移行の前後どちらの時点でも
+ * 取りこぼしが出ないよう **両方を読んで人単位で束ねる**。
+ *
+ * 片方だけを読むと、その瞬間に配信が静かに止まる —
+ *   - `favorites` だけ … 移行を流す前は 0 件になる (デプロイした瞬間に配信停止)
+ *   - `follows` だけ  … 移行後に保存した人へ届かない (新規が永久に漏れる)
+ * どちらも「エラーは出ないのに誰にも届かない」形の壊れ方をする。
+ *
+ * 同じ人が両方に居るのは移行後の正常な状態なので、`customerId` で重複を落とす。
+ */
 async function getFollowersForFarmer(
   farmerSlug: string
 ): Promise<FollowerDoc[]> {
   const db = getAdminFirestore();
 
-  // Collection group query: all `follows` subcollections where farmerSlug matches
-  const snapshot = await db
-    .collectionGroup("follows")
-    .where("farmerSlug", "==", farmerSlug)
-    .get();
+  const [legacy, saved] = await Promise.all([
+    // 旧: users/{customerId}/follows/{docId}
+    db.collectionGroup("follows").where("farmerSlug", "==", farmerSlug).get(),
+    // 新: users/{customerId}/favorites/{docId} (type: "farmer" / targetId: slug)
+    db
+      .collectionGroup("favorites")
+      .where("type", "==", "farmer")
+      .where("targetId", "==", farmerSlug)
+      .get(),
+  ]);
 
-  return snapshot.docs.map((doc) => {
+  const byCustomer = new Map<string, FollowerDoc>();
+
+  for (const doc of legacy.docs) {
     const data = doc.data();
-    // Path: users/{customerId}/follows/{docId}
     const customerId = doc.ref.parent.parent?.id ?? "";
-    return {
+    if (!customerId) continue;
+    byCustomer.set(customerId, {
       farmerSlug: data.farmerSlug as string,
       farmerName: data.farmerName as string,
       customerId,
       customerEmail: data.customerEmail as string,
       customerName: data.customerName as string,
-    };
-  });
+    });
+  }
+
+  for (const doc of saved.docs) {
+    const data = doc.data();
+    const customerId = doc.ref.parent.parent?.id ?? "";
+    if (!customerId || byCustomer.has(customerId)) continue;
+    /* お気に入りの行は農家名 (`title`) しか持たない。宛先の氏名・メールは
+       ここでは分からないので空にしておく — 呼び出し側が Shopify から引き直す
+       ときに、推測した値で上書きされないようにする。 */
+    byCustomer.set(customerId, {
+      farmerSlug,
+      farmerName: (data.title as string) ?? farmerSlug,
+      customerId,
+      customerEmail: "",
+      customerName: "",
+    });
+  }
+
+  return [...byCustomer.values()];
 }
 
 /**

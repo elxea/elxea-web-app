@@ -16,7 +16,6 @@ import {
   AccountSectionHeader,
   AccountTitleBlock,
 } from "@/components/account/account-parts";
-import { FollowsSection } from "@/components/account/follows-section";
 import { LineLinkageEntry } from "@/components/account/line-linkage-entry";
 import { captionClass } from "@/components/editorial/rule-list";
 import { Button } from "@/components/ui/button";
@@ -29,8 +28,14 @@ import {
 } from "@/lib/line/linkage-status";
 import { readVerifiedLineUserId } from "@/lib/line/session";
 import { LINK_RESULT_PARAM } from "@/lib/line/link-flow";
+import { FavoritesBoard } from "@/components/account/favorites-board";
 import { FavoritesSeed } from "@/components/favorites/favorites-seed";
-import { FAVORITE_KIND_META, favoriteKeysOf } from "@/lib/account-favorites";
+import {
+  favoriteKeysOf,
+  groupFavorites,
+  normalizeFavorites,
+  type FavoriteGroup,
+} from "@/lib/account-favorites";
 import {
   ACCOUNT_SECTION_ORDER,
   accountActionHref,
@@ -43,7 +48,6 @@ import {
 } from "@/lib/account-capabilities";
 import {
   buildAccountView,
-  buildContinueItems,
   buildUpcoming,
   formatRecordDate,
   type AccountRecord,
@@ -70,11 +74,10 @@ export async function generateMetadata(): Promise<Metadata> {
  *   1. TitleBlock          主見出し + 「…としてログイン中」(+ PC のみ「設定・契約 →」)
  *   2. GreetingBand        面つきの挨拶
  *   3. これから            次回の定期便 + これから開催のイベント申込 (RecordCard)
- *   4. 続き                お気に入り (ExpCard)
- *   5. フォロー中の農家
- *   6. これまで            注文履歴 (RecordCard)
- *   7. お支払い方法        ご登録のカード (PaymentMethodCard) + 変更は外部リンク 1 本
- *   8. AccountOpsBand      契約・お支払い・お届け先の案内 + CTA
+ *   4. お気に入り          商品 / 読みもの / 人 / 農家を分類ごとに全件 + 解除
+ *   5. これまで            注文履歴 (RecordCard)
+ *   6. お支払い方法        ご登録のカード (PaymentMethodCard) + 変更は外部リンク 1 本
+ *   7. AccountOpsBand      契約・お支払い・お届け先の案内 + CTA
  *
  * ## ログイン経路で画面を切り替えない
  *
@@ -190,7 +193,14 @@ export default async function AccountPage({
      既にサーバの手元にある (`loadActivity` は `React.cache` で 1 回に畳んである)。
      渡しておけば、この画面の保存トグルは往復ゼロで 1 枚目から状態が確定する。
      PREVIEW_SEED の見本表示では実セッションが無いので渡さない。 */
-  const favoriteKeys = seeded ? [] : favoriteKeysOf((await loadActivity()).favorites);
+  /* お気に入りは 1 回だけ読み (`loadActivity` は `React.cache` で畳んである)、
+     2 つの用途に配る — 画面に出す分類別の一覧と、保存トグルへ渡す初期値。
+     見本表示 (PREVIEW_SEED) では実セッションが無いので節ごと出さない。 */
+  const rawFavorites = seeded ? [] : (await loadActivity()).favorites;
+  const favoriteKeys = favoriteKeysOf(rawFavorites);
+  const favoriteGroups: FavoriteGroup[] | null = seeded
+    ? null
+    : groupFavorites(normalizeFavorites(rawFavorites));
 
   /* 連携フロー (P2) から戻ってきた直後の結果。値は 2 つだけを許し、それ以外は無視する
      (任意の文字列を画面の分岐に持ち込ませない)。表示は LineLinkageEntry の中に閉じ、
@@ -284,54 +294,26 @@ export default async function AccountPage({
       );
     })(),
 
-    /* 4. 続き — お気に入りの抜粋。
-       ここは **抜粋** (`ACCOUNT_CONTINUE_LIMIT` = 6 枚) で、全件・種類別・解除は
-       /account/favorites が引き受ける。以前は 2 枚しか出ないうえ「すべて見る」が
-       ジャーナル一覧 (= 自分のお気に入りではない) へ飛んでいたので、残りに辿り
-       着けなかった (Setaka 指摘 2026-08-25)。
-       カードのラベルは種類ごとに変える — 全部「お気に入り」だと、並んだカードの
-       どれが商品でどれが読みものか押すまで分からない。 */
-    continue: (() => {
-      const { locked } = splitSectionItems("continue", auth);
-      if (view.continueItems.length === 0 && locked.length === 0) return null;
+    /* 4. お気に入り — **分類ごとに、この画面で直接**出す。
+       ここは以前「続き」という抜粋 6 枚で、全件・種類別・解除は
+       /account/favorites という別ページが引き受けていた。自分が保存したものを
+       見るのに 1 回よけいに遷移が要り、抜粋に入らなかった種類はマイページから
+       存在ごと見えなかった (Setaka 実機指摘 2026-08-25)。別ページは本ページへの
+       恒久リダイレクトにし、中身をここへ移した。
+       解除の状態を持つのは `FavoritesBoard` 側だけ (件数の出どころを 2 つに
+       分けると、解除したのに件数だけ古いままになる = F14 の再発)。 */
+    favorites: (() => {
+      const { locked } = splitSectionItems("favorites", auth);
+      if (favoriteGroups === null) return null;
       return (
         <>
-          <AccountSectionHeader
-            title={t("continueHeading")}
-            action={{ label: t("continueAll"), href: "/account/favorites" }}
-          />
-          <AccountCardGrid columns={2}>
-            {view.continueItems.map((item) => (
-              <AccountExpCard
-                key={item.id}
-                label={t(FAVORITE_KIND_META[item.kind].labelKey)}
-                title={item.title}
-                imageUrl={item.imageUrl}
-                imageAlt={item.title}
-                href={item.href}
-              />
-            ))}
-            {locked.map(lockedCard)}
-          </AccountCardGrid>
+          <FavoritesBoard groups={favoriteGroups} />
+          {locked.length > 0 ? (
+            <AccountCardGrid columns={2}>{locked.map(lockedCard)}</AccountCardGrid>
+          ) : null}
         </>
       );
     })(),
-
-    /* 5. フォロー中の農家 — 経路によらず出す。
-       Firestore 側の情報なので LINE だけの人にも引ける (`resolveIdentity()` が
-       LINE の識別子を解決する)。以前はこの節が LINE 側の画面にしか無かった。
-       造作は旧世代の `account-panel` のままで、R2 確定版が起きたら寄せる。 */
-    follows: (
-      <div className="page-container">
-        <FollowsSection
-          title={t("followingFarmers")}
-          emptyMessage={t("noFollows")}
-          errorMessage={t("actionError")}
-          removedMessage={t("unfollowed")}
-          locale={locale}
-        />
-      </div>
-    ),
 
     /* 6. これまで — 注文履歴 */
     past: (() => {
@@ -493,7 +475,6 @@ async function loadAccountView(customer: Customer): Promise<AccountView> {
   return buildAccountView({
     customer,
     subscriptions,
-    favorites: activity.favorites,
     events: activity.events,
   });
 }
@@ -512,7 +493,6 @@ async function loadLineOnlyAccountView(displayName: string | null): Promise<Acco
     displayName,
     email: null,
     upcoming: buildUpcoming({ subscriptions: [], events: activity.events }),
-    continueItems: buildContinueItems(activity.favorites),
     past: [],
     paymentMethod: null,
     seeded: false,
