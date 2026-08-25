@@ -14,7 +14,6 @@ import { AuthorByline } from "@/components/journal/author-byline";
 import { ArticleProse } from "@/components/journal/article-blocks";
 import { SpecBand } from "@/components/editorial/section-blocks";
 import { PortableText } from "@/components/sanity/portable-text";
-import { isFictionalSlug } from "@/lib/fictional-content";
 import {
   CuratorQuote,
   PhotoCardGrid,
@@ -118,7 +117,6 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  if (isFictionalSlug("playlist", slug)) return {};
   try {
     const pl: Playlist | null = await getClient().fetch(PLAYLIST_BY_SLUG_QUERY, { slug });
     if (!pl) return {};
@@ -147,9 +145,6 @@ export default async function PlaylistDetailPage({
   const locale = await getLocale();
   const t = await getTranslations("playlist");
   const bt = await getTranslations("breadcrumb");
-
-  // Fictional/seed playlist -> behave as if the document does not exist.
-  if (isFictionalSlug("playlist", slug)) notFound();
 
   let pl: Playlist | null;
   let others: OtherPlaylist[] = [];

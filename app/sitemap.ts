@@ -141,8 +141,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       `*[_type == "playlist" && defined(slug.current)]{ "slug": slug.current, _updatedAt }`
     );
     for (const pl of playlists) {
-      // Skip the seed playlists (tracks are a placeholder bgm.mp3).
-      if (isFictionalSlug("playlist", pl.slug)) continue;
+      // プレイリストは遮断しない (Setaka 2026-08-26 に 8/22 の非表示判断を上書き)。
       for (const locale of locales) {
         entries.push({
           url: `${BASE_URL}/${locale}/playlists/${pl.slug}`,
