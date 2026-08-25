@@ -11,7 +11,6 @@ import { Toaster } from "@/components/ui/sonner";
 import { LenisProvider } from "@/components/providers/lenis-provider";
 import { ChatProvider } from "@/components/chat/chat-provider";
 import { ChatBar } from "@/components/chat/chat-bar";
-import { AudioProvider } from "@/components/audio/audio-provider";
 import { ArticleAudioProvider } from "@/components/audio/article-audio-provider";
 import { AudioDock } from "@/components/audio/audio-dock";
 import { getClient } from "@/sanity/lib/client";
@@ -134,7 +133,6 @@ export default async function LocaleLayout({
       </head>
       <body className="min-h-screen flex flex-col bg-background text-foreground">
         <NextIntlClientProvider messages={messages}>
-          <AudioProvider>
           {/* 記事音声はページ遷移で止めない (SoundCloud 方式)。provider を
               ここに常駐させるのが前提条件で、記事ページ側に置くと遷移で
               unmount され再生が必ず切れる。 */}
@@ -153,7 +151,6 @@ export default async function LocaleLayout({
             </ChatProvider>
           </CartProviderWrapper>
           </ArticleAudioProvider>
-          </AudioProvider>
         </NextIntlClientProvider>
       </body>
     </html>
