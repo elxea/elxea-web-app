@@ -17,6 +17,22 @@ import {
 const ROOT = join(__dirname, "..");
 const read = (relative: string) => readFileSync(join(ROOT, relative), "utf8");
 
+/**
+ * コメントを落としたソース。「この名前が**書かれていない**こと」を縛るときに使う。
+ *
+ * 撤去した機能は doc コメントに経緯を残すので、素のソースを見ると
+ * 「以前は `FollowsSection` を置いていた」という説明文が本物の実装と区別できず、
+ * 経緯を書いた瞬間にテストが赤くなる。見るのはコメントを除いた側にする。
+ * (`__tests__/account-favorites.test.ts` の同名ヘルパと同じ考え方。)
+ *
+ * 文字列の中の `//` (URL 等) までは面倒を見ないので、対象ファイルに
+ * それが無いことを確かめてから使うこと。
+ */
+const readCode = (relative: string) =>
+  read(relative)
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/\/\/[^\n]*/g, "");
+
 const EMAIL_ONLY: AccountAuth = { shopify: true, line: false };
 const LINE_ONLY: AccountAuth = { shopify: false, line: true };
 const BOTH: AccountAuth = { shopify: true, line: true };
@@ -49,9 +65,11 @@ describe("マイページの項目カタログ", () => {
     }
   });
 
-  it("「フォロー中の農家」はどちらの経路でも見られる (旧: LINE 側にしか無かった)", () => {
-    expect(isAvailable("follows", LINE_ONLY)).toBe(true);
-    expect(isAvailable("follows", EMAIL_ONLY)).toBe(true);
+  it("「フォロー中の農家」の項目はもう無い (お気に入りの 4 分類目へ統合・J-5)", () => {
+    /* 農家は `favorites` の `type: "farmer"` になったので、独立した項目・節を
+       持たない。カタログに `follows` が復活すると、画面に「別の動詞」が戻る。 */
+    expect(ACCOUNT_ITEMS.map((item) => item.id)).not.toContain("follows");
+    expect(ACCOUNT_SECTION_ORDER as readonly string[]).not.toContain("follows");
   });
 
   it("お気に入り・イベント申込も両方の経路で見られる (Firestore 側の情報)", () => {
@@ -131,9 +149,33 @@ describe("マイページはログイン経路で画面ごと切り替えない"
     expect(page).toContain("account-capabilities");
   });
 
-  it("「フォロー中の農家」はマイページ本体に置かれている", () => {
-    expect(page).toContain("FollowsSection");
-    expect(page).toContain("followingFarmers");
+  /**
+   * 「フォロー中の農家」の節は撤去し、農家はお気に入りの 4 分類目にした (J-5)。
+   *
+   * 経緯は doc コメントに残すので、名前の出現ではなく **実体** で見る
+   * (`readCode` でコメントを落とした側を見る)。節・部品・文言のどれか 1 つでも
+   * 戻ると、利用者から見て「別の動詞」が画面に復活する。
+   */
+  it("「フォロー中の農家」の節はもう無い (お気に入りへ統合・J-5)", () => {
+    const code = readCode("app/[locale]/account/page.tsx");
+    expect(code).not.toContain("FollowsSection");
+    expect(code).not.toContain("followingFarmers");
+    expect(() => read("components/account/follows-section.tsx")).toThrow();
+    expect(() => read("components/farmers/follow-button.tsx")).toThrow();
+    expect(() => read("app/api/user/follows/route.ts")).toThrow();
+  });
+
+  /**
+   * お気に入りはマイページ本体で **分類ごとに直接** 出す。
+   * 「続き」の抜粋 6 枚 + 「お気に入りをすべて見る」リンクという
+   * ワンクッションは廃止した (Setaka 実機指摘 2026-08-25)。
+   */
+  it("お気に入りは抜粋ではなく分類ごとに本体へ出す", () => {
+    const code = readCode("app/[locale]/account/page.tsx");
+    expect(code).toContain("FavoritesBoard");
+    expect(code).not.toContain("continueAll");
+    expect(code).not.toContain("continueHeading");
+    expect(code).not.toContain("buildContinueItems");
   });
 });
 

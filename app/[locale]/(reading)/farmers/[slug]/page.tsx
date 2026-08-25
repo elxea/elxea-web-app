@@ -14,7 +14,7 @@ import { AuthorByline } from "@/components/journal/author-byline";
 import { ArticleProse } from "@/components/journal/article-blocks";
 import { SpecBand } from "@/components/editorial/section-blocks";
 import { PortableText } from "@/components/sanity/portable-text";
-import { FollowButton } from "@/components/farmers/follow-button";
+import { FavoriteToggleButton } from "@/components/favorites/favorite-toggle-button";
 import { CommentSection } from "@/components/community/comment-section";
 import {
   FarmerCardGrid,
@@ -439,20 +439,28 @@ export default async function FarmerPage({
       {/* 以下は Figma 確定版に枠が無い既存機能 (意図的差分)。購入導線より後に
           置き、読み物としての流れを壊さない。 */}
       <FarmerSection>
-        <FollowButton
-          farmerSlug={slug}
-          farmerName={farmer.name}
-          farmerImageUrl={
+        {/* 農家も「お気に入り」の 4 分類目 (J-5 決裁)。以前ここは「フォローする」
+            という別の動詞・別のコレクションだった。動詞も保存先も部品も、他の
+            3 種類と同じにする。 */}
+        <FavoriteToggleButton
+          kind="farmer"
+          targetId={slug}
+          title={farmer.name}
+          imageUrl={
             farmer.photo?.asset
               ? urlFor(farmer.photo).width(80).height(80).url()
               : null
           }
-          followLabel={t("follow")}
-          unfollowLabel={t("unfollow")}
-          followedMessage={t("followedMessage")}
-          unfollowedMessage={t("unfollowedMessage")}
-          errorMessage={tCommon("error")}
-          loginRequiredMessage={tCommon("loginRequired")}
+          appearance="panel"
+          labels={{
+            add: t("follow"),
+            remove: t("unfollow"),
+            saved: t("followSaved"),
+            added: t("followedMessage"),
+            removed: t("unfollowedMessage"),
+            error: tCommon("error"),
+            loginRequiredMessage: tCommon("loginRequired"),
+          }}
         />
       </FarmerSection>
 

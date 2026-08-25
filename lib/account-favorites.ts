@@ -34,7 +34,7 @@
  *
  * 並びは一覧ページ (/account/favorites) の節の並びでもある。
  */
-export const FAVORITE_KINDS = ["product", "article", "person"] as const;
+export const FAVORITE_KINDS = ["product", "article", "person", "farmer"] as const;
 
 export type FavoriteKind = (typeof FAVORITE_KINDS)[number];
 
@@ -58,15 +58,6 @@ type FavoriteKindMeta = {
   labelKey: string;
   /** 0 件のときに出す「探しに行く」導線のラベル (`common.*` のキー)。 */
   browseLabelKey: string;
-  /**
-   * マイページ本体の「続き」(抜粋 6 枚) に出すときの種類の優先順位 (小さいほど先)。
-   *
-   * 抜粋は枚数が限られるので、並べる順で「その種類が 1 枚も出ない」が起きる。
-   * どの種類を先に見せるかは表示の判断なので、`FAVORITE_KINDS` (= データの並び)
-   * とは別に持つ。`Record<FavoriteKind, …>` の一部なので、**種類を足すとここも
-   * 埋めないと型エラーになる** = 新しい種類が抜粋から黙って漏れることが無い。
-   */
-  continueRank: number;
 };
 
 /**
@@ -81,7 +72,6 @@ export const FAVORITE_KIND_META: Record<FavoriteKind, FavoriteKindMeta> = {
     emptyKey: "noFavoriteProducts",
     labelKey: "favoriteKindProduct",
     browseLabelKey: "products",
-    continueRank: 2,
   },
   article: {
     basePath: "/journal",
@@ -90,15 +80,12 @@ export const FAVORITE_KIND_META: Record<FavoriteKind, FavoriteKindMeta> = {
     emptyKey: "noFavoriteArticles",
     labelKey: "favoriteKindArticle",
     browseLabelKey: "journal",
-    continueRank: 0,
   },
   /**
    * 人 (作り手・つくり手を訪ねた記事の主・聞き手など `/people/[slug]` に載る人)。
    *
    * `browsePath` が `/journal` なのは上記のとおり `/people` 一覧が無いため。
    * 人のページへは読みものの著者名から入るので、0 件のときの導線も読みものへ送る。
-   * `continueRank` は読みものの次 — 人のページは読みものの延長で見るものなので、
-   * 商品より読みもの側に寄せる。
    */
   person: {
     basePath: "/people",
@@ -107,19 +94,34 @@ export const FAVORITE_KIND_META: Record<FavoriteKind, FavoriteKindMeta> = {
     emptyKey: "noFavoritePeople",
     labelKey: "favoriteKindPerson",
     browseLabelKey: "journal",
-    continueRank: 1,
+  },
+  /**
+   * 農家 (茶畑をたずねた先の作り手)。**4 分類目として独立させる** (J-5 決裁)。
+   *
+   * ここは以前「フォロー中の農家」という**別の動詞・別のコレクション**だった。
+   * 利用者から見ると「お気に入りの人」と「フォロー中の農家」が並んでいて、
+   * 内部の都合 (別コレクション・別 Sanity 型) がそのまま画面に露出していた。
+   * しかも農家をフォローする入口 (`/farmers/[slug]`) への導線が失われていたため、
+   * 節だけが残って中身が増えない状態になっていた。
+   *
+   * 「人 (著者)」へ畳まないのは、Sanity 上も別の content type で、利用者にとっても
+   * 意味が違うため。無理に 1 つにすると、どちらを探せばよいのか分からなくなる。
+   *
+   * `browsePath` が `/about` なのは、**農家一覧 (`/farmers`) が 2026-08-14 に
+   * 廃止されている**ため (`app/sitemap.ts` に経緯)。詳細 (`/farmers/[slug]`) だけが
+   * 残っており、`basePath` をそのまま 0 件の導線にすると 404 へ送ることになる。
+   * 人 (`/people`) と同じ形の落とし穴で、実在して農家が並ぶ面は `/about` の
+   * 作り手の節。ここが唯一の一覧なのでそこへ送る。
+   */
+  farmer: {
+    basePath: "/farmers",
+    browsePath: "/about",
+    headingKey: "favoriteFarmers",
+    emptyKey: "noFavoriteFarmers",
+    labelKey: "favoriteKindFarmer",
+    browseLabelKey: "about",
   },
 };
-
-/**
- * 「続き」(マイページ本体の抜粋) に出す種類の順。`continueRank` の昇順。
- *
- * 呼び出し側が並びを自前で書かないための唯一の出口。ここを経由する限り、
- * 種類を足したときに抜粋から漏れることが無い。
- */
-export const FAVORITE_CONTINUE_ORDER: readonly FavoriteKind[] = [...FAVORITE_KINDS].sort(
-  (a, b) => FAVORITE_KIND_META[a].continueRank - FAVORITE_KIND_META[b].continueRank
-);
 
 /**
  * 一覧ページで 1 種類あたりに描く上限。

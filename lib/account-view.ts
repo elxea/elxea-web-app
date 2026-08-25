@@ -16,12 +16,7 @@
  *   カードを描かず外部リンクだけを残す。権限が付いたらここに取得を足す。
  */
 
-import {
-  FAVORITE_CONTINUE_ORDER,
-  normalizeFavorites,
-  type FavoriteInput,
-  type FavoriteKind,
-} from "@/lib/account-favorites";
+import { type FavoriteInput, type FavoriteKind } from "@/lib/account-favorites";
 
 export type AccountRecordKind = "subscription" | "event" | "order";
 
@@ -60,7 +55,6 @@ export type AccountView = {
   displayName: string | null;
   email: string | null;
   upcoming: AccountRecord[];
-  continueItems: AccountMediaItem[];
   past: AccountRecord[];
   paymentMethod: AccountPaymentMethod | null;
   /** プレビュー用の見本データで描いているか (production では常に false)。 */
@@ -69,13 +63,6 @@ export type AccountView = {
 
 /** 節ごとの最大枚数。Figma の 1 行分 (PC これから 3 / これまで 3)。 */
 export const ACCOUNT_UPCOMING_LIMIT = 3;
-/**
- * 「続き」= お気に入りの抜粋枚数。Figma 確定版は 1 行 (2 枚) だったが、
- * 2 枚では「お気に入りに入れたのに見当たらない」状態になる (Setaka 指摘
- * 2026-08-25)。PC 2 列 × 3 行の 6 枚に広げ、全件は
- * `/account/favorites` (種類別・解除つき) へ送る。
- */
-export const ACCOUNT_CONTINUE_LIMIT = 6;
 export const ACCOUNT_PAST_LIMIT = 3;
 
 /* -------------------------------------------------------------------------- */
@@ -182,68 +169,6 @@ export function buildUpcoming({
   return [...fromSubscriptions, ...fromEvents].sort(byDateAsc).slice(0, ACCOUNT_UPCOMING_LIMIT);
 }
 
-/**
- * 「続き」= お気に入りの抜粋。
- *
- * 正規化 (何を落とすか・遷移先をどう組むか) は `lib/account-favorites.ts` が正本で、
- * ここは並べ方と枚数だけを決める。以前はこの関数の中に同じ正規化をもう一度
- * 書いていたので、一覧ページと抜粋で落ちる件が食い違う余地があった。
- *
- * 並びは **種類ごとにまとめる** (読みもの → 人 → 商品)。混ぜて時系列に並べると、
- * 6 枚のなかで種類がばらけて「種類別に見たい」という要望から遠ざかる。
- * 種類の中の順序は入力順 (= createdAt 降順) のまま。
- *
- * ## どの種類も必ず 1 枚は顔を出す (F4)
- *
- * 以前は「優先順位の高い種類から順に 6 枚で打ち切る」だけだった。種類が 2 つの
- * うちは実害が無かったが、3 つ目 (人) を足した瞬間に **後ろの種類が 1 枚も
- * 出なくなる** 事故が起きる (実測: 読みもの 4 + 人 2 で 6 枚が埋まり、商品が
- * まるごと消えた)。お客さまから見ると「商品のお気に入りが無くなった」であり、
- * 種類が増えるたびに末尾の種類が黙って落ちていく壊れ方をする。
- *
- * そこで **枠の割り当てだけ順番に 1 枚ずつ配り** (優先順位の高い種類から)、
- * 描くときは種類ごとにまとめ直す。持っている種類が少なければ余った枠は
- * そのまま前の種類に回るので、1 種類しか無い人の見え方は変わらない。
- */
-export function buildContinueItems(favorites: AccountFavoriteInput[]): AccountMediaItem[] {
-  const entries = normalizeFavorites(favorites);
-
-  /* 種類の優先順位は `FAVORITE_KIND_META.continueRank` が正本 (確定版の 1 枚目は
-     読みもの = `FAVORITE_KINDS` の並びとは別)。ここに語を並べ直すと、種類が
-     増えたときに抜粋から黙って漏れる — 実際 F3 までの並びは
-     ["article","product"] のベタ書きで、人を足しても出なかった。 */
-  const order: readonly FavoriteKind[] = FAVORITE_CONTINUE_ORDER;
-
-  const byKind = new Map<FavoriteKind, typeof entries>(
-    order.map((kind) => [kind, entries.filter((entry) => entry.kind === kind)])
-  );
-
-  /* 枠を 1 枚ずつ配る。配れる種類が無くなるか、枠を使い切ったら終わり。 */
-  const quota = new Map<FavoriteKind, number>(order.map((kind) => [kind, 0]));
-  let assigned = 0;
-  let assignedThisRound = true;
-  while (assigned < ACCOUNT_CONTINUE_LIMIT && assignedThisRound) {
-    assignedThisRound = false;
-    for (const kind of order) {
-      if (assigned >= ACCOUNT_CONTINUE_LIMIT) break;
-      const taken = quota.get(kind) ?? 0;
-      if (taken >= (byKind.get(kind)?.length ?? 0)) continue;
-      quota.set(kind, taken + 1);
-      assigned += 1;
-      assignedThisRound = true;
-    }
-  }
-
-  return order
-    .flatMap((kind) => (byKind.get(kind) ?? []).slice(0, quota.get(kind) ?? 0))
-    .map((entry) => ({
-      id: entry.id,
-      kind: entry.kind,
-      title: entry.title,
-      imageUrl: entry.imageUrl,
-      href: entry.href,
-    }));
-}
 
 /** 「これまで」= 注文履歴 (新しい順)。 */
 export function buildPast(customer: AccountCustomerInput): AccountRecord[] {
@@ -281,13 +206,11 @@ export function buildPast(customer: AccountCustomerInput): AccountRecord[] {
 export function buildAccountView({
   customer,
   subscriptions = [],
-  favorites = [],
   events = [],
   now,
 }: {
   customer: AccountCustomerInput;
   subscriptions?: AccountSubscriptionInput[];
-  favorites?: AccountFavoriteInput[];
   events?: AccountEventInput[];
   now?: Date;
 }): AccountView {
@@ -295,7 +218,6 @@ export function buildAccountView({
     displayName: accountDisplayName(customer),
     email: str(customer.emailAddress?.emailAddress),
     upcoming: buildUpcoming({ subscriptions, events, now }),
-    continueItems: buildContinueItems(favorites),
     past: buildPast(customer),
     paymentMethod: null,
     seeded: false,

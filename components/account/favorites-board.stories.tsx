@@ -100,11 +100,19 @@ function kindCount(root: HTMLElement, kind: string): string | null {
   return section.querySelector("h2 span span")?.textContent ?? null;
 }
 
-/** 見出し (`AccountTitleBlock`) に出ている合計。 */
+/**
+ * 節の見出し「お気に入り」の脇に出ている合計。
+ *
+ * マイページ本体の 1 節になったので、見出しはページ見出し (`AccountTitleBlock`)
+ * ではなく節見出し (`AccountSectionHeader`) が担う。分類ごとの節も同じ部品を使う
+ * ため、**分類の節の中に無い方** (= 最初に現れる、板全体の見出し) を取る。
+ */
 function totalCount(root: HTMLElement): string {
-  const block = root.querySelector('[data-slot="account-title-block"]');
-  if (!block) throw new Error("見出しブロックが描かれていない");
-  return block.querySelector("p")?.textContent ?? "";
+  const header = Array.from(
+    root.querySelectorAll('[data-slot="account-section-header"]')
+  ).find((el) => !el.closest('[data-slot="favorites-group"]'));
+  if (!header) throw new Error("お気に入りの節見出しが描かれていない");
+  return header.querySelector("h2 span span")?.textContent ?? "";
 }
 
 /**
