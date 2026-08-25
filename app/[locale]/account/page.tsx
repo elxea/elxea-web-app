@@ -38,6 +38,7 @@ import {
 } from "@/lib/account-favorites";
 import {
   ACCOUNT_SECTION_ORDER,
+  canRenderAccountShell,
   isAvailable,
   isSignedIn,
   splitSectionItems,
@@ -145,7 +146,13 @@ export default async function AccountPage({
 
   /* 計測用の見本 (PREVIEW_SEED=1 のときだけ) は実セッションを持たないので、
      cookie が 1 つも無くても骨格を出す必要がある。 */
-  if (!hasShopifySession && !hasLineSession && !previewSeedEnabled()) {
+  if (
+    !canRenderAccountShell({
+      hasShopifySession,
+      hasLineSession,
+      previewSeed: previewSeedEnabled(),
+    })
+  ) {
     return (
       <AccountLoginPrompt
         title={tCommon("account")}

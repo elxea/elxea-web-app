@@ -23,6 +23,14 @@ import {
 } from "./elxea-chat-transport";
 import { usePathname } from "next/navigation";
 import { randomId } from "@/lib/random-id";
+import {
+  clearAllHistoryCache,
+  historyCacheKey,
+  isSignedInFromCookie,
+  readCachedHistory,
+  writeCachedHistory,
+  type HistoryIdentity,
+} from "@/lib/chat/history-cache";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -74,6 +82,20 @@ function getOrCreateSessionId(): string {
   if (existing && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(existing)) {
     return existing;
   }
+  const id = randomId();
+  localStorage.setItem(SESSION_KEY, id);
+  return id;
+}
+
+/**
+ * 会話 ID を捨てて新しく作る。
+ *
+ * ログイン状態が変わったとき (= 端末の前に居る人が入れ替わりうるとき) に呼ぶ。
+ * 会話 ID は cx-agent 側の会話の単位でもあるので、振り直すとサーバ側の会話も
+ * 引き継がれなくなる — 共用端末で前の人の会話が続いてしまう問題も同時に切れる。
+ */
+function rotateSessionId(): string {
+  if (typeof window === "undefined") return "";
   const id = randomId();
   localStorage.setItem(SESSION_KEY, id);
   return id;
@@ -187,78 +209,8 @@ async function fetchChatHistory(
 // 履歴の持ち回り (監査 #6 / W-B)
 // ---------------------------------------------------------------------------
 
-/**
- * ## なぜ履歴をタブに置くのか
- *
- * 会話履歴は cx-agent への往復で、実測 1.6〜2.9 秒かかる (本番 / 2026-08-25)。
- * これがページを開くたびに 1 本ずつ出ていた。ChatProvider はレイアウトに居るので
- * 画面内の移動では再取得しないが、**リロード・新しいタブ・外から入り直すたびに
- * 毎回**払う。しかも履歴はチャットを開くまで一切見えない — 見えないもののために
- * 最初の描画と帯域を奪っていた。
- *
- * 変えたのは 2 点で、どちらも Web 側だけで完結する (cx-agent は触っていない)。
- *
- *   1. **同じタブの中では 1 回だけ引く** — `sessionStorage` に置いて使い回す。
- *      タブを閉じれば消えるので、共用端末に会話が残ることはない。
- *   2. **最初の描画に割り込ませない** — 画面が落ち着いてから (idle) 引く。
- *      ただしチャットを開かれたら待たずにその場で引く (開いたのに空、を作らない)。
- *
- * 保存先を `sessionStorage` にしたのは、`localStorage` だと閉じても残るため。
- * 鍵にログイン状態を混ぜているのは、ログイン前後で見えてよい履歴が変わるから。
- */
-const HISTORY_CACHE_PREFIX = "elxea-chat-history:";
-
-/** 履歴の作り置きの寿命。これを過ぎたら引き直す。 */
-const HISTORY_CACHE_TTL_MS = 5 * 60 * 1000;
-
-/** ログイン状態が変わったら別の作り置きとして扱う (他人の履歴を見せない)。 */
-function historyCacheKey(sessionId: string): string {
-  const signedIn =
-    typeof document !== "undefined" && document.cookie.includes("shop_auth=1");
-  return `${HISTORY_CACHE_PREFIX}${sessionId}:${signedIn ? "1" : "0"}`;
-}
-
-function readCachedHistory(sessionId: string): HistoryApiResponse | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = window.sessionStorage.getItem(historyCacheKey(sessionId));
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as { at: number; data: HistoryApiResponse };
-    if (!parsed?.data || typeof parsed.at !== "number") return null;
-    if (Date.now() - parsed.at > HISTORY_CACHE_TTL_MS) return null;
-    return parsed.data;
-  } catch {
-    return null;
-  }
-}
-
-function writeCachedHistory(sessionId: string, data: HistoryApiResponse): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.sessionStorage.setItem(
-      historyCacheKey(sessionId),
-      JSON.stringify({ at: Date.now(), data }),
-    );
-  } catch {
-    // 容量超過・プライベートモード等。作り置きが無いだけで機能は落ちない。
-  }
-}
-
-/**
- * 発言したら作り置きを捨てる。
- *
- * 作り置きはサーバに保存済みの履歴の写しなので、こちらから 1 通送った時点で
- * 古くなる。次に開いたときに自分の発言が消えて見えるのを避けるため、送信のたびに
- * 捨てて引き直させる。
- */
-function clearCachedHistory(sessionId: string): void {
-  if (typeof window === "undefined" || !sessionId) return;
-  try {
-    window.sessionStorage.removeItem(historyCacheKey(sessionId));
-  } catch {
-    // 消せなくても TTL で失効する。
-  }
-}
+/* 鍵の作り方・読み書き・全消しは `lib/chat/history-cache.ts` が正本。
+   共用端末での取り違え (QA 指摘 2026-08-26) の経緯もそちらのヘッダに書いてある。 */
 
 /** 画面が落ち着いてから走らせる。`requestIdleCallback` が無い環境では時間で代用。 */
 function runWhenIdle(fn: () => void): () => void {
@@ -333,6 +285,11 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   const [productCards, setProductCards] = useState<ProductCardItem[]>([]);
   const [quickReplies, setQuickReplies] = useState<QuickReplyItem[]>([]);
   const initialisedRef = useRef(false);
+  /* 履歴を引いたか。ログイン状態が変わったら false に戻して引き直させる。 */
+  const historyLoadedRef = useRef(false);
+  /* 画面上のメッセージを空にする手段。`useChat` はこの下で作られるので、
+     上の効果からも呼べるように ref 越しに繋ぐ。 */
+  const resetMessagesRef = useRef<(() => void) | null>(null);
 
   // Hydrate session ID on mount (client only)
   useEffect(() => {
@@ -342,12 +299,43 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  /* ログイン状態。cookie 名を完全一致で見る (部分一致だと `xshop_auth=1` のような
+     別名でも真になる)。判定は `lib/chat/history-cache.ts` に置いてテストしてある。 */
+  const [signedIn, setSignedIn] = useState(false);
+
+  /* 直前のログイン状態。**入れ替わり**を見るためだけに持つ。初回は「まだ何とも
+     比べていない」を意味する null (初回訪問をログアウトと誤認しないため)。 */
+  const prevSignedInRef = useRef<boolean | null>(null);
+
   // Fetch Shopify Customer ID if shop_auth cookie exists (non-httpOnly flag).
   // Re-check when pathname changes (user might log in/out during navigation).
   useEffect(() => {
     const hasAuthFlag =
-      typeof document !== "undefined" &&
-      document.cookie.includes("shop_auth=1");
+      typeof document !== "undefined" && isSignedInFromCookie(document.cookie);
+
+    setSignedIn(hasAuthFlag);
+
+    /* ## 人が入れ替わったら、タブに残っているものを断ち切る (QA 指摘 2026-08-26)
+     *
+     * ログアウトはサーバの cookie を消すだけで、`localStorage` の会話 ID と
+     * `sessionStorage` の作り置きには触れない。共用端末で A がログアウトし、
+     * 5 分以内に B が同じタブでログインすると、会話 ID が据え置きでログイン中
+     * フラグも "1" に戻るため鍵が一致し、**B に A の履歴が出る**。
+     *
+     * そこでログイン状態が変わった時点で、作り置きを全消しし、会話 ID を振り直し、
+     * 画面上のメッセージも捨てる。TTL の残りに依存しない止め方なので、鍵の指紋に
+     * よる分離と二重に効かせている。 */
+    const prev = prevSignedInRef.current;
+    prevSignedInRef.current = hasAuthFlag;
+
+    if (prev !== null && prev !== hasAuthFlag && typeof window !== "undefined") {
+      clearAllHistoryCache(window.sessionStorage);
+      setSessionId(rotateSessionId());
+      setShopifyCustomerId(null);
+      historyLoadedRef.current = false;
+      resetMessagesRef.current?.();
+      return;
+    }
 
     if (hasAuthFlag && !shopifyCustomerId) {
       fetchShopifyCustomerId().then(setShopifyCustomerId);
@@ -401,11 +389,13 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   const { messages, sendMessage: rawSendMessage, status, error, setMessages } =
     useChat({ transport });
 
+  /* 上のログイン状態の効果から画面上のメッセージを捨てられるようにする
+     (人が入れ替わったときに前の人の発言を残さない)。 */
+  resetMessagesRef.current = () => setMessages([]);
+
   /* WC3: クロスチャネル会話履歴のロード。
      引き方の方針 (作り置き優先 + 最初の描画に割り込ませない) は
      このファイル上部の「履歴の持ち回り」を参照。 */
-  const historyLoadedRef = useRef(false);
-
   const hydrateHistory = useCallback(
     (data: HistoryApiResponse | null) => {
       if (!data || data.messages.length === 0) return;
@@ -418,33 +408,48 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     [setMessages],
   );
 
+  /* 作り置きの鍵になる identity。**ログイン中なのに顧客 ID がまだ解決していない
+     間は引かない** — 解決前に引くと「ログイン中・本人不明」の鍵で読み書きしてしまい、
+     人が変わっても同じ鍵に当たりうるため。未ログインなら顧客 ID は無くて当たり前
+     なので、そのまま進む。 */
+  const identity: HistoryIdentity | null =
+    !sessionId || (signedIn && !shopifyCustomerId)
+      ? null
+      : { sessionId, signedIn, customerId: shopifyCustomerId };
+
   /** 履歴を 1 回だけ引く。作り置きがあれば往復ゼロで済ませる。 */
   const loadHistory = useCallback(() => {
-    if (historyLoadedRef.current || !sessionId || IS_MOCK) return;
+    if (historyLoadedRef.current || !identity || IS_MOCK) return;
     historyLoadedRef.current = true;
 
-    const cached = readCachedHistory(sessionId);
+    const cached = readCachedHistory<HistoryApiResponse>(
+      window.sessionStorage,
+      identity,
+    );
     if (cached) {
       hydrateHistory(cached);
       return;
     }
 
-    fetchChatHistory(sessionId).then((data) => {
+    fetchChatHistory(identity.sessionId).then((data) => {
       if (!data) {
         // 失敗は作り置きしない。次の機会に引き直せるよう鍵も戻す。
         historyLoadedRef.current = false;
         return;
       }
-      writeCachedHistory(sessionId, data);
+      writeCachedHistory(window.sessionStorage, identity, data);
       hydrateHistory(data);
     });
-  }, [sessionId, hydrateHistory]);
+    // identity は 3 つの値から毎描画作り直すので、鍵の文字列で同一性を見る。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [identity && historyCacheKey(identity), hydrateHistory]);
 
   /* 通常経路: 画面が落ち着いてから引く。最初の描画とは競合しない。 */
   useEffect(() => {
-    if (!sessionId || IS_MOCK) return;
+    if (!identity || IS_MOCK) return;
     return runWhenIdle(loadHistory);
-  }, [sessionId, loadHistory]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [identity && historyCacheKey(identity), loadHistory]);
 
   /* チャットを開かれたら idle を待たずにその場で引く
      (開いたのに履歴が空、という状態を作らない)。 */
@@ -461,8 +466,9 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       setProductCards([]);
       setQuickReplies([]);
       /* 送った時点で作り置きは古い。捨てておかないと、次にこのタブで開いたときに
-         自分の発言が抜けた履歴が出る。 */
-      clearCachedHistory(sessionId);
+         自分の発言が抜けた履歴が出る。鍵は identity ごとに分かれているので全消しする
+         (自分の分だけ狙って消すより、取りこぼしが無い)。 */
+      if (typeof window !== "undefined") clearAllHistoryCache(window.sessionStorage);
       rawSendMessage({
         text,
         metadata: { timestamp: new Date().toISOString() } satisfies ChatMessageMeta,

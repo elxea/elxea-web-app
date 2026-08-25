@@ -35,6 +35,10 @@ import { previewSeedEnabled, previewImageForKey } from "@/lib/preview-seed";
 import { requireAuth } from "@/lib/firebase/auth-guard";
 import { getRecommendedArticles } from "@/lib/recommendations/content-engine";
 import { getPopularArticles, orderByPopularity } from "@/lib/journal/popular-articles";
+import {
+  canUseSpeculativeBundle,
+  resolveActiveCategory,
+} from "@/lib/journal/active-category";
 
 /**
  * ジャーナル一覧 — Figma【R2: 確定版】共通リストパターン整合 + 特集枠 +
@@ -254,10 +258,10 @@ async function JournalContent({ params }: { params: SearchParams }) {
     { value: "all", label: tl("all") },
     ...categories.map((c) => ({ value: c.slug.current, label: c.title })),
   ];
-  const activeCategory =
-    requestedCategory && categories.some((c) => c.slug.current === requestedCategory)
-      ? requestedCategory
-      : "all";
+  const activeCategory = resolveActiveCategory(
+    requestedCategory,
+    categories.map((c) => c.slug.current),
+  );
 
   // 2) 特集枠は「編集判断で指定」(Figma 8073:44991)。Sanity の featured フラグを
   //    唯一の根拠にし、無ければ最新記事を充てる。絞り込み中は出さない
@@ -273,7 +277,7 @@ async function JournalContent({ params }: { params: SearchParams }) {
     /* 先読みが当たっていればそのまま使う。外れる (存在しないカテゴリを指定された)
        のは稀なので、そのときだけ絞り込みなしで引き直す。 */
     [windowArticles, featuredArticles, newestArticles, total] =
-      activeCategory === (requestedCategory ?? "all")
+      canUseSpeculativeBundle(requestedCategory, activeCategory)
         ? await speculativeBundle
         : await fetchListBundle(activeCategory);
   } catch {
