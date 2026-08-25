@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
-import { Bookmark, Heart } from "lucide-react";
+import { Bookmark, Heart, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -160,6 +160,8 @@ export function FavoriteToggleButton({
     onClick,
     /* 無効化するのは書き込み中だけ (二重送信の防止)。読み取りでは絶対に止めない。 */
     disabled: isPending,
+    /* 押した瞬間から「進んでいる」ことを名乗る (支援技術にも、下の印にも)。 */
+    "aria-busy": isPending,
     /* 状態が分かっていないときは pressed を名乗らない (未登録と断定できないため)。 */
     "aria-pressed": state === "unknown" ? undefined : isSaved,
     title: isSaved ? labels.remove : label,
@@ -171,13 +173,17 @@ export function FavoriteToggleButton({
   if (appearance === "product") {
     return (
       <Button {...common} variant="outline" size="sm" className={cn("gap-2", className)}>
-        <Heart
-          aria-hidden="true"
-          className={cn(
-            "size-4 transition-colors duration-fast",
-            isSaved ? "fill-destructive text-destructive" : "fill-none text-current",
-          )}
-        />
+        {isPending ? (
+          <Loader2 aria-hidden="true" className="size-4 animate-spin" />
+        ) : (
+          <Heart
+            aria-hidden="true"
+            className={cn(
+              "size-4 transition-colors duration-fast",
+              isSaved ? "fill-destructive text-destructive" : "fill-none text-current",
+            )}
+          />
+        )}
         {label}
       </Button>
     );
@@ -192,15 +198,19 @@ export function FavoriteToggleButton({
         aria-label={label}
         className={cn("transition-colors duration-fast", className)}
       >
-        <Heart
-          aria-hidden="true"
-          className={cn(
-            "size-5 transition-colors duration-fast",
-            isSaved
-              ? "fill-destructive text-destructive"
-              : "fill-none text-muted-foreground",
-          )}
-        />
+        {isPending ? (
+          <Loader2 aria-hidden="true" className="size-5 animate-spin" />
+        ) : (
+          <Heart
+            aria-hidden="true"
+            className={cn(
+              "size-5 transition-colors duration-fast",
+              isSaved
+                ? "fill-destructive text-destructive"
+                : "fill-none text-muted-foreground",
+            )}
+          />
+        )}
       </Button>
     );
   }
@@ -220,13 +230,17 @@ export function FavoriteToggleButton({
         className,
       )}
     >
-      <Bookmark
-        aria-hidden="true"
-        className={cn(
-          "size-4 shrink-0 transition-colors duration-fast",
-          isSaved ? "fill-current" : "fill-none",
-        )}
-      />
+      {isPending ? (
+        <Loader2 aria-hidden="true" className="size-4 shrink-0 animate-spin" />
+      ) : (
+        <Bookmark
+          aria-hidden="true"
+          className={cn(
+            "size-4 shrink-0 transition-colors duration-fast",
+            isSaved ? "fill-current" : "fill-none",
+          )}
+        />
+      )}
       {label}
     </Button>
   );

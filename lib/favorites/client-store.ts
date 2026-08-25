@@ -367,6 +367,11 @@ export async function toggleFavorite(entry: {
   let previous: boolean;
   const state = readFavoriteState(snapshot, entry.kind, entry.targetId);
   if (state === "unknown") {
+    /* 1 件だけ確かめる。**走っている一覧の着地は待たない** — 一覧は重く
+       (実測 450-787ms)、遅いときは秒単位で開いたままになる。待つ作りにすると
+       「押しても何も起きない時間」がその一覧の遅さに引きずられる。
+       1 件の確認 (実測 335-393ms) のほうが速く、しかも一覧と並行に走る。
+       押した瞬間の反応はボタン側の進行表示が担う (監査 P1-2)。 */
     const resolved = await fetchOne(entry.kind, entry.targetId);
     if (resolved === null) return "failed";
     previous = resolved;

@@ -142,8 +142,21 @@ export type MergeCounters = {
   deduped: number;
   /** Required fields missing; nothing written, **source retained**. */
   skippedInvalid: number;
-  /** Copy unconfirmed or delete threw; **source retained** for a later run. */
+  /** Copy unconfirmed; nothing landed, **source retained** for a later run. */
   failed: number;
+  /**
+   * コピーは着地したのに、**元の 1 件を消せなかった**数。
+   *
+   * `failed` と分けているのは、この 1 件が既に `copied` か `deduped` に数えられて
+   * いるから。同じ数を `failed` にも足すと `copied + deduped + skippedInvalid +
+   * failed` が元の件数を超える (QA 指摘 2)。中身は引っ越し済みなので利用者から
+   * 見れば成功で、残っているのは元の置き場の残骸だけ — 次の実行が step 2 で
+   * 「引っ越し先に既にある」と判定して消す。
+   *
+   * `retained` (= 引っ越しできずに残った件数) には**入れない**。入れると
+   * 全部運べているときにも「半分しか効かなかった」警告が鳴り続ける。
+   */
+  staleSourceRetained: number;
 };
 
 export type IdentityMergeResult = {
@@ -304,7 +317,7 @@ async function mapWithConcurrency<T>(
 }
 
 function emptyCounters(): MergeCounters {
-  return { copied: 0, deduped: 0, skippedInvalid: 0, failed: 0 };
+  return { copied: 0, deduped: 0, skippedInvalid: 0, failed: 0, staleSourceRetained: 0 };
 }
 
 function addCounters(a: MergeCounters, b: MergeCounters): MergeCounters {
@@ -313,6 +326,7 @@ function addCounters(a: MergeCounters, b: MergeCounters): MergeCounters {
     deduped: a.deduped + b.deduped,
     skippedInvalid: a.skippedInvalid + b.skippedInvalid,
     failed: a.failed + b.failed,
+    staleSourceRetained: a.staleSourceRetained + b.staleSourceRetained,
   };
 }
 
@@ -449,8 +463,10 @@ async function mergeByFields(
     } catch {
       /* 消せなかったぶんだけ元の場所に残る（次の再実行が step 2 で重複と
          判定して消す）。同じ束の他の 1 件は消せているので、束ごと道連れに
-         しない。 */
-      counters.failed += 1;
+         しない。
+         ここへ来る 1 件は**既に `copied` か `deduped` に数えられている**ので、
+         `failed` ではなく専用の欄に足す（同じ 1 件を 2 度数えない / QA 指摘 2）。 */
+      counters.staleSourceRetained += 1;
     }
   });
 
@@ -481,6 +497,9 @@ async function mergeByDocId(
      source 内の畳み込みは要らない（同じ ID の source が 2 件あることは無い）。
      よってそのまま並行に流せる。 */
   await mapWithConcurrency(srcSnap.docs, MERGE_CONCURRENCY, async (doc) => {
+    /* コピー段と削除段を**別の try に分ける**。1 つにまとめていたときは、
+       着地を確認したあとの `delete()` が投げても `failed` に落ち、その 1 件が
+       `copied` / `deduped` と二重に数えられていた（QA 指摘 2）。 */
     try {
       const dstRef = db.collection(dstPath).doc(doc.id);
 
@@ -497,10 +516,17 @@ async function mergeByDocId(
         }
         counters.copied += 1;
       }
-
-      await doc.ref.delete();
     } catch {
       counters.failed += 1;
+      return;
+    }
+
+    /* ここまで来た 1 件は引っ越し先に確実にある。元を消せなくても中身は
+       運べているので、`failed` ではなく残骸として数える。 */
+    try {
+      await doc.ref.delete();
+    } catch {
+      counters.staleSourceRetained += 1;
     }
   });
 
@@ -563,10 +589,17 @@ async function mergeUserDocument(
       }
       counters.copied += 1;
     }
-
-    await srcRef.delete();
   } catch {
     counters.failed += 1;
+    return counters;
+  }
+
+  /* コピー段と別の try。着地後の削除が投げても、その 1 件は既に `copied` /
+     `deduped` に数えられているので `failed` には足さない（QA 指摘 2）。 */
+  try {
+    await db.doc(srcPath).delete();
+  } catch {
+    counters.staleSourceRetained += 1;
   }
 
   return counters;

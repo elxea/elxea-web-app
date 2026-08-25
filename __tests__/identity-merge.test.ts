@@ -203,7 +203,21 @@ describe("partial failure", () => {
 
     expect(contents(favoritesCol(SHOPIFY_ID))).toEqual([VALID_FAVORITE]);
     expect(contents(favoritesCol(LINE_KEY))).toEqual([VALID_FAVORITE]);
-    expect(result.collections.favorites.failed).toBe(1);
+
+    /* 引っ越しは着地しているので `copied`。消し損ねた 1 件を `failed` にも
+       足すと同じ 1 件が 2 度数えられる (QA 指摘 2)。残骸は別の欄で数える。 */
+    expect(result.collections.favorites).toMatchObject({
+      copied: 1,
+      failed: 0,
+      staleSourceRetained: 1,
+    });
+    /* 数え上げが元の件数 (1) を超えない。 */
+    const c = result.collections.favorites;
+    expect(c.copied + c.deduped + c.skippedInvalid + c.failed).toBe(1);
+
+    /* 中身は運べているので「合体は不完全」ではない。 */
+    expect(result.retained).toBe(0);
+    expect(result.complete).toBe(true);
   });
 
   it("makes an incomplete merge visible on console.warn", async () => {
@@ -251,7 +265,11 @@ describe("idempotency", () => {
     );
 
     const first = await mergeLineIdentityIntoShopify(LINE_USER_ID, SHOPIFY_ID, db);
-    expect(first.collections.favorites.failed).toBe(1);
+    expect(first.collections.favorites).toMatchObject({
+      copied: 1,
+      failed: 0,
+      staleSourceRetained: 1,
+    });
 
     failDelete = false;
     const second = await mergeLineIdentityIntoShopify(LINE_USER_ID, SHOPIFY_ID, db);
