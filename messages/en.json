@@ -586,6 +586,7 @@
     "errorLineAuthFailed": "LINE sign-in failed. Please try again.",
     "errorStateMismatch": "Your session has expired. Please try again.",
     "errorTokenFailed": "Could not obtain an authentication token. Please try again.",
+    "errorMisconfiguredChannel": "LINE sign-in is temporarily paused. We are working on a fix — please try again later. We are sorry for the inconvenience.",
     "errorProfileFailed": "Could not load your LINE profile. Please try again.",
     "errorNotConfigured": "LINE sign-in is not configured. Please contact the administrator.",
     "errorMissingParams": "Authentication parameters were missing. Please try again.",

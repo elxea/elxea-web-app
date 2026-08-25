@@ -14,6 +14,14 @@ import {
 } from "@/lib/line/auto-login";
 import { verifyLineIdToken } from "@/lib/line/verify-liff-token";
 import { lineApiBaseUrl } from "@/lib/line/endpoints";
+import {
+  resolveLoginChannelId,
+  resolveLoginChannelSecret,
+} from "@/lib/line/login-channel";
+import {
+  classifyTokenExchangeError,
+  reportMisconfiguredChannel,
+} from "@/lib/line/token-error";
 
 /**
  * LINE Login OAuth 2.0 callback endpoint.
@@ -60,10 +68,42 @@ export async function GET(request: NextRequest) {
   const error = searchParams.get("error");
   const locale = resolveLocale(request);
 
+  /* Expire the one-shot state cookie at BOTH scopes, on whatever response we end
+   * up returning.
+   *
+   * It cannot be done through `cookieStore.delete()`: that store is keyed by
+   * cookie name and can hold only one directive per name, so it can express one
+   * scope, never two. And one scope is not enough here — `/api/line-login/init`
+   * issued this cookie Domain-scoped while the legacy `/api/line-login` issued it
+   * host-only, so after this deploys both shapes exist in real browsers. The old
+   * code additionally derived the Domain from `getBaseUrl()` (env) rather than
+   * from the request, which is a different input from the one used at issue time;
+   * that mismatch is what made the delete a silent no-op.
+   *
+   * ## なぜ handler の先頭で定義するのか (2026-08-25 に塞いだ穴)
+   *
+   * 以前これは state 照合のあとで定義されており、その結果 **`if (error)` の枝だけが
+   * 掃除を通らなかった**。LINE 側でユーザーが「キャンセル」を押すと、この route は
+   * `?error=...` で呼ばれてそのまま login へ戻す — `line_oauth_state` と
+   * `line_oauth_nonce` を残したまま。使い捨てのはずの値が自然失効 (10 分) まで
+   * ブラウザに残り、次の往復がその古い値と突き合わせられる状態が生まれていた。
+   * 「往復が終わったら必ず落とす」を守れる唯一の書き方は、**掃除の定義を、途中で
+   * return しうるどの分岐よりも前に置く**こと。 */
+  const clearState = <T extends NextResponse>(res: T): T => {
+    clearFlowCookie(res, "line_oauth_state");
+    /* nonce も同じ往復の使い捨て値。state だけ消して nonce を残すと、次の試行が
+     * 前回の nonce と突き合わせられる状態が生まれる。必ず一緒に落とす。 */
+    clearFlowCookie(res, "line_oauth_nonce");
+    return res;
+  };
+
   // Handle LINE auth errors
   if (error) {
     console.error("[line-callback] LINE auth error:", error);
-    return NextResponse.redirect(new URL(`/${locale}/login?error=LineAuthFailed`, requestOrigin));
+    /* この往復はここで終わり。使い捨ての state / nonce を残さない。 */
+    return clearState(
+      NextResponse.redirect(new URL(`/${locale}/login?error=LineAuthFailed`, requestOrigin)),
+    );
   }
 
   if (!code || !state) {
@@ -95,30 +135,13 @@ export async function GET(request: NextRequest) {
   const baseUrl = getBaseUrl(request);
   const stateDomain = resolveCookieDomain(request);
 
-  /* Expire the one-shot state cookie at BOTH scopes, on whatever response we end
-   * up returning.
-   *
-   * It cannot be done through `cookieStore.delete()`: that store is keyed by
-   * cookie name and can hold only one directive per name, so it can express one
-   * scope, never two. And one scope is not enough here — `/api/line-login/init`
-   * issued this cookie Domain-scoped while the legacy `/api/line-login` issued it
-   * host-only, so after this deploys both shapes exist in real browsers. The old
-   * code additionally derived the Domain from `getBaseUrl()` (env) rather than
-   * from the request, which is a different input from the one used at issue time;
-   * that mismatch is what made the delete a silent no-op.
-   *
-   * Applied at every exit after the state check, so a failed exchange does not
-   * strand a state cookie that a later attempt would compare against. */
-  const clearState = <T extends NextResponse>(res: T): T => {
-    clearFlowCookie(res, "line_oauth_state");
-    /* nonce も同じ往復の使い捨て値。state だけ消して nonce を残すと、次の試行が
-     * 前回の nonce と突き合わせられる状態が生まれる。必ず一緒に落とす。 */
-    clearFlowCookie(res, "line_oauth_nonce");
-    return res;
-  };
-
-  const channelId = process.env.AUTH_LINE_ID;
-  const channelSecret = process.env.AUTH_LINE_SECRET;
+  /* 生の `process.env` を読まない。`vercel env add` に標準入力で値を流し込むと
+     末尾の改行まで保存され、Channel Secret なら「32 文字 + 見えない 1 文字」に
+     なる — ダッシュボードでは正しく見え、LINE の `400 invalid_client` でしか
+     気づけない。連携側は 2026-08-22 にこれで壊れて trim 済みだったが、ログイン側
+     だけ生読みが残っていた。`lib/line/login-channel.ts` の doc を読むこと。 */
+  const channelId = resolveLoginChannelId();
+  const channelSecret = resolveLoginChannelSecret();
 
   if (!channelId || !channelSecret) {
     return clearState(NextResponse.redirect(new URL(`/${locale}/login?error=NotConfigured`, requestOrigin)));
@@ -141,6 +164,31 @@ export async function GET(request: NextRequest) {
     if (!tokenRes.ok) {
       const err = await tokenRes.text();
       console.error("[line-callback] Token exchange failed:", err);
+
+      /* 「もう一度お試しください」と言ってよい失敗と、言ってはいけない失敗を分ける。
+       *
+       * LINE は token 交換の失敗をほぼ全て 400 に畳むが、`invalid_client` だけは
+       * 意味が違う: **こちらのチャネル設定が壊れている**ので、何度やり直しても
+       * 必ず同じところで落ちる。2026-08-22 / 2026-08-25 の本番障害はどちらもこれで、
+       * 画面はその間ずっと「もう一度お試しください」と案内し続けた。直らないものを
+       * 直るかのように見せて、利用者に無意味な再試行をさせていた。
+       *
+       * 分けたうえで Sentry に即時で上げる。ログだけだと、このプロジェクトの
+       * Runtime Logs 保持 (1 時間) を越えた区間は永久に消える。 */
+      const { kind, code } = classifyTokenExchangeError(tokenRes.status, err);
+      if (kind === "misconfigured-channel") {
+        reportMisconfiguredChannel({
+          source: "line-callback",
+          channel: "login",
+          code,
+        });
+        return clearState(
+          NextResponse.redirect(
+            new URL(`/${locale}/login?error=MisconfiguredChannel`, requestOrigin),
+          ),
+        );
+      }
+
       return clearState(NextResponse.redirect(new URL(`/${locale}/login?error=TokenFailed`, requestOrigin)));
     }
 

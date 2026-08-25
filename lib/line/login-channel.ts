@@ -117,6 +117,38 @@ export function loginBotPrompt(): "aggressive" | "normal" | null {
   return "aggressive";
 }
 
+/**
+ * ログイン (`/api/line-login*` → `/api/line-callback`) が使う LINE Login チャネルの
+ * Channel ID / Channel Secret。**この 2 本を読む唯一の入口**。
+ *
+ * ## なぜ関数にまとめたのか
+ *
+ * 理由は 2 つある。
+ *
+ * **1. trim を効かせる。** 以前は 3 つの route が `process.env.AUTH_LINE_ID` を生で
+ * 読んでいた。`vercel env add NAME production < file` のように標準入力から値を流し込むと
+ * **末尾の改行までが値として保存される**（`lib/env.ts` の冒頭に経緯）。連携側は
+ * 2026-08-22 にこれで壊れ、`resolveLinkChannelSecret` は `readSecretEnvTrimmed` を
+ * 通すように直された。ログイン側だけが生読みのまま残っていた — 同じ入れ方をされれば
+ * 同じ壊れ方をする。2026-08-25 の本番障害（`AUTH_LINE_SECRET` 不一致で token 交換が
+ * 全滅）で現に踏んだ。
+ *
+ * **2. ヘルスチェックと本番経路の読み方をずらさない。** `/api/health/line` は
+ * 「この資格情報で LINE が通るか」を答える。そこが route と違う読み方をしていたら、
+ * **ヘルスチェックが緑でログインが落ちる**（あるいはその逆）が起こりうる。同じ関数を
+ * 通すことでしか、この一致は保証できない。
+ *
+ * 未設定・空文字は `undefined`。空の資格情報を LINE に送って「認可エラー」に化けさせない。
+ */
+export function resolveLoginChannelId(): string | undefined {
+  return readSecretEnvTrimmed(process.env.AUTH_LINE_ID);
+}
+
+/** @see resolveLoginChannelId */
+export function resolveLoginChannelSecret(): string | undefined {
+  return readSecretEnvTrimmed(process.env.AUTH_LINE_SECRET);
+}
+
 /** 名前空間ガードの検査結果。 */
 export type ChannelNamespaceCheck =
   | { ok: true; channelId: string }

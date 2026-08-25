@@ -356,6 +356,92 @@ export function evaluateProbe(probe, actual) {
   return null;
 }
 
+/**
+ * 資格情報ヘルスチェック (`/api/health/line`) の判定。
+ *
+ * ## 上の evaluateProbe と分けてある理由
+ *
+ * `evaluateProbe` は「期待したステータス/行き先が返ったか」しか見ない。この
+ * エンドポイントは **本文に判定語を載せて返す**設計なので、ステータスだけを見ると
+ * 「壊れている」と「LINE に到達できなかった」が同じ 5xx に潰れる。前者は今すぐ
+ * 直さないと全員がログインできない状態、後者は判断材料が無いだけで、対処が違う。
+ *
+ * ## severity の付け方
+ *
+ *   misconfigured   … critical。**確定した設定破壊**。2026-08-22 / 2026-08-25 の
+ *                     本番障害はどちらもこれで、放置した時間だけ被害が増えた。
+ *   not-configured  … critical。env が無い = このデプロイでは LINE ログインが
+ *                     動かない。「壊れている」と原因は違うが、利用者から見た結果は同じ。
+ *   unknown         … error。LINE に到達できなかった等。異常なしではないが、
+ *                     こちら側が壊れている証拠でもない。
+ *   読めない応答    … error。ステータスは返ったのに JSON が読めない = サイト
+ *                     パスワードの門や CDN のエラーページが前に出ている疑い。
+ *                     200 でも緑にしない (ステータスだけ見る監視が踏む罠)。
+ *
+ * @param {object} probe   期待値 (name / path / description)
+ * @param {object} actual  実測 ({ status, json, error })
+ */
+export function evaluateCredentialProbe(probe, actual) {
+  const base = {
+    kind: 'probe',
+    id: `probe-${probe.name}`,
+    description: probe.description,
+    requestPath: probe.path,
+    statusCode: actual.status ?? null,
+  };
+
+  if (actual.error) {
+    return { ...base, severity: 'error', reason: `到達できなかった: ${actual.error}` };
+  }
+
+  const verdict = actual.json && typeof actual.json === 'object' ? actual.json.status : null;
+
+  if (verdict === 'ok') return null;
+
+  if (verdict === 'misconfigured') {
+    return {
+      ...base,
+      severity: 'critical',
+      reason:
+        'LINE がチャネルの資格情報を拒否している (invalid_client) — 誰もログイン/連携できない。' +
+        ` 内訳: ${describeChannels(actual.json)}`,
+    };
+  }
+
+  if (verdict === 'not-configured') {
+    return {
+      ...base,
+      severity: 'critical',
+      reason: `このデプロイに LINE の資格情報が無い。内訳: ${describeChannels(actual.json)}`,
+    };
+  }
+
+  if (verdict === 'unknown') {
+    return {
+      ...base,
+      severity: 'error',
+      reason: `資格情報の可否を判定できなかった。内訳: ${describeChannels(actual.json)}`,
+    };
+  }
+
+  return {
+    ...base,
+    severity: 'error',
+    reason:
+      `判定を読めなかった (status=${actual.status})。` +
+      'サイトパスワードの門や CDN のエラーページが前に出ている疑い',
+  };
+}
+
+/** チャネル別の判定を 1 行にする。**秘密は元から入っていない** (route 側で保証)。 */
+function describeChannels(json) {
+  const channels = json && typeof json === 'object' ? json.channels : null;
+  if (!channels || typeof channels !== 'object') return '(内訳なし)';
+  return Object.entries(channels)
+    .map(([name, v]) => `${name}=${v?.verdict ?? '?'} (${v?.detail ?? 'no detail'})`)
+    .join(' / ');
+}
+
 /** 検知結果を 1 行の要約にする (Issue 本文と Job Summary の見出しに使う)。 */
 export function summarize(result) {
   const { findings, scanned, windowMinutes } = result;

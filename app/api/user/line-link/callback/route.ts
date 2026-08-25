@@ -16,6 +16,10 @@ import {
   resolveLinkChannelSecret,
   returnUrlWithResult,
 } from "@/lib/line/link-flow";
+import {
+  classifyTokenExchangeError,
+  reportMisconfiguredChannel,
+} from "@/lib/line/token-error";
 
 /**
  * GET /api/user/line-link/callback — Web 発 LINE 連携の帰り道（P2）。
@@ -164,8 +168,22 @@ export async function GET(request: NextRequest) {
        * (`invalid_grant` = redirect_uri 不一致 / code 期限切れ、`invalid_client`
        *  = client_id と secret の組み合わせ違い、等)。**本文全体は出さない** —
        * 交換に成功していれば access_token / id_token が同じ JSON に入るため、
-       * 丸ごとログに流すと秘密をログに置くことになる。 */
-      return fail(returnTo, `token exchange failed: ${tokenRes.status} ${await describeLineError(tokenRes)}`);
+       * 丸ごとログに流すと秘密をログに置くことになる。
+       *
+       * Response の本文は 1 度しか読めないので、先にテキストで受けてから
+       * 分類と説明文の両方に使う。 */
+      const errBody = await tokenRes.text();
+      const { kind, code } = classifyTokenExchangeError(tokenRes.status, errBody);
+      if (kind === "misconfigured-channel") {
+        /* 設定破壊は「連携できなかった 1 件」ではなく「全員が連携できない」。
+         * ログ保持 (Hobby プランで 1 時間) を越えても残るよう Sentry に上げる。 */
+        reportMisconfiguredChannel({
+          source: "line-link-callback",
+          channel: "link",
+          code,
+        });
+      }
+      return fail(returnTo, `token exchange failed: ${tokenRes.status} ${describeLineError(errBody)}`);
     }
     const tokens = (await tokenRes.json()) as { id_token?: string };
     idToken = tokens.id_token;
@@ -251,9 +269,9 @@ export async function GET(request: NextRequest) {
  * ければ `(no error body)` を返し、ログの行そのものは必ず出す（「静かに失敗した」
  * を作らない）。
  */
-async function describeLineError(res: Response): Promise<string> {
+function describeLineError(rawBody: string): string {
   try {
-    const body = (await res.json()) as unknown;
+    const body = JSON.parse(rawBody) as unknown;
     if (!body || typeof body !== "object") return "(no error body)";
     const record = body as Record<string, unknown>;
     const parts: string[] = [];

@@ -40,6 +40,7 @@ import { writeFileSync } from 'node:fs';
 import {
   decideOutcome,
   dedupeById,
+  evaluateCredentialProbe,
   evaluateProbe,
   parseLogLines,
   scanLogEntries,
@@ -95,6 +96,45 @@ const PROBES = [
     description: '連携開始が未ログインを 401 で弾いていること (503 なら設定破壊)',
   },
 ];
+
+/**
+ * 資格情報ヘルスチェック — 「誰も踏まなくても設定破壊が分かる」の本体。
+ *
+ * 上の 2 本 (PROBES) は **こちらのサーバーの振る舞い**しか見ていない。認可 URL を
+ * 組み立てて 307 を返すのにも、未ログインを 401 で弾くのにも、Channel Secret は
+ * 一切要らない。だから 2026-08-22 / 2026-08-25 の壊れ方 — 「Secret だけが壊れて
+ * token 交換が全滅」 — は、あの 2 本を **緑のまま通り抜ける**。
+ *
+ * `/api/health/line` は LINE に実際に問い合わせて資格情報の可否を答えるので、
+ * その穴を塞ぐ。判定の理屈は `lib/line/credential-probe.ts` の doc。
+ */
+const CREDENTIAL_PROBE = {
+  name: 'line-credentials',
+  path: '/api/health/line',
+  description: 'LINE のチャネル資格情報が token 交換で受理されること (invalid_client でないこと)',
+};
+
+async function runCredentialProbe(probe) {
+  const url = `${BASE_URL}${probe.path}`;
+  try {
+    const res = await fetch(url, {
+      method: 'GET',
+      redirect: 'manual',
+      // route 側が LINE へ 2 往復するので、他のプローブより長く待つ。
+      signal: AbortSignal.timeout(30_000),
+    });
+    const text = await res.text();
+    let json = null;
+    try {
+      json = JSON.parse(text);
+    } catch {
+      // JSON でない = 門やエラーページが前に出ている。evaluate 側が error として扱う。
+    }
+    return { status: res.status, json, error: null };
+  } catch (err) {
+    return { status: null, json: null, error: String(err) };
+  }
+}
 
 async function runProbe(probe) {
   const url = `${BASE_URL}${probe.path}`;
@@ -257,6 +297,18 @@ async function main() {
       console.error(`[probe] FAIL ${probe.name}: ${finding.reason}`);
     } else {
       console.log(`[probe] OK   ${probe.name} (${actual.status})`);
+    }
+  }
+
+  // --- 2b. 資格情報ヘルスチェック --------------------------------------------
+  {
+    const actual = await runCredentialProbe(CREDENTIAL_PROBE);
+    const finding = evaluateCredentialProbe(CREDENTIAL_PROBE, actual);
+    if (finding) {
+      findings.push(finding);
+      console.error(`[probe] FAIL ${CREDENTIAL_PROBE.name}: ${finding.reason}`);
+    } else {
+      console.log(`[probe] OK   ${CREDENTIAL_PROBE.name} (${actual.status})`);
     }
   }
 

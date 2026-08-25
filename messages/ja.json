@@ -586,6 +586,7 @@
     "errorLineAuthFailed": "LINE ログインに失敗しました。もう一度お試しください。",
     "errorStateMismatch": "セッションの有効期限が切れました。もう一度お試しください。",
     "errorTokenFailed": "認証トークンの取得に失敗しました。もう一度お試しください。",
+    "errorMisconfiguredChannel": "現在、LINE ログインを一時的に停止しています。復旧作業を進めていますので、時間をおいてからお試しください。ご不便をおかけして申し訳ありません。",
     "errorProfileFailed": "LINE プロフィールの取得に失敗しました。もう一度お試しください。",
     "errorNotConfigured": "LINE ログインが設定されていません。管理者にお問い合わせください。",
     "errorMissingParams": "認証パラメータが不足しています。もう一度お試しください。",
