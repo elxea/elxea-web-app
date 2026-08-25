@@ -139,12 +139,102 @@ async function JournalContent({ params }: { params: SearchParams }) {
   const sort = params.sort === "oldest" || params.sort === "newest" ? params.sort : "recommended";
   const show = Math.max(PAGE_SIZE, Number(params.show) || PAGE_SIZE);
 
+  /* ## 外部往復は「足し算」ではなく「いちばん長い 1 本」にする (LCP / W-B)
+   *
+   * この節は以前、外部への問い合わせを **4 段の直列**で回していた:
+   *   カテゴリ件数 → 記事一覧ほか 4 本 → ログイン判定 → おすすめ並べ替え。
+   * 段の数だけ往復が積み上がるので、一覧が届くまでの時間がそのまま
+   * 「4 本の足し算」になる。ジャーナル一覧の LCP 要素 (記事の抜粋テキスト) は
+   * この Suspense の内側にあるため、足し算がまるごと LCP に乗っていた。
+   *
+   * 実測 (本番 SP390 / 2026-08-25): サーバの送信完了 4,694ms → LCP 4,736ms。
+   * LCP は送信完了の 42ms 後に立っており、**LCP を決めていたのはここ**だった
+   * (監査 #14 が疑った写真とフォントではない。この一覧に写真は 2 枚しか無く、
+   *  どちらもヘッダーのロゴで、特集写真には既に priority が付いている)。
+   *
+   * 依存関係を洗うと、直列にする必然があるのは最後の 1 段だけだった:
+   *   - カテゴリ件数 … 記事一覧に依存しない
+   *   - ログイン判定 … 何にも依存しない
+   *   - おすすめ並べ替え … 記事一覧が要る (ここだけ本当に後段)
+   * よって先に全部走らせ、最後にまとめて待つ。
+   */
+  const requestedCategory =
+    typeof params.category === "string" && params.category ? params.category : undefined;
+
   // 1) チップ (カテゴリ) は記事の取得窓ではなく Sanity 側の件数で決める。
   //    以前は「取得した 60 件に現れたカテゴリ」だけを出していたため、61 件目
   //    以降にしか記事が無いカテゴリはチップごと消えていた。
+  const categoriesPromise: Promise<
+    { _id: string; title: string; slug: { current: string }; count: number }[]
+  > = client.fetch(CATEGORIES_WITH_COUNTS_QUERY, { language: locale });
+
+  // 人気の記事は全ユーザー共通の集計なので、記事の取得と並べて引く
+  // (失敗しても空配列が返るだけで一覧の描画は止まらない)。
+  const popularArticlesPromise = getPopularArticles(RAIL_SIZE);
+
+  /* ログイン判定は誰にも依存しないので最初に投げる。おすすめ順のときしか使わない
+     ので、それ以外では往復ごと発生させない。 */
+  const customerIdPromise: Promise<string | null> =
+    sort === "recommended"
+      ? requireAuth()
+          .then((auth) => (auth.authenticated ? auth.customerId : null))
+          .catch(() => null)
+      : Promise.resolve(null);
+
+  /* 一覧側の 4 本。`?category=` の正当性はカテゴリ件数が返るまで確定しないが、
+     **待たずに投げる**。指定が正しければそのまま使い、綴り違い等で外れたときだけ
+     「絞り込みなし」で引き直す (従来と同じ挙動に落ちる)。外れは稀なので、
+     通常の閲覧では往復が 1 段減る。 */
+  const fetchListBundle = (activeCategory: string) => {
+    const showsFeatured = activeCategory === "all";
+    // 一覧から特集 1 件を抜くぶん、窓を 1 件多く取る。
+    const fetchEnd =
+      sort === "recommended"
+        ? Math.max(show + (showsFeatured ? 1 : 0), RECOMMEND_POOL)
+        : show + (showsFeatured ? 1 : 0);
+
+    const listQuery =
+      activeCategory === "all"
+        ? sort === "oldest"
+          ? ARTICLES_ASC_QUERY
+          : ARTICLES_QUERY
+        : sort === "oldest"
+          ? ARTICLES_BY_CATEGORY_ASC_QUERY
+          : ARTICLES_BY_CATEGORY_QUERY;
+
+    const listParams =
+      activeCategory === "all"
+        ? { language: locale, start: 0, end: fetchEnd }
+        : { language: locale, categorySlug: activeCategory, start: 0, end: fetchEnd };
+
+    return Promise.all([
+      client.fetch(listQuery, listParams) as Promise<ArticleItem[]>,
+      // 特集候補 (最大 4 件・新しい順)。ヒーローとサイドバーの並びに使う。
+      // 絞り込み中もサイドバーは全体の並びを出すので常に引く。
+      client.fetch(FEATURED_ARTICLES_QUERY, { language: locale }) as Promise<ArticleItem[]>,
+      // サイドバー「人気の記事」の穴埋め用の最新記事。
+      client.fetch(ARTICLES_QUERY, {
+        language: locale,
+        start: 0,
+        end: RAIL_SIZE,
+      }) as Promise<ArticleItem[]>,
+      (activeCategory === "all"
+        ? client.fetch(ARTICLES_COUNT_QUERY, { language: locale })
+        : client.fetch(ARTICLES_BY_CATEGORY_COUNT_QUERY, {
+            language: locale,
+            categorySlug: activeCategory,
+          })) as Promise<number>,
+    ]);
+  };
+
+  const speculativeBundle = fetchListBundle(requestedCategory ?? "all");
+  /* 捨てる可能性がある promise なので、握られない失敗にしない
+     (unhandled rejection でプロセスに警告が出る)。実際の失敗は下の await で拾う。 */
+  speculativeBundle.catch(() => undefined);
+
   let rawCategories: { _id: string; title: string; slug: { current: string }; count: number }[];
   try {
-    rawCategories = await client.fetch(CATEGORIES_WITH_COUNTS_QUERY, { language: locale });
+    rawCategories = await categoriesPromise;
   } catch {
     return <p className={"mt-8 text-sm text-muted-foreground lg:mt-12"}>{t("loadError")}</p>;
   }
@@ -165,8 +255,8 @@ async function JournalContent({ params }: { params: SearchParams }) {
     ...categories.map((c) => ({ value: c.slug.current, label: c.title })),
   ];
   const activeCategory =
-    params.category && categories.some((c) => c.slug.current === params.category)
-      ? params.category
+    requestedCategory && categories.some((c) => c.slug.current === requestedCategory)
+      ? requestedCategory
       : "all";
 
   // 2) 特集枠は「編集判断で指定」(Figma 8073:44991)。Sanity の featured フラグを
@@ -175,49 +265,17 @@ async function JournalContent({ params }: { params: SearchParams }) {
   //    専用クエリで引く。
   const showsFeatured = activeCategory === "all";
 
-  // 一覧から特集 1 件を抜くぶん、窓を 1 件多く取る。
-  const fetchEnd =
-    sort === "recommended"
-      ? Math.max(show + (showsFeatured ? 1 : 0), RECOMMEND_POOL)
-      : show + (showsFeatured ? 1 : 0);
-
-  const listQuery =
-    activeCategory === "all"
-      ? sort === "oldest"
-        ? ARTICLES_ASC_QUERY
-        : ARTICLES_QUERY
-      : sort === "oldest"
-        ? ARTICLES_BY_CATEGORY_ASC_QUERY
-        : ARTICLES_BY_CATEGORY_QUERY;
-
-  const listParams =
-    activeCategory === "all"
-      ? { language: locale, start: 0, end: fetchEnd }
-      : { language: locale, categorySlug: activeCategory, start: 0, end: fetchEnd };
-
-  // 人気の記事は全ユーザー共通の集計なので、記事の取得と並べて引く
-  // (失敗しても空配列が返るだけで一覧の描画は止まらない)。
-  const popularArticlesPromise = getPopularArticles(RAIL_SIZE);
-
   let windowArticles: ArticleItem[];
   let featuredArticles: ArticleItem[];
   let newestArticles: ArticleItem[];
   let total: number;
   try {
-    [windowArticles, featuredArticles, newestArticles, total] = await Promise.all([
-      client.fetch(listQuery, listParams),
-      // 特集候補 (最大 4 件・新しい順)。ヒーローとサイドバーの並びに使う。
-      // 絞り込み中もサイドバーは全体の並びを出すので常に引く。
-      client.fetch(FEATURED_ARTICLES_QUERY, { language: locale }),
-      // サイドバー「人気の記事」の穴埋め用の最新記事。
-      client.fetch(ARTICLES_QUERY, { language: locale, start: 0, end: RAIL_SIZE }),
-      activeCategory === "all"
-        ? client.fetch(ARTICLES_COUNT_QUERY, { language: locale })
-        : client.fetch(ARTICLES_BY_CATEGORY_COUNT_QUERY, {
-            language: locale,
-            categorySlug: activeCategory,
-          }),
-    ]);
+    /* 先読みが当たっていればそのまま使う。外れる (存在しないカテゴリを指定された)
+       のは稀なので、そのときだけ絞り込みなしで引き直す。 */
+    [windowArticles, featuredArticles, newestArticles, total] =
+      activeCategory === (requestedCategory ?? "all")
+        ? await speculativeBundle
+        : await fetchListBundle(activeCategory);
   } catch {
     return <p className={"mt-8 text-sm text-muted-foreground lg:mt-12"}>{t("loadError")}</p>;
   }
@@ -258,13 +316,9 @@ async function JournalContent({ params }: { params: SearchParams }) {
   // 新着順・古い順は Sanity 側で並べてから切り出しているので、ここでは触らない。
   let ordered = filtered;
   if (sort === "recommended") {
-    let customerId: string | null = null;
-    try {
-      const auth = await requireAuth();
-      if (auth.authenticated) customerId = auth.customerId;
-    } catch {
-      // 未ログインはそのまま (customerId = null)
-    }
+    // ログイン判定は冒頭で投げてあるので、ここでは既に返っている
+    // (未ログイン・失敗はどちらも null に倒れる)。
+    const customerId = await customerIdPromise;
     ordered = await getRecommendedArticles({ customerId, rawArticles: filtered });
   }
 

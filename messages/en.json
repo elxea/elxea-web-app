@@ -439,6 +439,7 @@
     "paymentUnavailable": "You can review your payment method from the settings page.",
     "opsNote": "Contracts, payment and delivery addresses are managed here. Your preferences and records live in your tea chart.",
     "loginRequired": "Please log in to view your account.",
+    "loading": "Loading your account",
     "orderHistory": "Order History",
     "noOrders": "You have no orders yet.",
     "memberOnlyDescription": "This content is for members only. Log in to access the full content.",
