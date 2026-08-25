@@ -8,15 +8,15 @@
  *    re-consenting on every login. The code comment justified it as needed "for a
  *    fresh token exchange", which is not true — the exchange rests on
  *    `code` + `state` + `code_verifier`.
- *  - Shopify MUST send `prompt=login`. Without it the Shopify SSO cookie silently
- *    re-authenticates the previous user, so a shared device cannot switch
- *    accounts. It is also the backstop for the one residual risk in the logout
- *    fix: if our `shop_it` cannot be decrypted we skip Shopify's RP-initiated
- *    logout, leaving Shopify's SSO cookie in place — and `prompt=login` forces
- *    re-authentication anyway.
+ *  - Shopify must not send `prompt` either — **reversed 2026-08-25**. This file
+ *    used to assert `prompt=login` and call it load-bearing. It is not a value
+ *    the Shopify Customer Account API accepts (`none` is the only one), it never
+ *    delivered the forced re-authentication it was added for, and it broke email
+ *    login in production. The evidence sits above the Shopify block below.
  *
- * Asserting them in the same file is the point: someone deleting the LINE
- * `prompt` must see, in the same breath, that the Shopify one is load-bearing.
+ * Keeping both in one file still earns its place: the two omissions are for
+ * completely different reasons (LINE = auto login, Shopify = the value does not
+ * exist), and anyone touching one should see that they are not the same decision.
  *
  * The same file now also pins LINE's auto login, because that is the reason the
  * LINE `prompt` omission matters at all. Auto login is the only path by which a
@@ -245,13 +245,42 @@ describe("the failed-auto-login round trip is wired end to end", () => {
   });
 });
 
-describe("Shopify authorize URL keeps prompt=login", () => {
+/**
+ * Shopify も `prompt` を送らない（2026-08-25 に反転）。
+ *
+ * このファイルは長らく「LINE には送るな / Shopify には必ず送れ」という**対の決定**
+ * として書かれていた。Shopify 側の前提が誤りだったので、対ではなくなった。
+ *
+ * **Shopify Customer Account API の authorize が定義している `prompt` は `none` だけ**
+ * である（意味も逆で、ログイン画面を出さない）。`login` はこの endpoint に存在しない値。
+ *   https://shopify.dev/docs/api/customer/2025-07
+ *
+ * 旧テストが守っていた主張は 2 つとも、本番ログ（JST）で否定されている:
+ *
+ *   1. 「毎回ログイン画面を出す」
+ *      21:53:45.969 `/api/auth/login` → 21:53:46.961 `/api/auth/callback`。
+ *      992 ミリ秒。人がログイン画面を操作できる時間ではない。`prompt=login` を
+ *      付けたまま Shopify はセッションから無言で code を返している。
+ *   2. 「`shop_it` を復号できず RP-initiated logout を飛ばしたときの backstop」
+ *      1 が効いていない以上、backstop も最初から存在しない。
+ *
+ * 実害の方は逆に大きい。セッションが**無い**状態の往復（＝ログアウト直後の、まさに
+ * ログインしたい状況）は 21:51:14 / 21:51:15 の 2 本とも Shopify 側で落ち、その後
+ * 2 分半、`/api/auth/callback` へのリクエストが 1 件も来ていない。利用者はその間
+ * コードを入れ直し続け、毎回エラーを見ていた。
+ *
+ * アカウント切り替え / 共有 PC の担保は `/api/auth/logout` の RP-initiated logout
+ * （`id_token_hint` 付き）が持っており、そちらは変えていない
+ * （`__tests__/auth-logout-route.test.ts`）。
+ */
+describe("Shopify authorize URL sends no prompt", () => {
   it("GET /api/auth/login", async () => {
     const { GET } = await import("@/app/api/auth/login/route");
     const res = await GET(request("https://www.elxea.com/api/auth/login?locale=ja"));
 
     const url = new URL(res.headers.get("location")!);
-    expect(url.searchParams.get("prompt")).toBe("login");
+    expect(url.searchParams.has("prompt")).toBe(false);
+    // 往復を成立させるパラメータはそのまま。
     expect(url.searchParams.get("response_type")).toBe("code");
     expect(url.searchParams.get("code_challenge_method")).toBe("S256");
   });

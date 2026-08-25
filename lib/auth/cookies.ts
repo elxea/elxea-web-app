@@ -160,6 +160,14 @@ export const COOKIE_REGISTRY: readonly CookieSpec[] = [
   { name: "shop_nonce", group: "transient", scope: "host-only", secure: "prod-only" },
   { name: "shop_locale", group: "transient", scope: "host-only", secure: "prod-only" },
   { name: "shop_return_to", group: "transient", scope: "host-only", secure: "prod-only" },
+  /* 進行中の Shopify ログインを **まとめて** 持つ入れ物（`lib/shopify/oauth-state.ts`）。
+   * 上の 5 本と同じ値を、state ごとに最大 5 件まで抱える。
+   *
+   * 別 cookie を足しているのは、上の 5 本が 1 個ずつしか無いせいで **ログイン開始が
+   * 2 回走ると先行する試行が壊れる** から（2026-08-25 の「エラーなのにログインできて
+   * いる」障害）。scope / secure は上の 5 本と同一 — 同じ往復で使い捨てる同じ性質の
+   * 値なので、ここだけ規則を変える理由が無い。 */
+  { name: "shop_oauth", group: "transient", scope: "host-only", secure: "prod-only" },
   /* Shared-domain for the same reason as the LINE session: the init POST may
    * land on apex or www, and the callback returns to whichever host is pinned. A
    * host-only state cookie misses the opposite host and the CSRF check fails —

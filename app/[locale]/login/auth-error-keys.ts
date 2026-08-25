@@ -43,6 +43,14 @@ export const ERROR_KEY_MAP: Record<string, string> = {
   /* 検証そのものが行えなかったとき (Shopify の公開鍵を取得できない等)。ユーザーの
    * やり直しでは直らない可能性があるので、文言を分けて「時間をおいて」と伝える。 */
   VerificationUnavailable: "errorVerificationUnavailable",
+  /* ログインの提供元 (Shopify) が `?error=` を付けて戻してきたとき。
+   *
+   * `/api/auth/callback` はこの分岐を **読んでいなかった**。code が無いという理由
+   * だけで state 不一致に畳まれ、ログにも「state が違う」としか残らないので、
+   * 提供元が何を拒んだのかが最初から失われていた (2026-08-25 の調査が長引いた
+   * 直接の理由)。内訳は Sentry に残し、画面には 1 つの文言で出す — 利用者側の
+   * 打ち手はどれも「もう一度」で同じなので分ける意味がない。 */
+  ProviderRejected: "errorProviderRejected",
 };
 
 /** 未知のコードが来たときに使う既定キー。 */

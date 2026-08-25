@@ -22,6 +22,107 @@ import {
   resolveOneTapResult,
 } from "@/lib/auth/one-tap-link";
 import { returnUrlWithResult } from "@/lib/line/link-flow";
+import {
+  PENDING_AUTH_COOKIE,
+  findPendingAuth,
+  parsePendingAuths,
+  removePendingAuth,
+  serializePendingAuths,
+  type PendingAuth,
+} from "@/lib/shopify/oauth-state";
+
+/**
+ * クエリから拾った値をログに載せる前に均す。
+ *
+ * `?error=` / `?error_description=` は **URL から来る = 誰でも仕込める**。
+ * `searchParams.get` は %0A を実際の改行に戻すので、そのまま出すとログに偽の行を
+ * 差し込める（後から原因を追う人が読むのはそのログである以上、そこを汚させない）。
+ * 制御文字を落とし、長さも切る。
+ */
+function forLog(value: string | null, maxLength = 200): string {
+  if (!value) return "";
+  return Array.from(value)
+    .filter((ch) => {
+      const code = ch.codePointAt(0) ?? 0;
+      return code >= 0x20 && code !== 0x7f;
+    })
+    .join("")
+    .slice(0, maxLength);
+}
+
+/** 1 回きりの値を載せている旧クッキー。成否によらず必ず落とす。 */
+const ONE_SHOT_COOKIES = [
+  "shop_cv",
+  "shop_state",
+  "shop_nonce",
+  "shop_locale",
+  "shop_return_to",
+] as const;
+
+/**
+ * この往復に対応する「進行中のログイン」を引き当てる。
+ *
+ * 新しい入れ物 (`shop_oauth`) を先に見て、無ければ旧クッキーに落ちる。旧経路が
+ * 要るのは **デプロイをまたいで進行中のログイン** のためだけで、そこでは従来と
+ * まったく同じ判定（state 完全一致）をする。
+ */
+function resolvePendingAuth(
+  request: NextRequest,
+  state: string,
+): { entry: PendingAuth | null; remaining: PendingAuth[] | null } {
+  const stored = request.cookies.get(PENDING_AUTH_COOKIE)?.value;
+  if (stored) {
+    const list = parsePendingAuths(stored);
+    const entry = findPendingAuth(list, state);
+    if (entry) return { entry, remaining: removePendingAuth(list, state) };
+    // 新クッキーはあるが、この state はそこに無い。旧クッキーも見る（移行期）。
+  }
+
+  const codeVerifier = request.cookies.get("shop_cv")?.value;
+  const savedState = request.cookies.get("shop_state")?.value;
+  if (!codeVerifier || !savedState || savedState !== state) {
+    return { entry: null, remaining: stored ? parsePendingAuths(stored) : null };
+  }
+
+  return {
+    entry: {
+      state: savedState,
+      verifier: codeVerifier,
+      nonce: request.cookies.get("shop_nonce")?.value ?? "",
+      locale: request.cookies.get("shop_locale")?.value || "ja",
+      returnTo: sanitizeReturnTo(request.cookies.get("shop_return_to")?.value),
+      createdAt: Date.now(),
+    },
+    remaining: stored ? parsePendingAuths(stored) : null,
+  };
+}
+
+/**
+ * このブラウザは **もう使えるセッションを持っているか**（通信はしない）。
+ *
+ * ## なぜこの判定が要るのか（2026-08-25 の症状そのもの）
+ *
+ * 従来この route は、失敗したら理由も現状も見ずにエラー用 URL へ飛ばしていた。
+ * ところがメールログインは「1 回の操作で 1 回だけ callback が来る」流れではない。
+ * 開始が二重に走る・戻りが二重に届く・利用者が押し直す、が普通に起きる。
+ * そのとき起きるのは
+ *
+ *   1 本目の往復でログインは **成立している**（session cookie も書けている）
+ *   2 本目の往復が「その code はもう使われた」「state が違う」で落ちる
+ *   → 画面には 2 本目のエラーだけが出る
+ *
+ * という並びで、利用者から見ると「エラーが出たのにマイページはログイン済み」に
+ * なる。**成立しているログインをエラーとして見せない**のがここの役目。
+ *
+ * 復号まで確かめるのは、消し損ねたゴミが残っているだけの状態を「ログイン済み」と
+ * 誤認しないため。
+ */
+function hasUsableSession(request: NextRequest): boolean {
+  const accessToken = request.cookies.get("shop_at")?.value;
+  const refreshToken = request.cookies.get("shop_rt")?.value;
+  if (!accessToken || !refreshToken) return false;
+  return Boolean(decryptToken(accessToken)) && Boolean(decryptToken(refreshToken));
+}
 
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
@@ -34,17 +135,88 @@ export async function GET(request: NextRequest) {
   const code = searchParams.get("code");
   const state = searchParams.get("state");
 
-  const codeVerifier = request.cookies.get("shop_cv")?.value;
-  const savedState = request.cookies.get("shop_state")?.value;
-  const savedNonce = request.cookies.get("shop_nonce")?.value;
-  const locale = request.cookies.get("shop_locale")?.value || "ja";
+  const pending = state ? resolvePendingAuth(request, state) : { entry: null, remaining: null };
+  const locale = pending.entry?.locale ?? request.cookies.get("shop_locale")?.value ?? "ja";
 
-  // Validate state
-  if (!code || !state || !codeVerifier || state !== savedState) {
-    return NextResponse.redirect(
-      `${origin}/${locale}/account?error=invalid_state`
+  /* 失敗の出口はここ 1 本に寄せる。以前は 3 か所がばらばらに redirect していて、
+   * そのうち 2 か所（state 不一致と catch-all）は **ログを 1 行も残さず**
+   * `/{locale}/account?error=...` へ飛ばしていた。後者は middleware が
+   * 未ログインの /account をクエリごと落として /login に飛ばすため、利用者には
+   * 理由の無いログイン画面しか出ない — この route 自身が 96-105 行目で同じ欠陥を
+   * nonce 経路について説明しているのに、残る 2 経路は直っていなかった。 */
+  function fail(reason: string, userFacingKey: string): NextResponse {
+    /* まず「本当に失敗しているのか」を確かめる。すでに使えるセッションがあるなら、
+     * この往復が落ちてもログイン自体は成立している。エラーを見せる方が嘘になる。 */
+    if (hasUsableSession(request)) {
+      console.warn(
+        `[Auth Callback] ${reason}; session already established — completing instead of erroring`,
+      );
+      Sentry.addBreadcrumb({
+        category: "shopify-oauth",
+        level: "info",
+        message: "callback failed but session already established",
+        data: { subsystem: "shopify-oauth", reason },
+      });
+      const settled = NextResponse.redirect(
+        new URL(pending.entry?.returnTo ?? `/${locale}/account`, origin),
+      );
+      for (const name of ONE_SHOT_COOKIES) settled.cookies.delete(name);
+      if (pending.remaining) {
+        settled.cookies.set(PENDING_AUTH_COOKIE, serializePendingAuths(pending.remaining), {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: "lax",
+          path: "/",
+          maxAge: 60 * 10,
+        });
+      }
+      return settled;
+    }
+
+    /* 本当の失敗。**必ず記録する** — 2026-08-25 の調査で、この route の失敗が
+     * Vercel のログにも Sentry にも 1 件も残っていないことが分かった。無言で
+     * 落ちる経路は、次に同じことが起きても同じだけ時間が溶ける。 */
+    console.warn(`[Auth Callback] login failed: ${reason}`);
+    Sentry.captureMessage("Shopify OAuth callback failed", {
+      level: "warning",
+      tags: { subsystem: "shopify-oauth" },
+      extra: { reason },
+    });
+
+    // `/{locale}/login` に出す。`AuthErrorBanner` がここでだけ文言に訳せる。
+    const failed = NextResponse.redirect(`${origin}/${locale}/login?error=${userFacingKey}`);
+    for (const name of ONE_SHOT_COOKIES) failed.cookies.delete(name);
+    if (pending.remaining) {
+      failed.cookies.set(PENDING_AUTH_COOKIE, serializePendingAuths(pending.remaining), {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        path: "/",
+        maxAge: 60 * 10,
+      });
+    }
+    return failed;
+  }
+
+  /* Shopify が `error=` を返してきた場合（`login_required` / `invalid_request` 等）。
+   *
+   * ここは以前まったく読んでおらず、code が無いという理由だけで `invalid_state`
+   * に畳まれていた。**別物を同じ名前で記録すると原因究明がそこで止まる**ので、
+   * 分けて記録する。利用者向けの文言は 1 つで足りる（やることが同じなので）。 */
+  const providerError = searchParams.get("error");
+  if (providerError) {
+    /* `error_description` は Shopify が組み立てる文字列。値そのものは記録するが、
+     * 画面には出さない（第三者の文言をそのまま自サイトに描かない）。 */
+    return fail(
+      `provider_error=${forLog(providerError, 64)}:${forLog(searchParams.get("error_description"))}`,
+      "ProviderRejected",
     );
   }
+
+  if (!code || !state) return fail("missing_code_or_state", "MissingParams");
+  if (!pending.entry) return fail("no_matching_pending_auth", "StateMismatch");
+
+  const { verifier: codeVerifier, nonce: savedNonce } = pending.entry;
 
   try {
     const redirectUri = `${origin}/api/auth/callback`;
@@ -108,19 +280,17 @@ export async function GET(request: NextRequest) {
        *     iss, aud, exp, sub. These stay **indistinguishable from each other**.
        *     Telling the outside world which one failed hands an attacker a free
        *     oracle for probing the verifier. The precise reason goes to the log and
-       *     to Sentry, where only we can read it. */
+       *     to Sentry, where only we can read it.
+       *
+       * 出口が `fail` に変わっているのは意味がある。ここに来た時点で **token 交換は
+       * 成功している** ので、別の往復で既にセッションが立っている場合が現実にある
+       * （nonce クッキーが後続のログイン開始に上書きされて棄却された、がまさにその
+       * 形）。成立しているログインにエラーを見せない判定は `fail` が一手に持つ。 */
       const userFacingKey =
         verified.reason === "jwks_unavailable" || verified.reason === "client_id_not_configured"
           ? "VerificationUnavailable"
           : "InvalidIdToken";
-      const rejected = NextResponse.redirect(
-        `${origin}/${locale}/login?error=${userFacingKey}`,
-      );
-      // One-shot values: a rejected attempt must not leave anything reusable.
-      for (const name of ["shop_cv", "shop_state", "shop_nonce", "shop_locale", "shop_return_to"]) {
-        rejected.cookies.delete(name);
-      }
-      return rejected;
+      return fail(`id_token_rejected=${verified.reason}`, userFacingKey);
     }
 
     // Post-login destination. Defaults to /{locale}/account (previous fixed
@@ -130,7 +300,11 @@ export async function GET(request: NextRequest) {
     //
     // `sanitizeReturnTo` only lets same-site relative paths through, so this
     // cannot be abused as an open redirect even if the cookie is tampered with.
-    const returnTo = sanitizeReturnTo(request.cookies.get("shop_return_to")?.value);
+    //
+    // 戻り先は **この試行に紐付いた値** を使う。単一クッキー時代は、戻り先の違う
+    // ログインが同時に走ると後から始めた方の戻り先で上書きされ、連携の往復
+    // （/{locale}/link）が黙って /account に落ちていた。
+    const returnTo = pending.entry.returnTo;
     const response = NextResponse.redirect(
       new URL(returnTo ?? `/${locale}/account`, origin),
     );
@@ -208,14 +382,21 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Clean up PKCE cookies
-    response.cookies.delete("shop_cv");
-    response.cookies.delete("shop_state");
-    response.cookies.delete("shop_nonce");
-    response.cookies.delete("shop_locale");
-    // One-shot: the return path is consumed by this redirect and must not leak
-    // into the next login.
-    response.cookies.delete("shop_return_to");
+    /* Clean up PKCE cookies.
+     *
+     * One-shot: the return path is consumed by this redirect and must not leak
+     * into the next login.
+     *
+     * 新しい入れ物からは **この試行だけ** を抜く（`pending.remaining`）。全部消すと、
+     * 同時に走っている別の正当な試行まで巻き添えで壊れる — それは今回直している
+     * 上書き事故と同じことを、掃除の側でやり直すことになる。 */
+    for (const name of ONE_SHOT_COOKIES) response.cookies.delete(name);
+    if (pending.remaining) {
+      response.cookies.set(PENDING_AUTH_COOKIE, serializePendingAuths(pending.remaining), {
+        ...cookieOptions,
+        maxAge: 60 * 10,
+      });
+    }
 
     /* このブラウザが LINE セッションも持ったまま Shopify OAuth を終えた。
      * **連携済みの人なら**、まだ `users/line:<id>/` に残っている分をここで
@@ -395,8 +576,14 @@ export async function GET(request: NextRequest) {
     return response;
   } catch (error) {
     console.error("Auth callback error:", error);
-    return NextResponse.redirect(
-      `${origin}/${locale}/account?error=auth_failed`
+    /* ここに来る典型が **authorization code の二度目の提示**（Shopify は
+     * `invalid_grant` を返す）。1 回目で既にログインが成立しているので、`fail` は
+     * セッションを見てエラーを出さずに完了させる。従来はここが無条件で
+     * `/{locale}/account?error=auth_failed` へ飛ばしており、届かないクエリのせいで
+     * 「理由のないログイン画面」に見えていた。 */
+    return fail(
+      `token_exchange_failed: ${forLog(error instanceof Error ? error.message : String(error), 300)}`,
+      "TokenFailed",
     );
   }
 }
