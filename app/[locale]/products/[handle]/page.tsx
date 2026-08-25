@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { decodeHandle } from "@/lib/handle";
 import { getProductByHandle, getProducts } from "@/lib/shopify";
-import { formatPrice } from "@/lib/utils";
+import { formatPrice, formatPriceRange } from "@/lib/utils";
 import { ImageGallery } from "@/components/product/image-gallery";
 import { VariantSelector } from "@/components/product/variant-selector";
 import { AddToCartButton } from "@/components/product/add-to-cart-button";
@@ -427,9 +427,9 @@ export default async function ProductPage({
                   imageAlt={p.title}
                   overline={p.vendor}
                   title={p.title}
-                  meta={formatPrice(
-                    p.priceRange.minVariantPrice.amount,
-                    p.priceRange.minVariantPrice.currencyCode
+                  meta={formatPriceRange(
+                    p.priceRange.minVariantPrice,
+                    p.priceRange.maxVariantPrice
                   )}
                   /* Figma は SP 2 枚 / PC 3 枚 (8057:1790 / 8056:1613)。 */
                   className={i === 2 ? "hidden lg:flex" : undefined}

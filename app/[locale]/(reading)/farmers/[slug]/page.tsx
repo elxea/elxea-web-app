@@ -38,7 +38,7 @@ import {
   withSeedFarmerDetail,
 } from "@/lib/preview-seed";
 import { getProductByHandle } from "@/lib/shopify";
-import { formatPrice } from "@/lib/utils";
+import { formatPriceRange } from "@/lib/utils";
 
 /**
  * 農家詳細 — Figma【R2: 確定版】People 詳細テンプレ統合 (茶園セクション拡張)
@@ -262,7 +262,9 @@ export default async function FarmerPage({
       imageAlt: p.featuredImage?.altText ?? p.title,
       title: p.title,
       note: p.vendor || undefined,
-      meta: price ? formatPrice(price.amount, price.currencyCode) : undefined,
+      meta: price
+        ? formatPriceRange(price, p.priceRange?.maxVariantPrice)
+        : undefined,
     };
   });
 

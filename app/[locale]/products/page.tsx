@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
-import { getTranslations } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 
 import { FilterX } from "lucide-react";
 
 import { getProducts } from "@/lib/shopify";
+import { productTypeLabel, productTypeMatches } from "@/lib/shopify/product-type";
 import type { Product } from "@/lib/shopify/types";
 import { Link } from "@/i18n/navigation";
 import { Breadcrumb } from "@/components/seo/breadcrumb";
@@ -85,6 +86,7 @@ export default async function ProductsPage({
 async function ProductsContent({ params }: { params: SearchParams }) {
   const t = await getTranslations("product");
   const tl = await getTranslations("catalog");
+  const locale = await getLocale();
 
   const sort = params.sort && params.sort in SORT_KEYS ? params.sort : "newest";
 
@@ -95,15 +97,25 @@ async function ProductsContent({ params }: { params: SearchParams }) {
     return <p className="mt-8 text-sm text-muted-foreground lg:mt-12">{t("loadError")}</p>;
   }
 
-  // チップは実データの productType から組む (Figma の固定文言は焼かない)。
+  /* チップは実データの productType から組む (Figma の固定文言は焼かない)。
+     **値** は生の productType (`Green Tea｜緑茶`) のまま URL に載せ、**ラベル**
+     だけロケール側 (`緑茶`) に落とす。日本語 UI に英日併記のラベルが出るのを
+     やめるための分離で、分類名そのものはコードに持たない。 */
   const categories = [...new Set(products.map((p) => p.productType).filter(Boolean))];
   const chips = [
     { value: "all", label: tl("all") },
-    ...categories.map((c) => ({ value: c, label: c })),
+    ...categories.map((c) => ({ value: c, label: productTypeLabel(c, locale) })),
   ];
 
+  /* `?category=` は生の productType だけでなく、トップの CATEGORIES タイルが渡す
+     コレクション名 (`緑茶`) でも届く。一致判定を `productTypeMatches` に寄せて
+     どちらでも同じ絞り込みに着地させる (以前は生値一致のみで、タイル経由は
+     すべて「すべて」に落ちていた)。 */
+  const requested = params.category;
   const activeCategory =
-    params.category && categories.includes(params.category) ? params.category : "all";
+    (requested
+      ? categories.find((c) => productTypeMatches(c, requested))
+      : undefined) ?? "all";
   const filtered =
     activeCategory === "all"
       ? products
@@ -123,7 +135,7 @@ async function ProductsContent({ params }: { params: SearchParams }) {
   };
 
   const kindEntries = categories.map((category) => ({
-    label: category,
+    label: productTypeLabel(category, locale),
     count: products.filter((p) => p.productType === category).length,
     href: `/products?category=${encodeURIComponent(category)}`,
   }));

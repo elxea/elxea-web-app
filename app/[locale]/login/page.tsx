@@ -12,9 +12,11 @@
  * 4. メールアドレスでログインは /api/auth/login → Shopify OAuth (PKCE)
  */
 import { Suspense } from "react";
+import { cookies } from "next/headers";
 import { getTranslations, getLocale } from "next-intl/server";
 import {
   AuthCard,
+  AuthCardBanner,
   AuthCardActions,
   AuthCardDescription,
   AuthCardDivider,
@@ -41,9 +43,23 @@ export default async function LoginPage() {
   const t = await getTranslations("login");
   const locale = await getLocale();
 
+  /* LINE だけで入っている人がこの画面に来たときは、**飛ばさずに知らせる**。
+   *
+   * Shopify セッションがある人は middleware がマイページへ送る (押しても得るものが
+   * 無いため)。LINE だけの人はここが連携の入口なので画面を出す必要があるが、素の
+   * ログイン画面に見えると「ログアウトしている」と誤解する。もう入っていることと、
+   * メールで入ると同じアカウントにまとまることを 1 行で言う。 */
+  const signedInWithLineOnly = (await cookies()).has("line_session");
+
   return (
     <AuthSection>
       <AuthCard>
+        {signedInWithLineOnly ? (
+          <AuthCardBanner tone="success" data-testid="login-line-session-notice">
+            {t("alreadySignedInWithLine")}
+          </AuthCardBanner>
+        ) : null}
+
         {/* 状態バナー — Figma 6706:14468「カード上部に条件表示（該当クエリ時のみ）」 */}
         <Suspense fallback={null}>
           <AuthErrorBanner />

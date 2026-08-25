@@ -8,6 +8,7 @@ import {
   buildPast,
   buildUpcoming,
   formatRecordDate,
+  isPlaceholderEmail,
 } from "@/lib/account-view";
 
 /**
@@ -162,12 +163,85 @@ describe("buildAccountView", () => {
 });
 
 describe("formatRecordDate", () => {
-  it("確定版のカード 1 行目と同じ「8月20日(木)」形にする", () => {
-    expect(formatRecordDate("2026-08-20T00:00:00.000Z", "ja")).toBe("8月20日(木)");
+  /* 年を出すのは Figma (「8月20日(木)」) からの意図的な逸脱。注文履歴は何年でも
+     遡るので、年が無いと 2 年前の注文が今年の注文に見える (実測 2026-08-25)。 */
+  it("年つきの「2026年8月20日(木)」形にする", () => {
+    expect(formatRecordDate("2026-08-20T00:00:00.000Z", "ja")).toBe("2026年8月20日(木)");
+  });
+
+  it("何年前の記録でも年で見分けが付く", () => {
+    expect(formatRecordDate("2024-03-21T01:28:32.000Z", "ja")).toBe("2024年3月21日(木)");
   });
 
   it("日付が無い・壊れているときは null", () => {
     expect(formatRecordDate(null, "ja")).toBeNull();
     expect(formatRecordDate("not-a-date", "ja")).toBeNull();
+  });
+});
+
+describe("送信専用アドレスは識別子として出さない", () => {
+  it("no-reply 系はメール欄を空にする (表示名に落ちる)", () => {
+    const view = buildAccountView({
+      customer: {
+        firstName: "世堅",
+        lastName: "温",
+        emailAddress: { emailAddress: "no-reply@elxea.com" },
+      },
+    });
+
+    expect(view.email).toBeNull();
+    expect(view.displayName).toBe("世堅 温");
+  });
+
+  it("本人のアドレスはそのまま残す", () => {
+    const view = buildAccountView({
+      customer: { emailAddress: { emailAddress: "yuki@example.com" } },
+    });
+
+    expect(view.email).toBe("yuki@example.com");
+  });
+
+  it("大文字・別綴りの送信専用アドレスも落とす", () => {
+    for (const email of ["NoReply@example.com", "do-not-reply@example.jp"]) {
+      expect(isPlaceholderEmail(email)).toBe(true);
+    }
+    expect(isPlaceholderEmail("noreplytea@example.com")).toBe(false);
+  });
+});
+
+describe("返金済みの注文を ¥0 と言い切らない", () => {
+  const order = (financialStatus: string, amount: string) => ({
+    orders: {
+      edges: [
+        {
+          node: {
+            id: `gid://order/${financialStatus}`,
+            name: "#1027",
+            processedAt: "2024-03-21T01:28:32.000Z",
+            financialStatus,
+            totalPrice: { amount, currencyCode: "JPY" },
+          },
+        },
+      ],
+    },
+  });
+
+  it("全額返金は refunded", () => {
+    expect(buildPast(order("REFUNDED", "0.0"))[0].status).toBe("refunded");
+  });
+
+  it("無効・期限切れは voided", () => {
+    expect(buildPast(order("VOIDED", "0.0"))[0].status).toBe("voided");
+    expect(buildPast(order("EXPIRED", "0.0"))[0].status).toBe("voided");
+  });
+
+  it("一部返金は partiallyRefunded (金額と併記する)", () => {
+    const record = buildPast(order("PARTIALLY_REFUNDED", "1200.0"))[0];
+    expect(record.status).toBe("partiallyRefunded");
+    expect(record.amount).toEqual({ value: "1200.0", currencyCode: "JPY" });
+  });
+
+  it("通常の入金済みは状態を持たない (金額だけ出す)", () => {
+    expect(buildPast(order("PAID", "1598.0"))[0].status).toBeNull();
   });
 });

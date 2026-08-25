@@ -26,7 +26,7 @@ import {
   type PhotoCardItem,
 } from "@/components/playlist/playlist-detail";
 import { getProductByHandle } from "@/lib/shopify";
-import { formatPrice } from "@/lib/utils";
+import { formatPriceRange } from "@/lib/utils";
 import { formatArticleDate } from "@/lib/format-date";
 import { previewSeedEnabled, previewImageForKey } from "@/lib/preview-seed";
 import { toPlainText } from "@/lib/sanity-text";
@@ -235,7 +235,9 @@ export default async function PlaylistDetailPage({
       imageAlt: p.featuredImage?.altText ?? p.title,
       title: p.title,
       note: p.vendor || undefined,
-      meta: price ? formatPrice(price.amount, price.currencyCode) : undefined,
+      meta: price
+        ? formatPriceRange(price, p.priceRange?.maxVariantPrice)
+        : undefined,
     };
   });
 

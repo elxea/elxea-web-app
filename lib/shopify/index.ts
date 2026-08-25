@@ -1,4 +1,5 @@
 import { shopifyFetch, storefrontConfigured } from "./client";
+import { stripPlaceholderCopy } from "./placeholder-copy";
 import {
   previewSeedStorefrontEnabled,
   seedProductByHandle,
@@ -116,6 +117,11 @@ function reshapeProduct(raw: Record<string, unknown>): Product {
 
   return {
     ...product,
+    /* 入稿待ちの印 (`【準備中】`) だけの説明文は、説明が無いものとして扱う。
+       画面・SEO の両方がこの 1 か所を通るので、ここで落とせば「売っているのに
+       準備中と書いてある」表示が全経路から消える。詳細は placeholder-copy.ts。 */
+    description: stripPlaceholderCopy(product.description),
+    descriptionHtml: stripPlaceholderCopy(product.descriptionHtml),
     variants: flattenConnection(
       product.variants as unknown as ShopifyConnection<ProductVariant & {
         sellingPlanAllocations: ShopifyConnection<SellingPlanAllocation>;

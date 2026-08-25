@@ -31,7 +31,35 @@ export type AccountRecord = {
   href?: string;
   /** 注文金額など、カード 3 行目に出す値の素材。 */
   amount?: { value: string; currencyCode: string };
+  /**
+   * 注文の入金状態 (注文だけが持つ)。**金額と対で出すために要る**。
+   *
+   * Customer Account API の `totalPrice` は「いま請求されている額」なので、
+   * 全額返金・無効化された注文では 0 になる。金額だけを出すと過去の注文が
+   * すべて「¥0」に見え、買った覚えのある人の信頼を損なう (実測 2026-08-25:
+   * #1027 / #1028 / #1030 はいずれも全額返金済みで ¥0 表示)。
+   * 数字を偽らず、返金済みなら金額の代わりに状態を言う。
+   */
+  status?: AccountOrderStatus;
 };
+
+/** カードに出す注文状態。判定できない / 通常の入金済みは `null`。 */
+export type AccountOrderStatus = "refunded" | "voided" | "partiallyRefunded" | null;
+
+/** Shopify の `financialStatus` を、画面に出す状態へ畳む。 */
+export function orderStatusOf(financialStatus: string | null | undefined): AccountOrderStatus {
+  switch ((financialStatus ?? "").toUpperCase()) {
+    case "REFUNDED":
+      return "refunded";
+    case "VOIDED":
+    case "EXPIRED":
+      return "voided";
+    case "PARTIALLY_REFUNDED":
+      return "partiallyRefunded";
+    default:
+      return null;
+  }
+}
 
 /**
  * 「続き」に並ぶ 1 枚 (写真つきカード = Figma ExpCard)。
@@ -79,6 +107,7 @@ export type AccountCustomerInput = {
         id?: string | null;
         name?: string | null;
         processedAt?: string | null;
+        financialStatus?: string | null;
         totalPrice?: { amount?: string | null; currencyCode?: string | null } | null;
       } | null;
     }[];
@@ -108,6 +137,32 @@ export type AccountFavoriteInput = FavoriteInput;
 
 function str(value: unknown): string | null {
   return typeof value === "string" && value.trim() !== "" ? value : null;
+}
+
+/**
+ * 送信専用アドレス (no-reply@…) — **本人のメールではない**。
+ *
+ * LINE だけで入った人にも Shopify 顧客レコードを作る都合で、メール欄に
+ * 送信専用アドレスが入っていることがある。これをそのまま
+ * 「no-reply@elxea.com としてログイン中」と出すと、本人の識別子として
+ * 読めてしまう (実測 2026-08-25)。本人が名乗ったアドレスではないので、
+ * 識別子としては **無い** ものとして扱う。
+ *
+ * 判定はローカル部だけを見る (ドメインは自社とは限らない)。
+ */
+const PLACEHOLDER_EMAIL_LOCAL_PARTS = new Set([
+  "no-reply",
+  "noreply",
+  "no_reply",
+  "donotreply",
+  "do-not-reply",
+  "do_not_reply",
+]);
+
+export function isPlaceholderEmail(email: string | null | undefined): boolean {
+  if (!email) return false;
+  const local = email.split("@")[0]?.trim().toLowerCase();
+  return local !== undefined && PLACEHOLDER_EMAIL_LOCAL_PARTS.has(local);
 }
 
 /** 日付昇順。日付が無いものは末尾。 */
@@ -188,6 +243,7 @@ export function buildPast(customer: AccountCustomerInput): AccountRecord[] {
         date: str(node.processedAt),
         title: name,
         amount: amountValue && currency ? { value: amountValue, currencyCode: currency } : undefined,
+        status: orderStatusOf(node.financialStatus),
       } satisfies AccountRecord;
     })
     .filter((o): o is AccountRecord => o !== null)
@@ -214,9 +270,12 @@ export function buildAccountView({
   events?: AccountEventInput[];
   now?: Date;
 }): AccountView {
+  const rawEmail = str(customer.emailAddress?.emailAddress);
+
   return {
     displayName: accountDisplayName(customer),
-    email: str(customer.emailAddress?.emailAddress),
+    /* 送信専用アドレスは識別子ではないので持たせない (画面は表示名に落ちる)。 */
+    email: isPlaceholderEmail(rawEmail) ? null : rawEmail,
     upcoming: buildUpcoming({ subscriptions, events, now }),
     past: buildPast(customer),
     paymentMethod: null,
@@ -224,12 +283,22 @@ export function buildAccountView({
   };
 }
 
-/** 「8月20日(木)」。Figma 確定版のカード 1 行目と同じ形。 */
+/**
+ * 「2024年3月21日(木)」。Figma 確定版のカード 1 行目に **年を足した**形。
+ *
+ * ## なぜ Figma (「8月20日(木)」) から外すのか
+ *
+ * 注文履歴は何年でも遡る。年を落とすと 2 年前の注文が今年の注文に見える
+ * (実測 2026-08-25: 2024-03-21 の注文 3 件が「3月21日(木)」と並び、直近の
+ * 買い物と区別が付かなかった)。「これから」の予定側も同じ書式に揃える —
+ * 予定と記録で日付の読み方が変わるほうが混乱する。
+ */
 export function formatRecordDate(iso: string | null, locale: string): string | null {
   if (!iso) return null;
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return null;
   return new Intl.DateTimeFormat(locale === "ja" ? "ja-JP" : "en-US", {
+    year: "numeric",
     month: "long",
     day: "numeric",
     weekday: "short",
