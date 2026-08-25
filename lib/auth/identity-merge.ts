@@ -385,6 +385,10 @@ async function mergeByFields(
     else groups.set(identity, { key, docs: [{ ref: doc.ref, data }] });
   }
 
+  /* Step 2/3 — 引っ越し先に無いものだけコピーし、読み戻して着地を確かめる。
+     ここを抜けて `deletable` に入った束だけが、消してよい束。 */
+  const deletable: DedupeGroup["docs"] = [];
+
   await mapWithConcurrency(
     [...groups.values()],
     MERGE_CONCURRENCY,
@@ -419,16 +423,7 @@ async function mergeByFields(
           counters.deduped += group.docs.length - 1;
         }
 
-        /* Step 4 — the source is redundant now, and only now.
-           束のうち 1 件の delete が転んでも残りは消せる（消せなかったぶんだけ
-           `failed` = 元の場所に残る）。 */
-        await mapWithConcurrency(group.docs, MERGE_CONCURRENCY, async (doc) => {
-          try {
-            await doc.ref.delete();
-          } catch {
-            counters.failed += 1;
-          }
-        });
+        deletable.push(...group.docs);
       } catch {
         /* Retain the source. A throw anywhere above (copy or verify) leaves
          * these documents under the LINE key; the next run re-runs the merge
@@ -437,6 +432,27 @@ async function mergeByFields(
       }
     },
   );
+
+  /* Step 4 — the source is redundant now, and only now.
+   *
+   * **削除を別の pass にしてある**のは、同時実行数の上限を 1 段に保つため。
+   * 束ごとの削除を上の worker の中で `mapWithConcurrency` していたときは、
+   * 上限が入れ子になって最悪 `24 × 24` 本の往復が同時に開きうる形になっていた
+   * （重複が大量にある棚でしか起きないが、上限を置いた意味が消える）。
+   * 平らにして一度に流せば、開く往復は常に 24 本以下に収まる。
+   *
+   * 「その束の verify が通ってからしか消さない」という順序は変わっていない —
+   * `deletable` に入るのは上の pass を通過した束だけ。 */
+  await mapWithConcurrency(deletable, MERGE_CONCURRENCY, async (doc) => {
+    try {
+      await doc.ref.delete();
+    } catch {
+      /* 消せなかったぶんだけ元の場所に残る（次の再実行が step 2 で重複と
+         判定して消す）。同じ束の他の 1 件は消せているので、束ごと道連れに
+         しない。 */
+      counters.failed += 1;
+    }
+  });
 
   return counters;
 }
