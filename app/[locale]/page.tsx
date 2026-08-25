@@ -337,10 +337,14 @@ async function CategoriesSection() {
 
   try {
     const { getCollections } = await import("@/lib/shopify");
-    const collections = (await getCollections(TOP_CATEGORY_COUNT)).slice(
-      0,
-      TOP_CATEGORY_COUNT
-    );
+    /* 写真があるカテゴリを先に並べる (#9)。
+       写真の無いカテゴリは `ActionTile` が 1 行に畳むので、混ざった順のままだと
+       写真タイルと 1 行タイルが市松に並んで段がガタつく。写真つきを前に寄せると
+       上段が写真・下段が一覧という素直な並びになり、SP で先頭 3 枚を出す
+       (下の `TOP_CATEGORY_COUNT_SP`) 判断とも噛み合う。 */
+    const collections = (await getCollections(TOP_CATEGORY_COUNT))
+      .slice(0, TOP_CATEGORY_COUNT)
+      .sort((a, b) => Number(Boolean(b.image?.url)) - Number(Boolean(a.image?.url)));
     if (collections.length === 0) return null;
 
     /* Figma SP は上下 48 (8109:46629)。PC は 96。

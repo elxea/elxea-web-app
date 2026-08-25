@@ -417,6 +417,8 @@
   "account": {
     "settingsLink": "Settings & contracts →",
     "loggedInAs": "Signed in as {email}",
+    "loggedInAsName": "Signed in as {name}",
+    "alreadySignedInNotice": "You are already signed in. Here is your account page.",
     "greeting": "Welcome back, {name}.",
     "greetingNoName": "Welcome back.",
     "greetingLead": "Your next delivery and upcoming seats, gathered here.",
@@ -431,6 +433,9 @@
     "pastAll": "See all orders →",
     "pastOrderMeta": "Ordered on {date}",
     "pastOrderTitle": "Order {name}",
+    "pastOrderRefunded": "Refunded",
+    "pastOrderVoided": "Voided",
+    "pastOrderPartiallyRefunded": "(partially refunded)",
     "paymentHeading": "Payment method",
     "paymentChange": "Change payment method →",
     "paymentCardLabel": "Card on file",

@@ -244,6 +244,40 @@ export default async function middleware(request: NextRequest) {
     }
   }
 
+  /* ログイン済みで /login を開いたときはマイページへ送る。
+   *
+   * ## なぜ素通しではいけないのか
+   *
+   * 素通しすると「LINE でログイン」「メールアドレスでログイン」がそのまま出る。
+   * 既に入っている人がそこで別の方法を押すと **もう 1 つアカウントを作る** 経路に
+   * 入ってしまう (二重アカウント)。ログイン中であることも告げないので、押す前に
+   * 気づく手がかりも無い。判定は上の /account ガードと同じ 2 つの cookie を使う
+   * (判定が 2 か所に割れると「門は開くのに画面は閉じる」ずれが生まれる)。
+   *
+   * ## 例外: 認証フローの戻り先としての /login
+   *
+   * `?error=` (認証失敗) と `?linked=` (連携完了) は、ログイン画面の上でしか
+   * 出せない案内で、`app/[locale]/login/` の 2 つのバナーがこれを読んで描く。
+   * ここで飛ばすと失敗理由も連携成功も伝わらないまま消えるので、クエリが付いて
+   * いるときは素通しする。
+   */
+  const loginMatch = pathname.match(/^\/(ja|en)\/login\/?$/);
+  if (loginMatch) {
+    const isAuthFlowReturn =
+      request.nextUrl.searchParams.has("error") ||
+      request.nextUrl.searchParams.has("linked");
+    const signedIn =
+      hasShopifySessionCookies((name) => request.cookies.has(name)) ||
+      request.cookies.has("line_session");
+    if (signedIn && !isAuthFlowReturn) {
+      const locale = loginMatch[1];
+      const target = new URL(`/${locale}/account`, request.url);
+      // 飛ばされた理由をマイページ側で 1 行案内するための印 (AccountNotice が読む)。
+      target.searchParams.set("notice", "already-signed-in");
+      return NextResponse.redirect(target);
+    }
+  }
+
   return intlMiddleware(request);
 }
 

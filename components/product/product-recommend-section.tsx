@@ -15,7 +15,7 @@ import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
 import { ImageCard } from "@/components/media/image-card";
 import { getProducts } from "@/lib/shopify";
-import { formatPrice } from "@/lib/utils";
+import { formatPriceRange } from "@/lib/utils";
 import {
   getRecommendedProducts,
   PERSONA_TAG_AFFINITY,
@@ -135,7 +135,10 @@ export async function ProductRecommendSection() {
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
         {recommended.map((product) => {
-          const price = product.priceRange.minVariantPrice;
+          const price = formatPriceRange(
+            product.priceRange.minVariantPrice,
+            product.priceRange.maxVariantPrice
+          );
 
           return (
             <Link
@@ -156,7 +159,7 @@ export async function ProductRecommendSection() {
                 {product.title}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
-                {formatPrice(price.amount, price.currencyCode)}
+                {price}
               </p>
             </Link>
           );

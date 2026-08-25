@@ -36,7 +36,7 @@ import {
   withSeedPersonDetail,
 } from "@/lib/preview-seed";
 import { getProductByHandle } from "@/lib/shopify";
-import { formatPrice } from "@/lib/utils";
+import { formatPriceRange } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 
 /**
@@ -281,7 +281,9 @@ export default async function PeoplePage({
       imageAlt: p.featuredImage?.altText ?? p.title,
       title: p.title,
       note: p.vendor || undefined,
-      meta: price ? formatPrice(price.amount, price.currencyCode) : undefined,
+      meta: price
+        ? formatPriceRange(price, p.priceRange?.maxVariantPrice)
+        : undefined,
     };
   });
 

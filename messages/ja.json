@@ -47,7 +47,7 @@
     "loginRequired": "この機能を使用するにはログインが必要です。"
   },
   "cart": {
-    "subtitle": "Items in your cart"
+    "subtitle": "カートに入っている商品"
   },
   "home": {
     "tagline": "Single-Origin Japanese Tea",
@@ -417,6 +417,8 @@
   "account": {
     "settingsLink": "設定・契約 →",
     "loggedInAs": "{email} としてログイン中",
+    "loggedInAsName": "{name} さんとしてログイン中",
+    "alreadySignedInNotice": "すでにログインしています。マイページを表示しました。",
     "greeting": "おかえりなさい、{name}さん。",
     "greetingNoName": "おかえりなさい。",
     "greetingLead": "次のお便りと、お席の予定をまとめました。",
@@ -431,6 +433,9 @@
     "pastAll": "ご注文をすべて見る →",
     "pastOrderMeta": "{date} ご注文",
     "pastOrderTitle": "ご注文 {name}",
+    "pastOrderRefunded": "返金済み",
+    "pastOrderVoided": "無効",
+    "pastOrderPartiallyRefunded": "(一部返金)",
     "paymentHeading": "お支払い方法",
     "paymentChange": "お支払い方法を変更する →",
     "paymentCardLabel": "ご登録のカード",

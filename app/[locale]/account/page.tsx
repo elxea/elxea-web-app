@@ -212,7 +212,8 @@ export default async function AccountPage({
   /* 連携フロー (P2) から戻ってきた直後の結果。値は 2 つだけを許し、それ以外は無視する
      (任意の文字列を画面の分岐に持ち込ませない)。表示は LineLinkageEntry の中に閉じ、
      専用の完了画面は作らない。 */
-  const rawLineLink = (await searchParams)?.[LINK_RESULT_PARAM];
+  const resolvedSearchParams = (await searchParams) ?? {};
+  const rawLineLink = resolvedSearchParams[LINK_RESULT_PARAM];
   const lineLinkResult =
     rawLineLink === "success" ||
     rawLineLink === "error" ||
@@ -220,6 +221,10 @@ export default async function AccountPage({
     rawLineLink === "line-conflict"
       ? rawLineLink
       : undefined;
+
+  /* ログイン済みで /login を開いた人を middleware がここへ送ったときの印。
+     飛ばした理由をその場で 1 行だけ告げる (黙って行き先を変えない)。 */
+  const showSignedInNotice = resolvedSearchParams.notice === "already-signed-in";
 
   /* Shopify 顧客アカウントポータルへの外部リンク。LINE だけの人はポータルの
      セッションを持たないので出さない (押しても入れない導線を置かない)。 */
@@ -230,6 +235,25 @@ export default async function AccountPage({
    * (Setaka 確定 2026-08-17 / main #62)。 */
 
   const recordDate = (record: AccountRecord) => formatRecordDate(record.date, locale);
+
+  /** 注文カードの 3 行目。金額と入金状態を 1 行に畳む。 */
+  const orderNote = (record: AccountRecord): string | undefined => {
+    const price = record.amount
+      ? formatPrice(record.amount.value, record.amount.currencyCode)
+      : undefined;
+    switch (record.status) {
+      case "refunded":
+        return t("pastOrderRefunded");
+      case "voided":
+        return t("pastOrderVoided");
+      case "partiallyRefunded":
+        return price
+          ? `${price} ${t("pastOrderPartiallyRefunded")}`
+          : t("pastOrderPartiallyRefunded");
+      default:
+        return price;
+    }
+  };
 
   /** 使えない項目 1 件をグレーのカードにする。**理由だけを言い、行動は持たない。**
    *
@@ -354,11 +378,11 @@ export default async function AccountPage({
                   key={record.id}
                   meta={date ? t("pastOrderMeta", { date }) : undefined}
                   title={t("pastOrderTitle", { name: record.title })}
-                  note={
-                    record.amount
-                      ? formatPrice(record.amount.value, record.amount.currencyCode)
-                      : undefined
-                  }
+                  /* 返金・無効化された注文は Customer Account API の totalPrice が
+                     0 になる。金額だけを出すと「¥0 で買った」ように読めるので、
+                     金額の代わりに状態を言う (一部返金は金額と併記して、いま
+                     いくらの扱いなのかを両方見せる)。 */
+                  note={orderNote(record)}
                 />
               );
             })}
@@ -412,14 +436,32 @@ export default async function AccountPage({
           そのまま渡すので、この画面のトグルは往復ゼロで状態が確定する。 */}
       <FavoritesSeed keys={favoriteKeys} />
 
+      {showSignedInNotice ? (
+        <p
+          role="status"
+          className={cn(
+            captionClass,
+            "page-container pt-4 text-muted-foreground lg:pt-6"
+          )}
+        >
+          {t("alreadySignedInNotice")}
+        </p>
+      ) : null}
+
       <AccountTitleBlock
         title={tCommon("account")}
+        /* 誰として入っているかの 1 行。
+           メール → 表示名 → 「LINE で接続中」の順に落とす。送信専用アドレス
+           (no-reply@…) は本人の識別子ではないので `buildAccountView` の時点で
+           落としてあり、ここには届かない (#12)。 */
         identity={
           view.email
             ? t("loggedInAs", { email: view.email })
-            : auth.line
-              ? t("lineConnected")
-              : undefined
+            : view.displayName
+              ? t("loggedInAsName", { name: view.displayName })
+              : auth.line
+                ? t("lineConnected")
+                : undefined
         }
         action={
           portalUrl ? { label: t("settingsLink"), href: portalUrl, external: true } : undefined
