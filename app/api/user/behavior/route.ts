@@ -14,41 +14,11 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
+import { BehaviorBodySchema } from "@/lib/validation/behavior-schema";
 import { resolveIdentity } from "@/lib/firebase/auth-guard";
 import { addBehaviorLog } from "@/lib/firebase/server-actions";
 import { parseJsonBody } from "@/lib/validation/zod-helpers";
 import { enforceRateLimit, limiters } from "@/lib/ratelimit";
-
-const BehaviorActionSchema = z.enum([
-  "tap_button",
-  "view_content",
-  "view_product",
-  "purchase",
-  "line_message",
-  "search",
-  "audio_play",
-]);
-
-// Explicit whitelist. Do NOT use .catchall() — behavior payloads come from
-// untrusted client code and unbounded metadata defeats validation. If a new
-// field is needed, add it here with an explicit length/type constraint.
-const BehaviorMetadataSchema = z
-  .object({
-    contentId: z.string().max(300).optional(),
-    productId: z.string().max(300).optional(),
-    query: z.string().max(500).optional(),
-    buttonLabel: z.string().max(300).optional(),
-    targetUrl: z.string().max(2048).optional(),
-    referrer: z.string().max(2048).optional(),
-  })
-  .strict();
-
-const BehaviorBodySchema = z.object({
-  action: BehaviorActionSchema,
-  channel: z.enum(["web", "line", "shopify"]).optional(),
-  metadata: BehaviorMetadataSchema.optional(),
-});
 
 export async function POST(request: NextRequest) {
   try {
@@ -67,7 +37,14 @@ export async function POST(request: NextRequest) {
     if (limited) return limited;
 
     const parsed = await parseJsonBody(request, BehaviorBodySchema);
-    if (!parsed.ok) return parsed.response;
+    if (!parsed.ok) {
+      /* 受け口と送り手がずれても、これまでは**ブラウザの console にしか出ず**
+         サーバ側は何も残らなかった。だから `durationSeconds` が弾かれ続けている
+         ことに誰も気づけず、読了イベントが丸ごと欠けたまま何か月も走った
+         (監査 P1-3)。次に項目が増えたときは、ここが本番ログに出る。 */
+      console.warn("[POST /api/user/behavior] rejected payload (schema drift?)");
+      return parsed.response;
+    }
 
     const result = await addBehaviorLog(
       auth.userKey,
