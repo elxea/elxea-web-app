@@ -1,9 +1,0 @@
-{
-  "name": "elxea Variable Exporter",
-  "id": "elxea-variable-exporter-dev",
-  "api": "1.0.0",
-  "main": "code.js",
-  "capabilities": [],
-  "enableProposedApi": false,
-  "editorType": ["figma"]
-}

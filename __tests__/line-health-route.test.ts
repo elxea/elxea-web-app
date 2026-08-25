@@ -87,8 +87,11 @@ describe("GET /api/health/line", () => {
     expect((body.channels as Record<string, { verdict: string }>).link.verdict).toBe("ok");
   });
 
-  it("ログイン用の secret が壊れていたら 503 / status=misconfigured", async () => {
-    /* 2026-08-25 の本番障害そのもの。連携側は無事でもログインは全滅する。 */
+  it("チャネルの secret が壊れていたら 503 / status=misconfigured", async () => {
+    /* 単一チャネル構成では、壊れた Channel Secret はログインと連携の**両方**を倒す。
+       `resolveLinkChannelSecret` が (ID 一致を条件に) ログインと同じ秘密を使うように
+       なったため、片方だけ生き残ることは無い。それが 2026-08-25 の再発防止そのもの
+       ——「ログインは通るのに連携だけ落ちる」状態を作れなくした。 */
     stubLineBySecret({
       [LOGIN_SECRET]: { status: 400, body: { error: "invalid_client" } },
       [LINK_SECRET]: { status: 400, body: { error: "invalid_grant" } },
@@ -99,12 +102,27 @@ describe("GET /api/health/line", () => {
     expect(body.status).toBe("misconfigured");
     const channels = body.channels as Record<string, { verdict: string }>;
     expect(channels.login.verdict).toBe("misconfigured");
-    /* 片方が無事でも全体は赤。「半分正常」という状態は利用者には無い。 */
-    expect(channels.link.verdict).toBe("ok");
+    expect(channels.link.verdict).toBe("misconfigured");
   });
 
-  it("連携用の secret が壊れていても全体は赤になる", async () => {
-    /* 2026-08-22 の本番障害。ログインだけ通り続けたので「連携の不具合」に見えた。 */
+  it("同一チャネルなら、取り残された連携専用 secret は判定に影響しない", async () => {
+    /* 2026-08-25 の本番障害の形。`LINE_LIFF_CHANNEL_SECRET` だけが旧チャネルの値の
+       まま取り残されても、コードはもうその値を読まないので連携は成立する。health も
+       「読んでいない env」を理由に赤くしてはいけない（誰も直せない赤は監視を殺す）。 */
+    stubLineBySecret({
+      [LOGIN_SECRET]: { status: 400, body: { error: "invalid_grant" } },
+      [LINK_SECRET]: { status: 400, body: { error: "invalid_client" } },
+    });
+
+    const { res, body } = await callHealth();
+    expect(res.status).toBe(200);
+    expect(body.status).toBe("ok");
+  });
+
+  it("チャネルが実際に分かれているときは、連携専用 secret の破壊を捕まえる", async () => {
+    /* ID が違えば秘密の流用はしない。この構成では連携専用 env が実際に使われるので、
+       その破壊は health に出なければならない。 */
+    process.env.LINE_LIFF_CHANNEL_ID = "2009473839";
     stubLineBySecret({
       [LOGIN_SECRET]: { status: 400, body: { error: "invalid_grant" } },
       [LINK_SECRET]: { status: 400, body: { error: "invalid_client" } },
@@ -113,6 +131,9 @@ describe("GET /api/health/line", () => {
     const { res, body } = await callHealth();
     expect(res.status).toBe(503);
     expect(body.status).toBe("misconfigured");
+    const channels = body.channels as Record<string, { verdict: string }>;
+    expect(channels.login.verdict).toBe("ok");
+    expect(channels.link.verdict).toBe("misconfigured");
   });
 
   it("env が無ければ not-configured (壊れているとは言わない)", async () => {

@@ -124,8 +124,56 @@ export type LinkResult = "success" | "error" | "conflict" | "line-conflict";
  * よって「本番の値を一度掃除する」では直したことにならない。**コード側を不感にする**
  * （= `readSecretEnvTrimmed` を通す）ことで、同じ入れ方をされても二度と再発しない。
  * 同じ判断の先例が `lib/env.ts`（`NEXT_PUBLIC_SITE_URL` の改行が sitemap を壊した件）。
+ *
+ * ## なぜログイン側の秘密を最優先で使うのか（2026-08-25 15:55 本番障害）
+ *
+ * チャネル ID は 3 本の env（`AUTH_LINE_ID` / `LINE_LOGIN_CHANNEL_ID` /
+ * `LINE_LIFF_CHANNEL_ID`）に分かれているが、**指しているチャネルは 1 つ**である。
+ * それを保証するのが `checkChannelNamespace`（`lib/line/login-channel.ts`）で、
+ * 割れていれば mismatch として鳴る。
+ *
+ * ところが **Channel Secret 側には同じ保証が無かった**。1 つのチャネルの秘密が
+ * `AUTH_LINE_SECRET` / `LINE_LIFF_CHANNEL_SECRET` / `LINE_LOGIN_CHANNEL_SECRET` の
+ * 3 本に写し取られていて、どれか 1 本だけを更新しても誰も気づけない。
+ *
+ * 2026-08-25、まさにそれが起きた。チャネルを `2011239425` に移すときに **ログインが
+ * 読む `AUTH_LINE_SECRET` だけが新しい値に更新され**、連携が読む
+ * `LINE_LIFF_CHANNEL_SECRET` は旧チャネルの値のまま取り残された。結果、
+ *
+ *   - ログイン（`AUTH_LINE_SECRET`）  … 通る
+ *   - 連携（`LINE_LIFF_CHANNEL_SECRET`）… `client_id` は新・`client_secret` は旧 で
+ *     組が合わず、token 交換が毎回 `400 invalid_client`
+ *
+ * という「ログインはできるのに連携だけが必ず落ちる」状態になった。ID は揃っていた
+ * ので名前空間ガードは沈黙し、`/api/health/line` も緑のままだった。
+ *
+ * **同一チャネルなら Channel Secret は定義上 1 つしか無い。** ならば秘密を選ぶ基準は
+ * 「どの env 名に入っているか」ではなく「**現に通っている秘密はどれか**」であるべきで、
+ * それはログインが日々使って成立している `AUTH_LINE_SECRET` である。よって
+ * **`AUTH_LINE_ID` が連携チャネル ID と一致する限り、`AUTH_LINE_SECRET` を最優先**で
+ * 使う。こうすると秘密の写しが 1 本増えても、連携は常にログインと同じ運命をたどる
+ * ——片方だけ黙って壊れることが原理的に起きなくなる。
+ *
+ * ID が一致しない（＝将来ほんとうに別チャネルへ分けた）ときだけ、従来どおり
+ * 連携専用の env に戻る。その状況では名前空間ガードが別途鳴るので、取り違えに
+ * 気づけないまま進むことはない。
  */
 export function resolveLinkChannelSecret(): string | undefined {
+  const linkChannelId = resolveLinkChannelId();
+  const loginChannelId = readSecretEnvTrimmed(process.env.AUTH_LINE_ID);
+  const loginChannelSecret = readSecretEnvTrimmed(process.env.AUTH_LINE_SECRET);
+
+  /* 同一チャネルを指しているときだけ流用する。ID が欠けている・食い違うときに
+     流用すると、別チャネルの秘密を送って `invalid_client` を自作することになる。 */
+  if (
+    linkChannelId &&
+    loginChannelId &&
+    linkChannelId === loginChannelId &&
+    loginChannelSecret
+  ) {
+    return loginChannelSecret;
+  }
+
   return (
     readSecretEnvTrimmed(process.env.LINE_LIFF_CHANNEL_SECRET) ??
     readSecretEnvTrimmed(process.env.LINE_LOGIN_CHANNEL_SECRET)
