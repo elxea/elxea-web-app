@@ -93,7 +93,20 @@ export function buildAuthorizeUrl({
   state: string;
   nonce: string;
   codeChallenge: string;
-  prompt?: "login" | "none" | "consent" | "select_account";
+  /**
+   * Shopify Customer Account API の authorize が受け付ける `prompt` は **`none`
+   * だけ**（= ログイン画面を出さず、セッションがあれば code を返し、無ければ
+   * `login_required` を返す）。OIDC 一般の `login` / `consent` / `select_account`
+   * は、この endpoint には存在しない。
+   *
+   * 型で `none` に絞ってあるのは事故の再発防止。ここには 2026-04-13 から
+   * `prompt=login` が入っており、2026-08-25 のメールログイン障害
+   * （Shopify 側でエラーになり callback に戻って来ない）の原因になった。詳細と
+   * 本番ログの根拠は `app/api/auth/login/route.ts` のコメント。
+   *
+   * Ref: https://shopify.dev/docs/api/customer/2025-07
+   */
+  prompt?: "none";
 }): string {
   const params = new URLSearchParams({
     client_id: CLIENT_ID,
@@ -105,11 +118,9 @@ export function buildAuthorizeUrl({
     code_challenge: codeChallenge,
     code_challenge_method: "S256",
   });
-  // Fix (shared PC / account switching): force re-authentication at IdP.
-  // Without this, Shopify SSO cookie silently re-authenticates the previous user
-  // on the next login attempt, making it impossible to switch accounts or
-  // leaking the previous user's session on shared devices.
-  // Ref: RFC 6749 §4.1.1, OIDC Core 1.0 §3.1.2.1
+  // 共有 PC / アカウント切り替えの担保は `/api/auth/logout` の RP-initiated logout
+  // （id_token_hint 付きで Shopify 側 SSO を落とす）が持つ。ここで prompt を使うのは
+  // 「画面を出さずにセッションの有無だけ確かめたい」場合の `none` に限られる。
   if (prompt) {
     params.set("prompt", prompt);
   }

@@ -368,7 +368,18 @@ describe("GET /api/auth/callback id_token enforcement", () => {
       callbackRequest({ ...HAPPY_COOKIES, shop_state: "a-different-state" }),
     );
 
-    expect(response.headers.get("location")).toContain("error=invalid_state");
+    /* 行き先が `/{locale}/account?error=invalid_state` から
+     * `/{locale}/login?error=StateMismatch` に変わっている。**弾く判断は同じ**で、
+     * 変えたのは伝え方だけ。
+     *
+     * このファイルの 96 行目付近が nonce 経路について説明しているとおり、
+     * `/account?error=...` は middleware が未ログインの /account をクエリごと落として
+     * /login に飛ばすため、利用者には理由の無いログイン画面しか出ない。state 経路は
+     * その説明が書かれた後も直っていなかった (2026-08-25)。`StateMismatch` は
+     * `auth-error-keys.ts` が文言に訳せるキーで、snake_case の造語では訳せない。 */
+    const location = new URL(response.headers.get("location")!);
+    expect(location.pathname).toBe("/ja/login");
+    expect(location.searchParams.get("error")).toBe("StateMismatch");
     expect(exchangeTokenMock).not.toHaveBeenCalled();
   });
 });

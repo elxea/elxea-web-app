@@ -570,7 +570,8 @@
     "errorMissingParams": "Authentication parameters were missing. Please try again.",
     "errorUnexpected": "An unexpected error occurred. Please try again.",
     "errorInvalidIdToken": "We could not verify your sign-in. Please sign in again.",
-    "errorVerificationUnavailable": "Sign-in verification is unavailable right now. Please try again in a few minutes."
+    "errorVerificationUnavailable": "Sign-in verification is unavailable right now. Please try again in a few minutes.",
+    "errorProviderRejected": "The sign-in could not be completed. Please try again."
   },
   "loginComplete": {
     "title": "Account Linked",
