@@ -152,10 +152,6 @@
     "removedFromBookmarks": "Removed from bookmarks",
     "bookmarkError": "Action failed. Please try again.",
     "loginRequiredForBookmark": "Please log in to add to bookmarks.",
-    "bookmarkLoading": "Checking bookmark status",
-    "bookmarkLoginRequired": "Log in to bookmark this story",
-    "bookmarkStatusUnknown": "Could not load the bookmark status. Press to check again.",
-    "bookmarkStatusRetry": "Checking the bookmark status again.",
     "featured": "Featured",
     "popular": "Popular",
     "categories": "Categories",
@@ -364,14 +360,10 @@
     "saveAdd": "Save this person",
     "saveRemove": "Remove from saved",
     "saveSaved": "Saved",
-    "saveLoading": "Checking saved status",
-    "saveLoginRequired": "Log in to save",
-    "saveStatusUnknown": "Could not load the saved status. Press to check again.",
     "saveAddedMessage": "Saved to My Account",
     "saveRemovedMessage": "Removed from saved",
     "saveErrorMessage": "Action failed. Please try again.",
-    "saveLoginRequiredMessage": "Please log in to save this person.",
-    "saveStatusRetryMessage": "Checking the saved status again."
+    "saveLoginRequiredMessage": "Please log in to save this person."
   },
   "farmer": {
     "heading": "Farmers",

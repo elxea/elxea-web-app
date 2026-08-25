@@ -178,6 +178,25 @@ export function favoriteHref(kind: FavoriteKind, targetId: string): string {
 }
 
 /**
+ * 1 件を指す鍵。**サーバとブラウザで同じ綴りを使う**ための唯一の口。
+ *
+ * ブラウザ側の倉庫 (`lib/favorites/client-store.ts`) はこの鍵の集合で
+ * 「何が登録済みか」を持ち、マイページはサーバで数えた一覧を同じ鍵に直して
+ * 初期値として渡す。両側が別々に組み立てると、綴りが 1 文字違うだけで
+ * 「保存済みなのに未登録に見える」が起きるので、ここに 1 本化する。
+ */
+export function favoriteKey(kind: FavoriteKind, targetId: string): string {
+  return `${kind}:${targetId}`;
+}
+
+/** 生の一覧を鍵の配列にする (マイページがブラウザへ初期値を渡すとき用)。 */
+export function favoriteKeysOf(favorites: FavoriteInput[]): string[] {
+  return normalizeFavorites(favorites).map((entry) =>
+    favoriteKey(entry.kind, entry.targetId)
+  );
+}
+
+/**
  * 生データを `FavoriteEntry[]` に正規化する。
  *
  * 落とすもの: 見出しが無いもの / 知らない種類 / 遷移先を組めないもの (targetId 無し)。
