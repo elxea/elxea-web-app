@@ -271,7 +271,12 @@ describe("合体が途中で切れても、お客さまのデータは失われ�
     );
 
     const first = await mergeLineIdentityIntoShopify(LINE_USER_ID, SHOPIFY_ID, fake.db);
-    expect(first.complete).toBe(false);
+    /* 消し損ねた残骸は残るが、中身は全部引っ越し先に着地している。だから
+       `complete`（= 運べなかったものがあるか）は true で、残骸は専用の欄で
+       数える (QA 指摘 2 / 以前は同じ 1 件を copied と failed に二重計上して
+       いたので、ここが false になっていた)。 */
+    expect(first.complete).toBe(true);
+    expect(first.totals.staleSourceRetained).toBeGreaterThan(0);
     expect(fake.contents(behaviorLogCol(LINE_KEY)).length).toBeGreaterThan(0);
 
     broken = false;

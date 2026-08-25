@@ -173,6 +173,73 @@ describe("F16 — 連携時のお気に入り重複", () => {
     expect(fake.count(favoritesCol(SHOPIFY_ID))).toBe(2);
   });
 
+  it("I7: 旧採番の 1 件しか無い棚は、保存し直したときに新採番へ移る", async () => {
+    /* QA 指摘 3 の回帰。以前は `already_exists` を返して**そのまま**にしていたので、
+       旧採番が 1 件だけの棚は永久に旧採番のまま残った。読み出し側の片付けが効くのは
+       「重複しているとき」だけなので、1 件だけの棚は誰も直さない。つまり
+       `doc(favoriteDocId(...)).set()` を前提にした F16 の再発防止の外に居続ける。 */
+    const createdAt = new Date("2026-08-20T00:00:00.000Z");
+    const fake = useFake({
+      [favoritesCol(SHOPIFY_ID)]: [{ ...ARTICLE, createdAt }],
+    });
+    expect(fake.ids(favoritesCol(SHOPIFY_ID))).toEqual(["seed-1"]);
+
+    const result = await addFavorite(SHOPIFY_ID, ARTICLE);
+
+    expect(result).toMatchObject({ success: true, action: "already_exists" });
+    // 棚は 1 件のまま。ただし ID が内容から決まる形になっている。
+    expect(fake.ids(favoritesCol(SHOPIFY_ID))).toEqual([
+      favoriteDocId(ARTICLE.type, ARTICLE.targetId),
+    ]);
+
+    // 保存日は最初の 1 件のものを引き継ぐ (移動で今日に化けさせない)。
+    const stored = fake.contents(favoritesCol(SHOPIFY_ID));
+    expect(stored).toHaveLength(1);
+    expect((stored[0] as { createdAt: Date }).createdAt).toEqual(createdAt);
+  });
+
+  it("I7b: 旧採番と新採番が両方あるときは、新採番を残して旧採番を消す", async () => {
+    const docId = favoriteDocId(ARTICLE.type, ARTICLE.targetId);
+    const fake = useFake({
+      [favoritesCol(SHOPIFY_ID)]: [
+        { ...ARTICLE, createdAt: new Date("2026-08-20T00:00:00.000Z") },
+      ],
+    });
+    // 新採番の 1 件を後から置く (本命)。
+    fake.seed(
+      favoritesCol(SHOPIFY_ID),
+      { ...ARTICLE, createdAt: new Date("2026-08-24T00:00:00.000Z") },
+      docId,
+    );
+    expect(fake.count(favoritesCol(SHOPIFY_ID))).toBe(2);
+
+    await addFavorite(SHOPIFY_ID, ARTICLE);
+
+    expect(fake.ids(favoritesCol(SHOPIFY_ID))).toEqual([docId]);
+  });
+
+  it("I7c: 移行に失敗しても保存済みの答えは変わらない (利用者に失敗を見せない)", async () => {
+    fakeDb.current = createFakeFirestore(
+      {
+        [favoritesCol(SHOPIFY_ID)]: [
+          { ...ARTICLE, createdAt: new Date("2026-08-20T00:00:00.000Z") },
+        ],
+      },
+      {
+        beforeDelete: () => {
+          throw new Error("delete rejected");
+        },
+      },
+    );
+
+    const result = await addFavorite(SHOPIFY_ID, ARTICLE);
+
+    expect(result).toMatchObject({ success: true, action: "already_exists" });
+    /* 消せなかったぶんは重複として残るが、読み出し側の片付けが次に拾う。 */
+    const rows = await getFavorites(SHOPIFY_ID);
+    expect(rows).toHaveLength(1);
+  });
+
   it("I4b: 種類や対象が読めない行は、重複と判定して消さない", () => {
     const rows = [
       { id: "a", type: "article", targetId: "x", createdAt: "2026-01-01" },

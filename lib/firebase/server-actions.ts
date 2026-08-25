@@ -48,19 +48,55 @@ export async function addFavorite(
   const db = getAdminFirestore();
   const colPath = favoritesCol(customerId);
 
+  const docId = favoriteDocId(data.type, data.targetId);
+
   // 旧採番 (自動 ID) で既に入っていないか。内容でしか照合できない。
   const existing = await db
     .collection(colPath)
     .where("type", "==", data.type)
     .where("targetId", "==", data.targetId)
-    .limit(1)
     .get();
 
   if (!existing.empty) {
-    return { success: true, action: "already_exists" as const };
+    /* 既にある。ここで**新しい規則の ID へ移しておく** (QA 指摘 3)。
+     *
+     * 以前はそのまま `already_exists` を返していたので、旧 ID のドキュメントは
+     * 何度保存し直しても旧 ID のまま残った。読み出し側 (`getFavorites`) の
+     * 片付けが効くのは**重複しているとき**だけなので、旧 ID が 1 件だけの棚は
+     * 永久に旧採番のままで、`doc(favoriteDocId(...)).set()` を前提にした
+     * 「同じものは同じ 1 件に上書きされる」保証 (F16) の外に居続ける。
+     *
+     * 移すのは「既に新しい ID のものが無い」ときだけ。あるならそれが本命で、
+     * 旧 ID のほうは重複なので消せばよい — どちらの道でも棚には新しい ID の
+     * 1 件だけが残る。保存日 (`createdAt`) は最初の 1 件のものを引き継ぐ
+     * (利用者に見える情報なので、移動で今日に化けさせない)。
+     */
+    const canonical = existing.docs.find((doc) => doc.id === docId);
+    const legacy = existing.docs.filter((doc) => doc.id !== docId);
+
+    if (legacy.length > 0) {
+      try {
+        if (!canonical) {
+          const oldest = legacy.reduce((a, b) =>
+            (a.createTime?.toMillis() ?? 0) <= (b.createTime?.toMillis() ?? 0) ? a : b,
+          );
+          await db
+            .collection(colPath)
+            .doc(docId)
+            .set({ ...oldest.data(), ...data });
+        }
+        /* 消すのは新しい ID への着地が済んだあとだけ (順序を崩さない)。 */
+        for (const doc of legacy) await doc.ref.delete();
+      } catch (err) {
+        /* 移せなくても「保存済み」であることは変わらない。読み出し側の片付けが
+           次に拾うので、ここで利用者に失敗を見せる理由は無い。 */
+        console.error("[favorites] legacy id migration failed:", err);
+      }
+    }
+
+    return { success: true, action: "already_exists" as const, id: docId };
   }
 
-  const docId = favoriteDocId(data.type, data.targetId);
   await db
     .collection(colPath)
     .doc(docId)
@@ -123,10 +159,14 @@ export async function getFavorites(customerId: string, type?: FavoriteType) {
   query = query.orderBy("createdAt", "desc");
 
   const snapshot = await query.get();
+  /* `id` は**展開のあと**に置く。先に置くと、保存されている中身がたまたま `id`
+     という項目を持っていたときにドキュメント ID が上書きされ、重複の片付け
+     (`partitionFavoriteDuplicates` → `doc(id).delete()`) が**別のドキュメントを
+     指す**。中身は利用者の入力を含むので、そうなり得ないとは言えない。 */
   const rows = snapshot.docs.map((doc) => ({
-    id: doc.id,
     ...doc.data(),
     createdAt: doc.data().createdAt?.toDate?.()?.toISOString() ?? null,
+    id: doc.id,
   }));
 
   const { kept, duplicates } = partitionFavoriteDuplicates(rows);
@@ -225,10 +265,11 @@ export async function getFollows(customerId: string) {
     .orderBy("createdAt", "desc")
     .get();
 
+  /* `id` は展開のあと (中身の `id` にドキュメント ID を奪わせない)。 */
   return snapshot.docs.map((doc) => ({
-    id: doc.id,
     ...doc.data(),
     createdAt: doc.data().createdAt?.toDate?.()?.toISOString() ?? null,
+    id: doc.id,
   }));
 }
 
@@ -312,10 +353,11 @@ export async function getEventRegistrations(customerId: string) {
     .orderBy("registeredAt", "desc")
     .get();
 
+  /* `id` は展開のあと (中身の `id` にドキュメント ID を奪わせない)。 */
   return snapshot.docs.map((doc) => ({
-    id: doc.id,
     ...doc.data(),
     registeredAt: doc.data().registeredAt?.toDate?.()?.toISOString() ?? null,
+    id: doc.id,
   }));
 }
 
@@ -387,10 +429,12 @@ export async function getComments(
     .limit(limit)
     .get();
 
+  /* `id` は展開のあと。コメントの中身は利用者が書いた JSON なので、`id` という
+     項目が混じったときにドキュメント ID を奪われると、削除の宛先がずれる。 */
   return snapshot.docs.map((doc) => ({
-    id: doc.id,
     ...doc.data(),
     createdAt: doc.data().createdAt?.toDate?.()?.toISOString() ?? null,
+    id: doc.id,
   }));
 }
 
