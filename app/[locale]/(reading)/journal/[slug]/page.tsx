@@ -219,7 +219,12 @@ export default async function ArticlePage({
           {/* Head — キッカー / 見出し / 著者クレジット */}
           <header className="mt-6">
             <p className={cn(overlineClass, "text-muted-foreground")}>JOURNAL</p>
-            <div className="mt-4 flex items-start justify-between gap-4">
+            {/* SP は縦積み (見出し → 保存トグル)、md 以上で横並びに戻す。
+                横並びのままだと、保存トグルが `whitespace-nowrap` + `shrink-0`
+                で 182px を確保し、SP 390 では見出しに 160px = 行の 45% しか
+                残らなかった (実測: 見出しが 5〜6 行に折り返す)。見出しは
+                ページの主役なので、幅を譲るのはトグルの側にする。 */}
+            <div className="mt-4 flex flex-col items-start gap-3 md:flex-row md:items-start md:justify-between md:gap-4">
               {/* ページ主見出しは一覧・詳細で統一 (Setaka 裁定 2026-08-08):
                   44px display トークン = `.page-title`。Figma 記事詳細の
                   functional 52px 束縛は Figma 側を追従修正中のため、
@@ -245,7 +250,7 @@ export default async function ArticlePage({
                   error: t("bookmarkError"),
                   loginRequiredMessage: t("loginRequiredForBookmark"),
                 }}
-                className="mt-1 shrink-0"
+                className="shrink-0 md:mt-1"
               />
             </div>
             {author || readMinutes ? (
