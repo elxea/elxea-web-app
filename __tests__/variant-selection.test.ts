@@ -185,6 +185,19 @@ describe("押した瞬間に決まる作りであること", () => {
     expect(contextCode).not.toMatch(/router\.(replace|push)/);
   });
 
+  /**
+   * 同じ tick に 2 回押されたとき、1 回目を落とさないこと。
+   *
+   * 土台を外側の `selection` から読む書き方 (`setSelection(applySelection(selection, …))`)
+   * だと 2 回目が古い土台から計算され、1 回目が消える。本番相当のローカルビルドで
+   * 実測して確認した不具合 (S+ティーバッグ から「XS」「フルリーフ」を続けて押すと
+   * ¥1,480 になるべきところ ¥2,462 になった)。更新関数の形でだけ書かせる。
+   */
+  it("選択の更新は必ず直前の選択を土台にする", () => {
+    expect(contextCode).toMatch(/setSelection\(\s*\(/);
+    expect(contextCode).not.toMatch(/setSelection\(\s*applySelection\(\s*selection\b/);
+  });
+
   /** 注釈剥がしが効いていること自体の確認 (剥がし過ぎ / 剥がし漏れの検知)。 */
   it("注釈を剥がしても、コード本体は残っている", () => {
     expect(selectorCode).toMatch(/useVariantSelection/);

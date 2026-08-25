@@ -1,6 +1,13 @@
 "use client";
 
-import { createContext, useCallback, useContext, useMemo, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
 import type { ProductVariant } from "@/lib/shopify/types";
 
@@ -76,24 +83,33 @@ export function VariantSelectionProvider({
 }) {
   const [selection, setSelection] = useState<VariantSelection>(initialSelection);
 
-  const select = useCallback(
-    (name: string, value: string) => {
-      const next = applySelection(selection, name, value);
+  /**
+   * 選択を 1 つ変える。**必ず直前の選択 (`previous`) を土台にする**。
+   *
+   * 土台を外側の `selection` から読む書き方 (`applySelection(selection, ...)`)
+   * にすると、同じ tick に 2 回押されたとき 2 回目が古い土台から計算され、
+   * 1 回目が消える。実測で確認済み: S+ティーバッグ から「XS」「フルリーフ」を
+   * 続けて押すと ¥1,480 になるべきところ ¥2,462 (サイズが S のまま) になった。
+   * 人の指では起きにくいが、連打・自動操作では起きる。
+   */
+  const select = useCallback((name: string, value: string) => {
+    setSelection((previous) => applySelection(previous, name, value));
+  }, []);
 
-      // 1) 見た目を先に決める。これが同期的に走るので、押してから次の描画
-      //    (通常 1 フレーム) で枠も価格も変わる。
-      setSelection(next);
-
-      // 2) URL 同期は後追い。`router.replace` を使うとサーバ往復に戻ってしまう
-      //    ので、履歴 API を直接叩く。共有リンクと再読み込みのためだけの写し。
-      if (typeof window !== "undefined") {
-        const url = new URL(window.location.href);
-        url.search = selectionToSearchParams(next, url.searchParams).toString();
-        window.history.replaceState(null, "", url);
-      }
-    },
-    [selection]
-  );
+  /**
+   * URL 同期は**描画が確定してから**の後追い。
+   *
+   * `router.replace` を使うとサーバ往復に戻ってしまうので履歴 API を直接叩く。
+   * 共有リンクと再読み込みのためだけの写しで、選択の正本ではない。
+   * 初回表示のように URL と選択が既に一致しているときは何もしない。
+   */
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const nextSearch = selectionToSearchParams(selection, url.searchParams).toString();
+    if (nextSearch === url.searchParams.toString()) return;
+    url.search = nextSearch;
+    window.history.replaceState(null, "", url);
+  }, [selection]);
 
   const selectedVariant = useMemo(
     () => resolveSelectedVariant(variants, selection),
