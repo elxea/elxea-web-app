@@ -31,6 +31,25 @@ import {
   type PendingAuth,
 } from "@/lib/shopify/oauth-state";
 
+/**
+ * クエリから拾った値をログに載せる前に均す。
+ *
+ * `?error=` / `?error_description=` は **URL から来る = 誰でも仕込める**。
+ * `searchParams.get` は %0A を実際の改行に戻すので、そのまま出すとログに偽の行を
+ * 差し込める（後から原因を追う人が読むのはそのログである以上、そこを汚させない）。
+ * 制御文字を落とし、長さも切る。
+ */
+function forLog(value: string | null, maxLength = 200): string {
+  if (!value) return "";
+  return Array.from(value)
+    .filter((ch) => {
+      const code = ch.codePointAt(0) ?? 0;
+      return code >= 0x20 && code !== 0x7f;
+    })
+    .join("")
+    .slice(0, maxLength);
+}
+
 /** 1 回きりの値を載せている旧クッキー。成否によらず必ず落とす。 */
 const ONE_SHOT_COOKIES = [
   "shop_cv",
@@ -189,7 +208,7 @@ export async function GET(request: NextRequest) {
     /* `error_description` は Shopify が組み立てる文字列。値そのものは記録するが、
      * 画面には出さない（第三者の文言をそのまま自サイトに描かない）。 */
     return fail(
-      `provider_error=${providerError}:${searchParams.get("error_description") ?? ""}`,
+      `provider_error=${forLog(providerError, 64)}:${forLog(searchParams.get("error_description"))}`,
       "ProviderRejected",
     );
   }
@@ -563,7 +582,7 @@ export async function GET(request: NextRequest) {
      * `/{locale}/account?error=auth_failed` へ飛ばしており、届かないクエリのせいで
      * 「理由のないログイン画面」に見えていた。 */
     return fail(
-      `token_exchange_failed: ${error instanceof Error ? error.message : String(error)}`,
+      `token_exchange_failed: ${forLog(error instanceof Error ? error.message : String(error), 300)}`,
       "TokenFailed",
     );
   }

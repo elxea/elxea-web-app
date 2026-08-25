@@ -323,6 +323,22 @@ describe("すでにログインが成立していれば、失敗した往復で�
     expect(String(reported?.[1]?.extra?.reason)).toContain("login_required");
   });
 
+  it("提供元が返した文字列でログに偽の行を差し込めない", async () => {
+    /* `?error=` / `?error_description=` は URL から来る = 誰でも仕込める。
+     * `searchParams.get` は %0A を実際の改行に戻すので、素通しするとログに偽の
+     * 行を差し込める。**後から原因を追う人が読むのはそのログ**なので汚させない。 */
+    await callback(
+      callbackRequest(
+        `?error=x&error_description=${encodeURIComponent("ok\n[Auth Callback] login succeeded")}`,
+        { shop_locale: "ja" },
+      ),
+    );
+
+    const reason = String(captureMessageMock.mock.calls.at(-1)?.[1]?.extra?.reason);
+    expect(reason).not.toContain("\n");
+    expect(reason).toContain("ok[Auth Callback] login succeeded");
+  });
+
   it("失敗は必ず記録される（無言で落ちない）", async () => {
     /* 2026-08-25 の調査が長引いた直接の理由が「state 不一致の経路が Vercel の
      * ログにも Sentry にも 1 行も残さない」だったので、記録そのものを固定する。 */
