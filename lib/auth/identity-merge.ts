@@ -1,6 +1,11 @@
 import * as Sentry from "@sentry/nextjs";
 import type { DocumentData, Firestore, Query } from "firebase-admin/firestore";
 
+import {
+  FAVORITE_KINDS,
+  favoriteDocId,
+  type FavoriteKind,
+} from "@/lib/account-favorites";
 import { getAdminFirestore } from "@/lib/firebase/admin";
 import {
   USER_SUBCOLLECTIONS,
@@ -131,11 +136,32 @@ type DedupeClause = { field: string; value: string };
 type DedupeKeyOf = (data: Record<string, unknown>) => DedupeClause[] | null;
 
 /**
+ * 引っ越し先で使うドキュメント ID を内容から決める (決められないときは `null`)。
+ *
+ * ## なぜ内容で決めるのか (F16)
+ *
+ * `add()` で自動採番していたころ、合体の重複判定は「引っ越し先に同じ内容が
+ * 在るか問い合わせ、無ければ書く」だった。この 2 手のあいだに**もう 1 つの合体**
+ * が割り込むと、両方が「まだ無い」を見て両方が書く。連携の入口は 3 経路あり
+ * (メールログインの取りこぼし再試行 / ワンタップ / LIFF)、救済スクリプトもある
+ * ので、2 つが重なるのは想定内の出来事だった。
+ *
+ * 2026-08-25 の本番データがその痕跡そのもので、重複した 3 組はいずれも
+ * `createdAt` がミリ秒まで一致していた (= 引っ越し元の同じ 1 件が 2 度写された)。
+ *
+ * ID を内容から決めれば、同時に走った 2 つは**同じドキュメントを上書きする**。
+ * 増えない。
+ */
+type DocIdOf = (data: Record<string, unknown>) => string | null;
+
+/**
  * コレクションごとの運び方。
  *
  *   - `dedupe-by-fields` … 「同じ内容が既にあるか」を**内容**で判定する。
  *     お気に入り・フォロー・イベント参加のように、ドキュメント ID に意味が無く
- *     内容の一意性だけが問題になるもの向け。ID は引っ越し先で振り直す。
+ *     内容の一意性だけが問題になるもの向け。`docIdOf` を持つものは引っ越し先の
+ *     ID も内容から決める (同時に走った合体どうしが同じ 1 件に落ちる)。持たない
+ *     ものは従来どおり引っ越し先で振り直す。
  *   - `preserve-doc-id` … **ドキュメント ID を保ったまま**運ぶ。ID そのものが
  *     鍵（`orders/{orderId}`）か、追記されるだけのログで内容の重複が正当
  *     （同じ行動を 2 回した / 同じ言葉を 2 回言った）なもの向け。内容で重複
@@ -143,7 +169,7 @@ type DedupeKeyOf = (data: Record<string, unknown>) => DedupeClause[] | null;
  *     保つこと自体が再実行の冪等性になる。
  */
 type MergeStrategy =
-  | { kind: "dedupe-by-fields"; dedupeKeyOf: DedupeKeyOf }
+  | { kind: "dedupe-by-fields"; dedupeKeyOf: DedupeKeyOf; docIdOf?: DocIdOf }
   | { kind: "preserve-doc-id" };
 
 function requireString(data: Record<string, unknown>, field: string): string | null {
@@ -166,6 +192,16 @@ const STRATEGIES: Record<UserSubcollection, MergeStrategy> = {
         { field: "type", value: type },
         { field: "targetId", value: targetId },
       ];
+    },
+    /* 引っ越し先の ID は保存側 (`addFavorite`) と同じ規則で決める。両者が別々に
+       採番すると「合体で入った 1 件」と「あとから押した 1 件」が別ドキュメントに
+       なり、一意キーにした意味が無くなる。正本は `lib/account-favorites.ts`。 */
+    docIdOf: (data) => {
+      const type = requireString(data, "type");
+      const targetId = requireString(data, "targetId");
+      if (!type || !targetId) return null;
+      if (!(FAVORITE_KINDS as readonly string[]).includes(type)) return null;
+      return favoriteDocId(type as FavoriteKind, targetId);
     },
   },
   follows: {
@@ -219,12 +255,18 @@ async function destinationHas(
   return !snap.empty;
 }
 
-/** 内容で重複判定して運ぶ（ID は引っ越し先で振り直す）。 */
+/**
+ * 内容で重複判定して運ぶ。
+ *
+ * `docIdOf` があるコレクションは引っ越し先の ID も内容から決める。無い
+ * コレクション（follows / eventRegistrations）は従来どおり引っ越し先で振り直す。
+ */
 async function mergeByFields(
   db: Firestore,
   srcPath: string,
   dstPath: string,
   dedupeKeyOf: DedupeKeyOf,
+  docIdOf?: DocIdOf,
 ): Promise<MergeCounters> {
   const counters = emptyCounters();
   const srcSnap = await db.collection(srcPath).get();
@@ -246,7 +288,14 @@ async function mergeByFields(
       if (alreadyPresent) {
         counters.deduped += 1;
       } else {
-        await db.collection(dstPath).add(data);
+        /* 内容から決まる ID があるなら、その 1 件を上書きする。同時に走った
+           もう 1 つの合体も同じ ID へ書くので、2 件にはならない（F16）。 */
+        const dstId = docIdOf?.(data) ?? null;
+        if (dstId === null) {
+          await db.collection(dstPath).add(data);
+        } else {
+          await db.collection(dstPath).doc(dstId).set(data);
+        }
 
         /* Step 3 — verify. `add` resolving means the server acknowledged the
          * write; reading it back is what lets the delete below be justified by
@@ -431,7 +480,13 @@ export async function mergeLineIdentityIntoShopify(
 
     collections[name] =
       strategy.kind === "dedupe-by-fields"
-        ? await mergeByFields(db, srcPath, dstPath, strategy.dedupeKeyOf)
+        ? await mergeByFields(
+            db,
+            srcPath,
+            dstPath,
+            strategy.dedupeKeyOf,
+            strategy.docIdOf,
+          )
         : await mergeByDocId(db, srcPath, dstPath);
   }
 

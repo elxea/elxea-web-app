@@ -191,6 +191,35 @@ export function favoriteKey(kind: FavoriteKind, targetId: string): string {
   return `${kind}:${targetId}`;
 }
 
+/**
+ * Firestore のドキュメント ID。**同じお気に入りは必ず同じ 1 ドキュメントに落ちる**。
+ *
+ * ## なぜ ID を内容から決めるのか (F16 の根治)
+ *
+ * 以前は `collection().add()` で ID を自動採番し、重複は「先に問い合わせて、無ければ
+ * 書く」で防いでいた。この形は **問い合わせと書き込みのあいだに割り込まれると破れる**。
+ * 2 つの処理が同時に「まだ無い」を見れば、2 つとも書く。実際に本番で起きたのがこれで、
+ * 連携時の合体が 2 度重なった結果、同じ記事・同じ人が 2 件ずつマイページに並んだ
+ * (2026-08-25 実測: 重複した 3 組はいずれも `createdAt` がミリ秒まで一致していた
+ * = 同じ 1 件が 2 度書かれた痕跡)。
+ *
+ * ID を内容から決めれば、同時に書いても**同じドキュメントを上書きするだけ**になる。
+ * 「重複しないように気をつける」をやめて、重複できない形にする。
+ *
+ * ## 綴りの規則
+ *
+ * `{kind}~{targetId}`。`kind` は `FAVORITE_KINDS` の語 (英小文字のみ) なので、区切りの
+ * `~` が種類側に現れることはない。`targetId` は API で最大 200 字の任意文字列を
+ * 受けうるので、Firestore のドキュメント ID で使えない `/` と、その退避に使う `%`
+ * だけを退避する (順序に意味がある — `%` を先に退避しないと 1 対 1 でなくなる)。
+ *
+ * 先頭が必ず種類名なので、Firestore が禁じる `.` / `..` / `__…__` にはならない。
+ */
+export function favoriteDocId(kind: FavoriteKind, targetId: string): string {
+  const escaped = targetId.replace(/%/g, "%25").replace(/\//g, "%2F");
+  return `${kind}~${escaped}`;
+}
+
 /** 生の一覧を鍵の配列にする (マイページがブラウザへ初期値を渡すとき用)。 */
 export function favoriteKeysOf(favorites: FavoriteInput[]): string[] {
   return normalizeFavorites(favorites).map((entry) =>
@@ -199,14 +228,103 @@ export function favoriteKeysOf(favorites: FavoriteInput[]): string[] {
 }
 
 /**
+ * 同じ (種類, 対象) の 2 件目以降を仕分ける。**捨てる側も返す** — 読み出し側が
+ * 「画面から隠す」だけでなく「棚から片付ける」ところまでやれるようにするため。
+ *
+ * ## どれを残すか
+ *
+ * 1. ドキュメント ID が `favoriteDocId()` と一致するもの (= 新しい規則で書かれた本命)
+ * 2. なければ **いちばん古いもの** (`createdAt` 昇順)。保存した日付は利用者に見える
+ *    情報なので、後から重なった写しではなく最初の 1 件を残す
+ * 3. それも決まらなければドキュメント ID の辞書順 (何度実行しても同じ答えになる)
+ *
+ * 種類や対象が読めない行は**どの組にも入れず必ず残す**。鍵が作れないものを
+ * 「重複」と判定して消すのは、判定できないものを消すのと同じなので行わない
+ * (合体 `lib/auth/identity-merge.ts` の `skippedInvalid` と同じ考え方)。
+ *
+ * 並びは入力順を保つ (Firestore は `createdAt` 降順で返すので、画面の並びが変わらない)。
+ */
+export function partitionFavoriteDuplicates<T extends FavoriteInput>(
+  favorites: T[]
+): { kept: T[]; duplicates: T[] } {
+  const groups = new Map<string, T[]>();
+  const unkeyable = new Set<T>();
+
+  for (const favorite of favorites) {
+    const kind = toKind(favorite.type);
+    const targetId = str(favorite.targetId);
+    if (kind === null || targetId === null) {
+      unkeyable.add(favorite);
+      continue;
+    }
+    const key = favoriteKey(kind, targetId);
+    const group = groups.get(key);
+    if (group) group.push(favorite);
+    else groups.set(key, [favorite]);
+  }
+
+  const survivors = new Set<T>(unkeyable);
+  const duplicates: T[] = [];
+
+  for (const group of groups.values()) {
+    if (group.length === 1) {
+      survivors.add(group[0]);
+      continue;
+    }
+    const survivor = pickFavoriteSurvivor(group);
+    survivors.add(survivor);
+    for (const favorite of group) {
+      if (favorite !== survivor) duplicates.push(favorite);
+    }
+  }
+
+  return {
+    kept: favorites.filter((favorite) => survivors.has(favorite)),
+    duplicates,
+  };
+}
+
+/** 重複を取り除いた一覧 (捨てる側が要らない画面用)。 */
+export function dedupeFavorites<T extends FavoriteInput>(favorites: T[]): T[] {
+  return partitionFavoriteDuplicates(favorites).kept;
+}
+
+function pickFavoriteSurvivor<T extends FavoriteInput>(group: T[]): T {
+  const kind = toKind(group[0].type);
+  const targetId = str(group[0].targetId);
+  if (kind !== null && targetId !== null) {
+    const canonicalId = favoriteDocId(kind, targetId);
+    const canonical = group.find((favorite) => str(favorite.id) === canonicalId);
+    if (canonical) return canonical;
+  }
+
+  /* `createdAt` が読めない行は**最後**に回す。空文字を昇順に混ぜると、日付を
+     持たない行が「いちばん古い」ことになって本物の 1 件目を追い出す。 */
+  return [...group].sort((a, b) => {
+    const left = str(a.createdAt);
+    const right = str(b.createdAt);
+    if (left !== right) {
+      if (left === null) return 1;
+      if (right === null) return -1;
+      return left.localeCompare(right);
+    }
+    return (str(a.id) ?? "").localeCompare(str(b.id) ?? "");
+  })[0];
+}
+
+/**
  * 生データを `FavoriteEntry[]` に正規化する。
  *
- * 落とすもの: 見出しが無いもの / 知らない種類 / 遷移先を組めないもの (targetId 無し)。
- * 「押しても何も無いカード」を画面に出さないため、ここで捨てる。
+ * 落とすもの: 見出しが無いもの / 知らない種類 / 遷移先を組めないもの (targetId 無し)
+ * / **同じものの 2 件目以降**。「押しても何も無いカード」「同じカードが 2 枚」を
+ * 画面に出さないため、ここで捨てる。
  * 並びは入力順のまま (Firestore は createdAt 降順で返す)。
+ *
+ * 重複をここでも落とすのは、棚の側 (`getFavorites` の自動修復) が失敗しても
+ * **画面だけは正しく見える**ようにするため。棚を直すのが本筋で、ここは最後の砦。
  */
 export function normalizeFavorites(favorites: FavoriteInput[]): FavoriteEntry[] {
-  return favorites
+  return dedupeFavorites(favorites)
     .map((favorite, index): FavoriteEntry | null => {
       const kind = toKind(favorite.type);
       const targetId = str(favorite.targetId);
