@@ -8,6 +8,7 @@ import {
   getBillingAttempts,
   updateSubscriptionContract,
 } from "@/lib/shopify/subscription-admin";
+import { env } from "@/lib/config";
 import { sendDunningEmail } from "@/lib/email/dunning";
 import {
   notifyBillingCronFatal,
@@ -101,7 +102,7 @@ import {
  * Protected by CRON_SECRET header check.
  */
 
-const CRON_SECRET = process.env.CRON_SECRET || "";
+const CRON_SECRET = env("CRON_SECRET") ?? "";
 
 /**
  * Outcome of one contract in one cron run.

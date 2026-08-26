@@ -1,5 +1,7 @@
 import type { NextRequest, NextResponse } from "next/server";
 
+import { env, isProduction } from "@/lib/config";
+
 import { normalizeHost } from "./normalize-host";
 
 /**
@@ -95,7 +97,7 @@ export function validateApex(raw: string): string {
 }
 
 /** Canonical apex. Default matches the pre-existing hard-coded production value. */
-export const AUTH_COOKIE_APEX = validateApex(process.env.AUTH_COOKIE_APEX ?? "elxea.com");
+export const AUTH_COOKIE_APEX = validateApex(env("AUTH_COOKIE_APEX"));
 
 /** The one Domain value this application is ever allowed to emit. */
 const SHARED_COOKIE_DOMAIN = `.${AUTH_COOKIE_APEX}`;
@@ -273,7 +275,7 @@ export const LINE_SESSION_COOKIES = cookieNamesInGroup("line-session");
 
 /** `secure` for a given cookie, per its registry rule. */
 export function isSecure(spec: CookieSpec): boolean {
-  return spec.secure === "always" || process.env.NODE_ENV === "production";
+  return spec.secure === "always" || isProduction();
 }
 
 /**

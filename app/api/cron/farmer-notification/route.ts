@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
+import { env } from "@/lib/config";
 import { getAdminFirestore } from "@/lib/firebase/admin";
 import { sanityClient } from "@/sanity/lib/client";
 import {
@@ -27,7 +28,7 @@ import { filterOutFictional } from "@/lib/fictional-content";
  * This prevents re-sending if the cron runs multiple times for the same day.
  */
 
-const CRON_SECRET = process.env.CRON_SECRET || "";
+const CRON_SECRET = env("CRON_SECRET") ?? "";
 /** How far back to look for new content (hours) */
 const LOOKBACK_HOURS = 25; // slightly over 24h to handle scheduling drift
 const SITE_URL = siteUrl();

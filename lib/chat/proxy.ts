@@ -15,14 +15,13 @@
  * fail-closed: SYNC_API_SECRET 未設定なら X-API-Key を付けない = cx-agent 側は
  * customer_id を無視して匿名 web セッション扱い (line-callback / survey と同方針)。
  */
+import { env, isProduction } from "@/lib/config";
 import { getCustomerFromSession } from "@/lib/shopify/auth";
 
 /** cx-agent のオリジン (末尾の /api/chat を除去)。survey / line-callback と同じ導出。 */
 export const CX_AGENT_BASE_URL = (
-  process.env.NEXT_PUBLIC_CHAT_API_URL ?? "http://localhost:8787/api/chat"
-)
-  .trim()
-  .replace(/\/api\/chat\/?$/, "");
+  env("NEXT_PUBLIC_CHAT_API_URL") ?? "http://localhost:8787/api/chat"
+).replace(/\/api\/chat\/?$/, "");
 
 export interface ProxyAuth {
   /** cx-agent へ付与するヘッダー (X-API-Key を含みうる)。信頼できないときは空。 */
@@ -51,13 +50,13 @@ export async function buildProxyAuth(): Promise<ProxyAuth> {
     verifiedCustomerId = null;
   }
 
-  const secret = process.env.SYNC_API_SECRET;
+  const secret = env("SYNC_API_SECRET");
   const headers: Record<string, string> = {};
   const trusted = !!secret;
 
   if (secret) {
     headers["X-API-Key"] = secret;
-  } else if (process.env.NODE_ENV === "production") {
+  } else if (isProduction()) {
     console.error(
       "[chat-proxy] SYNC_API_SECRET not set; requests downgraded to anonymous (verified customer_id will NOT be forwarded). Set SYNC_API_SECRET in production.",
     );

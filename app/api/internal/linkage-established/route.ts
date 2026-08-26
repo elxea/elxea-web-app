@@ -3,7 +3,7 @@ import crypto from "crypto";
 import * as Sentry from "@sentry/nextjs";
 
 import { applyLinkageEstablished } from "@/lib/auth/identity-link";
-import { readSecretEnvTrimmed } from "@/lib/env";
+import { env } from "@/lib/config";
 import { extractCustomerId } from "@/lib/firebase/types";
 
 /**
@@ -70,7 +70,7 @@ function secretsMatch(provided: string, expected: string): boolean {
 }
 
 export async function POST(request: NextRequest) {
-  const expected = readSecretEnvTrimmed(process.env.LINKAGE_EVENT_SECRET);
+  const expected = env("LINKAGE_EVENT_SECRET");
   if (!expected) {
     /* 503 であって 500 ではない。壊れているのではなく、このデプロイでは
        設定されていない（プレビュー等）。素通しには**しない**。 */

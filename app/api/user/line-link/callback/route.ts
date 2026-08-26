@@ -6,6 +6,7 @@ import { applyLinkageEstablishedWithinBudget } from "@/lib/auth/linkage-merge-ha
 import { getBaseUrl, getRequestOrigin } from "@/lib/base-url";
 import { getCookieSpec, resolveCookieDomain } from "@/lib/auth/cookies";
 import { CX_AGENT_BASE_URL } from "@/lib/chat/proxy";
+import { env } from "@/lib/config";
 import { verifyLineIdToken } from "@/lib/line/verify-liff-token";
 import { lineApiBaseUrl } from "@/lib/line/endpoints";
 import {
@@ -174,7 +175,7 @@ export async function GET(request: NextRequest) {
     return fail(returnTo, "LINE_LIFF_CHANNEL_ID / _SECRET not configured");
   }
 
-  const syncSecret = process.env.SYNC_API_SECRET;
+  const syncSecret = env("SYNC_API_SECRET");
   if (!syncSecret) {
     /* fail-closed。秘密が無ければ cx-agent は 401 を返すので、無駄打ちもしない。 */
     return fail(returnTo, "SYNC_API_SECRET not set; cannot link");

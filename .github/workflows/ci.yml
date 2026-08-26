@@ -10,11 +10,31 @@ name: CI
 # `feat/**` now runs a lean gate on every push. Heavy jobs (Chromatic) stay on
 # PRs, because they cost more than they return on a work-in-progress branch.
 #
-# There is no branch protection on this repo (GitHub Free + private = required
-# status checks are a paid feature; `gh api .../branches/main/protection` returns
-# 403 "Upgrade to GitHub Pro"). So CI here *inspects and reports* — it cannot
-# block a merge. Enforcement is the operational rule in docs/ci-gates.md: Boss
-# confirms CI green before merging.
+# Branch protection IS in effect on `main` (訂正 2026-08-27).
+#
+# The paragraph that used to sit here said the opposite — "there is no branch
+# protection on this repo (GitHub Free + private = required status checks are a
+# paid feature)" — and concluded that CI "inspects and reports, it cannot block
+# a merge". Both halves are now false, and the note had gone stale in two
+# separate ways at once:
+#
+#   1. The repository is **public**, so protection is not a paid feature here.
+#   2. `main` has required status checks configured. Measured 2026-08-27 with
+#      `gh api repos/elxea/elxea-web-app/branches/main/protection`:
+#      static-checks, unit-tests, coverage, build, storybook-tests, e2e-tests,
+#      identity-e2e — 7 required contexts.
+#
+# So a red check on those 7 blocks the merge button by itself. The operational
+# rule in docs/ci-gates.md still applies, but it is now a second layer rather
+# than the only one.
+#
+# Note what is NOT enforced, so nobody reads more into this than is there:
+# `enforce_admins` is false and `required_approving_review_count` is 0. An
+# admin can still merge without review; what they cannot do is merge red.
+#
+# Keep this comment honest: it is the kind of statement that decides how much
+# people trust the pipeline, and a wrong one is worse than none. If protection
+# changes, re-measure with the `gh api` call above rather than editing prose.
 on:
   push:
     branches: [main, developer, "feat/**"]
@@ -94,6 +114,15 @@ jobs:
         # was invisible to CI while the pre-push hook (which does run the script)
         # caught it locally. CI and pre-push now check the same thing.
         run: pnpm typecheck
+
+      - name: Validate SoT registry
+        # 憲章 R5「『単一正本』を自称させない」の機械強制。同じ `@sot <concept>`
+        # が 2 箇所で宣言されていたら失敗する。散文で「ここが正本」と書くのは
+        # 何箇所でもできてしまい、実際 site-origin は 2 実装が別々の正規化規則で
+        # 並立していた (lib/site-url.ts と lib/env.ts)。
+        # 生成物 docs/sot-registry.md の drift もここで落ちる。
+        # 既存の static-checks に相乗りさせている (新規ジョブは作らない)。
+        run: pnpm check:sot
 
       - name: Validate design tokens
         # Fails the build (validate-tokens.ts exits 1) when tokens drift from

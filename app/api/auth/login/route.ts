@@ -6,6 +6,7 @@ import {
   generateNonce,
   buildAuthorizeUrl,
 } from "@/lib/shopify/customer";
+import { isProduction } from "@/lib/config";
 import { sanitizeReturnTo } from "@/lib/auth/return-to";
 import { getRequestHostname, getRequestOrigin, isTrustedAuthHost } from "@/lib/base-url";
 import {
@@ -93,7 +94,7 @@ export async function GET(request: NextRequest) {
 
   const cookieOptions = {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: isProduction(),
     sameSite: "lax" as const,
     path: "/",
     maxAge: PENDING_AUTH_TTL_MS / 1000, // 10 minutes

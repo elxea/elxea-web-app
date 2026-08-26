@@ -10,16 +10,29 @@ import {
   STALE_BILLING_CYCLE_VIEW,
 } from "@/lib/subscription-view";
 
+import { env, isTest } from "@/lib/config";
+
 import { SHOPIFY_API_VERSION } from "./api-version";
 import { reportSubscriptionFailure } from "./subscription-failure";
 
-const CLIENT_ID = process.env.SHOPIFY_CUSTOMER_ACCOUNT_CLIENT_ID || "";
-const SESSION_SECRET = process.env.SESSION_SECRET || "";
+const CLIENT_ID = env("SHOPIFY_CUSTOMER_ACCOUNT_CLIENT_ID") ?? "";
+
+// `SESSION_SECRET` is declared `raw` in lib/config/spec.ts — deliberately NOT
+// trimmed. It is a sha256 input for token encryption, so if the stored value
+// carries a trailing newline today, every cookie already issued was derived
+// *with* that newline. Trimming it here would change the derived key and log
+// every signed-in customer out. See the normalisation note in spec.ts.
+const SESSION_SECRET = env("SESSION_SECRET") ?? "";
 
 // Fail fast at module load time if SESSION_SECRET is missing.
 // This is used for token encryption; an empty secret would silently produce
 // insecure ciphertext.
-if (!SESSION_SECRET && typeof process !== "undefined" && process.env.NODE_ENV !== "test") {
+//
+// The old condition also carried a `typeof process !== "undefined"` guard. It
+// is dropped rather than translated: this module imports `node:crypto`, so it
+// only ever loads on the server, and `isTest()` resolves `NODE_ENV` through the
+// literal read in lib/config/spec.ts, which the bundler inlines anyway.
+if (!SESSION_SECRET && !isTest()) {
   throw new Error(
     "SESSION_SECRET environment variable is required for token encryption. " +
     "Set it in .env.local or your deployment environment.",
@@ -39,13 +52,13 @@ if (!SESSION_SECRET && typeof process !== "undefined" && process.env.NODE_ENV !=
 // existing production behaviour is unchanged.
 const DEFAULT_ACCOUNT_DOMAIN = "account.elxea.com";
 const AUTHORIZE_URL =
-  process.env.SHOPIFY_CUSTOMER_ACCOUNT_AUTHORIZE_URL ||
+  env("SHOPIFY_CUSTOMER_ACCOUNT_AUTHORIZE_URL") ??
   `https://${DEFAULT_ACCOUNT_DOMAIN}/authentication/oauth/authorize`;
 const TOKEN_URL =
-  process.env.SHOPIFY_CUSTOMER_ACCOUNT_TOKEN_URL ||
+  env("SHOPIFY_CUSTOMER_ACCOUNT_TOKEN_URL") ??
   `https://${DEFAULT_ACCOUNT_DOMAIN}/authentication/oauth/token`;
 const LOGOUT_URL =
-  process.env.SHOPIFY_CUSTOMER_ACCOUNT_LOGOUT_URL ||
+  env("SHOPIFY_CUSTOMER_ACCOUNT_LOGOUT_URL") ??
   `https://${DEFAULT_ACCOUNT_DOMAIN}/authentication/logout`;
 // Customer GraphQL API の向き先。
 //
@@ -57,8 +70,8 @@ const LOGOUT_URL =
 //
 // 未設定時の値は従来と完全に同一なので、本番の挙動は変わらない。
 const CUSTOMER_API_URL =
-  process.env.SHOPIFY_CUSTOMER_ACCOUNT_API_URL ||
-  `https://shopify.com/${process.env.SHOPIFY_SHOP_ID}/account/customer/api/${SHOPIFY_API_VERSION}/graphql`;
+  env("SHOPIFY_CUSTOMER_ACCOUNT_API_URL") ??
+  `https://shopify.com/${env("SHOPIFY_SHOP_ID")}/account/customer/api/${SHOPIFY_API_VERSION}/graphql`;
 
 export { LOGOUT_URL };
 

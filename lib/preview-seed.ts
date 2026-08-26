@@ -20,6 +20,7 @@
  * download / remote host is required.
  */
 
+import { env } from "@/lib/config";
 import type { FavoriteInput } from "@/lib/account-favorites";
 import { type AccountView } from "@/lib/account-view";
 import type { SubscriptionContract } from "@/lib/shopify/customer";
@@ -28,7 +29,7 @@ import type { Cart } from "@/lib/shopify/types";
 /** True when preview seeding is enabled via either the unified or legacy flag. */
 export function previewSeedEnabled(): boolean {
   return (
-    process.env.PREVIEW_SEED === "1" || process.env.PREVIEW_SEED_EVENTS === "1"
+    env("PREVIEW_SEED") === "1" || env("PREVIEW_SEED_EVENTS") === "1"
   );
 }
 
@@ -88,7 +89,7 @@ const PREVIEW_IMAGES = [
  * Default (flag unset) behaviour is byte-identical to before.
  */
 export function previewSeedDeterministic(): boolean {
-  return process.env.PREVIEW_SEED_DETERMINISTIC === "1";
+  return env("PREVIEW_SEED_DETERMINISTIC") === "1";
 }
 
 /** Deterministic image by numeric index (cycles through the pool). */
@@ -1089,7 +1090,7 @@ export function seedEventDetail(slug: string): SeedEventDetail | null {
  */
 export function seedSubscriptionContracts(): SubscriptionContract[] | null {
   if (!previewSeedEnabled()) return null;
-  if (process.env.PREVIEW_SEED_SUBSCRIPTIONS_EMPTY === "1") return [];
+  if (env("PREVIEW_SEED_SUBSCRIPTIONS_EMPTY") === "1") return [];
 
   const line = (
     key: string,

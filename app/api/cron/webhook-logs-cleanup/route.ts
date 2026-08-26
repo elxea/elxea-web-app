@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
+import { env } from "@/lib/config";
 import { getAdminFirestore } from "@/lib/firebase/admin";
 
 /**
@@ -21,7 +22,7 @@ import { getAdminFirestore } from "@/lib/firebase/admin";
  * Configured to run daily at 03:00 JST (18:00 UTC) via vercel.json.
  */
 
-const CRON_SECRET = process.env.CRON_SECRET || "";
+const CRON_SECRET = env("CRON_SECRET") ?? "";
 const BATCH_SIZE = 400; // Firestore batch write limit is 500; leave headroom
 
 function isAuthorizedCronRequest(authHeader: string | null): boolean {

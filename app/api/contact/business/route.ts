@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
 import { z } from "zod";
+import { env } from "@/lib/config";
 import { parseJsonBody } from "@/lib/validation/zod-helpers";
 import { enforceRateLimit, limiters, getClientIp } from "@/lib/ratelimit";
 
-const RESEND_API_KEY = process.env.RESEND_API_KEY;
-const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "no-reply@elxea.com";
-const TO_EMAIL = process.env.CONTACT_BUSINESS_TO_EMAIL || "info@elxea.com";
+const RESEND_API_KEY = env("RESEND_API_KEY");
+const FROM_EMAIL = env("RESEND_FROM_EMAIL") ?? "no-reply@elxea.com";
+const TO_EMAIL = env("CONTACT_BUSINESS_TO_EMAIL") ?? "info@elxea.com";
 
 const INQUIRY_TYPE_LABELS: Record<string, string> = {
   wholesale: "卸売について",

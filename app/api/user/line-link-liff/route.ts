@@ -7,6 +7,7 @@ import { enforceRateLimit, limiters } from "@/lib/ratelimit";
 import { verifyLineIdToken } from "@/lib/line/verify-liff-token";
 import { resolveLinkChannelId } from "@/lib/line/link-flow";
 import { CX_AGENT_BASE_URL } from "@/lib/chat/proxy";
+import { env } from "@/lib/config";
 
 /**
  * POST /api/user/line-link-liff
@@ -73,7 +74,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 3. cx-agent の customer_linkages upsert を server-to-server で呼ぶ（SYNC_API_SECRET）
-    const secret = process.env.SYNC_API_SECRET;
+    const secret = env("SYNC_API_SECRET");
     if (!secret) {
       // fail-closed: 秘密が無ければ連携を成立させない（cx-agent は 401 を返すため無駄打ちも避ける）
       console.error("[line-link-liff] SYNC_API_SECRET not set; cannot link.");

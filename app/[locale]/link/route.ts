@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { env } from "@/lib/config";
 import { requireAuth } from "@/lib/firebase/auth-guard";
 import { enforceRateLimit, limiters } from "@/lib/ratelimit";
 import { CX_AGENT_BASE_URL } from "@/lib/chat/proxy";
@@ -101,7 +102,7 @@ export async function GET(
   if (limited) return withSecurityHeaders(limited);
 
   // 3. cx-agent に nonce を発行させる（サーバ間・秘密はブラウザに出さない）。
-  const secret = process.env.SYNC_API_SECRET;
+  const secret = env("SYNC_API_SECRET");
   if (!secret) {
     // fail-closed: 秘密が無ければ連携を進めない（cx-agent は 401 を返すため無駄打ちも避ける）。
     console.error("[account-link] SYNC_API_SECRET not set; cannot issue nonce.");

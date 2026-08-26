@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
+import { isProduction } from "@/lib/config";
 import {
   exchangeToken,
   encryptToken,
@@ -164,7 +165,7 @@ export async function GET(request: NextRequest) {
       if (pending.remaining) {
         settled.cookies.set(PENDING_AUTH_COOKIE, serializePendingAuths(pending.remaining), {
           httpOnly: true,
-          secure: process.env.NODE_ENV === "production",
+          secure: isProduction(),
           sameSite: "lax",
           path: "/",
           maxAge: 60 * 10,
@@ -189,7 +190,7 @@ export async function GET(request: NextRequest) {
     if (pending.remaining) {
       failed.cookies.set(PENDING_AUTH_COOKIE, serializePendingAuths(pending.remaining), {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
+        secure: isProduction(),
         sameSite: "lax",
         path: "/",
         maxAge: 60 * 10,
@@ -311,7 +312,7 @@ export async function GET(request: NextRequest) {
 
     const cookieOptions = {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: isProduction(),
       sameSite: "lax" as const,
       path: "/",
     };
@@ -349,7 +350,7 @@ export async function GET(request: NextRequest) {
     });
     response.cookies.set("shop_auth", sessionCookies.authFlag.value, {
       httpOnly: false,
-      secure: process.env.NODE_ENV === "production",
+      secure: isProduction(),
       sameSite: "lax",
       path: "/",
       maxAge: sessionCookies.authFlag.maxAge,

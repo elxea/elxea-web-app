@@ -2,6 +2,7 @@
 
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
+import { isProduction } from "@/lib/config";
 import {
   createCart,
   addToCart,
@@ -20,7 +21,7 @@ async function setCartId(cartId: string) {
   const cookieStore = await cookies();
   cookieStore.set(CART_COOKIE, cartId, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: isProduction(),
     sameSite: "lax",
     maxAge: 60 * 60 * 24 * 30, // 30 days
     path: "/",

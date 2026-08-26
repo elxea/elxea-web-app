@@ -20,6 +20,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { env } from "@/lib/config";
 
 type Phase =
   | "loading" // 初期化・通信中
@@ -97,7 +98,7 @@ export function LiffLinkClient({ locale }: { locale: string }) {
   const run = useCallback(async () => {
     setPhase("loading");
 
-    const liffId = process.env.NEXT_PUBLIC_LIFF_ID;
+    const liffId = env("NEXT_PUBLIC_LIFF_ID");
     if (!liffId) {
       // LINE Developers コンソールでの LIFF 登録・LIFF_ID 投入が未了。静かに案内。
       setPhase("unavailable");

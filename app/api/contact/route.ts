@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
 import { z } from "zod";
+import { env } from "@/lib/config";
 import { parseJsonBody } from "@/lib/validation/zod-helpers";
 import { enforceRateLimit, limiters, getClientIp } from "@/lib/ratelimit";
 
@@ -8,7 +9,7 @@ let _resend: Resend | null = null;
 
 function getResend(): Resend {
   if (!_resend) {
-    const key = process.env.RESEND_API_KEY;
+    const key = env("RESEND_API_KEY");
     if (!key) {
       throw new Error("RESEND_API_KEY is not configured");
     }
@@ -17,11 +18,11 @@ function getResend(): Resend {
   return _resend;
 }
 
-const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "no-reply@elxea.com";
+const FROM_EMAIL = env("RESEND_FROM_EMAIL") ?? "no-reply@elxea.com";
 // 既定の受信先は info@ に統一 (Setaka 確定 2026-08-11)。画面に出す問い合わせ先と
 // 実際の受信箱が別アドレスだと、返信元と案内先が食い違う。
-const TO_EMAIL = process.env.CONTACT_TO_EMAIL || "info@elxea.com";
-const BUSINESS_TO_EMAIL = process.env.CONTACT_BUSINESS_TO_EMAIL || "info@elxea.com";
+const TO_EMAIL = env("CONTACT_TO_EMAIL") ?? "info@elxea.com";
+const BUSINESS_TO_EMAIL = env("CONTACT_BUSINESS_TO_EMAIL") ?? "info@elxea.com";
 
 /**
  * お問い合わせの種類。Figma【R2: 確定版】`8109:46695` の 2 択に対応する。
@@ -51,7 +52,7 @@ export async function POST(request: NextRequest) {
     const limited = await enforceRateLimit(request, limiters.contactForm, getClientIp(request));
     if (limited) return limited;
 
-    if (!process.env.RESEND_API_KEY) {
+    if (!env("RESEND_API_KEY")) {
       return NextResponse.json(
         { error: "Email service not configured" },
         { status: 503 }

@@ -1,6 +1,8 @@
 import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 
+import { env } from "@/lib/config";
+
 /**
  * Verify a Shopify webhook request using HMAC-SHA256 signature.
  *
@@ -57,7 +59,7 @@ export async function validateWebhookRequest(
     };
   }
 
-  const webhookSecret = process.env.SHOPIFY_WEBHOOK_SECRET;
+  const webhookSecret = env("SHOPIFY_WEBHOOK_SECRET");
   if (!webhookSecret) {
     console.error("[Webhook] SHOPIFY_WEBHOOK_SECRET is not configured");
     return {

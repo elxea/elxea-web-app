@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import crypto from "crypto";
 import { getBaseUrl, getRequestHostname, isTrustedAuthHost } from "@/lib/base-url";
 import { getCookieSpec, isSecure, resolveCookieDomain } from "@/lib/auth/cookies";
+import { env } from "@/lib/config";
 import { wantsAutoLoginDisabled } from "@/lib/line/auto-login";
 import { lineAuthBaseUrl } from "@/lib/line/endpoints";
 import { loginBotPrompt, loginScopeParam } from "@/lib/line/login-channel";
@@ -44,7 +45,7 @@ export async function GET(request: NextRequest) {
       { status: 503 },
     );
   }
-  const channelId = process.env.AUTH_LINE_ID;
+  const channelId = env("AUTH_LINE_ID");
   if (!channelId) {
     // Same rationale as /api/line-login/init: unconfigured, not broken.
     return NextResponse.json({ error: "auth_not_configured" }, { status: 503 });

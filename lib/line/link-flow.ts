@@ -1,6 +1,6 @@
 import crypto from "crypto";
 
-import { readSecretEnvTrimmed } from "@/lib/env";
+import { env } from "@/lib/config";
 import { encryptToken, decryptToken } from "@/lib/shopify/customer";
 
 /**
@@ -122,8 +122,9 @@ export type LinkResult = "success" | "error" | "conflict" | "line-conflict";
  * 保存されていたため**ログインだけは通り続け**、連携の不具合に見えていた。
  *
  * よって「本番の値を一度掃除する」では直したことにならない。**コード側を不感にする**
- * （= `readSecretEnvTrimmed` を通す）ことで、同じ入れ方をされても二度と再発しない。
- * 同じ判断の先例が `lib/env.ts`（`NEXT_PUBLIC_SITE_URL` の改行が sitemap を壊した件）。
+ * （= 設定レジストリ `lib/config/spec.ts` で `trimmed` と宣言し `env()` 経由でのみ読む）
+ * ことで、同じ入れ方をされても二度と再発しない。
+ * 同じ判断の先例が `NEXT_PUBLIC_SITE_URL`（改行が sitemap を壊した件・spec.ts 冒頭）。
  *
  * ## なぜログイン側の秘密を最優先で使うのか（2026-08-25 15:55 本番障害）
  *
@@ -160,8 +161,8 @@ export type LinkResult = "success" | "error" | "conflict" | "line-conflict";
  */
 export function resolveLinkChannelSecret(): string | undefined {
   const linkChannelId = resolveLinkChannelId();
-  const loginChannelId = readSecretEnvTrimmed(process.env.AUTH_LINE_ID);
-  const loginChannelSecret = readSecretEnvTrimmed(process.env.AUTH_LINE_SECRET);
+  const loginChannelId = env("AUTH_LINE_ID");
+  const loginChannelSecret = env("AUTH_LINE_SECRET");
 
   /* 同一チャネルを指しているときだけ流用する。ID が欠けている・食い違うときに
      流用すると、別チャネルの秘密を送って `invalid_client` を自作することになる。 */
@@ -174,10 +175,7 @@ export function resolveLinkChannelSecret(): string | undefined {
     return loginChannelSecret;
   }
 
-  return (
-    readSecretEnvTrimmed(process.env.LINE_LIFF_CHANNEL_SECRET) ??
-    readSecretEnvTrimmed(process.env.LINE_LOGIN_CHANNEL_SECRET)
-  );
+  return env("LINE_LIFF_CHANNEL_SECRET") ?? env("LINE_LOGIN_CHANNEL_SECRET");
 }
 
 /**
@@ -192,7 +190,7 @@ export function resolveLinkChannelSecret(): string | undefined {
  * LINE に送ると、設定漏れが「認可エラー」として顧客側に出てしまう。
  */
 export function resolveLinkChannelId(): string | undefined {
-  return readSecretEnvTrimmed(process.env.LINE_LIFF_CHANNEL_ID);
+  return env("LINE_LIFF_CHANNEL_ID");
 }
 
 /** cookie に封じる中身。キーを 1 文字にしているのは cookie サイズを抑えるため。 */

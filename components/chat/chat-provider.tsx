@@ -34,6 +34,7 @@ import {
   type HistoryIdentity,
 } from "@/lib/chat/history-cache";
 import { applyAuthTransition } from "@/lib/chat/auth-transition";
+import { env } from "@/lib/config";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -162,7 +163,7 @@ class MockChatTransport implements ChatTransport<UIMessage> {
 // proxy が X-API-Key + verify 済み customer_id を付けて cx-agent に転送する。
 // 公開 Workers URL をブラウザから直叩きしない (なりすまし防止)。
 const CHAT_PROXY_URL = "/api/chat";
-const IS_MOCK = process.env.NEXT_PUBLIC_CHAT_MOCK === "true";
+const IS_MOCK = env("NEXT_PUBLIC_CHAT_MOCK") === "true";
 
 // ---------------------------------------------------------------------------
 // History API types

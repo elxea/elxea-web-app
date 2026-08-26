@@ -1,5 +1,6 @@
 import { createHmac } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
+import { env } from "@/lib/config";
 
 /**
  * Generate a hashed token from the site password.
@@ -12,7 +13,7 @@ function hashSitePassword(password: string): string {
 
 export async function POST(request: NextRequest) {
   const { password } = await request.json();
-  const sitePassword = process.env.SITE_PASSWORD;
+  const sitePassword = env("SITE_PASSWORD");
 
   if (!sitePassword || password !== sitePassword) {
     return NextResponse.json({ error: "Invalid password" }, { status: 401 });
