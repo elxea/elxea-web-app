@@ -20,6 +20,13 @@ const eslintConfig = [
       // `pnpm lint` は --max-warnings 0 なので、無視しないと一度カバレッジを計測
       // した作業ツリーで lint が必ず落ちる。.gitignore の `/coverage` と対で維持する。
       "coverage/**",
+      // `vercel build` / `vercel dev` がローカルに作る出力。中身は `.next` を
+      // まるごと写した本番バンドル (minify 済みの巨大な JS を含む) なので、
+      // lint 対象に入ると ESLint がそれを 1 ファイルずつ parse しようとして
+      // ヒープを食い潰し、`pnpm lint` が JS heap out of memory で落ちる。
+      // `.next/**` を無視しているのと同じ理由 — 生成物であって原稿ではない。
+      // `.gitignore` の `.vercel` と対で維持する。
+      ".vercel/**",
     ],
   },
   ...nextCoreWebVitals,

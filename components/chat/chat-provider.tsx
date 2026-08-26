@@ -24,13 +24,16 @@ import {
 import { usePathname } from "next/navigation";
 import { randomId } from "@/lib/random-id";
 import {
+  authSignatureFromCookie,
   clearAllHistoryCache,
+  hasLineAuthFromCookie,
   historyCacheKey,
   isSignedInFromCookie,
   readCachedHistory,
   writeCachedHistory,
   type HistoryIdentity,
 } from "@/lib/chat/history-cache";
+import { applyAuthTransition } from "@/lib/chat/auth-transition";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -290,6 +293,9 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   /* 画面上のメッセージを空にする手段。`useChat` はこの下で作られるので、
      上の効果からも呼べるように ref 越しに繋ぐ。 */
   const resetMessagesRef = useRef<(() => void) | null>(null);
+  /* LINE ユーザー ID を引いたか。人が入れ替わったら false に戻して引き直させる
+     (前の人の ID が作り置きの鍵に残らないように)。 */
+  const lineUserIdFetchedRef = useRef(false);
 
   // Hydrate session ID on mount (client only)
   useEffect(() => {
@@ -303,17 +309,26 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
      別名でも真になる)。判定は `lib/chat/history-cache.ts` に置いてテストしてある。 */
   const [signedIn, setSignedIn] = useState(false);
 
-  /* 直前のログイン状態。**入れ替わり**を見るためだけに持つ。初回は「まだ何とも
-     比べていない」を意味する null (初回訪問をログアウトと誤認しないため)。 */
-  const prevSignedInRef = useRef<boolean | null>(null);
+  /* LINE の旗。Shopify の旗が立っていなくても真になりうる (LINE だけで入った人)。
+     作り置きの鍵を匿名の人と共有させないために持つ。 */
+  const [lineAuthed, setLineAuthed] = useState(false);
+
+  /* 直前の**入口の署名** (`""` / `"s"` / `"l"` / `"sl"`)。入れ替わりを見るためだけに
+     持つ。初回は「まだ何とも比べていない」を意味する null (初回訪問をログアウトと
+     誤認しないため)。
+     以前はここが「Shopify にログイン中か」の真偽値で、LINE だけで入った人は
+     ログイン・ログアウトのどちらでも値が動かず入れ替わりを取り逃していた
+     (QA 指摘 2026-08-25)。 */
+  const prevAuthSignatureRef = useRef<string | null>(null);
 
   // Fetch Shopify Customer ID if shop_auth cookie exists (non-httpOnly flag).
   // Re-check when pathname changes (user might log in/out during navigation).
   useEffect(() => {
-    const hasAuthFlag =
-      typeof document !== "undefined" && isSignedInFromCookie(document.cookie);
+    const cookie = typeof document !== "undefined" ? document.cookie : "";
+    const hasAuthFlag = isSignedInFromCookie(cookie);
 
     setSignedIn(hasAuthFlag);
+    setLineAuthed(hasLineAuthFromCookie(cookie));
 
     /* ## 人が入れ替わったら、タブに残っているものを断ち切る (QA 指摘 2026-08-26)
      *
@@ -325,15 +340,28 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
      * そこでログイン状態が変わった時点で、作り置きを全消しし、会話 ID を振り直し、
      * 画面上のメッセージも捨てる。TTL の残りに依存しない止め方なので、鍵の指紋に
      * よる分離と二重に効かせている。 */
-    const prev = prevSignedInRef.current;
-    prevSignedInRef.current = hasAuthFlag;
+    const signature = authSignatureFromCookie(cookie);
+    const previous = prevAuthSignatureRef.current;
+    prevAuthSignatureRef.current = signature;
 
-    if (prev !== null && prev !== hasAuthFlag && typeof window !== "undefined") {
-      clearAllHistoryCache(window.sessionStorage);
-      setSessionId(rotateSessionId());
-      setShopifyCustomerId(null);
-      historyLoadedRef.current = false;
-      resetMessagesRef.current?.();
+    /* 判断と後始末の中身は `lib/chat/auth-transition.ts` が正本 (テストで縛って
+       ある)。ここは「何を消すか」の配線だけを持つ。 */
+    if (
+      typeof window !== "undefined" &&
+      applyAuthTransition(previous, signature, {
+        clearCache: () => clearAllHistoryCache(window.sessionStorage),
+        rotateSession: () => setSessionId(rotateSessionId()),
+        forgetIdentity: () => {
+          setShopifyCustomerId(null);
+          setLineUserId(null);
+          lineUserIdFetchedRef.current = false;
+        },
+        resetMessages: () => {
+          historyLoadedRef.current = false;
+          resetMessagesRef.current?.();
+        },
+      })
+    ) {
       return;
     }
 
@@ -347,7 +375,6 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   }, [pathname]);
 
   // Fetch LINE User ID from Auth.js session (once on mount)
-  const lineUserIdFetchedRef = useRef(false);
   useEffect(() => {
     if (lineUserIdFetchedRef.current) return;
     lineUserIdFetchedRef.current = true;
@@ -415,7 +442,16 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   const identity: HistoryIdentity | null =
     !sessionId || (signedIn && !shopifyCustomerId)
       ? null
-      : { sessionId, signedIn, customerId: shopifyCustomerId };
+      : {
+          sessionId,
+          signedIn,
+          customerId: shopifyCustomerId,
+          /* LINE だけで入った人を匿名の人と同じ棚に入れない (QA 指摘 2026-08-25)。
+             ここで足止めはしない — LINE の人は Shopify 顧客 ID を持たないので
+             「解決を待つ」作りにすると履歴が永久に出なくなる。鍵を分けるだけ。 */
+          lineAuthed,
+          lineUserId,
+        };
 
   /** 履歴を 1 回だけ引く。作り置きがあれば往復ゼロで済ませる。 */
   const loadHistory = useCallback(() => {

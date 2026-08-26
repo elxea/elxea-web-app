@@ -32,8 +32,22 @@ export const DEM_TILE_TEMPLATE = "https://tiles.mapterhorn.com/{z}/{x}/{y}.webp"
  * 提供側が変えたときに静かにずれる (標高が壊れてもエラーは出ない)。
  */
 export const DEM_TILEJSON_URL = "https://tiles.mapterhorn.com/tilejson.json";
-/** 画面に必ず出す帰属表示。 */
-export const DEM_ATTRIBUTION = "DEM (C) Mapterhorn";
+/**
+ * 画面に必ず出す帰属表示。
+ *
+ * 以前は `DEM (C) Mapterhorn` だった。DEM は社内語、`(C)` は記号が出せなかった
+ * 時代の書き方で、地図の下にこの 1 行が本文と同じ体裁で置かれていたため、
+ * 読み手には**意味の分からない生テキストが記事の中に紛れている**ようにしか
+ * 見えなかった (監査 #20 / 2026-08-25 の /ja/tea-menu 実測)。
+ *
+ * 帰属表示は法的義務なので消せない。消せないなら**帰属表示として読める形**に
+ * する — 平易な語 (標高データ)・正しい記号 (`©`)・出典へのリンク。体裁側
+ * (右寄せ・キャプション級) は `terroir-overview-map.tsx` が受け持つ。
+ */
+export const DEM_ATTRIBUTION = "標高データ © Mapterhorn";
+
+/** 帰属表示のリンク先 (提供元)。 */
+export const DEM_ATTRIBUTION_URL = "https://mapterhorn.com";
 
 export interface DemView {
   west: number;

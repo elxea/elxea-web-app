@@ -48,6 +48,49 @@ export const HISTORY_CACHE_TTL_MS = 5 * 60 * 1000;
  * 実害が出る配置は今のところ無いが、認証状態の判定を部分一致に委ねる形は残さない。
  */
 export function isSignedInFromCookie(cookieString: string | undefined | null): boolean {
+  return hasFlagCookie(cookieString, "shop_auth");
+}
+
+/**
+ * LINE だけで入っている人か。`line_auth=1` を **完全一致で** 判定する。
+ *
+ * ## なぜ別に要るのか (QA 指摘 2026-08-25)
+ *
+ * `isSignedInFromCookie` は Shopify の旗しか見ない。これは「Shopify 顧客 ID が
+ * 解決できるはずか」を答える関数なので、それ自体は正しい。問題は
+ * **`ChatProvider` の入れ替わり検知までこの 1 つの真偽値に乗っていた**こと。
+ *
+ * LINE だけで入った人は `shop_auth` が付かないので、
+ *
+ *   A が LINE でログイン → `signedIn = false`
+ *   A がログアウト       → `signedIn = false`  (変化なし)
+ *   B が LINE でログイン → `signedIn = false`  (変化なし)
+ *
+ * となり、**入れ替わりが一度も観測されない**。作り置きも会話 ID もそのままなので、
+ * 共用端末で B の画面に A の履歴が出うる — Shopify 側で塞いだはずの取り違えが、
+ * LINE だけの人には効いていなかった。
+ */
+export function hasLineAuthFromCookie(cookieString: string | undefined | null): boolean {
+  return hasFlagCookie(cookieString, "line_auth");
+}
+
+/**
+ * いま**どの入口で**入っているかの署名。`s` = Shopify / `l` = LINE。
+ *
+ * 入れ替わりの検知はこの署名の変化で行う。真偽値 1 つではなく署名にするのは、
+ * 入口が 2 つあるうえに **両方立つ (連携済み) 状態がある**ため。
+ * `"" → "l" → "" → "l"` のような LINE だけの往復も、`"sl" → "s"` のような
+ * 連携解除も、同じ 1 本の比較で捕まる。
+ */
+export function authSignatureFromCookie(cookieString: string | undefined | null): string {
+  return (
+    (isSignedInFromCookie(cookieString) ? "s" : "") +
+    (hasLineAuthFromCookie(cookieString) ? "l" : "")
+  );
+}
+
+/** `name=1` の旗 cookie を完全一致で探す (部分一致に認証判定を委ねない)。 */
+function hasFlagCookie(cookieString: string | undefined | null, name: string): boolean {
   if (!cookieString) return false;
   return cookieString
     .split(";")
@@ -55,7 +98,7 @@ export function isSignedInFromCookie(cookieString: string | undefined | null): b
     .some((part) => {
       const eq = part.indexOf("=");
       if (eq < 0) return false;
-      return part.slice(0, eq) === "shop_auth" && part.slice(eq + 1) === "1";
+      return part.slice(0, eq) === name && part.slice(eq + 1) === "1";
     });
 }
 
@@ -77,10 +120,14 @@ export function fingerprintIdentity(value: string): string {
 export type HistoryIdentity = {
   /** localStorage の会話 ID。 */
   sessionId: string;
-  /** ログイン中か (cookie 由来)。 */
+  /** Shopify でログイン中か (cookie 由来)。 */
   signedIn: boolean;
   /** verify 済み Shopify 顧客 ID。未ログイン / 未解決なら null。 */
   customerId: string | null;
+  /** LINE の旗 cookie があるか。Shopify 側が立っていなくても真になりうる。 */
+  lineAuthed?: boolean;
+  /** Auth.js セッション由来の LINE ユーザー ID。未解決なら null。 */
+  lineUserId?: string | null;
 };
 
 /**
@@ -90,9 +137,35 @@ export type HistoryIdentity = {
  *   - 会話 ID … 別の会話の履歴を混ぜない
  *   - ログイン状態 … ログイン前後で見えてよい履歴が変わる
  *   - 本人の指紋 … 同じ端末で人が入れ替わったときに取り違えない
+ *
+ * ## 指紋が「Shopify 顧客 ID だけ」では足りない (QA 指摘 2026-08-25)
+ *
+ * LINE だけで入った人には Shopify 顧客 ID が無いので、以前はその全員が
+ * 未ログインと同じ `anon` の棚に入っていた。同じタブで LINE をログアウトして
+ * 再読み込みすると、旗も顧客 ID も無い匿名の状態と **鍵が完全に一致する** ため、
+ * 直前の人の履歴がそのまま出うる (再読み込みだと入れ替わり検知も走らない —
+ * 比べる相手が無いので初回観測になる)。
+ *
+ * よって指紋は「解決している方の本人 ID」を使い、どちらも未解決のときだけ
+ * 入口の種類 (`auth` / `line` / `anon`) に落とす。入口の種類が違えば鍵も違うので、
+ * 少なくとも **LINE の人と匿名の人が同じ棚を共有することは無くなる**。
  */
-export function historyCacheKey({ sessionId, signedIn, customerId }: HistoryIdentity): string {
-  const who = customerId ? fingerprintIdentity(customerId) : signedIn ? "auth" : "anon";
+export function historyCacheKey({
+  sessionId,
+  signedIn,
+  customerId,
+  lineAuthed = false,
+  lineUserId = null,
+}: HistoryIdentity): string {
+  const who = customerId
+    ? fingerprintIdentity(customerId)
+    : lineUserId
+      ? fingerprintIdentity(lineUserId)
+      : signedIn
+        ? "auth"
+        : lineAuthed
+          ? "line"
+          : "anon";
   return `${HISTORY_CACHE_PREFIX}${sessionId}:${signedIn ? "1" : "0"}:${who}`;
 }
 

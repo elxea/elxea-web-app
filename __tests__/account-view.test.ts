@@ -207,6 +207,48 @@ describe("送信専用アドレスは識別子として出さない", () => {
     }
     expect(isPlaceholderEmail("noreplytea@example.com")).toBe(false);
   });
+
+  /* 完全一致の語彙だけでは、区切り・連番・タグのどれか 1 つで静かにすり抜けた
+     (QA 指摘 2026-08-25)。すり抜けると本人の識別子として画面に出てしまうので、
+     正規化の 3 段 (タグ / 区切り / 連番) を 1 件ずつ固定する。 */
+  it("区切り・連番・タグが付いた送信専用アドレスも落とす", () => {
+    for (const email of [
+      "no.reply@elxea.com", // 区切りがドット
+      "noreply2@elxea.com", // 末尾の連番
+      "no-reply-01@elxea.com", // 区切り + 連番
+      "noreply+line@elxea.com", // 配送タグ
+      "NO_REPLY@ELXEA.COM", // 大文字
+      "mailer-daemon@elxea.com", // 送信系の別語彙
+      "postmaster@elxea.com",
+      "unknown@elxea.com",
+    ]) {
+      expect(isPlaceholderEmail(email), email).toBe(true);
+    }
+  });
+
+  it("到達しないと規格で決まっているドメインは本人のアドレスとして扱わない", () => {
+    for (const email of ["yuki@elxea.invalid", "u123@line.local"]) {
+      expect(isPlaceholderEmail(email), email).toBe(true);
+    }
+  });
+
+  it("本人が名乗りうるアドレスは巻き込まない", () => {
+    for (const email of [
+      "noreplytea@example.com", // 屋号が偶然 noreply で始まる
+      "nobuo@example.com",
+      "none-of-your-business@example.com", // 語としては none ではない
+      "yuki@example.com",
+      "yuki@example.jp",
+    ]) {
+      expect(isPlaceholderEmail(email), email).toBe(false);
+    }
+  });
+
+  it("メールアドレスの形をしていない値では真にならない", () => {
+    for (const value of ["", "  ", "noreply", "@elxea.com", null, undefined]) {
+      expect(isPlaceholderEmail(value), String(value)).toBe(false);
+    }
+  });
 });
 
 describe("返金済みの注文を ¥0 と言い切らない", () => {

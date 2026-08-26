@@ -7,6 +7,7 @@ import { getClient } from "@/sanity/lib/client";
 import { ARTICLE_BY_SLUG_QUERY, RELATED_ARTICLES_QUERY } from "@/sanity/lib/queries";
 import { urlFor } from "@/sanity/lib/image";
 import { getProductByHandle } from "@/lib/shopify";
+import { productTypeLabel } from "@/lib/shopify/product-type";
 import type { MembershipTier } from "@/lib/shopify/customer";
 import { getMembershipTier } from "@/lib/shopify/auth";
 import { Link } from "@/i18n/navigation";
@@ -419,13 +420,19 @@ export default async function ArticlePage({
                   title: product.title,
                   href: `/products/${product.handle}`,
                   imageUrl: product.featuredImage?.url,
-                  meta: product.productType || undefined,
+                  /* Shopify の `productType` は英日を 1 本に畳んだ値
+                     (`Green Tea｜緑茶`)。生のまま出すと日本語の記事の中に
+                     英語が混ざるので、商品一覧のチップと同じ規則で
+                     ロケール側だけを出す (QA 指摘 2026-08-25)。 */
+                  meta: productTypeLabel(product.productType, locale) || undefined,
                   description: product.description || undefined,
                   spec: [
                     { label: t("teaSpecNo"), value: product.metafields?.menuNumber },
                     {
                       label: t("teaSpecCategory"),
-                      value: product.metafields?.teaCategory || product.productType,
+                      value:
+                        product.metafields?.teaCategory ||
+                        productTypeLabel(product.productType, locale),
                     },
                     { label: t("teaSpecName"), value: product.title },
                     { label: t("teaSpecVariety"), value: product.metafields?.variety },

@@ -358,4 +358,60 @@ describe("サーバが知っている一覧を初期値に渡せる (往復ゼ�
     ).toBe("saved");
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  /* `ensureFavoritesHydrated` が「もう確定しているか」を見ていなかったので、
+     seed した画面に保存ボタンが載っているだけで一覧を 1 本余計に叩いていた
+     (QA 指摘 2026-08-25)。ボタンは必ず mount で呼ぶので、往復が必ず 1 本出る。 */
+  it("seed 済みの画面では、保存ボタンが載っていても一覧を取りに行かない", async () => {
+    const store = await loadStore();
+    const fetchMock = vi.fn();
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    store.seedFavoriteKeys(["person:masayuki-kubo"]);
+    /* 画面上の保存ボタンが mount した = この呼び出しが起きる。 */
+    store.ensureFavoritesHydrated();
+    store.ensureFavoritesHydrated();
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(store.getFavoritesSnapshot().phase).toBe("ready");
+  });
+});
+
+describe("1 回目の取り込みが失敗しても、そのタブで取り直せる", () => {
+  /* 失敗を `hydrating` に握ったままにしていたので、`if (hydrating) return` が
+     効き続けて **タブを閉じるまで二度と取り直せなかった** (QA 指摘 2026-08-25)。
+     通信が戻っても `error` のままで、保存ボタンは押すたびに 1 件確認の往復が
+     要る状態で固定される。 */
+  it("間を置いたあとの呼び出しで取り直し、ready まで回復する", async () => {
+    vi.useFakeTimers();
+    try {
+      const store = await loadStore();
+
+      globalThis.fetch = vi.fn(async () => {
+        throw new Error("offline");
+      }) as unknown as typeof fetch;
+
+      store.ensureFavoritesHydrated();
+      await vi.waitFor(() => expect(store.getFavoritesSnapshot().phase).toBe("error"));
+
+      /* 通信は戻った。だが「失敗した直後」はまだ取りに行かない
+         (1 画面のボタンの数だけ再試行が飛ぶのを防ぐため)。 */
+      const recovered = listing([{ type: "product", targetId: "sencha" }]);
+      globalThis.fetch = recovered;
+      store.ensureFavoritesHydrated();
+      expect(recovered).not.toHaveBeenCalled();
+
+      /* 間隔 (10 秒) を越えたら 1 回だけ取り直す。 */
+      vi.setSystemTime(Date.now() + 11_000);
+      store.ensureFavoritesHydrated();
+      await vi.waitFor(() => expect(store.getFavoritesSnapshot().phase).toBe("ready"));
+
+      expect(recovered).toHaveBeenCalledTimes(1);
+      expect(
+        store.readFavoriteState(store.getFavoritesSnapshot(), "product", "sencha"),
+      ).toBe("saved");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

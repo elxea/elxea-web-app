@@ -27,6 +27,7 @@ import {
 } from "@/components/marketing/top-blocks";
 import { getClient } from "@/sanity/lib/client";
 import { filterOutFictional } from "@/lib/fictional-content";
+import { excludeReservedTitles } from "@/lib/navigation/reserved-destinations";
 import {
   ARTICLES_QUERY,
   EVENTS_QUERY,
@@ -332,17 +333,51 @@ const TOP_CATEGORY_COUNT = 6;
 /** Figma SP は 1 列 x 3 段 = 3 タイル (8109:46631 / 46634 / 46637)。 */
 const TOP_CATEGORY_COUNT_SP = 3;
 
+/**
+ * カテゴリータイルに出してはいけない名前 = サイトの主要な行き先の名前。
+ * 値は `messages` の `common.*` を引くので、名前の一覧をここに焼かない。
+ */
+const RESERVED_DESTINATION_KEYS = [
+  "products",
+  "subscription",
+  "collections",
+  "journal",
+  "events",
+  "teaMenu",
+  "playlists",
+  "about",
+  "faq",
+  "contact",
+  "shipping",
+  "search",
+  "cart",
+  "account",
+] as const;
+
 async function CategoriesSection() {
   const t = await getTranslations("homeR2");
+  const tCommon = await getTranslations("common");
 
   try {
     const { getCollections } = await import("@/lib/shopify");
-    /* 写真があるカテゴリを先に並べる (#9)。
+    /* 主要な行き先と同じ名前のコレクションは落とす (監査 #18)。本番には
+       「イベント」という名前のコレクションがあり、タイルは「イベント」と
+       名乗るのに着地先は商品一覧だった (2026-08-26 実測)。入口が多いことより
+       先に、**同じ名前で違う場所へ連れて行くこと**が問題なので、そこだけ塞ぐ。
+       判定は `lib/navigation/reserved-destinations.ts` (テスト済み)。
+
+       写真があるカテゴリを先に並べる (#9)。
        写真の無いカテゴリは `ActionTile` が 1 行に畳むので、混ざった順のままだと
        写真タイルと 1 行タイルが市松に並んで段がガタつく。写真つきを前に寄せると
        上段が写真・下段が一覧という素直な並びになり、SP で先頭 3 枚を出す
-       (下の `TOP_CATEGORY_COUNT_SP`) 判断とも噛み合う。 */
-    const collections = (await getCollections(TOP_CATEGORY_COUNT))
+       (下の `TOP_CATEGORY_COUNT_SP`) 判断とも噛み合う。
+
+       絞り込みは **取得件数の上限を掛ける前** に行う。後ろでやると、落とした
+       ぶんだけタイルが減る (6 件取って 1 件落とすと 5 件しか出ない)。 */
+    const collections = excludeReservedTitles(
+      await getCollections(TOP_CATEGORY_COUNT + RESERVED_DESTINATION_KEYS.length),
+      RESERVED_DESTINATION_KEYS.map((key) => tCommon(key)),
+    )
       .slice(0, TOP_CATEGORY_COUNT)
       .sort((a, b) => Number(Boolean(b.image?.url)) - Number(Boolean(a.image?.url)));
     if (collections.length === 0) return null;

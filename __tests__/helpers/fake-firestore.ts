@@ -111,14 +111,29 @@ export function createFakeFirestore(seed: Seed = {}, hooks: FakeFirestoreHooks =
   const store = new Map<string, Map<string, DocData>>();
   let counter = 0;
 
-  /* 往復の観測。`operations` は総往復数、`maxInFlight` は同時に開いていた
-     往復の最大数（1 なら完全に直列だったということ）。 */
-  const stats = { operations: 0, maxInFlight: 0 };
+  /* 往復の観測。
+       `operations`  総往復数
+       `maxInFlight` 同時に開いていた往復の最大数（1 なら完全に直列）
+       `waves`       **直列に並んだ段数**（下記） */
+  const stats = { operations: 0, maxInFlight: 0, waves: 0 };
   let inFlight = 0;
 
   /** 1 往復ぶんの「行って帰ってくる」を挟む。すべての非同期 API がこれを通る。 */
   async function roundTrip<T>(run: () => T): Promise<T> {
     stats.operations += 1;
+    /* 走っている往復がゼロの状態から 1 本目が開くたびに 1 段。つまり
+       「前の往復が返ってこないと次を投げられない」箇所の数を数えている。
+       本番の待ち時間は往復の**総数**ではなく、この段数 × 1 往復の時間で決まる
+       （Firestore は asia-northeast1 / 関数は iad1 で 1 往復 170〜200ms）。
+
+       ## なぜ壁時計ではなくこれを数えるのか（QA 指摘 2026-08-25）
+
+       以前この観測は `Date.now()` の差分だった。だが偽物の遅延は実タイマーな
+       ので、機械が他の作業で混んでいると測定値が桁で揺れる。判定が「変更の
+       中身」ではなく「そのとき機械が空いていたか」で決まるテストは、いずれ
+       無視されて意味を失う。段数は**約束の構造そのもの**なので、同じコードなら
+       何度走らせても同じ数になり、直列に戻せば必ず増える。 */
+    if (inFlight === 0) stats.waves += 1;
     inFlight += 1;
     if (inFlight > stats.maxInFlight) stats.maxInFlight = inFlight;
     try {

@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { Suspense } from "react";
 import { getTranslations } from "next-intl/server";
 import { getProducts } from "@/lib/shopify";
 import { Link } from "@/i18n/navigation";
@@ -135,8 +134,6 @@ export default async function SubscriptionLPPage() {
     q: t(`faqQ${n}`),
     a: t(`faqA${n}`),
   }));
-
-  const selectedVariant = detail?.variants[0] ?? null;
 
   return (
     <div data-slot="subscription-lp">
