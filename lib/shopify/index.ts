@@ -1,7 +1,10 @@
 import { shopifyFetch, storefrontConfigured } from "./client";
 import { stripPlaceholderCopy } from "./placeholder-copy";
+import { SEED_ID_PREFIX } from "@/lib/preview-seed";
 import {
   previewSeedStorefrontEnabled,
+  seedCollectionProductHandles,
+  seedCollections,
   seedProductByHandle,
   seedProductCatalogue,
   seedSearchProducts,
@@ -239,6 +242,20 @@ export type CollectionSummary = Omit<Collection, "products"> & {
 };
 
 export async function getCollections(first = 20): Promise<CollectionSummary[]> {
+  if (seededStorefrontActive()) {
+    return seedCollections()
+      .slice(0, first)
+      .map((c) => ({
+        id: `${SEED_ID_PREFIX}collection-${c.handle}`,
+        handle: c.handle,
+        title: c.title,
+        description: c.description,
+        image: null,
+        seo: { title: c.title, description: c.description },
+        hasProducts: c.productHandles.length > 0,
+      }));
+  }
+
   const data = await shopifyFetch<{
     collections: ShopifyConnection<
       Omit<Collection, "products"> & { products?: ShopifyConnection<{ id: string }> }
@@ -266,6 +283,10 @@ export async function getCollectionProductHandles(
   handle: string,
   first = 250,
 ): Promise<string[]> {
+  if (seededStorefrontActive()) {
+    return seedCollectionProductHandles(handle).slice(0, first);
+  }
+
   const data = await shopifyFetch<{
     collection: { products: ShopifyConnection<{ handle: string }> } | null;
   }>({
