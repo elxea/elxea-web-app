@@ -1,18 +1,26 @@
 "use client";
 
-import {
-  createContext,
-  useContext,
-  useOptimistic,
-  useTransition,
-  type ReactNode,
-} from "react";
-import type { Cart } from "@/lib/shopify/types";
+import { createContext, useCallback, useContext, type ReactNode } from "react";
+import type { Cart, CartItem } from "@/lib/shopify/types";
 import { addItem, updateItem, removeItem } from "@/lib/shopify/cart-actions";
-import { cartReducer, type CartAction } from "./cart-reducer";
+import { cartReducer } from "./cart-reducer";
+import { useOptimisticMutation } from "@/lib/interaction/use-optimistic-mutation";
+import type { WriteMode, WriteOutcome } from "@/lib/interaction/write-queue";
 
 /** 書き込みが着地したかどうか。呼び出し側がその場で知らせ分けるために返す。 */
-export type CartWriteOutcome = "ok" | "failed";
+export type CartWriteOutcome = WriteOutcome;
+
+/**
+ * カートへの申し込み。**画面の書き換え方と送り先を 1 つの値にまとめる**。
+ *
+ * `cartReducer` は `type` / `item` / `lineId` / `quantity` だけを見るので、
+ * ここに送信用の項目 (`merchandiseId` など) を足しても楽観更新の規則は変わらない
+ * (構造的に `CartAction` として通る)。
+ */
+type CartInput =
+  | { type: "ADD"; item: CartItem; merchandiseId: string; sellingPlanId?: string }
+  | { type: "UPDATE"; lineId: string; merchandiseId: string; quantity: number }
+  | { type: "REMOVE"; lineId: string };
 
 type CartContextType = {
   cart: Cart | null;
@@ -32,6 +40,30 @@ type CartContextType = {
 
 const CartContext = createContext<CartContextType | null>(null);
 
+/**
+ * 連打をどう捌くか。**送る値の性質で決まる** (`write-queue` の表を参照)。
+ *
+ * - 数量と削除は**絶対量**なので `"latest"`。5 連打しても往復は最大 2 本で、
+ *   最後に送られるのは必ず最新の数量。
+ * - 追加は**加算**なので `"all"`。ここを `"latest"` にすると「カートに追加」を
+ *   3 回押したのに 1 個しか入らない、という取りこぼしになる。
+ */
+function modeFor(input: CartInput): WriteMode {
+  return input.type === "ADD" ? "all" : "latest";
+}
+
+/**
+ * 連打をまとめる単位。
+ *
+ * 同じ行への数量変更と削除は同じ鍵にして直列化する (削除が数量変更を追い越すと、
+ * 消したはずの行が戻ってくる)。追加は変種ごとに 1 本の列にする — カートがまだ
+ * 無いときの `cartCreate` が同時に 2 本走ると、カートが 2 つ出来て片方の商品が
+ * 消えるため。
+ */
+function keyFor(input: CartInput): string {
+  return input.type === "ADD" ? `add:${input.merchandiseId}` : `line:${input.lineId}`;
+}
+
 export function CartProvider({
   children,
   initialCart,
@@ -39,42 +71,43 @@ export function CartProvider({
   children: ReactNode;
   initialCart: Cart | null;
 }) {
-  const [optimisticCart, setOptimisticCart] = useOptimistic(
-    initialCart,
-    cartReducer
-  );
-  const [isPending, startTransition] = useTransition();
+  /**
+   * サーバへ送る。**絶対量 / 加算の区別は `modeFor` 側が持つ**ので、ここは
+   * 申し込みをそのまま対応する Server Action に流すだけ。
+   */
+  const send = useCallback((input: CartInput) => {
+    switch (input.type) {
+      case "ADD":
+        return addItem(input.merchandiseId, input.item.quantity, input.sellingPlanId);
+      case "UPDATE":
+        return updateItem(input.lineId, input.merchandiseId, input.quantity);
+      case "REMOVE":
+        return removeItem(input.lineId);
+    }
+  }, []);
 
   /**
-   * 「先に画面を書き換え、そのあとサーバへ送る」を 1 つの遷移にまとめる。
-   *
-   * `startTransition` は戻り値を返さないので、着地は別の Promise で渡す。
-   * こうしておくと呼び出し側は**押した瞬間に知らせを出し**、ここが `failed` を
-   * 返したときだけ言い直せる — 成功を待ってから知らせる作りだと、1 個目の
-   * 追加では知らせ自体が 8.9 秒遅れて出ていた (監査 P1-1)。
+   * 失敗したときの言い直しは**呼び出し側の画面**が出す (文言が場所ごとに違い、
+   * i18n の辞書も画面側にあるため)。ここは `run` の戻り値で成否を渡すだけに留め、
+   * 共通機構の「黙って戻さない」という約束は各画面が `failed` を見て果たす。
    */
-  function write(
-    optimistic: CartAction,
-    send: () => Promise<unknown>,
-  ): Promise<CartWriteOutcome> {
-    return new Promise<CartWriteOutcome>((resolve) => {
-      startTransition(async () => {
-        setOptimisticCart(optimistic);
-        try {
-          await send();
-          resolve("ok");
-        } catch (e) {
-          console.error("Cart write failed:", e);
-          resolve("failed");
-        }
-      });
-    });
-  }
+  const noop = useCallback(() => {}, []);
 
-  function handleAddToCart(merchandiseId: string, quantity = 1, sellingPlanId?: string) {
-    return write(
-      {
+  const cart = useOptimisticMutation<Cart | null, CartInput>({
+    value: initialCart,
+    reduce: cartReducer,
+    send,
+    keyOf: keyFor,
+    mode: modeFor,
+    onFailure: noop,
+  });
+
+  const addToCart = useCallback(
+    (merchandiseId: string, quantity = 1, sellingPlanId?: string) =>
+      cart.run({
         type: "ADD",
+        merchandiseId,
+        sellingPlanId,
         item: {
           id: `optimistic-${Date.now()}`,
           quantity,
@@ -88,36 +121,32 @@ export function CartProvider({
           cost: { totalAmount: { amount: "0", currencyCode: "JPY" } },
           sellingPlanAllocation: null,
         },
-      },
-      () => addItem(merchandiseId, quantity, sellingPlanId),
-    );
-  }
+      }),
+    [cart],
+  );
 
-  function handleUpdateQuantity(
-    lineId: string,
-    merchandiseId: string,
-    quantity: number
-  ) {
-    return write(
+  const updateQuantity = useCallback(
+    (lineId: string, merchandiseId: string, quantity: number) =>
+      /* 0 は「削除」。画面の書き換えも送り先も削除に寄せる。 */
       quantity === 0
-        ? { type: "REMOVE", lineId }
-        : { type: "UPDATE", lineId, quantity },
-      () => updateItem(lineId, merchandiseId, quantity),
-    );
-  }
+        ? cart.run({ type: "REMOVE", lineId })
+        : cart.run({ type: "UPDATE", lineId, merchandiseId, quantity }),
+    [cart],
+  );
 
-  function handleRemoveFromCart(lineId: string) {
-    return write({ type: "REMOVE", lineId }, () => removeItem(lineId));
-  }
+  const removeFromCart = useCallback(
+    (lineId: string) => cart.run({ type: "REMOVE", lineId }),
+    [cart],
+  );
 
   return (
     <CartContext.Provider
       value={{
-        cart: optimisticCart,
-        isPending,
-        addToCart: handleAddToCart,
-        updateQuantity: handleUpdateQuantity,
-        removeFromCart: handleRemoveFromCart,
+        cart: cart.value,
+        isPending: cart.isPending,
+        addToCart,
+        updateQuantity,
+        removeFromCart,
       }}
     >
       {children}

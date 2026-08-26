@@ -156,11 +156,26 @@ export function FavoriteToggleButton({
      被せない)。アイコンは `aria-hidden`。 */
   const label = isSaved ? labels.saved : labels.add;
 
+  /**
+   * 進行の印を出してよいのは、**まだ状態が分かっていないとき**だけ
+   * (Setaka 実機指摘 2026-08-26)。
+   *
+   * 倉庫 (`client-store`) は押した瞬間に書き換わるので、`state` が分かっている
+   * 場合はその時点で「保存済み」が正しい。それなのに以前はアイコンを往復のあいだ
+   * ずっと `Loader2` に差し替えていたので、**文字は「保存済み」なのに絵は
+   * 「処理中」**という食い違った知らせを出していた。しかも `disabled` で
+   * 押し直せなかった。
+   *
+   * `unknown` (一覧がまだ着いていない / 読めなかった) のときだけは、反転の向きを
+   * 確かめる 1 往復 (実測 335-393ms) を挟むので**本当に何も確定していない**。
+   * 進行の印が要るのはそこだけ。
+   */
+  const showProgress = isPending && state === "unknown";
+
   const common = {
     onClick,
-    /* 無効化するのは書き込み中だけ (二重送信の防止)。読み取りでは絶対に止めない。 */
-    disabled: isPending,
-    /* 押した瞬間から「進んでいる」ことを名乗る (支援技術にも、下の印にも)。 */
+    /* **押せなくしない**。二重送信は `onClick` 冒頭の再入ガードが受け持つので、
+       見た目まで殺す必要がない (殺すと「壊れている」ようにしか見えない)。 */
     "aria-busy": isPending,
     /* 状態が分かっていないときは pressed を名乗らない (未登録と断定できないため)。 */
     "aria-pressed": state === "unknown" ? undefined : isSaved,
@@ -173,7 +188,7 @@ export function FavoriteToggleButton({
   if (appearance === "product") {
     return (
       <Button {...common} variant="outline" size="sm" className={cn("gap-2", className)}>
-        {isPending ? (
+        {showProgress ? (
           <Loader2 aria-hidden="true" className="size-4 animate-spin" />
         ) : (
           <Heart
@@ -198,7 +213,7 @@ export function FavoriteToggleButton({
         aria-label={label}
         className={cn("transition-colors duration-fast", className)}
       >
-        {isPending ? (
+        {showProgress ? (
           <Loader2 aria-hidden="true" className="size-5 animate-spin" />
         ) : (
           <Heart
@@ -230,7 +245,7 @@ export function FavoriteToggleButton({
         className,
       )}
     >
-      {isPending ? (
+      {showProgress ? (
         <Loader2 aria-hidden="true" className="size-4 shrink-0 animate-spin" />
       ) : (
         <Bookmark

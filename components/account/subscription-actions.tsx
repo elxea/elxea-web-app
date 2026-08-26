@@ -214,10 +214,12 @@ export function SubscriptionActions({
             >
               {labels.pauseSubscription}
             </Button>
+            {/* パネルの開け閉めは**サーバに触らない**ので止めない
+                (Setaka 実機指摘 2026-08-26)。以前はスキップや停止の往復中に
+                ここまで固まっていたが、開くのはただの表示切り替えである。 */}
             {canChangeFrequency ? (
               <Button
                 variant="outline"
-                disabled={isPending}
                 aria-expanded={openPanel === "frequency"}
                 onClick={() => togglePanel("frequency")}
               >
@@ -226,7 +228,6 @@ export function SubscriptionActions({
             ) : null}
             <Button
               variant="destructive"
-              disabled={isPending}
               aria-expanded={openPanel === "cancel"}
               onClick={() => togglePanel("cancel")}
             >
@@ -271,11 +272,8 @@ export function SubscriptionActions({
             })}
           </SubscriptionActionRow>
           <SubscriptionActionRow>
-            <Button
-              variant="outline"
-              disabled={isPending}
-              onClick={() => setOpenPanel(null)}
-            >
+            {/* 閉じるだけ。往復中でも**必ず引き返せる**ようにしておく。 */}
+            <Button variant="outline" onClick={() => setOpenPanel(null)}>
               {labels.cancel}
             </Button>
           </SubscriptionActionRow>
@@ -293,6 +291,9 @@ export function SubscriptionActions({
         <SubscriptionPanel title={labels.cancelPanelTitle}>
           <SubscriptionPanelBody>{labels.cancelConfirmBody}</SubscriptionPanelBody>
           <SubscriptionActionRow>
+            {/* ここ (実際に解約する) は**押せなくするのが正しい**。二重に送ると
+                契約に二度手を入れることになるので、待たせてでも 1 回に保つ。
+                「押した瞬間に効かせる」対象は、取り消しの利く操作だけ。 */}
             <Button
               variant="destructive"
               disabled={isPending}
@@ -300,11 +301,8 @@ export function SubscriptionActions({
             >
               {labels.confirmCancel}
             </Button>
-            <Button
-              variant="outline"
-              disabled={isPending}
-              onClick={() => setOpenPanel(null)}
-            >
+            {/* 引き返す側は止めない。 */}
+            <Button variant="outline" onClick={() => setOpenPanel(null)}>
               {labels.cancel}
             </Button>
           </SubscriptionActionRow>

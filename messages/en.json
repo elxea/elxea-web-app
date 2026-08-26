@@ -22,6 +22,7 @@
     "viewCart": "View Cart",
     "removedFromCart": "Removed from cart",
     "removeFromCartFailed": "Could not remove from cart. Please try again.",
+    "updateQuantityFailed": "Could not change the quantity. Please try again.",
     "checkout": "Checkout",
     "subtotal": "Subtotal",
     "total": "Total",

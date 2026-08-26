@@ -23,6 +23,18 @@ import { toast } from "sonner";
  *
  * 送信が失敗したときだけ言い直す。ここは楽観更新と同じ約束で、
  * **先に見せて、外れたら直す**。
+ *
+ * ## 押せなくするのをやめた (Setaka 実機指摘 2026-08-26)
+ *
+ * 上の直しを入れてもなお「2 秒かかる」と感じられていた。実測すると、バッジは
+ * **72ms** で動いていたのに、ボタンは押した直後から **2,561ms** のあいだ
+ * `disabled` だった (本番 SP390 / 2026-08-26)。つまり待たせていたのは送信では
+ * なく**受付**で、2 個目を入れようとした指は無言で弾かれていた。
+ *
+ * いまは `disabled` を外し、進行は回転する印と `aria-busy` だけで名乗る。
+ * 2 個ほしい人が 2 回押せば 2 個入る (`addItem` は同じ行があれば数量を足すので、
+ * 続けて押しても数が壊れない)。**在庫切れのときだけ**は押せないままにする —
+ * あれは「進行中」ではなく「そもそも買えない」という別の意味だから。
  */
 export function AddToCartButton({
   merchandiseId,
@@ -69,7 +81,6 @@ export function AddToCartButton({
           toast.error(t("addToCartFailed"));
         }
       }}
-      disabled={isPending}
       aria-busy={isPending}
       className="relative w-full h-12 border border-foreground bg-foreground text-background text-[14px] font-medium hover:bg-transparent hover:text-foreground transition-colors disabled:opacity-50"
     >
