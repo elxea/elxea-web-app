@@ -41,6 +41,17 @@
  * 憲章 Wave 1 では同じ検討の結果セレクタ 1 本で足りたので自作していない。ここは
  * 足りないので自作する。
  *
+ * ■ 「報告した」を名前だけで信じない (敵対検証 2026-08-27 の指摘)
+ *
+ * 呼び出しの**名前**だけで判定すると、その場で作った同名の入れ物でルールを
+ * 黙らせられる — `const logger = console` と書けば `logger.error(e)` が通る。
+ * 通るのに届かないので、このルールが止めたい状態そのものになる。よって
+ * `logger` / `Sentry` / `captureException` は **`@/lib/log` か `@sentry/nextjs`
+ * から import された名前**でなければ数えない。`report*` ヘルパは、import された
+ * ものに加えて「本物の報告先を import しているファイルの中で定義されたもの」
+ * まで認める (`lib/line/linkage-status.ts` のように、同じファイルに報告を
+ * まとめる書き方は実在する正しい形なので)。
+ *
  * ■ まだ見ていないもの (次の wave の的・**先に書いておく**)
  *
  * 網は `catch` 節だけを見る。同じ握り潰しは他の形でも書けるので、この網を
@@ -94,8 +105,23 @@ const GRANDFATHERED = new Map([
 const REPORTING_MEMBERS = new Set(["captureException", "captureMessage"]);
 
 /** `lib/log` のレベル。`warn` / `info` は「残した」に数えない (届かないため)。 */
-const LOGGER_OBJECTS = new Set(["logger", "log"]);
 const LOGGER_REPORTING_LEVELS = new Set(["error", "fatal"]);
+
+/**
+ * 「本物の報告先」とみなす import 元。
+ *
+ * 名前だけで判定すると、その場で作った同名の入れ物で**ルールを黙らせられる**。
+ *
+ *   const logger = console;              // ← これで logger.error(e) が通ってしまう
+ *   const logger = { error() {} };       // ← 何もしない入れ物でも通ってしまう
+ *
+ * どちらも「届かない記録」なので、このルールが止めたい状態そのものである。
+ * よって**その名前が import 由来かどうか**まで見る (敵対検証の指摘 2026-08-27)。
+ */
+const REPORTING_MODULES = new Set(["@/lib/log", "@sentry/nextjs"]);
+
+/** Wave 0 から使っている報告ヘルパの命名 (`reportLoadFailure` など)。 */
+const REPORT_HELPER = /^report[A-Z]/;
 
 /** 失敗が答えである場所の明示。理由の記述を必須にする。 */
 const EXPECTED_FAILURE = /expected-failure:\s*\S/;
@@ -117,27 +143,50 @@ const FUNCTION_TYPES = new Set([
   "ArrowFunctionExpression",
 ]);
 
-function isReportingCall(node) {
+/**
+ * この呼び出しは「調査できる形に残した」と数えてよいか。
+ *
+ * @param node       CallExpression
+ * @param reporters  import 由来と確認できた報告先の名前
+ */
+function isReportingCall(node, reporters) {
   const callee = node.callee;
 
   if (callee.type === "Identifier") {
-    // `captureException(...)` (named import) と `reportLoadFailure(...)` 系。
-    return REPORTING_MEMBERS.has(callee.name) || /^report[A-Z]/.test(callee.name);
+    // `captureException(...)` / `reportLoadFailure(...)` — import されたものだけ。
+    return reporters.has(callee.name);
   }
 
   if (callee.type !== "MemberExpression" || callee.computed) return false;
   const property = callee.property;
   if (property.type !== "Identifier") return false;
 
-  // `Sentry.captureException(...)` — 受け側の名前は問わない (import 別名を許す)。
+  const object = callee.object;
+  if (object.type !== "Identifier" || !reporters.has(object.name)) return false;
+
+  // `Sentry.captureException(...)`
   if (REPORTING_MEMBERS.has(property.name)) return true;
 
-  // `logger.error(...)` — lib/log の出口。`console.error` は**含めない**。
-  const object = callee.object;
+  // `logger.error(...)` — lib/log の出口。`console.error` も `logger.warn` も含めない。
+  return LOGGER_REPORTING_LEVELS.has(property.name);
+}
+
+/**
+ * 例外を呼び出し元へ返す書き方。`throw` と同じ意味を持つので通す。
+ *
+ * `async` 関数の中では `return Promise.reject(err)` と `throw err` は同じで、
+ * 素直に書く人がいる。拒否すると「正しいのに直させられる」ことになるので
+ * 認める (敵対検証の指摘 2026-08-27)。
+ */
+function isRejection(node) {
+  const callee = node.callee;
   return (
-    object.type === "Identifier" &&
-    LOGGER_OBJECTS.has(object.name) &&
-    LOGGER_REPORTING_LEVELS.has(property.name)
+    callee.type === "MemberExpression" &&
+    !callee.computed &&
+    callee.object.type === "Identifier" &&
+    callee.object.name === "Promise" &&
+    callee.property.type === "Identifier" &&
+    callee.property.name === "reject"
   );
 }
 
@@ -166,57 +215,125 @@ const rule = {
     const source = context.sourceCode ?? context.getSourceCode();
     const allowed = GRANDFATHERED.get(filename) ?? 0;
 
-    /** 握り潰していると判定した catch 節。ファイルを読み終わってから件数で捌く。 */
+    /**
+     * import 由来と確認できた報告先の名前。
+     *
+     * `import` は本文より先に書かれるのが普通だが、順序に依存する作りにすると
+     * 「たまたま下に書いた」だけで判定が変わる。**ファイルを読み終わってから**
+     * まとめて判定する。
+     */
+    const reporters = new Set();
+
+    /** このファイルが本物の報告先を import しているか。 */
+    let hasReportingImport = false;
+
+    /** 判定待ちの catch 節。 */
+    const pending = [];
+
+    /** 握り潰していると判定した catch 節。 */
     const silent = [];
 
-    return {
-      CatchClause(node) {
-        const body = node.body;
+    function isSilent(node) {
+      let handled = false;
 
+      /* catch 節の中を歩く。関数の入れ子に入ったら `throw` は数えない
+         (呼び出し元へ伝わらないため) が、報告の呼び出しは数える。 */
+      const walk = (current, insideNestedFunction) => {
+        if (handled || current === null || typeof current !== "object") return;
+
+        if (Array.isArray(current)) {
+          for (const child of current) walk(child, insideNestedFunction);
+          return;
+        }
+
+        if (typeof current.type !== "string") return;
+
+        if (!insideNestedFunction && current.type === "ThrowStatement") {
+          handled = true;
+          return;
+        }
+
+        if (
+          current.type === "CallExpression" &&
+          (isReportingCall(current, reporters) ||
+            (!insideNestedFunction && isRejection(current)))
+        ) {
+          handled = true;
+          return;
+        }
+
+        // 内側の catch は自分で判定されるので、ここでは中身を見ない。
+        if (current.type === "CatchClause" && current !== node) return;
+
+        const nested = insideNestedFunction || FUNCTION_TYPES.has(current.type);
+        for (const key of Object.keys(current)) {
+          if (key === "parent") continue;
+          walk(current[key], nested);
+        }
+      };
+
+      walk(node.body, false);
+      return !handled;
+    }
+
+    return {
+      ImportDeclaration(node) {
+        const from = node.source.value;
+        if (typeof from !== "string") return;
+
+        if (REPORTING_MODULES.has(from)) hasReportingImport = true;
+
+        for (const specifier of node.specifiers) {
+          const local = specifier.local?.name;
+          if (!local) continue;
+
+          /* `@/lib/log` / `@sentry/nextjs` から来た名前は本物の報告先。 */
+          if (REPORTING_MODULES.has(from)) {
+            reporters.add(local);
+            continue;
+          }
+
+          /* `reportLoadFailure` 系は Wave 0 のヘルパ。どこから来てもよい。 */
+          if (REPORT_HELPER.test(local)) reporters.add(local);
+        }
+      },
+
+      CatchClause(node) {
         // `expected-failure:` の明示があれば、その場で終わり (理由が差分に残る)。
-        const comments = source.getCommentsInside(body);
+        const comments = source.getCommentsInside(node.body);
         if (comments.some((comment) => EXPECTED_FAILURE.test(comment.value))) return;
 
-        let handled = false;
-
-        /* catch 節の中を歩く。関数の入れ子に入ったら `throw` は数えない
-           (呼び出し元へ伝わらないため) が、報告の呼び出しは数える。 */
-        const walk = (current, insideNestedFunction) => {
-          if (handled || current === null || typeof current !== "object") return;
-
-          if (Array.isArray(current)) {
-            for (const child of current) walk(child, insideNestedFunction);
-            return;
-          }
-
-          if (typeof current.type !== "string") return;
-
-          if (!insideNestedFunction && current.type === "ThrowStatement") {
-            handled = true;
-            return;
-          }
-
-          if (current.type === "CallExpression" && isReportingCall(current)) {
-            handled = true;
-            return;
-          }
-
-          // 内側の catch は自分で判定されるので、ここでは中身を見ない。
-          if (current.type === "CatchClause" && current !== node) return;
-
-          const nested = insideNestedFunction || FUNCTION_TYPES.has(current.type);
-          for (const key of Object.keys(current)) {
-            if (key === "parent") continue;
-            walk(current[key], nested);
-          }
-        };
-
-        walk(body, false);
-
-        if (!handled) silent.push(node);
+        pending.push(node);
       },
 
       "Program:exit"(programNode) {
+        /* 同じファイルの中で報告をまとめている形 (`reportLinkageReadFailure` /
+           `reportFailure` など) は実在する正しい書き方なので通す。ただし
+           **そのファイルが本物の報告先を import している**ことを条件にする。
+           何も import していないファイルの `reportX` は、名前だけそれらしい
+           空の関数でありうるため。 */
+        if (hasReportingImport) {
+          for (const statement of programNode.body) {
+            if (statement.type === "FunctionDeclaration" && statement.id) {
+              if (REPORT_HELPER.test(statement.id.name)) reporters.add(statement.id.name);
+              continue;
+            }
+            if (statement.type !== "VariableDeclaration") continue;
+            for (const declarator of statement.declarations) {
+              if (
+                declarator.id.type === "Identifier" &&
+                REPORT_HELPER.test(declarator.id.name)
+              ) {
+                reporters.add(declarator.id.name);
+              }
+            }
+          }
+        }
+
+        for (const node of pending) {
+          if (isSilent(node)) silent.push(node);
+        }
+
         if (silent.length > allowed) {
           /* 例外表の枠を超えた分だけを報告する。どれを直しても数は合うので、
              「新しく足した 1 件」を特定させる必要はない。 */

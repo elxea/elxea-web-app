@@ -136,19 +136,28 @@ describe("ルールが判定を間違えない", () => {
 
   it("Sentry に載せる catch は通る", () => {
     expect(
-      lint(`function f() { try { a(); } catch (e) { Sentry.captureException(e); return null; } }`),
+      lint(
+        `import * as Sentry from "@sentry/nextjs";\n` +
+          `function f() { try { a(); } catch (e) { Sentry.captureException(e); return null; } }`,
+      ),
     ).toHaveLength(0);
   });
 
   it("共通 logger の error に載せる catch は通る", () => {
     expect(
-      lint(`function f() { try { a(); } catch (e) { logger.error("shopify.x.failed", e); return null; } }`),
+      lint(
+        `import { logger } from "@/lib/log";\n` +
+          `function f() { try { a(); } catch (e) { logger.error("shopify.x.failed", e); return null; } }`,
+      ),
     ).toHaveLength(0);
   });
 
   it("Wave 0 の報告ヘルパ (report*) に載せる catch は通る", () => {
     expect(
-      lint(`function f() { try { a(); } catch (e) { reportLoadFailure("customer", e); return null; } }`),
+      lint(
+        `import { reportLoadFailure } from "@/lib/shopify/load-result";\n` +
+          `function f() { try { a(); } catch (e) { reportLoadFailure("customer", e); return null; } }`,
+      ),
     ).toHaveLength(0);
   });
 
@@ -157,9 +166,63 @@ describe("ルールが判定を間違えない", () => {
   it("logger.warn に落として静かにする逃げ道は塞がれている", () => {
     /* `warn` は Sentry に載らない。載らないものを「残した」と数えると、
        ルールを通したまま無音に戻せてしまう。 */
-    const messages = lint(`try { a(); } catch (e) { logger.warn("shopify.x", { e }); }`);
+    const messages = lint(
+      `import { logger } from "@/lib/log";\n` +
+        `try { a(); } catch (e) { logger.warn("shopify.x", { e }); }`,
+    );
     expect(messages).toHaveLength(1);
     expect(messages[0].messageId).toBe("silent");
+  });
+
+  it("その場で作った偽の logger では黙らせられない (敵対検証 2026-08-27)", () => {
+    /* `const logger = console` や `{ error() {} }` で名前だけ揃えると、
+       名前で判定するルールは通ってしまう。どちらも「届かない記録」なので、
+       このルールが止めたい状態そのもの。import 由来かどうかまで見る。 */
+    const fake = `
+      const logger = console;
+      function f() { try { a(); } catch (e) { logger.error("shopify.x.failed", e); return null; } }
+    `;
+    expect(lint(fake)).toHaveLength(1);
+
+    const noop = `
+      const logger = { error() {} };
+      function f() { try { a(); } catch (e) { logger.error("shopify.x.failed", e); return null; } }
+    `;
+    expect(lint(noop)).toHaveLength(1);
+  });
+
+  it("名前だけ report で中身が空の関数も黙らせられない", () => {
+    const fake = `
+      function reportNothing() {}
+      function f() { try { a(); } catch (e) { reportNothing(e); return null; } }
+    `;
+    expect(lint(fake)).toHaveLength(1);
+  });
+
+  it("import した logger なら通る", () => {
+    const real = `
+      import { logger } from "@/lib/log";
+      function f() { try { a(); } catch (e) { logger.error("shopify.x.failed", e); return null; } }
+    `;
+    expect(lint(real)).toHaveLength(0);
+  });
+
+  it("同じファイルにまとめた報告ヘルパは通る (実在する正しい書き方)", () => {
+    /* lib/line/linkage-status.ts / lib/shopify/next-billing-date.ts の形。
+       Sentry を import しているファイルの report* ヘルパは本物とみなす。 */
+    const real = `
+      import * as Sentry from "@sentry/nextjs";
+      function reportLinkageReadFailure(kind) { Sentry.captureException(new Error(kind)); }
+      function f() { try { a(); } catch (e) { reportLinkageReadFailure("forward"); return null; } }
+    `;
+    expect(lint(real)).toHaveLength(0);
+  });
+
+  it("Promise.reject で返すのは投げ直しと同じなので通る", () => {
+    /* async の中では throw と同義。拒否すると「正しいのに直させられる」。 */
+    expect(
+      lint(`function f() { try { a(); } catch (e) { return Promise.reject(e); } }`),
+    ).toHaveLength(0);
   });
 
   it("入れ子の関数の中の throw は「投げ直した」に数えない", () => {
