@@ -375,7 +375,14 @@ async function CategoriesSection() {
        絞り込みは **取得件数の上限を掛ける前** に行う。後ろでやると、落とした
        ぶんだけタイルが減る (6 件取って 1 件落とすと 5 件しか出ない)。 */
     const collections = excludeReservedTitles(
-      await getCollections(TOP_CATEGORY_COUNT + RESERVED_DESTINATION_KEYS.length),
+      /* 中身が空のコレクションは落とす (通しテスト E-3 / 2026-08-27)。本番の
+         18 件のうち商品が所属しているのは 6 件だけで、トップに出ていた
+         「お茶のコレクション」(`single-item`) は 0 件だった。押しても何も
+         絞り込まれないタイルは、入口ではなく行き止まりである。
+
+         落とす前提で取得件数を増やす (6 + 予約名 では足りない)。判定は
+         `getCollections` が返す `hasProducts` — 呼び出し側で件数を推測しない。 */
+      (await getCollections(50)).filter((c) => c.hasProducts),
       RESERVED_DESTINATION_KEYS.map((key) => tCommon(key)),
     )
       .slice(0, TOP_CATEGORY_COUNT)
@@ -398,10 +405,11 @@ async function CategoriesSection() {
             <ActionTile
               key={collection.handle}
               /* コレクション詳細 (/collections/[handle]) は 2026-08-14 に廃止。
-                 着地先は商品一覧のカテゴリ絞り込みに一本化する。絞り込みの軸は
-                 Shopify の productType なのでコレクション名を渡す。商品一覧側は
-                 未知の category を「すべて」に落とすので、名前が productType と
-                 一致しないコレクションでも 404 や 0 件にはならない。 */
+                 着地先は商品一覧の絞り込みに一本化し、コレクション名を渡す。
+                 商品一覧側は productType で拾えない名前を**コレクションの所属**
+                 で絞る (`lib/shopify/category-filter.ts`)。以前は未知の名前を
+                 黙って「すべて」に落としていたため、アソートセット / 定期便の
+                 タイルを押しても 12 件が全部出ていた (通しテスト E-3)。 */
               href={`/products?category=${encodeURIComponent(collection.title)}`}
               image={collection.image?.url}
               imageAlt={collection.image?.altText || collection.title}

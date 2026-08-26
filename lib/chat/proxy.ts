@@ -41,14 +41,12 @@ export interface ProxyAuth {
  *   無視し匿名扱いになる (= verifiedCustomerId を転送しても意味がないので付けない)。
  */
 export async function buildProxyAuth(): Promise<ProxyAuth> {
-  let verifiedCustomerId: string | null = null;
-  try {
-    const customer = await getCustomerFromSession();
-    verifiedCustomerId = customer?.id ?? null;
-  } catch {
-    // 認証エラーは匿名フォールバック (正常系: 未ログインは常に null)
-    verifiedCustomerId = null;
-  }
+  /* 3 値で受ける。「未ログイン」も「判定できなかった」も転送する ID は無い
+     (= 匿名) ので**挙動は同じ**だが、後者は既に Sentry に記録済みで、
+     「なぜこの会話が匿名だったのか」を事後に追える。以前の catch は
+     握り潰していたので、障害中に会話が顧客へ紐付かなくなっても痕跡が無かった。 */
+  const result = await getCustomerFromSession();
+  const verifiedCustomerId = result.ok ? (result.data?.id ?? null) : null;
 
   const secret = env("SYNC_API_SECRET");
   const headers: Record<string, string> = {};

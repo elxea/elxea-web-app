@@ -13,6 +13,12 @@ import {
 import { env, isTest } from "@/lib/config";
 
 import { SHOPIFY_API_VERSION } from "./api-version";
+import {
+  loadFailed,
+  loaded,
+  reportLoadFailure,
+  type LoadResult,
+} from "./load-result";
 import { reportSubscriptionFailure } from "./subscription-failure";
 
 const CLIENT_ID = env("SHOPIFY_CUSTOMER_ACCOUNT_CLIENT_ID") ?? "";
@@ -429,18 +435,42 @@ function gidNumericSuffix(gid: string): string | null {
  * Verify that `subscriptionContractId` belongs to the customer authenticated by
  * `accessToken`.
  *
- * Fail-closed by construction: every path that is not an explicit, matching
- * contract id returns `false` — transport failure, GraphQL error, null contract,
- * malformed GID, or an id that does not match what we asked for. A caller that
- * cannot prove ownership must be treated exactly like a caller that does not own
- * the contract.
+ * **Fail-closed は一切緩めていない。** 所有が積極的に証明できない限り操作は通らない。
+ * 変えたのは返り値の形だけで、判定そのものは以前と 1 対 1 に対応する。
+ *
+ * ## なぜ boolean をやめたか (設計憲章 R1 / R4)
+ *
+ * 以前は 3 つの全く違う事実がすべて `false` に潰れていた:
+ *
+ *   1. 他人の契約だった / 存在しない  … **答えが出ている**
+ *   2. Shopify が落ちていて確かめられなかった … **答えが出ていない**
+ *   3. GraphQL がエラーを返した … 同上
+ *
+ * 潰れていること自体は安全側だが、**運用が成立しない**。呼び出し側
+ * (`subscription-actions.ts`) は `false` を受けて `NOT_AUTHORIZED` を投げ、
+ * それが Sentry に上がる。つまり Sentry には「Subscription not found or not
+ * accessible」だけが並び、**本物の不正アクセスと Shopify の一時障害が同じ 1 行**に
+ * なる。どちらが起きているか事後にも分からないので、アラートを引くことができない。
+ * 一方で生の失敗理由 (`console.error` のみ) はどこにも集約されていなかった。
+ *
+ * 返り値:
+ *
+ *   - `{ ok: true, data: true }`  … 所有を証明できた
+ *   - `{ ok: true, data: false }` … 所有していないと**確定した** (不正・打ち間違い)
+ *   - `{ ok: false, reason }`     … **確かめられなかった** (Shopify 側の問題)
+ *
+ * 呼び出し側は後ろ 2 つをどちらも「操作させない」に落とす (fail-closed は不変) が、
+ * 記録と顧客向け文言は分けられる。顧客に返す文字列は従来どおり同一の一般化文言で、
+ * どの契約 ID が存在するかを探れないようにしてある。
  */
 export async function verifySubscriptionContractOwnership(
   accessToken: string,
   subscriptionContractId: string
-): Promise<boolean> {
-  if (!accessToken) return false;
-  if (!isSubscriptionContractGid(subscriptionContractId)) return false;
+): Promise<LoadResult<boolean>> {
+  /* 引数の時点で確定する不成立。外部に問い合わせていないので「確かめられなかった」
+     ではなく「所有していない」である。 */
+  if (!accessToken) return loaded(false);
+  if (!isSubscriptionContractGid(subscriptionContractId)) return loaded(false);
 
   let json: {
     data?: { customer?: { subscriptionContract?: { id?: string } | null } | null };
@@ -462,35 +492,46 @@ export async function verifySubscriptionContractOwnership(
     });
 
     if (!res.ok) {
-      console.error(
-        "[verifySubscriptionContractOwnership] Customer API error:",
-        res.status
+      reportLoadFailure(
+        "verifySubscriptionContractOwnership:http",
+        new Error(`Customer API responded ${res.status}`),
+        { status: res.status, impact: "所有者照合ができず操作を拒否した" },
       );
-      return false;
+      return loadFailed("upstream-unavailable");
     }
 
     json = await res.json();
   } catch (e) {
-    console.error("[verifySubscriptionContractOwnership] request failed:", e);
-    return false;
+    reportLoadFailure("verifySubscriptionContractOwnership:transport", e, {
+      impact: "所有者照合ができず操作を拒否した",
+    });
+    return loadFailed("upstream-unavailable");
   }
 
   if (json.errors && json.errors.length > 0) {
-    console.error(
-      "[verifySubscriptionContractOwnership] GraphQL errors:",
-      JSON.stringify(json.errors)
+    /* GraphQL のエラー本文は Sentry にだけ残す。顧客 ID やストアの内部状態を
+       含みうるので、呼び出し側へは reason しか渡さない。 */
+    reportLoadFailure(
+      "verifySubscriptionContractOwnership:graphql",
+      new Error("Customer API returned GraphQL errors"),
+      {
+        errors: JSON.stringify(json.errors),
+        impact: "所有者照合ができず操作を拒否した",
+      },
     );
-    return false;
+    return loadFailed("upstream-unavailable");
   }
 
+  /* ここから先は Shopify が正常に答えた。契約が返らない = その顧客のものではない
+     という**確定した答え**なので `ok: true, data: false`。 */
   const returnedId = json.data?.customer?.subscriptionContract?.id;
-  if (!returnedId) return false;
+  if (!returnedId) return loaded(false);
 
   // Compare on the numeric suffix so an equivalent-but-differently-formatted
   // GID from Shopify still matches, while a different contract never does.
   const requested = gidNumericSuffix(subscriptionContractId);
   const returned = gidNumericSuffix(returnedId);
-  return requested !== null && requested === returned;
+  return loaded(requested !== null && requested === returned);
 }
 
 export type UpcomingBillingCycle = {

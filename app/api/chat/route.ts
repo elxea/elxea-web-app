@@ -11,8 +11,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { CX_AGENT_BASE_URL, buildProxyAuth, clientIpForwardHeaders } from "@/lib/chat/proxy";
 
-// cookies() でセッション参照 + SSE 中継のため Node ランタイム・動的レンダリング固定
-export const runtime = "nodejs";
+/* cookies() でセッションを参照し SSE を中継するため動的レンダリング固定。
+   ランタイム指定は書かない — Route Handler の既定が nodejs なので
+   `export const runtime = "nodejs"` は既定の再宣言でしかなく、
+   「ここだけ特別な指定がある」という誤読を生む。 */
 export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {

@@ -233,6 +233,63 @@ export function seedProductCatalogue(): Product[] {
   return SEED_SPECS.map(buildProduct);
 }
 
+/**
+ * 見本のコレクション。
+ *
+ * ## なぜ要るか (通しテスト E-3 / 2026-08-27)
+ *
+ * トップの分類タイルと商品一覧の絞り込みは **コレクション**を通る導線を持つ
+ * (`?category=<コレクション名>`)。ところが見本カタログは商品しか持たなかった
+ * ので、資格情報の無い環境ではタイルが 1 枚も出ず、「押したら絞り込まれる」の
+ * 検査が対象なしで素通りしていた。商品だけ見本にしても、**商品とコレクションの
+ * 対応**という肝心の部分は確かめられない。
+ *
+ * ## 3 件が何を代表しているか
+ *
+ * 本番で起きていた 3 つの形をそのまま持つ (実測 2026-08-27):
+ *   - `seed-assortment` … productType をまたぐ (どの productType とも一致しない)。
+ *     旧実装が黙って「すべて」に落としていた形。
+ *   - `seed-sencha` … productType と同名。チップ経由と同じ結果に着地すべき形。
+ *   - `seed-empty` … 中身が 0 件。タイルにも一覧にも出してはいけない形。
+ */
+export type SeedCollection = {
+  handle: string;
+  title: string;
+  description: string;
+  /** 所属商品の handle。空配列 = 中身の無いコレクション。 */
+  productHandles: string[];
+};
+
+const SEED_COLLECTIONS: SeedCollection[] = [
+  {
+    handle: "seed-assortment",
+    title: "見本の詰め合わせ",
+    description: "種類をまたいで選んだ見本の詰め合わせ。",
+    productHandles: ["seed-sencha-asagiri", "seed-hojicha-yuhi", "seed-wakoucha-akane"],
+  },
+  {
+    handle: "seed-sencha",
+    title: "煎茶",
+    description: "見本の煎茶。",
+    productHandles: ["seed-sencha-asagiri", "seed-sencha-tsuyukusa", "seed-sencha-kagerou"],
+  },
+  {
+    handle: "seed-empty",
+    title: "見本の空コレクション",
+    description: "枠だけ作って中身が入っていないコレクション。",
+    productHandles: [],
+  },
+];
+
+export function seedCollections(): SeedCollection[] {
+  return SEED_COLLECTIONS;
+}
+
+/** handle 一致の所属商品。未知の handle は空配列。 */
+export function seedCollectionProductHandles(handle: string): string[] {
+  return SEED_COLLECTIONS.find((c) => c.handle === handle)?.productHandles ?? [];
+}
+
 /** handle 一致の 1 件。未知の handle は `null` (= 呼び出し側で `notFound()`)。 */
 export function seedProductByHandle(handle: string): Product | null {
   return seedProductCatalogue().find((p) => p.handle === handle) ?? null;

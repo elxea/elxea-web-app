@@ -10,6 +10,12 @@ import {
 
 import { buildSessionCookieWrites } from "./session-cookies";
 import {
+  loadFailed,
+  loaded,
+  reportLoadFailure,
+  type LoadResult,
+} from "./load-result";
+import {
   decryptToken,
   refreshAccessToken,
   encryptToken,
@@ -77,9 +83,28 @@ type Session = {
  * 実体を走らせ、残りはその結果を共有する。リクエストの外 (テスト・スクリプト) では
  * メモ化されず素通しになるため、呼び出し側の意味は変わらない。
  */
-export const getSession: () => Promise<Session | null> = cache(loadSession);
+export const getSession: () => Promise<Session | null> = cache(async () => {
+  const result = await getSessionResult();
+  return result.ok ? result.data : null;
+});
 
-async function loadSession(): Promise<Session | null> {
+/**
+ * `getSession()` と同じ解決を行い、**「セッションが無い」と「判定できなかった」を
+ * 分けて**返す (設計憲章 R1)。
+ *
+ * `getSession()` は `Session | null` のままにしてある。呼び出し側の大半 (Server
+ * Action の `getAccessToken()` など) にとって両者の扱いは同じ ——「続行できない」——
+ * なので、そこに分岐を増やしても嘘が減らないからである。分ける意味があるのは
+ * **画面に状態を出す経路**だけで、それが下の 2 つのローダーにあたる。
+ *
+ * メモ化はこちら側に置く。`getSession()` はこれを呼ぶだけなので、どちらの入口から
+ * 何回呼んでも実体は 1 リクエスト 1 回のまま
+ * (`__tests__/session-request-dedup.test.ts` が守っている契約は保たれる)。
+ */
+export const getSessionResult: () => Promise<LoadResult<Session | null>> =
+  cache(loadSessionResult);
+
+async function loadSessionResult(): Promise<LoadResult<Session | null>> {
   const cookieStore = await cookies();
   const atEnc = cookieStore.get(ACCESS_TOKEN_COOKIE)?.value;
   const rtEnc = cookieStore.get(REFRESH_TOKEN_COOKIE)?.value;
@@ -87,9 +112,19 @@ async function loadSession(): Promise<Session | null> {
 
   /* 生存判定は refresh token ただ 1 つ。access token が無い / 期限切れなのは
      「ログインが切れた」ではなく「取り直せばよい」状態。 */
-  if (!rtEnc) return null;
+  if (!rtEnc) return loaded(null);
+
   const refreshToken = decryptToken(rtEnc);
-  if (!refreshToken) return null;
+  if (!refreshToken) {
+    /* cookie はあるのに復号できない。顧客にとっての結末は「ログインし直し」で
+       変わらないが、**原因はこちら側にある** — SESSION_SECRET のローテーション、
+       あるいは暗号文の破損。まとまった数が出たら事故なので、静かに
+       ログアウト扱いにせず必ず記録に残す。 */
+    reportLoadFailure("getSession:decrypt", new Error("refresh token decrypt failed"), {
+      impact: "顧客は再ログインを求められる (セッション自体は生きていた可能性がある)",
+    });
+    return loadFailed("credentials-unreadable");
+  }
 
   const accessToken = atEnc ? decryptToken(atEnc) : null;
   /* `shop_exp` が読めないときは「切れている」に倒す。推測で使い回さない
@@ -99,21 +134,38 @@ async function loadSession(): Promise<Session | null> {
 
   const needsRefresh = !accessToken || Date.now() >= expiresAt - 60_000;
   if (!needsRefresh) {
-    return { accessToken: accessToken!, refreshToken, expiresAt };
+    return loaded({ accessToken: accessToken!, refreshToken, expiresAt });
   }
 
   try {
     const tokens = await refreshAccessToken(refreshToken);
-    const session: Session = {
+    await persistSession(tokens.access_token, tokens.refresh_token, tokens.expires_in);
+    return loaded({
       accessToken: tokens.access_token,
       refreshToken: tokens.refresh_token,
       expiresAt: Date.now() + tokens.expires_in * 1000,
-    };
-    await persistSession(tokens.access_token, tokens.refresh_token, tokens.expires_in);
-    return session;
-  } catch {
-    /* refresh token も通らない = 本当にログインが切れている。 */
-    return null;
+    });
+  } catch (e) {
+    /* ここが**最も高くつく取り違え**だった。
+     *
+     * 以前はこの catch が黙って `null` を返し、コメントは「refresh token も
+     * 通らない = 本当にログインが切れている」と断定していた。実際にはここには
+     * 2 つの事実が流れ込む:
+     *
+     *   - refresh token が本当に失効した (= ログアウトが正しい)
+     *   - Shopify のトークンエンドポイントが落ちている / タイムアウトした
+     *
+     * 後者を前者として扱うと、**Shopify の一時障害が全顧客の一斉ログアウトに
+     * 化ける**。しかも 30 日有効な refresh token は cookie に残ったままなので、
+     * 障害が明ければそのまま通る — つまり顧客を追い出す必要は最初から無かった。
+     *
+     * `getSession()` (互換の入口) は従来どおり `null` を返すので、続行できない
+     * 経路の挙動は 1 ミリも変えていない。変えたのは「なぜ続行できないか」を
+     * 画面と Sentry に渡せるようにしたことだけ。 */
+    reportLoadFailure("getSession:refresh", e, {
+      impact: "以前は「ログアウト」として描画されていた (アラートなし)",
+    });
+    return loadFailed("upstream-unavailable");
   }
 }
 
@@ -147,33 +199,64 @@ export async function isAuthenticated(): Promise<boolean> {
  *
  * 顧客の取得は Shopify Customer Account API への往復なので、1 枚の画面で 2 回呼ぶと
  * そのまま 2 往復になる。値はリクエストの中で変わらないため、共有して差し支えない。
+ *
+ * ## 返り値が 3 値なのはなぜか (設計憲章 R1)
+ *
+ * 以前は `Customer | null` で、`null` が **「ログインしていない」と「Shopify から
+ * 答えが返らなかった」の両方**を意味していた。しかも catch は `console.error` を
+ * 1 行吐くだけで、アラートには一切繋がっていなかった。結果として Shopify の
+ * 一時障害は「顧客が黙ってログアウトさせられる」という形で表に出て、こちらは気付けない。
+ *
+ *   - `{ ok: true, data: null }`     … 確定的に未ログイン。ログイン導線を出してよい
+ *   - `{ ok: true, data: Customer }` … ログイン中
+ *   - `{ ok: false, reason }`        … **判定できなかった**。ログイン導線を出しては
+ *                                       いけない (ログイン済みの人を追い出すため)
  */
-export const getCustomerFromSession: () => Promise<Customer | null> =
+export const getCustomerFromSession: () => Promise<LoadResult<Customer | null>> =
   cache(loadCustomerFromSession);
 
-async function loadCustomerFromSession(): Promise<Customer | null> {
+async function loadCustomerFromSession(): Promise<LoadResult<Customer | null>> {
+  const session = await getSessionResult();
+  /* 判定不能はそのまま素通しする。原因は `getSessionResult` 側で記録済みなので、
+     ここで二重に Sentry へ送らない。 */
+  if (!session.ok) return session;
+  if (!session.data) return loaded(null);
+
   try {
-    const session = await getSession();
-    if (!session) return null;
-    return await getCustomer(session.accessToken);
+    return loaded(await getCustomer(session.data.accessToken));
   } catch (e) {
-    console.error("getCustomerFromSession error:", e);
-    return null;
+    reportLoadFailure("getCustomerFromSession", e, {
+      impact: "以前は「未ログイン」として描画されていた (アラートなし)",
+    });
+    return loadFailed("upstream-unavailable");
   }
 }
 
-/** 定期便契約。理由は `getCustomerFromSession` と同じ (1 リクエスト 1 往復)。 */
-export const getSubscriptionsFromSession: () => Promise<SubscriptionContract[]> =
-  cache(loadSubscriptionsFromSession);
+/**
+ * 定期便契約。理由は `getCustomerFromSession` と同じ (1 リクエスト 1 往復・3 値)。
+ *
+ * ここでの `[]` の取り違えは顧客への影響が特に大きい。**「定期便を契約していない」と
+ * 「契約は引けなかった」が同じ空配列**だったので、Shopify が詰まった日には
+ * 契約中の顧客に「まだ定期便のご契約はありません」と表示していた。
+ */
+export const getSubscriptionsFromSession: () => Promise<
+  LoadResult<SubscriptionContract[]>
+> = cache(loadSubscriptionsFromSession);
 
-async function loadSubscriptionsFromSession(): Promise<SubscriptionContract[]> {
+async function loadSubscriptionsFromSession(): Promise<
+  LoadResult<SubscriptionContract[]>
+> {
+  const session = await getSessionResult();
+  if (!session.ok) return session;
+  if (!session.data) return loaded([]);
+
   try {
-    const session = await getSession();
-    if (!session) return [];
-    return await getSubscriptionContracts(session.accessToken);
+    return loaded(await getSubscriptionContracts(session.data.accessToken));
   } catch (e) {
-    console.error("getSubscriptionsFromSession error:", e);
-    return [];
+    reportLoadFailure("getSubscriptionsFromSession", e, {
+      impact: "以前は「契約 0 件」として描画されていた (アラートなし)",
+    });
+    return loadFailed("upstream-unavailable");
   }
 }
 
@@ -182,15 +265,37 @@ async function loadSubscriptionsFromSession(): Promise<SubscriptionContract[]> {
  * Priority: tags (explicit) > subscription status (implicit).
  * Tags: "member-premium" → premium, "member-standard" or "member" → standard.
  * Fallback: any active subscription contract → standard.
+ *
+ * ## ここは 3 値化していない (意図的・Wave 0 の範囲外)
+ *
+ * 失敗時に `"none"` を返すのは、**会員限定コンテンツを守る側に倒している** ——
+ * 判定できないときに開けてしまうと、有料コンテンツをそのまま配ることになる。
+ * 逆に言えば Shopify が落ちている間、会費を払っている人が締め出される。
+ * どちらに倒すかは商品判断であって実装判断ではないので、**挙動は変えない**。
+ *
+ * 変えたのは可視性だけ: 以前は `console.error` 1 行で、締め出しが起きても
+ * 誰にも分からなかった。いまは Sentry に上がるので「障害中に何人が会員扱いを
+ * 失ったか」を数えられる。3 値化して画面を出し分けるかどうかは、その数字を
+ * 見てから決める (呼び出し側は `journal/[slug]` と `events/[slug]` の 2 か所)。
  */
 export async function getMembershipTier(): Promise<MembershipTier> {
   try {
-    const session = await getSession();
-    if (!session) return "none";
+    const session = await getSessionResult();
+    if (!session.ok) {
+      /* 判定不能。原因は `getSessionResult` 側で記録済み。ここでは「会員資格を
+         判定できないまま none に倒した」という**別の事実**を残す — 上の記録は
+         セッションの話で、こちらは会員限定コンテンツが閉じた話。 */
+      reportLoadFailure("getMembershipTier:session", new Error(session.reason), {
+        impact: "会員限定コンテンツが閉じた (課金中の会員が締め出された可能性)",
+      });
+      return "none";
+    }
+    if (!session.data) return "none";
+    const { accessToken } = session.data;
 
     const [customer, contracts] = await Promise.all([
-      getCustomer(session.accessToken),
-      getSubscriptionContracts(session.accessToken),
+      getCustomer(accessToken),
+      getSubscriptionContracts(accessToken),
     ]);
 
     // Check tags first (set by Shopify Flow)
@@ -205,7 +310,9 @@ export async function getMembershipTier(): Promise<MembershipTier> {
 
     return "none";
   } catch (e) {
-    console.error("getMembershipTier error:", e);
+    reportLoadFailure("getMembershipTier", e, {
+      impact: "会員限定コンテンツが閉じた (課金中の会員が締め出された可能性)",
+    });
     return "none";
   }
 }

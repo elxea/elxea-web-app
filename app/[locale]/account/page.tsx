@@ -196,6 +196,49 @@ function AccountLoginPrompt({
 }
 
 /**
+ * 「今は判定できない」画面 (設計憲章 R1)。
+ *
+ * `AccountLoginPrompt` と**別に置いてある**のが要点。見た目は似ているが言っている
+ * ことが違う — あちらは「あなたはログインしていない」、こちらは「こちらの都合で
+ * 確かめられなかった」。前者を後者に使うと、ログイン済みの人に無意味な再ログインを
+ * 指示することになる (しかも直らない)。
+ *
+ * 再試行は同じ URL への素のリンク。Server Component なので `reset()` は使えないが、
+ * 再訪すればもう一度 Shopify を引き直すので、実質は同じことができる。
+ * ログイン導線も残す — 本当に期限切れだった場合の逃げ道として。
+ */
+function AccountUnavailablePrompt({
+  title,
+  body,
+  retryLabel,
+  loginLabel,
+  locale,
+}: {
+  title: string;
+  body: string;
+  retryLabel: string;
+  loginLabel: string;
+  locale: string;
+}) {
+  return (
+    <div className="flex min-h-[70vh] items-center justify-center px-4 py-24">
+      <div className="max-w-sm text-center">
+        <h1 className="page-title mb-4 text-foreground">{title}</h1>
+        <p className={cn(captionClass, "mb-8 text-muted-foreground")}>{body}</p>
+        <div className="flex justify-center gap-4">
+          <Button variant="outline" asChild>
+            <a href={`/${locale}/account`}>{retryLabel}</a>
+          </Button>
+          <Button variant="outline" asChild>
+            <a href={`/${locale}/login`}>{loginLabel}</a>
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
  * マイページの中身。**外部往復はすべてここから下**にある。
  * 判定・描画の中身は従来と 1 行も変えていない (置き場所だけを Suspense の内側に移した)。
  */
@@ -208,12 +251,14 @@ async function AccountBody({
   const tCommon = await getTranslations("common");
   const locale = await getLocale();
 
-  let customer: Customer | null = null;
-  try {
-    customer = await getCustomerFromSession();
-  } catch {
-    // fall through — LINE セッションの有無を下で見る
-  }
+  /* 3 値で受ける (設計憲章 R1)。以前はここが try/catch で、Shopify が答えなかった
+     ときも `customer = null` に潰れていた。下の `isSignedIn` 判定は null を
+     「Shopify ログインなし」と読むので、**Shopify の一時障害がそのまま
+     「ログインしてください」画面**になっていた — ログイン済みの人を追い返す形で。 */
+  const customerResult = await getCustomerFromSession();
+  const customer: Customer | null = customerResult.ok ? customerResult.data : null;
+  /** 顧客を引けなかった (= 未ログインだと**断定できない**)。 */
+  const shopifyUndetermined = !customerResult.ok;
 
   /* 計測用の見本 (PREVIEW_SEED=1 のときだけ)。実セッションがあるときは呼ばない
      ので、実データを見本で上書きすることはない。フラグ未設定なら null。 */
@@ -238,6 +283,25 @@ async function AccountBody({
   };
 
   if (!isSignedIn(auth)) {
+    /* 「ログインしていない」と「判定できなかった」で出す画面を分ける。
+     *
+     * 判定できなかった人に `loginRequired` を出すのが以前の割れ方だった。
+     * その人は cookie を持っている (`middleware.ts` の /account ガードを
+     * 通ってここまで来ている) ので、ログインし直しても同じ画面に戻る —
+     * 直せない指示を出していたことになる。時間を置けば直るのだから、
+     * そう言うべきである。 */
+    if (shopifyUndetermined) {
+      return (
+        <AccountUnavailablePrompt
+          title={tCommon("account")}
+          body={t("networkError")}
+          retryLabel={tCommon("retry")}
+          loginLabel={tCommon("login")}
+          locale={locale}
+        />
+      );
+    }
+
     return (
       <AccountLoginPrompt
         title={tCommon("account")}
@@ -627,16 +691,23 @@ function getLineDisplayName(cookieValue: string | undefined): string | null {
   }
 }
 
-/** 実データ (Shopify + Firestore) からマイページの描画モデルを組む。 */
+/**
+ * 実データ (Shopify + Firestore) からマイページの描画モデルを組む。
+ *
+ * 定期便が引けなかったときも `[]` で組む点は従来どおり (画面の骨格を壊さない) が、
+ * **理由は握り潰さない**。以前の `.catch(() => [])` は catch の中で何もしないので、
+ * 契約中の顧客に「予定なし」と表示していてもサーバー側に痕跡が残らなかった。
+ * いまは `getSubscriptionsFromSession` が Sentry に送るので、後から数えられる。
+ */
 async function loadAccountView(customer: Customer): Promise<AccountView> {
-  const [subscriptions, activity] = await Promise.all([
-    getSubscriptionsFromSession().catch(() => []),
+  const [subscriptionsResult, activity] = await Promise.all([
+    getSubscriptionsFromSession(),
     loadActivity(),
   ]);
 
   return buildAccountView({
     customer,
-    subscriptions,
+    subscriptions: subscriptionsResult.ok ? subscriptionsResult.data : [],
     events: activity.events,
   });
 }

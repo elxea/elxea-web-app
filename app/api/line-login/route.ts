@@ -3,10 +3,13 @@ import { cookies } from "next/headers";
 import crypto from "crypto";
 import { getBaseUrl, getRequestHostname, isTrustedAuthHost } from "@/lib/base-url";
 import { getCookieSpec, isSecure, resolveCookieDomain } from "@/lib/auth/cookies";
-import { env } from "@/lib/config";
 import { wantsAutoLoginDisabled } from "@/lib/line/auto-login";
 import { lineAuthBaseUrl } from "@/lib/line/endpoints";
-import { loginBotPrompt, loginScopeParam } from "@/lib/line/login-channel";
+import {
+  loginBotPrompt,
+  loginScopeParam,
+  resolveLoginChannelId,
+} from "@/lib/line/login-channel";
 import { reportChannelNamespace } from "@/lib/line/login-channel-report";
 
 /**
@@ -45,7 +48,23 @@ export async function GET(request: NextRequest) {
       { status: 503 },
     );
   }
-  const channelId = env("AUTH_LINE_ID");
+  /* 読み方は `resolveLoginChannelId()` に寄せる。生の `process.env.AUTH_LINE_ID` は
+   * 読まない。
+   *
+   * `lib/line/login-channel.ts` はこの 2 本を読む唯一の入口として書かれているのに、
+   * 認可 URL を組む 2 経路 (ここと `/init`) だけが生読みのまま残っていた。差は trim
+   * ひとつだが、`vercel env add NAME production < file` で入れた値は末尾の改行まで
+   * 保存されるので、生読みの経路だけが `client_id=...\n` を認可 URL に載せる。
+   *
+   * そのとき壊れ方は沈黙する: token 交換をする `/api/line-callback` と
+   * `/api/health/line` は既に同じ helper 経由で trim 済みの値を使うため、
+   * **ヘルスチェックは緑のままログインだけが落ちる**。2026-08-25 の本番障害が
+   * まさにこれ (`AUTH_LINE_SECRET` 不一致で token 交換が全滅)。
+   *
+   * ⚠ ここで読むのはログイン用の `AUTH_LINE_ID` である。連携 (LIFF) 側の
+   *   `LINE_LIFF_CHANNEL_ID` とは**別のチャネルを指す別の env** であり、
+   *   「揃える」ために片方をもう片方へ置き換えてはならない。 */
+  const channelId = resolveLoginChannelId();
   if (!channelId) {
     // Same rationale as /api/line-login/init: unconfigured, not broken.
     return NextResponse.json({ error: "auth_not_configured" }, { status: 503 });
