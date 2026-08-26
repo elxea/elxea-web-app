@@ -37,12 +37,24 @@ Admin REST APIで既存インデックスと突き合わせ、**不足分だけ*
 上記スクリプトは **アプリが既に持っているサービスアカウント**でREST APIを直接
 叩くので、新しい認証情報も新しい依存も要らない。
 
-## 現状 (2026-08-12): 作成は権限不足でブロック中
+## 現状 (2026-08-26再確認): 作成は権限不足でブロック中
 
 | 操作 | 状態 |
 |---|---|
 | 一覧取得 (`datastore.indexes.list`) | [OK] サービスアカウントで成功 |
 | 作成 (`datastore.indexes.create`) | [FAIL] HTTP 403 PERMISSION_DENIED |
+
+2026-08-26に再実行して403が続いていることを確認した。あわせて、この手順が
+そもそも実行できない状態だった3点を修正済み (これらは権限とは別の穴だった)。
+
+| 直した箇所 | 何が壊れていたか |
+|---|---|
+| `package.json` | `deploy:indexes` / `deploy:indexes:dry` が未定義で、本ドキュメントと `lib/journal/popular-articles.ts` が案内するコマンドが存在しなかった |
+| `lib/firebase/admin.ts` | `decodePrivateKey` が未exportで、スクリプトが起動時に `is not a function` で落ちていた |
+| `firestore.indexes.json` | 「人気の記事」が必要とする `behaviorLog` の **COLLECTION_GROUP** 定義が欠けていた (COLLECTION版しか無く、`collectionGroup()` クエリを救えない) |
+
+したがって **残る障害はIAMのロール付与1点のみ**。付与されれば
+`pnpm deploy:indexes` の1コマンドで6件が反映される。
 
 つまり **差分の検出まではできるが、反映はできない**。`elxea-ec` の
 `firebase-adminsdk-fbsvc@elxea-ec.iam.gserviceaccount.com` に索引作成権限が付いて
@@ -71,9 +83,26 @@ Admin REST APIで既存インデックスと突き合わせ、**不足分だけ*
    firebase deploy --only firestore:indexes
    ```
 
-### 反映が必要な未作成インデックス (2026-08-12実測 / 9件中6件が未反映)
+#### エージェントが代行できない理由 (2026-08-26に実地確認)
 
-`pnpm deploy:indexes:dry` の出力。定義9件のうち本番に存在するのは3件だけだった。
+1も2も **owner本人しか実行できない**。自動化の経路は両方とも塞がっている。
+
+| 経路 | 結果 |
+|---|---|
+| gcloud CLI (`setaka-on@elxea.com`) | 再認証待ちで `cannot prompt during non-interactive execution` |
+| GCPコンソール (ブラウザ自動操作) | パスワードは通るが、2段階認証がデバイス通知 (本人のiPhone/iPad) に到達して停止 |
+
+ブラウザ経路では代替手段としてSMSとバックアップコードも提示されるが、SMSは本人の
+端末、バックアップコードはBitwardenに未登録のため、いずれも代行できない。
+
+**したがってロール付与はSetaka本人の手作業が必要**。上記1のコマンドを
+`setaka-on@elxea.com` でログイン済みの端末で1回実行すれば、以後は
+`pnpm deploy:indexes` がエージェント・CIから通るようになる (この作業は一度きり)。
+
+### 反映が必要な未作成インデックス (2026-08-26実測 / 9件中6件が未反映)
+
+`pnpm deploy:indexes:dry` の出力。定義9件のうち本番に存在するのは3件だけ
+(`comments` 1件 + `favorites` 2件) で、2026-08-12から変化していない。
 
 | collectionGroup | scope | fields | 影響 |
 |---|---|---|---|
