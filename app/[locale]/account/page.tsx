@@ -37,6 +37,11 @@ import {
   type FavoriteGroup,
 } from "@/lib/account-favorites";
 import {
+  COOKIE_NAME,
+  hasLineSessionCookies,
+  readSessionMirror,
+} from "@/lib/auth/cookies";
+import {
   ACCOUNT_SECTION_ORDER,
   canRenderAccountShell,
   isAvailable,
@@ -139,10 +144,18 @@ export default async function AccountPage({
   const cookieStore = await cookies();
 
   /* middleware の /account ガードと同じ cookie・同じ条件。ここを通っても
-     「ログイン済み」と断定はしない (下の AccountBody が実データで確定する)。 */
-  const hasShopifySession =
-    cookieStore.has("shop_at") && cookieStore.has("shop_rt");
-  const hasLineSession = cookieStore.has("line_session");
+     「ログイン済み」と断定はしない (下の AccountBody が実データで確定する)。
+
+     Wave 4 まで、この註釈は**事実ではなかった**。ここは
+     `shop_at && shop_rt` を要求していて、middleware (`hasShopifySessionCookies`)
+     は `shop_rt` だけを見ていた。`shop_at` はアクセストークンの寿命 (数時間) で
+     消えるので、30 日の `shop_rt` を持ったまま `shop_at` が切れた人は
+     **門は通るのにマイページだけ「ログインが必要です」に落ちる**。as-is D-1 で
+     middleware 側を直したときに、こちらが取り残されていた。
+
+     同じ関数を呼ぶことで、註釈が主張していた同一性を構造として持たせる。 */
+  const { shopify: hasShopifySession, line: hasLineSession } =
+    readSessionMirror((name) => cookieStore.has(name));
 
   /* 計測用の見本 (PREVIEW_SEED=1 のときだけ) は実セッションを持たないので、
      cookie が 1 つも無くても骨格を出す必要がある。 */
@@ -279,7 +292,7 @@ async function AccountBody({
    * 表示名は取れたときだけ出し、取れなければ名前の行を省く。 */
   const auth: AccountAuth = {
     shopify: Boolean(customer || seeded),
-    line: cookieStore.has("line_session"),
+    line: hasLineSessionCookies((name) => cookieStore.has(name)),
   };
 
   if (!isSignedIn(auth)) {
@@ -343,7 +356,9 @@ async function AccountBody({
     ? loadAccountView(customer)
     : seeded
       ? Promise.resolve(seeded)
-      : loadLineOnlyAccountView(getLineDisplayName(cookieStore.get("line_user")?.value));
+      : loadLineOnlyAccountView(
+          getLineDisplayName(cookieStore.get(COOKIE_NAME.lineUser)?.value),
+        );
 
   const [view, lineLinkage] = await Promise.all([viewPromise, linkagePromise]);
 

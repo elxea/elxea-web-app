@@ -30,8 +30,10 @@
  *   クッキーに入る（従来の `shop_cv` と同じ保護レベル）。ログには出さない。
  */
 
+import { COOKIE_NAME } from "@/lib/auth/cookie-names";
+
 /** 進行中の認証をまとめて入れるクッキー名。 */
-export const PENDING_AUTH_COOKIE = "shop_oauth";
+export const PENDING_AUTH_COOKIE = COOKIE_NAME.shopPendingOauth;
 
 /** 1 回のログイン試行を覚えておく時間（従来の shop_cv と同じ 10 分）。 */
 export const PENDING_AUTH_TTL_MS = 10 * 60 * 1000;

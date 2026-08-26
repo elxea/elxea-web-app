@@ -24,7 +24,9 @@
  * `__tests__/chat-session-cookie.test.ts` で退行を検知できるようにするため。
  */
 
-export const CHAT_SESSION_COOKIE = "chat_session_id";
+import { COOKIE_NAME } from "@/lib/auth/cookie-names";
+
+export const CHAT_SESSION_COOKIE = COOKIE_NAME.chatSessionId;
 
 /** identity linking の往復に足りる最短の寿命 (秒)。長く残す価値がない。 */
 export const CHAT_SESSION_COOKIE_MAX_AGE = 300;

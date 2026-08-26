@@ -129,6 +129,26 @@ function parseFile(abs: string): ts.SourceFile {
 type Finding = { file: string; line: number; detail: string };
 
 /**
+ * `COOKIE_NAME.lineSession` の形 — 識別子 1 つに、プロパティ 1 つ。
+ *
+ * `ts.isPropertyAccessExpression` だけで判定してはいけない。**光学的に同じ形の
+ * 別物**が通ってしまう:
+ *
+ *   cookieStore.get(COOKIE_NAME.chatSessionId)?.value
+ *
+ * これも最外側は property access (`.value`) なので `isPropertyAccessExpression`
+ * は true を返す。素直に追うと解決対象が `value` になり、リポジトリのどこかにある
+ * 無関係な `value` を拾って **まったく別の文字列を cookie 名として報告する**。
+ * 実際 Wave 4 でこれを踏み、`chat_session_id` を `"all"` と解決した
+ * (`lib/consent.ts` の値を掴んでいた)。
+ *
+ * レジストリ参照は必ず `識別子.プロパティ` の 2 段なので、そこに限定する。
+ */
+function isRegistryLookup(node: ts.Node): node is ts.PropertyAccessExpression {
+  return ts.isPropertyAccessExpression(node) && ts.isIdentifier(node.expression);
+}
+
+/**
  * Resolve a cookie-name expression to a literal.
  *
  * Handles string literals, template literals with no substitutions, and
@@ -177,7 +197,7 @@ function resolveName(node: ts.Node, sf: ts.SourceFile): string | null {
       ts.isIdentifier(n.name) &&
       n.name.text === targetName &&
       n.initializer &&
-      ts.isPropertyAccessExpression(n.initializer)
+      isRegistryLookup(n.initializer)
     ) {
       found = resolveName(n.initializer, sf);
       return;
@@ -214,6 +234,26 @@ function resolveName(node: ts.Node, sf: ts.SourceFile): string | null {
         ts.isStringLiteralLike(n.initializer)
       ) {
         hit = n.initializer.text;
+        return;
+      }
+      /* `export const PENDING_AUTH_COOKIE = COOKIE_NAME.shopPendingOauth`
+       *
+       * 同じモジュール内の解決 (上) には最初からあった 1 ホップが、**import 経由の
+       * 解決にだけ無かった**。Wave 4 で名前をレジストリへ寄せるまで、モジュール境界を
+       * 跨ぐ別名の初期化子は必ず文字列リテラルだったので露見していなかった。
+       *
+       * 無いままだと `lib/shopify/oauth-state.ts` の別名を使っている
+       * `app/api/auth/callback/route.ts` の set が「解決できない名前」として報告され、
+       * 同時にレジストリ側の `shop_oauth` が「誰も使っていない」と報告される。
+       * どちらもスキャナが 1 ホップ足りないだけで、rogue cookie ではない。 */
+      if (
+        ts.isVariableDeclaration(n) &&
+        ts.isIdentifier(n.name) &&
+        n.name.text === targetName &&
+        n.initializer &&
+        isRegistryLookup(n.initializer)
+      ) {
+        hit = resolveName(n.initializer, otherSf);
         return;
       }
       if (

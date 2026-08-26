@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import createMiddleware from "next-intl/middleware";
-import { hasShopifySessionCookies } from "./lib/auth/cookies";
+import {
+  COOKIE_NAME,
+  readSessionMirror,
+  hasShopifySessionCookies,
+} from "./lib/auth/cookies";
 import { env } from "./lib/config";
 import { routing } from "./i18n/routing";
 import { defaultLocale, disabledLocales } from "./i18n/config";
@@ -112,7 +116,7 @@ async function checkSitePassword(request: NextRequest): Promise<NextResponse | n
     return IS_VERCEL_PREVIEW ? previewMisconfiguredResponse() : null;
   }
 
-  const authCookie = request.cookies.get("site_auth")?.value;
+  const authCookie = request.cookies.get(COOKIE_NAME.siteAuth)?.value;
   if (authCookie) {
     const expectedHash = await hashSitePasswordEdge(SITE_PASSWORD);
     if (authCookie === expectedHash) return null;
@@ -234,10 +238,8 @@ export default async function middleware(request: NextRequest) {
      * アクセストークンの寿命で消えるので、30 日のリフレッシュトークンを持って
      * いる人まで数時間でログイン画面へ弾かれていた (as-is D-1)。判定が 2 か所に
      * あると、片方だけ直して「サーバは通すのに門だけ閉まる」状態になる。 */
-    const hasShopifySession = hasShopifySessionCookies((name) =>
-      request.cookies.has(name),
-    );
-    const hasLineSession = request.cookies.has("line_session");
+    const { shopify: hasShopifySession, line: hasLineSession } =
+      readSessionMirror((name) => request.cookies.has(name));
     if (!hasShopifySession && !hasLineSession) {
       // P3-fix: Redirect to /login (not Shopify OAuth) so LINE users can choose their login method
       const locale = accountMatch[1];

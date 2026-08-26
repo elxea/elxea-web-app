@@ -303,6 +303,51 @@ const eslintConfig = [
       ],
     },
   },
+
+  // 憲章 R5/R8「cookie の名前は 1 表から引く」の機械強制（2026-08-27 / Wave 4）:
+  //   `cookies.get("shop_at")` のように名前を生で書かない。
+  //   `COOKIE_NAME.shopAccessToken` (lib/auth/cookie-names.ts) から引く。
+  //
+  // なぜ規律ではなく lint なのか: レジストリは 2026-08-18 の logout 事故
+  //   (`Domain=.elxea.com` で発行した cookie を host-only で消していたので消えて
+  //   おらず、middleware が生き残った `line_session` で /account を通し続けた)
+  //   の処方として**既に存在していた**。にもかかわらず着手時点で実際にレジストリを
+  //   通っていたのは 26 本中 13 本で、残り 13 本は呼び出し側に生文字列のまま
+  //   散っていた。装置を足しただけでは再流入が止まらない = 憲章 R8 の失敗型。
+  //
+  // 既存の `__tests__/auth-cookie-registry.test.ts` との違い: あちらは
+  //   「**知らない**名前を set していないか」を見る。知っている名前を生で書くのは
+  //   通す。塞ぐ穴が違うので、両方要る。
+  //
+  // **例外表は 0 件**。着手時点の生文字列は全件移行した。逃げ道は下の `ignores` の
+  //   2 ファイル (= 名前の正本とその利用側) だけで、これは「表を書く場所」なので
+  //   例外ではない。
+  {
+    files: [
+      "app/**/*.ts",
+      "app/**/*.tsx",
+      "components/**/*.ts",
+      "components/**/*.tsx",
+      "lib/**/*.ts",
+      "lib/**/*.tsx",
+      "sanity/**/*.ts",
+      "sanity/**/*.tsx",
+      "middleware.ts",
+    ],
+    ignores: [
+      // 名前の正本 (`@sot cookie-name-registry`)。ここが表そのもの。
+      "lib/auth/cookie-names.ts",
+      // 表を使って Domain を決め、発行し、消す側。生成する `Set-Cookie` の
+      // 文字列テンプレートに名前が現れるので、表と同じ扱いにする。
+      "lib/auth/cookies.ts",
+    ],
+    plugins: {
+      "elxea-tokens": elxeaTokens,
+    },
+    rules: {
+      "elxea-tokens/cookie-name-through-registry": "error",
+    },
+  },
 ];
 
 export default eslintConfig;

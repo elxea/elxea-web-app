@@ -193,7 +193,14 @@ describe("LINE の判定は httpOnly cookie を主軸にする", () => {
   const page = read("app/[locale]/account/page.tsx");
 
   it("line_session だけで判定し、表示名 cookie を認証条件に混ぜない", () => {
-    expect(page).toContain('cookieStore.has("line_session")');
+    /* Wave 4 で判定が共通関数に移った (`lib/auth/cookies.ts`)。以前ここは
+       `cookieStore.has("line_session")` という**生の文字列**を期待していたが、
+       それはこの画面が判定を自前で持っていることを前提にした固定であり、
+       共通化すると必ず落ちる。見たいのは「どの cookie を見ているか」なので、
+       共通判定を通していることを期待する。
+       判定の中身 (`line_session` だけを見る) は
+       `__tests__/session-mirror-parity.test.ts` が関数の側で固定している。 */
+    expect(page).toMatch(/readSessionMirror|hasLineSessionCookies/);
     /* line_user (非 httpOnly) は表示名の取得にのみ使う。認証条件に AND で
        混ぜると、cookie が消えただけでログイン済みの人が締め出される。 */
     expect(page).not.toMatch(/hasLineSession\s*&&\s*lineDisplayName/);

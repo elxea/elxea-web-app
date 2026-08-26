@@ -34,6 +34,8 @@
  * (衝突しにくく安定して速いことだけが要件)。
  */
 
+import { COOKIE_NAME } from "@/lib/auth/cookie-names";
+
 /** 作り置きの鍵の接頭辞。全消しのときの走査にも使う。 */
 export const HISTORY_CACHE_PREFIX = "elxea-chat-history:";
 
@@ -48,7 +50,7 @@ export const HISTORY_CACHE_TTL_MS = 5 * 60 * 1000;
  * 実害が出る配置は今のところ無いが、認証状態の判定を部分一致に委ねる形は残さない。
  */
 export function isSignedInFromCookie(cookieString: string | undefined | null): boolean {
-  return hasFlagCookie(cookieString, "shop_auth");
+  return hasFlagCookie(cookieString, COOKIE_NAME.shopAuthFlag);
 }
 
 /**
@@ -71,7 +73,7 @@ export function isSignedInFromCookie(cookieString: string | undefined | null): b
  * LINE だけの人には効いていなかった。
  */
 export function hasLineAuthFromCookie(cookieString: string | undefined | null): boolean {
-  return hasFlagCookie(cookieString, "line_auth");
+  return hasFlagCookie(cookieString, COOKIE_NAME.lineAuth);
 }
 
 /**

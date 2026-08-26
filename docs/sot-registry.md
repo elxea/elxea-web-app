@@ -12,10 +12,12 @@
 
 | 概念 | 正本の場所 |
 | --- | --- |
+| `button-component` | `components/ui/button.tsx:8` |
 | `cache-tag-registry` | `lib/cache/tags.ts:2` |
+| `cookie-name-registry` | `lib/auth/cookie-names.ts:2` |
 | `env-access` | `lib/config/index.ts:2` |
 | `env-var-registry` | `lib/config/spec.ts:2` |
 | `sanity-read-gateway` | `sanity/lib/fetch.ts:8` |
 | `site-origin` | `lib/site-url.ts:2` |
 
-合計 5 概念。
+合計 7 概念。

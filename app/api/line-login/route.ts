@@ -11,6 +11,7 @@ import {
   resolveLoginChannelId,
 } from "@/lib/line/login-channel";
 import { reportChannelNamespace } from "@/lib/line/login-channel-report";
+import { COOKIE_NAME } from "@/lib/auth/cookie-names";
 
 /**
  * Direct LINE Login OAuth 2.0 redirect endpoint.
@@ -87,9 +88,9 @@ export async function GET(request: NextRequest) {
    * issued here was invisible to a callback arriving on the sibling host.
    * Both routes now go through the same registry-driven scope. */
   const cookieStore = await cookies();
-  const stateSpec = getCookieSpec("line_oauth_state")!;
+  const stateSpec = getCookieSpec(COOKIE_NAME.lineOauthState)!;
   const cookieDomain = resolveCookieDomain(request);
-  cookieStore.set("line_oauth_state", state, {
+  cookieStore.set(COOKIE_NAME.lineOauthState, state, {
     httpOnly: true,
     secure: isSecure(stateSpec),
     sameSite: "lax",
@@ -97,8 +98,8 @@ export async function GET(request: NextRequest) {
     path: "/",
     ...(cookieDomain ? { domain: cookieDomain } : {}),
   });
-  const nonceSpec = getCookieSpec("line_oauth_nonce")!;
-  cookieStore.set("line_oauth_nonce", nonce, {
+  const nonceSpec = getCookieSpec(COOKIE_NAME.lineOauthNonce)!;
+  cookieStore.set(COOKIE_NAME.lineOauthNonce, nonce, {
     httpOnly: true,
     secure: isSecure(nonceSpec),
     sameSite: "lax",

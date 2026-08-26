@@ -3,6 +3,7 @@ import crypto from "crypto";
 import { env } from "@/lib/config";
 import { logger } from "@/lib/log";
 import { encryptToken, decryptToken } from "@/lib/shopify/customer";
+import { COOKIE_NAME } from "@/lib/auth/cookie-names";
 
 /**
  * Web 発 LINE 連携フロー（P2）の state 束縛。
@@ -51,7 +52,7 @@ import { encryptToken, decryptToken } from "@/lib/shopify/customer";
  */
 
 /** state cookie の名前。`lib/auth/cookies.ts` のレジストリにも登録すること（未登録は test で落ちる）。 */
-export const LINE_LINK_STATE_COOKIE = "line_link_state";
+export const LINE_LINK_STATE_COOKIE = COOKIE_NAME.lineLinkState;
 
 /**
  * state の有効期間。LINE 認可の往復に必要な時間だけを与える。

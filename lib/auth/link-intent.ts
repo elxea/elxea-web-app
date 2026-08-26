@@ -35,9 +35,10 @@
  * `lib/line/link-flow.ts` の state 封緘と同じ判断。
  */
 import { encryptToken, decryptToken } from "@/lib/shopify/customer";
+import { COOKIE_NAME } from "@/lib/auth/cookie-names";
 
 /** cookie 名。`lib/auth/cookies.ts` のレジストリにも登録すること（未登録は test で落ちる）。 */
-export const LINK_INTENT_COOKIE = "line_link_intent";
+export const LINK_INTENT_COOKIE = COOKIE_NAME.lineLinkIntent;
 
 /**
  * 意思の有効期間。

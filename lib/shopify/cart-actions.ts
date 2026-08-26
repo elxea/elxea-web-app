@@ -9,8 +9,9 @@ import {
   updateCart,
   removeFromCart,
 } from "@/lib/shopify";
+import { COOKIE_NAME } from "@/lib/auth/cookie-names";
 
-const CART_COOKIE = "shopify_cart_id";
+const CART_COOKIE = COOKIE_NAME.shopifyCartId;
 
 async function getCartId(): Promise<string | undefined> {
   const cookieStore = await cookies();

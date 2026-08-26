@@ -6,6 +6,17 @@ import { cn } from "@/lib/utils";
 /**
  * PillButton — Figma `Button / Pill (Module) — elxea/共通` (8171:286)。
  *
+ * ## これは正本ではない (憲章 R5 / 監査 P2・領域 8)
+ *
+ * 押せるものの正本は `@sot button-component` (`components/ui/button.tsx`)。
+ * こちらは**上の Figma 部品の再現専用**で、カテゴリ絞り込みの丸いタグ列など
+ * その部品が指定されている場所でだけ使う。見た目が近いからという理由で
+ * こちらを選ばない (判断規則は正本側に書いてある)。
+ *
+ * variant を持たないのは意図的で、Figma の 8 バリアント (style 2 x state 4) が
+ * そのまま形になっている。汎用の押しどころが要るなら `Button` を使う。
+ *
+
  * Figma が正本。8 バリアント (style 2 x state 4) を 1 部品にまとめる。
  * state は Figma では明示バリアントだが、実装では CSS の擬似クラスに落とす
  * (hover / active / disabled は DOM の状態であって prop ではない)。

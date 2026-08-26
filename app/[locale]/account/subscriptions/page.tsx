@@ -27,6 +27,7 @@ import {
   lockedActionFor,
   type AccountAuth,
 } from "@/lib/account-capabilities";
+import { hasLineSessionCookies } from "@/lib/auth/cookies";
 import { seedSubscriptionContracts } from "@/lib/preview-seed";
 import { getCustomerFromSession, getSubscriptionsFromSession } from "@/lib/shopify/auth";
 import type { SubscriptionContract } from "@/lib/shopify/customer";
@@ -120,9 +121,10 @@ export default async function SubscriptionsPage() {
      * LINE で入り直しても同じ画面に戻る堂々巡りになる。案内を出し分ける。
      *
      * どの認証状態で何が使えるかの正本は `lib/account-capabilities.ts`。 */
+    const cookieStore = await cookies();
     const auth: AccountAuth = {
       shopify: false,
-      line: (await cookies()).has("line_session"),
+      line: hasLineSessionCookies((name) => cookieStore.has(name)),
     };
 
     /* ラベルも行き先もカタログから引く。この画面だけ別の文言・別の行き先を
