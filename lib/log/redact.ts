@@ -68,6 +68,8 @@ export const REDACTED = "[redacted]";
 const MAX_DEPTH = 4;
 const MAX_ARRAY = 20;
 const MAX_STRING = 500;
+/** 1 階層あたりの鍵の上限。生のリクエストを丸ごと詰められても膨らませない。 */
+const MAX_KEYS = 40;
 
 /**
  * 文字列から、形で分かる秘密を落とす。
@@ -109,6 +111,38 @@ export function redact(value: unknown, depth = 0): unknown {
 
   if (value instanceof Date) return value.toISOString();
 
+  /* バイト列は**中身を絶対に展開しない**。`Buffer` は `Uint8Array` なので、
+     素直に「オブジェクト」として鍵を数え上げると `{0:101,1:121,…}` になり、
+     **元のバイト列がそのまま復元できる形で外へ出る**。復号鍵・署名・cookie の
+     生バイトを扱う場所があるので、ここは長さだけ残す。 */
+  if (ArrayBuffer.isView(value)) {
+    return `[binary ${(value as ArrayBufferView).byteLength} bytes]`;
+  }
+  if (value instanceof ArrayBuffer) return `[binary ${value.byteLength} bytes]`;
+
+  /* URL は query に token が乗る。文字列として形の検査を通す。 */
+  if (value instanceof URL) return redactString(value.href);
+
+  /* Map / Set は `Object.entries` では空に見えるため、黙って中身が消える
+     (「詰めたのに記録に無い」= 調査で嘘をつく)。明示的に開く。 */
+  if (value instanceof Map) {
+    const out: Record<string, unknown> = {};
+    let count = 0;
+    for (const [key, item] of value) {
+      if (count >= MAX_KEYS) {
+        out["…"] = `[+${value.size - MAX_KEYS} more]`;
+        break;
+      }
+      const name = String(key);
+      out[name] = isSensitiveKey(name) ? REDACTED : redact(item, depth + 1);
+      count += 1;
+    }
+    return out;
+  }
+  if (value instanceof Set) {
+    return redact([...value].slice(0, MAX_ARRAY), depth);
+  }
+
   if (Array.isArray(value)) {
     const head = value.slice(0, MAX_ARRAY).map((item) => redact(item, depth + 1));
     return value.length > MAX_ARRAY ? [...head, `[+${value.length - MAX_ARRAY} more]`] : head;
@@ -116,9 +150,14 @@ export function redact(value: unknown, depth = 0): unknown {
 
   if (typeof value === "object") {
     const out: Record<string, unknown> = {};
-    for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
-      out[key] =
-        SENSITIVE_KEY.test(key) || NAME_KEY.test(key) ? REDACTED : redact(item, depth + 1);
+    let count = 0;
+    for (const [key, item] of safeEntries(value as Record<string, unknown>)) {
+      if (count >= MAX_KEYS) {
+        out["…"] = "[+more]";
+        break;
+      }
+      out[key] = isSensitiveKey(key) ? REDACTED : redact(item, depth + 1);
+      count += 1;
     }
     return out;
   }
@@ -126,18 +165,57 @@ export function redact(value: unknown, depth = 0): unknown {
   return "[unknown]";
 }
 
+function isSensitiveKey(key: string): boolean {
+  return SENSITIVE_KEY.test(key) || NAME_KEY.test(key);
+}
+
 /**
- * 例外そのものを Sentry に渡すときに、メッセージだけ作り替えた複製を作る。
+ * 鍵と値を取り出す。**getter が投げても記録全体を落とさない**。
+ *
+ * 記録は catch の中から呼ばれるので、ここで投げると呼び出し元の catch を
+ * 素通りする。logger 側にも安全網はあるが、そこで受けると**その 1 件の記録が
+ * まるごと消える**。壊れているのは 1 項目だけだと分かる形で残す。
+ */
+function safeEntries(value: Record<string, unknown>): [string, unknown][] {
+  const out: [string, unknown][] = [];
+  for (const key of Object.keys(value)) {
+    try {
+      out.push([key, value[key]]);
+    } catch {
+      // expected-failure: getter が投げるのは相手方の都合。記録は続ける。
+      out.push([key, "[unreadable]"]);
+    }
+  }
+  return out;
+}
+
+/**
+ * 例外そのものを Sentry に渡すときに、安全な複製を作る。
  *
  * stack はそのまま引き継ぐ (Sentry のまとめ方が stack に依るため)。上流の
  * メッセージに顧客のメールアドレスが入っている実例があるので、メッセージは
  * 必ず通す。
+ *
+ * ⚠ `cause` を必ず辿ること。Sentry は `error.cause` の連鎖を**自分で開いて
+ *   送る**ので、外側のメッセージだけ直しても、`new Error("failed", { cause:
+ *   upstreamError })` の形で内側に残った顧客情報はそのまま外へ出る。
+ *   `fetch` の失敗や SDK の例外はほぼこの形で来るため、ここは机上の穴ではない。
  */
-export function redactError(error: Error): Error {
+export function redactError(error: Error, depth = 0): Error {
   const safeMessage = redactString(error.message);
-  if (safeMessage === error.message) return error;
+  const cause = (error as { cause?: unknown }).cause;
 
-  const copy = new Error(safeMessage);
+  const safeCause =
+    cause === undefined || depth >= MAX_DEPTH
+      ? undefined
+      : cause instanceof Error
+        ? redactError(cause, depth + 1)
+        : redact(cause, depth + 1);
+
+  /* 直すところが 1 つも無いなら、複製せずそのまま返す (stack の忠実さを保つ)。 */
+  if (safeMessage === error.message && safeCause === cause) return error;
+
+  const copy = new Error(safeMessage, safeCause === undefined ? undefined : { cause: safeCause });
   copy.name = error.name;
   copy.stack = error.stack ? redactString(error.stack) : undefined;
   return copy;

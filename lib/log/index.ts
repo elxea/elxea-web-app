@@ -1,6 +1,7 @@
 import * as Sentry from "@sentry/nextjs";
 
 import { redact, redactError } from "./redact";
+import { admit } from "./throttle";
 
 /**
  * 記録の単一経路（設計憲章 Wave 3 / R1 の全域展開）。
@@ -52,6 +53,11 @@ import { redact, redactError } from "./redact";
  * 埋もれるため。したがって lint（`no-silent-catch-at-boundary`）は `error` /
  * `fatal` だけを「調査できる形に残した」と数える。失敗を `warn` に落として
  * 静かにする逃げ道は用意しない。
+ *
+ * 同じ理由で、Sentry への送信は event 名ごとに 1 分 10 件で頭打ちにしてある
+ * （`./throttle`）。壊れた cookie のように**通りすがりの誰でも起こせる**失敗が
+ * あり、素直に全部送ると決済・契約の失敗がその件数に埋もれる。最初の数件は
+ * 必ず送り、伏せた分は件数として次の 1 件に添えるので、第一報も総数も失わない。
  *
  * ## 個人情報
  *
@@ -120,6 +126,12 @@ function emitUnsafe(level: LogLevel, event: string, detail: unknown, context?: L
 
   if (level !== "fatal" && level !== "error") return;
 
+  /* 通りすがりの誰でも起こせる失敗 (壊れた cookie など) が鳴り続けると、
+     決済・契約の失敗が件数に埋もれてアラート全体が見られなくなる。
+     最初の数件は必ず送り、伏せた分は件数として次の 1 件に添える (`./throttle`)。 */
+  const admission = admit(event);
+  if (!admission.allow) return;
+
   Sentry.captureException(toError(event, detail), {
     level,
     tags: { event, area: areaOf(event) },
@@ -127,6 +139,8 @@ function emitUnsafe(level: LogLevel, event: string, detail: unknown, context?: L
       ...safeContext,
       /* Error はそのまま渡してあるので二重に持たない。 */
       detail: detail instanceof Error ? undefined : safeDetail,
+      /* 直前の窓で同じ event を何件伏せたか。0 のときは付けない (雑音になる)。 */
+      suppressedSinceLastReport: admission.suppressed || undefined,
     },
   });
 }

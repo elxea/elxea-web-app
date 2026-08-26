@@ -1,7 +1,7 @@
 import { readFileSync, existsSync } from "node:fs";
 import path from "node:path";
 
-import { Linter } from "eslint";
+import { ESLint, Linter } from "eslint";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 import elxeaTokens from "../eslint-rules/index.mjs";
@@ -32,7 +32,27 @@ function read(relative: string): string {
 /* -------------------------------------------------------------------------- */
 
 describe("握り潰しはビルドで落ちる", () => {
-  const config = read("eslint.config.mjs");
+  /**
+   * **このリポジトリの `eslint.config.mjs` を実際に使って**判定させる。
+   *
+   * 設定ファイルの文字列を照合するだけだと、後ろのブロックで `"off"` に
+   * 上書きしても文字列は残るので素通りする (= テストが装置の存在しか見て
+   * いない)。効いているかどうかは、実際に 1 本 lint させて確かめる。
+   */
+  const eslint = new ESLint({ cwd: ROOT });
+
+  /** 握り潰しの見本。区画を変えて同じものを流し、網の形を測る。 */
+  const SILENT = `export function load() {
+  try { fetchThing(); } catch (e) { console.error("failed", e); return null; }
+}
+`;
+
+  async function severitiesFor(filePath: string, code = SILENT) {
+    const [result] = await eslint.lintText(code, { filePath: path.join(ROOT, filePath) });
+    return result.messages
+      .filter((m) => m.ruleId === "elxea-tokens/no-silent-catch-at-boundary")
+      .map((m) => m.severity);
+  }
 
   it("ルールが plugin に登録されている", () => {
     expect(read("eslint-rules/index.mjs")).toMatch(
@@ -40,21 +60,25 @@ describe("握り潰しはビルドで落ちる", () => {
     );
   });
 
-  it("ルールが error 級で有効になっている (warning ではビルドが通ってしまう)", () => {
-    expect(config).toMatch(/"elxea-tokens\/no-silent-catch-at-boundary":\s*"error"/);
+  it("実際の設定で error (severity 2) として落ちる — warning ではビルドが通ってしまう", async () => {
+    expect(await severitiesFor("lib/shopify/__probe__.ts")).toEqual([2]);
   });
 
-  it("外の世界と話す 4 区画すべてが網に入っている", () => {
+  it("外の世界と話す 4 区画すべてが網に入っている", async () => {
     /* Wave 1 は網が 3 区画しか無く、外にあった 10 件を見落としていた。
-       同じ取りこぼしを繰り返さないため、区画の列挙をテストで固定する。 */
-    for (const area of [
-      '"lib/shopify/**/*.ts"',
-      '"lib/firebase/**/*.ts"',
-      '"lib/line/**/*.ts"',
-      '"app/api/**/*.ts"',
+       同じ取りこぼしを繰り返さないため、区画ごとに実際に落ちることを見る。 */
+    for (const probe of [
+      "lib/shopify/__probe__.ts",
+      "lib/firebase/__probe__.ts",
+      "lib/line/__probe__.ts",
+      "app/api/__probe__/route.ts",
     ]) {
-      expect(config).toContain(area);
+      expect(await severitiesFor(probe), probe).toEqual([2]);
     }
+  });
+
+  it("網の外 (例: lib/sanity) までは広げていない — 対象を狭く始める判断そのもの", async () => {
+    expect(await severitiesFor("lib/sanity/__probe__.ts")).toEqual([]);
   });
 });
 
@@ -393,5 +417,124 @@ describe("記録が失敗しても、呼び出し元の動きを変えない", (
     loop.self = loop;
 
     expect(() => redact(loop)).not.toThrow();
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* QA 指摘の穴 (2026-08-27 敵対検証) を塞いだことの回帰                          */
+/* -------------------------------------------------------------------------- */
+
+describe("記録が個人情報を外へ出す抜け道を塞いである", () => {
+  it("例外の cause 連鎖も辿る (Sentry は cause を自分で開いて送る)", async () => {
+    const { redactError } = await import("@/lib/log/redact");
+
+    const upstream = new Error("Shopify said: no customer someone@example.com");
+    const wrapper = new Error("customer fetch failed", { cause: upstream });
+
+    const safe = redactError(wrapper);
+    const safeCause = (safe as { cause?: Error }).cause;
+
+    expect(safeCause).toBeInstanceOf(Error);
+    expect(safeCause?.message).not.toContain("someone@example.com");
+    /* 元の例外は書き換えない (呼び出し側の動作を記録が変えない)。 */
+    expect(upstream.message).toContain("someone@example.com");
+  });
+
+  it("バイト列を展開しない (Buffer は Uint8Array なので素直に数え上げると復元できる)", async () => {
+    const { redact } = await import("@/lib/log/redact");
+
+    const secret = Buffer.from("session-secret-material");
+    const out = redact({ key: secret, blob: secret }) as Record<string, unknown>;
+
+    /* `key` は鍵の名前で落ちる。`blob` は名前では落ちないので、ここが本丸。 */
+    expect(out.blob).toBe(`[binary ${secret.byteLength} bytes]`);
+    expect(JSON.stringify(out)).not.toContain("115"); // "s" のバイト値
+  });
+
+  it("Map / Set の中身が黙って消えない (詰めたのに記録に無いのは調査での嘘)", async () => {
+    const { redact } = await import("@/lib/log/redact");
+
+    const out = redact({
+      headers: new Map([
+        ["x-request-id", "req_1"],
+        ["authorization", "Bearer xyz"],
+      ]),
+      kinds: new Set(["article", "product"]),
+    }) as Record<string, Record<string, unknown>>;
+
+    expect(out.headers["x-request-id"]).toBe("req_1");
+    expect(out.headers.authorization).toBe("[redacted]");
+    expect(out.kinds).toEqual(["article", "product"]);
+  });
+
+  it("投げる getter があっても、その 1 項目だけが欠ける", async () => {
+    const { redact } = await import("@/lib/log/redact");
+
+    const out = redact({
+      id: "ok",
+      get broken(): string {
+        throw new Error("nope");
+      },
+    }) as Record<string, unknown>;
+
+    expect(out.id).toBe("ok");
+    expect(out.broken).toBe("[unreadable]");
+  });
+});
+
+describe("鳴りすぎて他の失敗を埋めない", () => {
+  beforeEach(async () => {
+    captureException.mockClear();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const { resetThrottle } = await import("@/lib/log/throttle");
+    resetThrottle();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("通りすがりが起こせる同じ失敗は、1 分あたりの上限で頭打ちになる", async () => {
+    /* `decryptToken` は cookie を復号するだけなので、出鱈目な cookie を
+       送りつければ認証を通らないまま何度でも失敗させられる。 */
+    const { logger } = await import("@/lib/log");
+
+    for (let i = 0; i < 200; i += 1) {
+      logger.error("shopify.session.token-decrypt-failed", new Error("bad cookie"));
+    }
+
+    expect(captureException.mock.calls.length).toBeLessThanOrEqual(10);
+    /* 手元のログ (console) は間引かない — 調査の材料は落とさない。 */
+    expect((console.error as unknown as { mock: { calls: unknown[] } }).mock.calls.length).toBe(200);
+  });
+
+  it("最初の 1 件は必ず送る (第一報が遅れない)", async () => {
+    const { logger } = await import("@/lib/log");
+    logger.error("payment.subscription.charge-failed", new Error("boom"));
+    expect(captureException).toHaveBeenCalledTimes(1);
+  });
+
+  it("伏せた件数は失われず、次に送る 1 件に添えられる", async () => {
+    const { admit, resetThrottle } = await import("@/lib/log/throttle");
+    resetThrottle();
+
+    const t0 = 1_000_000;
+    for (let i = 0; i < 50; i += 1) admit("api.x.failed", t0);
+
+    const next = admit("api.x.failed", t0 + 61_000);
+    expect(next.allow).toBe(true);
+    expect(next.suppressed).toBe(40);
+  });
+
+  it("別の event は巻き添えにならない (決済の失敗が cookie の雑音で消えない)", async () => {
+    const { logger } = await import("@/lib/log");
+
+    for (let i = 0; i < 100; i += 1) {
+      logger.error("shopify.session.token-decrypt-failed", new Error("bad cookie"));
+    }
+    captureException.mockClear();
+
+    logger.error("payment.subscription.charge-failed", new Error("boom"));
+    expect(captureException).toHaveBeenCalledTimes(1);
   });
 });
