@@ -54,7 +54,6 @@ import {
   resolveLinkChannelSecret,
 } from "@/lib/line/link-flow";
 
-export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /** 判定を持ち回す時間。監視間隔 (30 分) より十分短い。 */

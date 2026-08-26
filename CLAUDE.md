@@ -50,9 +50,20 @@ pre-commit install --hook-type pre-commit --hook-type pre-push
 
 - Runtime: Next.js 16.2.1 + React 19.2.4 + TypeScript 5.9.3（App Router）
 - Styling: Tailwind CSS v4.2.1 + shadcn/ui（new-york）+ Radix UI + CVA
-- CMS: Sanity.io（コンテンツ）+ Notion（タスク・運用）
-- EC: Shopify Storefront API（ヘッドレス）
-- Auth/DB: Firebase（Firestore + Auth）
+- CMS: Sanity.io v5.18.0 + next-sanity 12.2.1（コンテンツ）+ Notion（タスク・運用）
+  - Next 16と併用できる。かつて「SanityがNext 16に非対応」という制約が設計判断の
+    前提に置かれていたが、**その制約はすでに消滅している**（上記2つの実バージョンが
+    Next 16.2.1上で動作中）。この前提でCache Components等を再検討してよい。
+- EC: Shopify Storefront API（ヘッドレス）+ Shopify Customer Account API（会員・定期便）
+- Auth: **Shopify Customer Account API（OAuth）とLINE Login（OIDC）の2系統**。
+  セッションはcookieで持つ（`lib/auth/cookies.ts` が正本）。
+  - ⚠ **Firebase Authは使っていない**（`firebase/auth` / `firebase-admin/auth` の
+    importはリポジトリ内に1件も無い）。以前ここには「Auth/DB: Firebase（Firestore +
+    Auth）」と書いてあったが誤り。`lib/firebase/auth-guard.ts` という紛らわしい名前の
+    ファイルはあるものの、その中身はShopifyセッション（`getSession`）とLINEセッション
+    （`readVerifiedLineUserIdFrom`）から本人を解決するもので、Firebaseの認証機能とは
+    無関係である。
+- DB: Firebase Firestore（`firebase-admin`）。**Firestoreのみ**を使う。
   - **手元では本番Firestoreに繋がらない**（既定はfail-closed）。`pnpm dev` は止まるので、
     エミュレーター（`pnpm emulator:start` + `pnpm dev:emulator`）か偽Firestore
     （`E2E_FIRESTORE_STUB=1`）を選ぶ。判定の正本は `lib/firebase/firestore-target.ts`、
