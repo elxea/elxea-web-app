@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { getLocale, getTranslations } from "next-intl/server";
 
 import { searchProducts } from "@/lib/shopify";
@@ -14,7 +15,13 @@ import { JournalGrid } from "@/components/journal/journal-list";
 import { MoreRow } from "@/components/catalog/catalog-list";
 import { Link } from "@/i18n/navigation";
 import { SearchForm } from "@/components/search-form";
-import { captionClass, overlineClass } from "@/components/editorial/rule-list";
+import { pillClass } from "@/components/ui/pill-button";
+import {
+  bodySmClass,
+  captionClass,
+  overlineClass,
+} from "@/components/editorial/rule-list";
+import { productTypeLabel } from "@/lib/shopify/product-type";
 import { cn } from "@/lib/utils";
 
 /**
@@ -132,6 +139,18 @@ export default async function SearchPage({
         <SearchForm initialQuery={query} />
       </div>
 
+      {/* まだ何も入力していない画面。以前はここが入力欄 1 つだけで、本文は
+          242 文字しか無かった (監査 #21 / 2026-08-25) — 「何を打てばいいのか」
+          の手がかりがゼロなので、キーワードを持っていない人はそのまま戻る。
+          手がかりは**実データから**組む (固定の「人気キーワード」を焼くと、
+          商品が入れ替わった日に嘘になる)。取得が遅くても入力欄は先に出したい
+          ので Suspense で切り離す。 */}
+      {query ? null : (
+        <Suspense fallback={null}>
+          <SearchStarters />
+        </Suspense>
+      )}
+
       {query && hasProducts ? (
         <section className="mt-16">
           <p className={cn(overlineClass, "text-muted-foreground")}>{t("productsHeading")}</p>
@@ -190,6 +209,95 @@ export default async function SearchPage({
       {query && anyFailed && (hasProducts || hasArticles) ? (
         <p className="mt-12 text-sm text-muted-foreground">{t("partialLoadError")}</p>
       ) : null}
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* 検索の初期画面 — 何を打てばいいかの手がかり (監査 #21)                        */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * 入力前の画面に置く出発点。
+ *
+ * 手がかりは 2 段で出す:
+ *
+ *   1. **お茶の種類** — Shopify の `productType` から実データで組む。値は生の
+ *      `productType` を URL に載せ、ラベルだけロケール側に落とす (商品一覧の
+ *      チップと同じ規則 = `productTypeLabel`)。着地先も商品一覧の絞り込みに
+ *      揃えるので、ここから入っても一覧から入っても同じ画面になる。
+ *   2. **ほかの入口** — 探すのが検索でなくてよい人のための面 (一覧 / 読みもの /
+ *      お茶メニュー)。3 つに絞る (トップの導線重複と同じ轍を踏まない)。
+ *
+ * 「人気キーワード」を固定文言で焼かないのは、根拠になる集計が今どこにも無い
+ * ため。**無い根拠を語るより、実在する分類を出す**。
+ */
+async function SearchStarters() {
+  const locale = await getLocale();
+  const t = await getTranslations("search");
+  const tCommon = await getTranslations("common");
+
+  let categories: string[] = [];
+  try {
+    const { getProducts } = await import("@/lib/shopify");
+    const { products } = await getProducts({ first: 60 });
+    categories = [...new Set(products.map((p) => p.productType).filter(Boolean))];
+  } catch {
+    /* 取得に失敗しても検索そのものは使える。手がかりだけ黙って畳む。 */
+    categories = [];
+  }
+
+  const outlets = [
+    { href: "/products", label: tCommon("products") },
+    { href: "/journal", label: tCommon("journal") },
+    { href: "/tea-menu", label: tCommon("teaMenu") },
+  ];
+
+  return (
+    <div className="mx-auto mt-12 max-w-2xl lg:mt-16">
+      {categories.length > 0 ? (
+        <section>
+          <p className={cn(overlineClass, "text-muted-foreground")}>
+            {t("startersHeading")}
+          </p>
+          <p className={cn(bodySmClass, "mt-2 text-muted-foreground")}>
+            {t("startersLead")}
+          </p>
+          <ul className="mt-6 flex flex-wrap gap-2">
+            {categories.map((category) => (
+              <li key={category}>
+                <Link
+                  href={`/products?category=${encodeURIComponent(category)}`}
+                  className={pillClass("outline")}
+                >
+                  {productTypeLabel(category, locale)}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      <section className={categories.length > 0 ? "mt-12" : undefined}>
+        <p className={cn(overlineClass, "text-muted-foreground")}>
+          {t("startersMoreHeading")}
+        </p>
+        <ul className="mt-4 flex flex-wrap gap-x-6 gap-y-2">
+          {outlets.map((outlet) => (
+            <li key={outlet.href}>
+              <Link
+                href={outlet.href}
+                className={cn(
+                  bodySmClass,
+                  "inline-flex min-h-11 items-center text-foreground underline underline-offset-4",
+                )}
+              >
+                {outlet.label}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </section>
     </div>
   );
 }

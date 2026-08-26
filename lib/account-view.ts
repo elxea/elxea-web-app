@@ -149,20 +149,70 @@ function str(value: unknown): string | null {
  * 識別子としては **無い** ものとして扱う。
  *
  * 判定はローカル部だけを見る (ドメインは自社とは限らない)。
+ *
+ * ## なぜ「6 語の完全一致」では足りないのか (QA 指摘 2026-08-25)
+ *
+ * 最初の実装は `no-reply` / `noreply` / `no_reply` / `donotreply` /
+ * `do-not-reply` / `do_not_reply` の **6 語との完全一致**だった。これは
+ * 「今この目で見た 1 つの綴り」を書き写しただけで、区切りの流儀 (`no.reply`)・
+ * 連番 (`noreply2`)・タグ (`noreply+line`) のどれか 1 つでも付いた瞬間に
+ * すり抜ける。すり抜けると「no-reply@… としてログイン中」が本人の識別子の
+ * ように出る — つまり **落ち方が静かで、間違った情報を自信満々に出す**。
+ *
+ * そこで綴りを列挙するのをやめ、**正規化してから語で照合する**:
+ *
+ *   1. `+tag` を落とす (配送上は同じ宛先。判定は本体で行う)
+ *   2. 区切り (`.` `-` `_`) を畳む → `no-reply` / `no_reply` / `no.reply` が 1 語に
+ *   3. 末尾の連番を落とす → `noreply2` / `no-reply-01` が 1 語に
+ *
+ * 正規化した語が送信専用の語彙と**完全に一致**したときだけ真にする。前方一致に
+ * しないのは `noreplytea@…` (実在しうる屋号) を巻き込まないため。
+ *
+ * 加えて、**到達しないと規格で決まっているドメイン** (RFC 2606 / RFC 6761 の
+ * 予約 TLD) も本人のアドレスではない。ローカル部が何であっても届かないので、
+ * 語彙に載っているかに関わらず落とす。`example.com` は「予約されたドメイン」で
+ * あって予約 TLD ではないので**対象外** — 手元やテストで人のアドレスとして
+ * 普通に使われており、落とすと本人のメールが消える。
  */
-const PLACEHOLDER_EMAIL_LOCAL_PARTS = new Set([
-  "no-reply",
+const PLACEHOLDER_EMAIL_LOCAL_WORDS = new Set([
   "noreply",
-  "no_reply",
   "donotreply",
-  "do-not-reply",
-  "do_not_reply",
+  "nonreply",
+  "noemail",
+  "nomail",
+  "mailerdaemon",
+  "postmaster",
+  "bounce",
+  "bounces",
+  "unknown",
+  "none",
+  "null",
+  "placeholder",
 ]);
+
+/** 到達しないと規格で決まっている TLD (RFC 2606 / RFC 6761)。 */
+const UNROUTABLE_TLDS = new Set(["invalid", "test", "localhost", "local"]);
+
+/** 区切り・タグ・連番を落として 1 語に畳む。 */
+function canonicalEmailLocalPart(local: string): string {
+  const withoutTag = local.split("+")[0] ?? "";
+  return withoutTag
+    .trim()
+    .toLowerCase()
+    .replace(/[.\-_]/g, "")
+    .replace(/\d+$/, "");
+}
 
 export function isPlaceholderEmail(email: string | null | undefined): boolean {
   if (!email) return false;
-  const local = email.split("@")[0]?.trim().toLowerCase();
-  return local !== undefined && PLACEHOLDER_EMAIL_LOCAL_PARTS.has(local);
+  const trimmed = email.trim();
+  const at = trimmed.lastIndexOf("@");
+  if (at <= 0) return false;
+
+  const tld = trimmed.slice(at + 1).toLowerCase().split(".").pop() ?? "";
+  if (UNROUTABLE_TLDS.has(tld)) return true;
+
+  return PLACEHOLDER_EMAIL_LOCAL_WORDS.has(canonicalEmailLocalPart(trimmed.slice(0, at)));
 }
 
 /** 日付昇順。日付が無いものは末尾。 */

@@ -3,6 +3,8 @@
 import { MessageCircle } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { useRetreatOnScroll } from "@/hooks/use-retreat-on-scroll";
 import { cn } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
@@ -36,6 +38,12 @@ interface ChatLauncherProps {
 export function ChatLauncher({ onClick, hasMessages }: ChatLauncherProps) {
   const t = useTranslations("chat");
 
+  /* SP だけ「読んでいるあいだは引っ込む」。PC はラベル付きのピルが余白 (本文の
+     外側) に居るので本文に重ならず、隠す理由が無い。判定は既存の
+     `useIsMobile` (768px) を使ってブレークポイントを 2 か所に持たない。 */
+  const isMobile = useIsMobile();
+  const shown = useRetreatOnScroll(isMobile);
+
   return (
     <Button
       data-slot="chat-launcher"
@@ -68,9 +76,21 @@ export function ChatLauncher({ onClick, hasMessages }: ChatLauncherProps) {
         "md:bottom-[calc(var(--audio-bar-h,0px)+var(--consent-bar-h,0px)+var(--event-bar-h,0px)+1.5rem)]",
         // 音声バーの出入りに合わせて滑らかに上下する。ChatBar / Cookie バーと
         // 同じ指定にして、3つの下端要素が同じ速さで動くようにする。
-        "transition-[bottom,transform] duration-fast ease-enter",
+        // `opacity` も足すのは、下の「読んでいるあいだは引っ込む」用
+        // (`transition: all` は禁止なのでプロパティを明示する)。
+        "transition-[bottom,transform,opacity] duration-fast ease-enter",
         "hover:scale-105 active:scale-95",
+        // 監査 #17: SP で本文 (商品カードのタイトル) に重なるのを、時間軸で
+        // 避ける。`transform` / `opacity` だけを切り替えるのでコンポジタで動き、
+        // DOM からは外さないので開いている会話も支援技術上の入口も失われない。
+        // `motion-reduce` では動かさず、その場で消えて出る。
+        !shown &&
+          "pointer-events-none translate-y-[150%] opacity-0 motion-reduce:translate-y-0",
       )}
+      // 引っ込んでいる間は読み上げ・タブ移動の対象から外す (見えないものに
+      // フォーカスが当たると「押したのに何も起きない」になる)。
+      aria-hidden={!shown}
+      tabIndex={shown ? undefined : -1}
     >
       <MessageCircle className="size-5" />
       <span

@@ -21,6 +21,7 @@
     "addToCartFailed": "カートに追加できませんでした。もう一度お試しください。",
     "viewCart": "カートを見る",
     "removedFromCart": "カートから削除しました",
+    "removeFromCartFailed": "カートから削除できませんでした。もう一度お試しください。",
     "checkout": "購入手続きへ",
     "subtotal": "小計",
     "total": "合計",
@@ -120,7 +121,10 @@
     "articlesHeading": "記事",
     "articleResults": "{count} 件の記事が見つかりました",
     "browseJournal": "ジャーナルの記事一覧を見る",
-    "partialLoadError": "一部の検索結果を読み込めませんでした。時間をおいて、もう一度お試しください。"
+    "partialLoadError": "一部の検索結果を読み込めませんでした。時間をおいて、もう一度お試しください。",
+    "startersHeading": "種類から探す",
+    "startersLead": "キーワードが浮かばないときは、お茶の種類から。",
+    "startersMoreHeading": "ほかの入口"
   },
   "journal": {
     "title": "ジャーナル",
@@ -388,7 +392,8 @@
       "eyebrow": "0 件",
       "title": "予定されているイベントはまだありません",
       "body": "次の開催を準備しています。決まりしだい、こちらでお知らせします。",
-      "ctaLabel": "お茶を見る"
+      "ctaLabel": "お茶を見る",
+      "secondaryCtaLabel": "読みものを見る"
     },
     "loadError": "イベント情報を読み込めませんでした。時間をおいて、もう一度お試しください。",
     "detailsLink": "詳細・申し込み →",
@@ -1517,7 +1522,7 @@
     "guideLead": "お茶を買う。読む。体験する。elxea は、日々の中に「お茶の時間」をつくる、ひとつづきのサービスです。",
     "guideTeaTitle": "お茶",
     "guideTeaBody": "シングルオリジン煎茶からほうじ茶・和紅茶・道具まで。茶葉と道具のオンラインストア。",
-    "guideTeaLink": "茶葉の一覧へ →",
+    "guideTeaLink": "取り扱いを見る →",
     "guideJournalTitle": "ジャーナル",
     "guideJournalBody": "淹れ方と産地の読みもの。季節ごとの扱い方から、産地をたずねた記録まで。",
     "guideJournalLink": "ジャーナルを読む →",
@@ -1530,6 +1535,6 @@
     "guideAboutTitle": "elxea について",
     "guideAboutBody": "ブランドの考え方と、店の運営について。",
     "guideAboutLink": "アバウトページへ →",
-    "purchaseLink": "茶葉の一覧へ →"
+    "purchaseLink": "お茶を選ぶ →"
   }
 }

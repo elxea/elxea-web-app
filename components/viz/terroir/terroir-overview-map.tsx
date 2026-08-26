@@ -37,6 +37,7 @@ import { useEffect, useRef } from "react";
 
 import "maplibre-gl/dist/maplibre-gl.css";
 
+import { captionClass } from "@/components/editorial/rule-list";
 import { TEA_CATEGORY_COLOR, TEA_CATEGORY_LABEL } from "@/lib/roji/tea-category";
 import {
   ELEVATION_RAMP,
@@ -47,7 +48,11 @@ import {
   type TerroirOverviewData,
   type TerroirOverviewPin,
 } from "@/lib/roji/tea-terroir-overview";
-import { DEM_ATTRIBUTION, DEM_TILEJSON_URL } from "@/lib/viz/dem";
+import {
+  DEM_ATTRIBUTION,
+  DEM_ATTRIBUTION_URL,
+  DEM_TILEJSON_URL,
+} from "@/lib/viz/dem";
 import { MAPLIBRE_WORKER_URL } from "@/lib/viz/map-style";
 import { ROJI_VIZ_COLOR } from "@/lib/viz/roji-viz-palette";
 import { cn } from "@/lib/utils";
@@ -270,9 +275,26 @@ export function TerroirOverviewMap({ data, label, className }: TerroirOverviewMa
       </ul>
 
       {/* 帰属表示は法的義務 (Mapterhorn)。地図の中には文字を置かない原則に従い
-          枠の外に出す (`terroir-lens-map.tsx` の但し書きと同じ扱い)。 */}
-      <p className="roji-viz-caption text-xs text-muted-foreground">
-        {DEM_ATTRIBUTION}
+          枠の外に出す (`terroir-lens-map.tsx` の但し書きと同じ扱い)。
+
+          体裁は**本文ではなく帰属表示**として読めるようにする (監査 #20)。
+          以前は凡例と同じ左寄せ・同じ字間 (`roji-viz-caption` = 0.2em) で
+          置いていたので、記事の途中に短い一文が紛れているようにしか見えず、
+          「DEM (C) Mapterhorn」という生テキストが本文の一部として読まれた。
+          右寄せ + 字間を広げない + 出典へのリンク、の 3 つで「これは出典だ」と
+          いう役割が形から分かる。 */}
+      <p
+        data-slot="map-attribution"
+        className={cn(captionClass, "text-right text-muted-foreground")}
+      >
+        <a
+          href={DEM_ATTRIBUTION_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline-offset-4 hover:underline"
+        >
+          {DEM_ATTRIBUTION}
+        </a>
       </p>
     </div>
   );

@@ -114,27 +114,33 @@ describe("合体は Firestore への往復を並行に開く", () => {
     expect(stats.maxInFlight).toBeGreaterThan(1);
   });
 
-  it("L2: 荷物が 8 倍になっても待ち時間は 8 倍にならない", async () => {
-    /* 1 往復 = 5ms として、直列なら 4 往復 × 件数ぶん素直に伸びる。
-       5 件 = 100ms 前後、40 件 = 800ms 前後（+ コレクション 6 本の直列）。
-       並行なら件数が増えても波の数しか増えない。 */
+  it("L2: 荷物が 8 倍になっても、直列に並ぶ往復の段数は 8 倍にならない", async () => {
+    /* 本番の待ち時間は往復の**総数**ではなく「直列に並んだ段数」で決まる
+       （1 往復 170〜200ms が素直に積み上がる）。よって段数を数える。
+
+       ## 壁時計をやめた理由（QA 指摘 2026-08-25）
+
+       ここは以前 `Date.now()` の差分で測っていた。偽物の遅延は実タイマーな
+       ので、機械が他の作業で混んでいると測定値が桁で揺れる — 判定が変更の
+       中身ではなく「そのとき機械が空いていたか」で決まる。落ちる理由が変更と
+       無関係なテストは、いずれ無視されて意味を失う（`vitest.config.ts` の
+       testTimeout の但し書きと同じ話）。段数なら同じコードで必ず同じ数が出る。
+       閾値の意味（直列への逆戻りだけを捕まえる）は 1 つも緩めていない。 */
     const run = async (count: number) => {
-      const { db } = createFakeFirestore(
-        { [favoritesCol(LINE_KEY)]: favorites(count) },
-        { latencyMs: 5 },
-      );
-      const from = Date.now();
+      const { db, stats } = createFakeFirestore({
+        [favoritesCol(LINE_KEY)]: favorites(count),
+      });
       const result = await mergeLineIdentityIntoShopify(LINE_USER_ID, SHOPIFY_ID, db);
       expect(result.collections.favorites.copied).toBe(count);
-      return Date.now() - from;
+      return stats.waves;
     };
 
     const small = await run(5);
     const large = await run(40);
 
-    /* 直列なら large / small はほぼ 8。並行なら 1 波の上限（24 件）を跨ぐぶん
-       だけ増えて 2 倍前後に収まる。4 倍を境にすれば、直列への逆戻りだけを
-       確実に捕まえつつ CI の揺れでは落ちない。 */
+    /* 直列なら large / small はほぼ 8（1 件 = 4 往復がそのまま 4 段）。
+       並行なら 1 波の上限（24 件）を跨ぐぶんだけ増えて 2 倍前後に収まる。
+       4 倍を境にすれば、直列への逆戻りだけを確実に捕まえられる。 */
     expect(large).toBeLessThan(small * 4);
   });
 });

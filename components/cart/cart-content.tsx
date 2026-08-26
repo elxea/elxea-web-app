@@ -47,7 +47,14 @@ export function CartContent() {
 
   return (
     <div className="flex flex-col gap-10 lg:flex-row lg:items-start lg:gap-12">
-      <ul data-slot="cart-lines" className="divide-border min-w-0 flex-1 divide-y">
+      {/* 書き込みが走っているあいだ、行の操作は `disabled` で止まる。見た目の
+          薄さだけでは支援技術に何も伝わらないので、`aria-busy` で「いま処理中」
+          であることを明示する (監査 #15 の「進行表示が無い」の読み上げ側)。 */}
+      <ul
+        data-slot="cart-lines"
+        aria-busy={isPending}
+        className="divide-border min-w-0 flex-1 divide-y"
+      >
         {cart.lines.map((item) => (
           <CartLine
             key={item.id}
@@ -86,8 +93,19 @@ export function CartContent() {
                 currency: item.merchandise.price.currencyCode,
                 quantity: item.quantity,
               });
-              await removeFromCart(item.id);
+              /* 着地を待たずに知らせる (監査 #15 / 2026-08-25)。
+                 以前は `await removeFromCart(...)` の**後**にトーストを出して
+                 いたので、行が消えたあとの本番実測 4.3 秒は「消えたけれど本当に
+                 消えたのか分からない」無言の時間だった。しかも着地の成否に
+                 関わらず「削除しました」と言い切っていたので、失敗して行が
+                 戻ってきたときに**嘘だけが残る**。
+                 いまは押した瞬間に知らせ、外れたときだけ言い直す
+                 (`AddToCartButton` と同じ約束)。 */
+              const pending = removeFromCart(item.id);
               toast(t("removedFromCart"));
+              if ((await pending) === "failed") {
+                toast.error(t("removeFromCartFailed"));
+              }
             }}
           />
         ))}

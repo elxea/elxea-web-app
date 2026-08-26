@@ -186,8 +186,36 @@ let writeSeq = 0;
 
 let hydrating: Promise<void> | null = null;
 
-/** 取り込みが 1 度でも走ったか (`seed` で満たされた場合も含む)。 */
+/** 取り込みが 1 度でも走ったか (`seed` / 持ち越しの復元で満たされた場合も含む)。 */
 let hydrated = false;
+
+/**
+ * **サーバの一覧で確定した**か。`seed` と取り込み成功のときだけ立つ。
+ *
+ * `hydrated` と分けているのは、両者で「次に何をすべきか」が違うから:
+ *   - 持ち越し (`sessionStorage`) の復元 … 表示は出せるが最新とは限らないので、
+ *     裏で 1 回取り直す
+ *   - サーバ由来 (`seed` / 取り込み成功) … もう取り直す理由が無い
+ *
+ * 以前は `hydrated` しか無く、しかも `ensureFavoritesHydrated` がそれを見て
+ * いなかったので、マイページのように **SSR が一覧を渡している画面でも
+ * `/api/user/favorites` を 1 本余計に叩いていた** (QA 指摘 2026-08-25)。
+ */
+let serverHydrated = false;
+
+/**
+ * 取り込みに失敗した時刻 (epoch ms)。0 は「まだ失敗していない」。
+ *
+ * 失敗を `hydrating` に残したままにすると、`if (hydrating) return` が効き続けて
+ * **そのタブでは二度と取り直せない** (通信が復活しても `error` のまま。保存ボタンは
+ * `unknown` = 押すたびに 1 件確認の往復が要る状態で固定される)。かといって
+ * 失敗のたびに即座に開放すると、1 画面に載っているボタンの数だけ再試行が飛ぶ。
+ * よって **開放はするが、次の試行までは間を置く**。
+ */
+let lastHydrateFailureAt = 0;
+
+/** 取り込み失敗後、次に取り直してよくなるまでの間隔。 */
+const HYDRATE_RETRY_COOLDOWN_MS = 10_000;
 
 /**
  * 取ってきた一覧を反映する。
@@ -206,8 +234,21 @@ function applyServerKeys(
     else merged.delete(key);
   }
   hydrated = true;
+  serverHydrated = true;
+  lastHydrateFailureAt = 0;
   writeCache(merged);
   publish({ phase: "ready", keys: merged });
+}
+
+/**
+ * 取り込みが実らなかった。**次の機会に取り直せる状態**にしてから倒す。
+ *
+ * `hydrating` を握ったままにしないのがここの要点 (上の `lastHydrateFailureAt`)。
+ */
+function failHydration(next: FavoritesSnapshot): void {
+  hydrating = null;
+  lastHydrateFailureAt = Date.now();
+  publish(next);
 }
 
 /**
@@ -222,12 +263,25 @@ export function seedFavoriteKeys(keys: Iterable<string>): void {
 /**
  * 一覧を 1 回だけ取り込む。2 回目以降は何もしない (タブにつき 1 往復)。
  *
+ * 取りに行かない条件は 3 つ:
+ *   - **既にサーバの一覧で確定している** (`seed` 済み / 取り込み済み)。
+ *     マイページのように SSR が一覧を渡している画面で往復を足さない
+ *   - いま走っている取り込みがある
+ *   - 直前に失敗したばかり (間を置いてから 1 回だけ取り直す)
+ *
  * 失敗しても例外は投げない。`error` に倒して「読めなかった」を残すだけで、
  * 「登録なし」には**化けさせない**。
  */
 export function ensureFavoritesHydrated(): void {
   if (typeof window === "undefined") return;
+  if (serverHydrated) return;
   if (hydrating) return;
+  if (
+    lastHydrateFailureAt !== 0 &&
+    Date.now() - lastHydrateFailureAt < HYDRATE_RETRY_COOLDOWN_MS
+  ) {
+    return;
+  }
 
   if (!isFavoritesAuthed()) {
     clearCache();
@@ -247,7 +301,7 @@ export function ensureFavoritesHydrated(): void {
       if (!res.ok) {
         /* 401 は「旗 cookie はあるがサーバは知らない」= 実質未ログイン。
            それ以外は読めなかっただけなので `error` に倒す。 */
-        publish(
+        failHydration(
           res.status === 401
             ? { phase: "signed-out", keys: EMPTY_KEYS }
             : { phase: "error", keys: snapshot.keys },
@@ -256,7 +310,7 @@ export function ensureFavoritesHydrated(): void {
       }
       const data = (await res.json()) as { favorites?: unknown };
       if (!Array.isArray(data.favorites)) {
-        publish({ phase: "error", keys: snapshot.keys });
+        failHydration({ phase: "error", keys: snapshot.keys });
         return;
       }
       const keys = new Set<string>();
@@ -268,7 +322,7 @@ export function ensureFavoritesHydrated(): void {
       }
       applyServerKeys(keys, issuedAtSeq);
     } catch {
-      publish({ phase: "error", keys: snapshot.keys });
+      failHydration({ phase: "error", keys: snapshot.keys });
     }
   })();
 }
@@ -443,6 +497,8 @@ export function __resetFavoritesStoreForTest(): void {
   snapshot = SERVER_SNAPSHOT;
   hydrating = null;
   hydrated = false;
+  serverHydrated = false;
+  lastHydrateFailureAt = 0;
   writeSeq = 0;
   localWrites.clear();
   listeners.clear();
