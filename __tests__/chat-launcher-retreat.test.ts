@@ -14,6 +14,7 @@ import {
   RETREAT_THRESHOLD_PX,
   initialRetreatState,
   retreatOnScroll,
+  retreatOnSettle,
 } from "@/hooks/use-retreat-on-scroll";
 
 /** 位置の並びを順に流し込み、最後の状態を返す。 */
@@ -66,5 +67,48 @@ describe("画面最上部では隠さない", () => {
   it("慣性で負の位置へ振れても出したまま", () => {
     const hidden = scrollThrough([0, 400], 0);
     expect(retreatOnScroll(hidden, -30).visible).toBe(true);
+  });
+});
+
+/**
+ * 通しテスト E-1 (2026-08-27) の回帰。
+ *
+ * 「手が止まったら戻る」を持っていたせいで、**静止状態では必ず本文の上に居る**
+ * 状態になり、本番 SP390 /ja/products の scrollY 504 / 756 / 1009 で 48px の
+ * ボタンが商品カード画像に完全に重なっていた (重なり 1,619 / 2,166 / 2,304 px^2)。
+ *
+ * ここが緩むと同じ実害がそのまま戻るので、**戻らないこと**を明示的に縛る。
+ * 「最上部では出す」だけは残す (下端に本文が流れてこないため)。
+ */
+describe("手が止まっても本文の上には戻らない", () => {
+  it("引っ込んだまま静止しても出てこない", () => {
+    const hidden = scrollThrough([0, 400], 0);
+    expect(hidden.visible).toBe(false);
+
+    expect(retreatOnSettle(hidden, 400).visible).toBe(false);
+  });
+
+  it("何度静止しても戻らない (タイマーの取りこぼしで出ない)", () => {
+    let state = scrollThrough([0, 400], 0);
+    for (let i = 0; i < 5; i += 1) state = retreatOnSettle(state, 400);
+    expect(state.visible).toBe(false);
+  });
+
+  it("最上部で静止したときだけ出す", () => {
+    const hidden = scrollThrough([0, 400], 0);
+    expect(retreatOnSettle(hidden, 0).visible).toBe(true);
+  });
+
+  it("出ている状態で静止しても消さない (静止は隠す合図ではない)", () => {
+    const shown = initialRetreatState(400);
+    expect(retreatOnSettle(shown, 400).visible).toBe(true);
+  });
+
+  it("静止した地点が次の下向きの起点になる", () => {
+    /* 起点を引き直さないと、静止 → 上へ戻す → 少し下る、で閾値の測り方が
+       壊れる (絶対座標で測る実装に退行する)。 */
+    const settled = retreatOnSettle(initialRetreatState(400), 400);
+    expect(settled.anchorY).toBe(400);
+    expect(retreatOnScroll(settled, 400 + RETREAT_THRESHOLD_PX + 1).visible).toBe(false);
   });
 });
