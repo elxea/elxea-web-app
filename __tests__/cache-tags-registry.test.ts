@@ -30,8 +30,10 @@ import ts from "typescript";
 import {
   CACHE_TAGS,
   SANITY_DOCUMENT_TYPES,
+  SANITY_TYPE_TO_OWN_TAG,
   SANITY_TYPE_TO_TAGS,
   type CacheTag,
+  type SanityDocumentType,
 } from "@/lib/cache/tags";
 import { sanityFetch } from "@/sanity/lib/fetch";
 
@@ -144,13 +146,22 @@ function scan(): Scan {
       }
 
       // (5) Sanity client の直接 import (static / dynamic)
-      // `./client` は `sanity/lib` 配下から書かれたときだけ Sanity の client を
-      // 指す (`lib/shopify/index.ts` の `./client` は別物)。
+      // Sanity の client を指す import かどうか。
+      //
+      // 綴りは 1 つではない (QA 指摘 2026-08-27)。別名 `@/sanity/lib/client`、
+      // 相対 `../sanity/lib/client` / `../../sanity/lib/client`、そして
+      // `sanity/lib` 配下からの `./client` はすべて同じモジュールを指す。
+      // 特定の 1 綴りだけを見る検査は、綴りを変えれば通るので検査にならない。
+      //
+      // `./client` は `sanity/lib` 配下から書かれたときだけ Sanity のものを指す
+      // (`lib/shopify/index.ts` の `./client` は別物)。
       const insideSanityLib = rel.startsWith("sanity/lib/");
-      const isClientModule = (spec: ts.Expression | undefined) =>
-        spec !== undefined &&
-        ts.isStringLiteralLike(spec) &&
-        (spec.text === "@/sanity/lib/client" || (insideSanityLib && spec.text === "./client"));
+      const isClientModule = (spec: ts.Expression | undefined) => {
+        if (spec === undefined || !ts.isStringLiteralLike(spec)) return false;
+        const text = spec.text;
+        if (/(^|\/)sanity\/lib\/client$/.test(text)) return true;
+        return insideSanityLib && text === "./client";
+      };
       if (ts.isImportDeclaration(node) && isClientModule(node.moduleSpecifier)) {
         if (!result.clientImporters.includes(rel)) result.clientImporters.push(rel);
       }
@@ -264,6 +275,150 @@ describe("cache tag registry — Sanity のドキュメント型との整合", (
         expect(CACHE_TAGS as readonly string[]).toContain(tag);
       }
     }
+  });
+});
+
+/* ------------------------------------------------------------------ *
+ * 参照展開の意味的な欠落を捕まえる (QA 指摘 / 2026-08-27)
+ *
+ * 最初の扇形の表は「その型を主役にするページ」しか見ておらず、**参照されて
+ * 他の型のページの中に描かれている**ぶんを 8 辺取りこぼしていた。目視で足すと
+ * 同じ取りこぼしを繰り返すので、必要な辺を **スキーマと GROQ から導出**する。
+ *
+ *   1. `sanity/schemas/*.ts` から「どの型のどのフィールドが、どの型を参照するか」
+ *   2. `sanity/lib/queries.ts` から「どの型を主役にするクエリが、どのフィールドを
+ *      `->` で展開しているか」「どの型を入れ子で数えているか」
+ *   3. 1 と 2 を突き合わせて「A のページには B の中身が出る」という辺を得る
+ *   4. その辺ごとに `SANITY_TYPE_TO_TAGS[B]` が `SANITY_TYPE_TO_OWN_TAG[A]` を
+ *      含むことを要求する
+ *
+ * Studio 側で参照フィールドを 1 本足してクエリで展開した時点で、検査が扇形の
+ * 更新を要求する。手で書いた表どうしの突き合わせではないのが要点。
+ * ------------------------------------------------------------------ */
+
+/** `${docType}.${fieldName}` -> 参照先のドキュメント型 */
+function scanSchemaReferences(): Map<string, string[]> {
+  const out = new Map<string, string[]>();
+  const dir = path.join(ROOT, "sanity/schemas");
+  const knownTypes = new Set<string>(SANITY_DOCUMENT_TYPES);
+
+  for (const entry of readdirSync(dir)) {
+    if (!entry.endsWith(".ts")) continue;
+    const docType = entry.replace(/\.ts$/, "");
+    // スキーマファイル名 = ドキュメント型名。文書型でないもの (blockContent /
+    // seo / index) はここで落ちる。
+    if (!knownTypes.has(docType)) continue;
+
+    const sf = parse(path.join(dir, entry));
+
+    const visit = (node: ts.Node): void => {
+      if (ts.isObjectLiteralExpression(node)) {
+        const nameProp = node.properties.find(
+          (p): p is ts.PropertyAssignment =>
+            ts.isPropertyAssignment(p) &&
+            ts.isIdentifier(p.name) &&
+            p.name.text === "name" &&
+            ts.isStringLiteralLike(p.initializer)
+        );
+        if (nameProp) {
+          const fieldName = (nameProp.initializer as ts.StringLiteralLike).text;
+          const text = node.getText(sf);
+          if (text.includes('"reference"') || text.includes("'reference'")) {
+            const targets = new Set<string>();
+            for (const m of text.matchAll(/to:\s*\[\s*\{\s*type:\s*["']([A-Za-z0-9_]+)["']/g)) {
+              if (knownTypes.has(m[1])) targets.add(m[1]);
+            }
+            if (targets.size > 0) out.set(`${docType}.${fieldName}`, [...targets]);
+          }
+        }
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(sf);
+  }
+
+  return out;
+}
+
+interface DependencyEdge {
+  /** このページ (主役の型) に */
+  owner: SanityDocumentType;
+  /** この型の中身が出る */
+  dependency: SanityDocumentType;
+  /** 根拠 (クエリ名 + 経路) */
+  why: string;
+}
+
+function scanQueryDependencies(schemaRefs: Map<string, string[]>): DependencyEdge[] {
+  const source = readFileSync(path.join(ROOT, "sanity/lib/queries.ts"), "utf8");
+  const known = new Set<string>(SANITY_DOCUMENT_TYPES);
+  const edges: DependencyEdge[] = [];
+
+  for (const block of source.matchAll(/export const (\w+) = groq`([\s\S]*?)`/g)) {
+    const [, queryName, body] = block;
+
+    const typesInBody = [...body.matchAll(/_type\s*==\s*"([A-Za-z0-9_]+)"/g)].map((m) => m[1]);
+    const owner = typesInBody[0];
+    if (!owner || !known.has(owner)) continue;
+
+    // (a) `field->` / `field[]->` の参照展開。参照先はスキーマが決める。
+    for (const m of body.matchAll(/([A-Za-z0-9_]+)\s*(?:\[\])?\s*->/g)) {
+      const field = m[1];
+      const targets = schemaRefs.get(`${owner}.${field}`);
+      if (!targets) continue; // スキーマに無いフィールドは判断材料が無いので数えない
+      for (const dependency of targets) {
+        edges.push({
+          owner: owner as SanityDocumentType,
+          dependency: dependency as SanityDocumentType,
+          why: `${queryName} が ${owner}.${field}-> を展開`,
+        });
+      }
+    }
+
+    // (b) 入れ子の `_type == "..."` (件数の埋め込み等)。
+    for (const t of typesInBody.slice(1)) {
+      if (!known.has(t) || t === owner) continue;
+      edges.push({
+        owner: owner as SanityDocumentType,
+        dependency: t as SanityDocumentType,
+        why: `${queryName} が入れ子で ${t} を数えている`,
+      });
+    }
+  }
+
+  return edges;
+}
+
+const SCHEMA_REFS = scanSchemaReferences();
+const DEPENDENCY_EDGES = scanQueryDependencies(SCHEMA_REFS);
+
+describe("扇形の網羅 — 参照で他の型のページに描かれるぶん", () => {
+  it("スキーマとクエリの走査が空振りしていない", () => {
+    // 走査が 0 件になると以下の検査は「該当なしで合格」になる。実測値
+    // (2026-08-27) は参照フィールド 10 / 依存辺 40 前後なので、その半分を床にする。
+    expect(SCHEMA_REFS.size, "スキーマの参照フィールドが取れていない").toBeGreaterThanOrEqual(5);
+    expect(DEPENDENCY_EDGES.length, "依存辺が取れていない").toBeGreaterThanOrEqual(20);
+  });
+
+  it("参照される型の更新は、参照する側のページの名札も剥がす", () => {
+    const missing: string[] = [];
+
+    for (const edge of DEPENDENCY_EDGES) {
+      const requiredTag = SANITY_TYPE_TO_OWN_TAG[edge.owner];
+      const invalidates = SANITY_TYPE_TO_TAGS[edge.dependency] as readonly CacheTag[];
+      if (!invalidates.includes(requiredTag)) {
+        missing.push(
+          `${edge.dependency} の更新が "${requiredTag}" を剥がさない ` +
+            `(根拠: ${edge.why})`
+        );
+      }
+    }
+
+    expect(
+      [...new Set(missing)].sort(),
+      "SANITY_TYPE_TO_TAGS に不足している辺がある。" +
+        "参照先が変わっても参照元のページが古いまま残る。"
+    ).toEqual([]);
   });
 });
 

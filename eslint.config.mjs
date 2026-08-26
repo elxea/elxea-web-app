@@ -243,20 +243,31 @@ const eslintConfig = [
         // (`await import("@/sanity/lib/client")` — sitemap が使っていた形) も
         // `ImportExpression` で同じく塞ぐ。
         //
-        // 例外はこのブロックの `ignores` に無い場所、すなわち `sanity/**` 配下
-        // (= ゲートウェイ自身) だけ。`app/**` からの逃げ道は用意しない。
+        // 例外はこのブロックの `files` に無い場所、すなわち `sanity/lib/**`
+        // (= ゲートウェイ自身と、client の設定だけを使う image.ts) だけ。
+        //
+        // **別名 (`@/`) だけを止めると相対パスで抜けられる** (QA 指摘 2026-08-27)。
+        // `app/[locale]/page.tsx` からは `../../sanity/lib/client`、
+        // `app/sitemap.ts` からは `../sanity/lib/client` と書けば、意味は同じまま
+        // セレクタに当たらない。「1 つの綴りだけを禁止する」検査は綴りを変えれば
+        // 通るので検査になっていない。よって **末尾が `sanity/lib/client` で
+        // 終わる指定を綴りによらず** 塞ぐ (正規表現マッチ)。
         {
-          selector: "ImportDeclaration[source.value='@/sanity/lib/client']",
+          selector:
+            "ImportDeclaration[source.value=/(^|\\/)sanity\\/lib\\/client$/]",
           message:
             "Sanity の client を直接 import しない。sanityFetch (@/sanity/lib/fetch) を通す " +
-            "(憲章 Wave 2)。理由: ゲートウェイだけがキャッシュの名札を型で必須にしており、" +
+            "(憲章 Wave 2)。相対パス (`../sanity/lib/client`) も同じく不可。" +
+            "理由: ゲートウェイだけがキャッシュの名札を型で必須にしており、" +
             "迂回すると 2026-08 まで続いた『webhook は 200 を返すが本番は更新されない』に戻る。",
         },
         {
-          selector: "ImportExpression[source.value='@/sanity/lib/client']",
+          selector:
+            "ImportExpression[source.value=/(^|\\/)sanity\\/lib\\/client$/]",
           message:
             "Sanity の client を動的 import で掴まない。sanityFetch (@/sanity/lib/fetch) を通す " +
-            "(憲章 Wave 2)。app/sitemap.ts が実際にこの形で迂回していた。",
+            "(憲章 Wave 2)。app/sitemap.ts が実際にこの形で迂回していた。" +
+            "相対パス (`../sanity/lib/client`) も同じく不可。",
         },
         {
           selector: "MemberExpression[object.name='process'][property.name='env']",
