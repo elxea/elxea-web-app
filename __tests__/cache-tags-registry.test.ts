@@ -72,6 +72,28 @@ function parse(file: string): ts.SourceFile {
   );
 }
 
+/**
+ * import 指定子を **リポジトリ相対のモジュールパス**に正規化する。
+ *
+ * - `@/x/y` … tsconfig の `paths` により リポジトリ直下からの `x/y`
+ * - `./x` `../x` … 書いたファイルの位置から解決
+ * - それ以外 (`next-sanity` 等の bare specifier) … 対象外なので `null`
+ *
+ * `path.posix.normalize` が `/./` と `/../` を畳むので、`sanity/lib/./client`
+ * も `sanity/lib/../lib/client` も同じ答えに落ちる。判定は「解決結果が
+ * `sanity/lib/client` か」だけで済み、綴りの数え上げが不要になる。
+ */
+function resolveToRepoPath(specifier: string, importerRel: string): string | null {
+  if (specifier.startsWith("@/")) {
+    return path.posix.normalize(specifier.slice(2));
+  }
+  if (specifier.startsWith(".")) {
+    const dir = path.posix.dirname(importerRel.split(path.sep).join("/"));
+    return path.posix.normalize(path.posix.join(dir, specifier));
+  }
+  return null;
+}
+
 interface Scan {
   /** `cache: { tag: "..." }` として書かれた名札 -> 書かれているファイル */
   appliedTags: Map<string, string[]>;
@@ -148,19 +170,22 @@ function scan(): Scan {
       // (5) Sanity client の直接 import (static / dynamic)
       // Sanity の client を指す import かどうか。
       //
-      // 綴りは 1 つではない (QA 指摘 2026-08-27)。別名 `@/sanity/lib/client`、
-      // 相対 `../sanity/lib/client` / `../../sanity/lib/client`、そして
-      // `sanity/lib` 配下からの `./client` はすべて同じモジュールを指す。
-      // 特定の 1 綴りだけを見る検査は、綴りを変えれば通るので検査にならない。
+      // **綴りを 1 つだけ見る検査は、綴りを変えれば通るので検査にならない**
+      // (QA 指摘 2026-08-27 / 2 回)。同じモジュールを指す書き方は複数ある:
       //
-      // `./client` は `sanity/lib` 配下から書かれたときだけ Sanity のものを指す
-      // (`lib/shopify/index.ts` の `./client` は別物)。
-      const insideSanityLib = rel.startsWith("sanity/lib/");
+      //   @/sanity/lib/client          別名
+      //   ../../sanity/lib/client      相対
+      //   ../sanity/lib/./client       dot-segment
+      //   ../sanity/lib/../lib/client  `..` の往復
+      //   ./client                     sanity/lib 配下から書いたとき
+      //
+      // Node も TypeScript もこれらを**正規化**して同じモジュールに解決する。
+      // だから検査も文字列一致ではなく **同じ正規化を通してから**照合する。
+      // 相対指定は書いたファイルの位置から解決してリポジトリ相対に直すので、
+      // どれだけ遠回りな綴りでも 1 つの答え (`sanity/lib/client`) に落ちる。
       const isClientModule = (spec: ts.Expression | undefined) => {
         if (spec === undefined || !ts.isStringLiteralLike(spec)) return false;
-        const text = spec.text;
-        if (/(^|\/)sanity\/lib\/client$/.test(text)) return true;
-        return insideSanityLib && text === "./client";
+        return resolveToRepoPath(spec.text, rel) === "sanity/lib/client";
       };
       if (ts.isImportDeclaration(node) && isClientModule(node.moduleSpecifier)) {
         if (!result.clientImporters.includes(rel)) result.clientImporters.push(rel);

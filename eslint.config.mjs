@@ -246,28 +246,36 @@ const eslintConfig = [
         // 例外はこのブロックの `files` に無い場所、すなわち `sanity/lib/**`
         // (= ゲートウェイ自身と、client の設定だけを使う image.ts) だけ。
         //
-        // **別名 (`@/`) だけを止めると相対パスで抜けられる** (QA 指摘 2026-08-27)。
-        // `app/[locale]/page.tsx` からは `../../sanity/lib/client`、
-        // `app/sitemap.ts` からは `../sanity/lib/client` と書けば、意味は同じまま
-        // セレクタに当たらない。「1 つの綴りだけを禁止する」検査は綴りを変えれば
-        // 通るので検査になっていない。よって **末尾が `sanity/lib/client` で
-        // 終わる指定を綴りによらず** 塞ぐ (正規表現マッチ)。
+        // **綴りを 1 つだけ禁止する検査は、綴りを変えれば通るので検査でない**
+        // (QA 指摘 2026-08-27 / 2 回)。同じモジュールを指す書き方は複数ある:
+        //   `@/sanity/lib/client` (別名)
+        //   `../../sanity/lib/client` (相対)
+        //   `../sanity/lib/./client` (dot-segment。Node も TS も正規化して同じ
+        //     モジュールに解決するが、素朴な文字列一致には当たらない)
+        // よって **末尾が `sanity/lib/client` に解決される指定**を、途中に
+        // `/.` が挟まっていても捕まえる。
+        //
+        // ここで正規表現が届かない形 (`sanity/lib/../lib/client` のような `..`
+        // を含む往復) は、`__tests__/cache-tags-registry.test.ts` 側が
+        // **指定子を実際に正規化してから**照合するので落ちる。lint は速い一次
+        // 検査、テストが網羅側、という役割分担にしてある (どちらか片方に穴が
+        // あっても、もう片方が拾う)。
         {
           selector:
-            "ImportDeclaration[source.value=/(^|\\/)sanity\\/lib\\/client$/]",
+            "ImportDeclaration[source.value=/(^|\\/)sanity(\\/\\.)*\\/lib(\\/\\.)*\\/client$/]",
           message:
             "Sanity の client を直接 import しない。sanityFetch (@/sanity/lib/fetch) を通す " +
-            "(憲章 Wave 2)。相対パス (`../sanity/lib/client`) も同じく不可。" +
+            "(憲章 Wave 2)。相対パス・dot-segment (`../sanity/lib/./client`) も同じく不可。" +
             "理由: ゲートウェイだけがキャッシュの名札を型で必須にしており、" +
             "迂回すると 2026-08 まで続いた『webhook は 200 を返すが本番は更新されない』に戻る。",
         },
         {
           selector:
-            "ImportExpression[source.value=/(^|\\/)sanity\\/lib\\/client$/]",
+            "ImportExpression[source.value=/(^|\\/)sanity(\\/\\.)*\\/lib(\\/\\.)*\\/client$/]",
           message:
             "Sanity の client を動的 import で掴まない。sanityFetch (@/sanity/lib/fetch) を通す " +
             "(憲章 Wave 2)。app/sitemap.ts が実際にこの形で迂回していた。" +
-            "相対パス (`../sanity/lib/client`) も同じく不可。",
+            "相対パス・dot-segment も同じく不可。",
         },
         {
           selector: "MemberExpression[object.name='process'][property.name='env']",
@@ -275,6 +283,28 @@ const eslintConfig = [
             'process.env を直接読まない。lib/config/spec.ts に宣言して env("NAME") で読む ' +
             "(憲章 R4)。理由: 生読みは値の正規化と『未設定とは何か』を呼び出し側ごとに" +
             "再定義し、実際に sitemap 全 172 件と LINE 連携を本番で壊している。",
+        },
+      ],
+
+      // 同じ禁止を **別の標準ルールでも**張る (QA 指摘 2026-08-27)。
+      //
+      // なぜ二重に張るのか: 上の `no-restricted-syntax` は AST セレクタなので
+      // `ImportDeclaration` と `ImportExpression` (動的 import) の両方に届くが、
+      // セレクタ 1 本の書き損じが即そのまま穴になる。`no-restricted-imports` は
+      // 逆に **import 指定子の判定に特化した標準ルール**で、`export ... from`
+      // 経由の再輸出も見る (動的 import は見ないので、上のセレクタと役割が
+      // 補い合う)。同じ規則を性質の違う 2 本で張ると、片方の穴をもう片方が塞ぐ。
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              regex: "(^|/)sanity(/\\.)*/lib(/\\.)*/client$",
+              message:
+                "Sanity の client を直接 import しない。sanityFetch (@/sanity/lib/fetch) を通す " +
+                "(憲章 Wave 2)。別名・相対パス・dot-segment のどれでも不可。",
+            },
+          ],
         },
       ],
     },
