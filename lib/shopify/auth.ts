@@ -7,6 +7,7 @@ import {
   hasShopifySessionCookies,
   isSecure,
 } from "@/lib/auth/cookies";
+import { logger } from "@/lib/log";
 
 import { buildSessionCookieWrites } from "./session-cookies";
 import {
@@ -184,9 +185,39 @@ async function persistSession(
 ): Promise<void> {
   try {
     await setSessionCookies(accessToken, refreshToken, expiresIn);
-  } catch {
-    /* Server Component からの呼び出し。次の書ける経路に任せる。 */
+  } catch (err) {
+    if (isReadOnlyCookieStore(err)) {
+      /* expected-failure: 描画中は cookie を書けないのが Next の仕様。次に
+         Route Handler / Server Action を通ったときに書き戻される (冒頭参照)。 */
+      return;
+    }
+
+    /* それ以外は本当に書けていない。書き戻せない状態が続くと、リフレッシュの
+       たびに新しい refresh token を捨て続ける (冒頭の ⚠ 参照) ので、
+       諦めた事実は残す。 */
+    logger.error("shopify.session.cookie-write-failed", err, {
+      operation: "persistSession",
+    });
   }
+}
+
+/**
+ * 「描画中だから書けなかった」だけかどうか。
+ *
+ * Next は Server Component から `cookies().set()` を呼ばれると必ず投げる。これは
+ * 設計どおりに起きる出来事で、リフレッシュのたびに鳴らすと**本当の失敗が
+ * 埋もれる**。かといって catch ごと黙らせると、権限や暗号の失敗まで一緒に
+ * 消える (それが憲章 R1 の直している欠陥そのもの) ので、この 1 種類だけを
+ * 名指しで外す。
+ *
+ * 文言での判定なので、Next 側が変えれば当たらなくなる。そのときは**黙るのでは
+ * なく余計に鳴る**側へ倒れる — 壊れ方の向きとして正しい方を選んでいる。
+ */
+function isReadOnlyCookieStore(err: unknown): boolean {
+  return (
+    err instanceof Error &&
+    err.message.includes("Cookies can only be modified in a Server Action or Route Handler")
+  );
 }
 
 export async function isAuthenticated(): Promise<boolean> {

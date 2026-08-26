@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAuth } from "@/lib/firebase/auth-guard";
 import { applyLinkageEstablished } from "@/lib/auth/identity-link";
+import { logger } from "@/lib/log";
 import { parseJsonBody } from "@/lib/validation/zod-helpers";
 import { enforceRateLimit, limiters } from "@/lib/ratelimit";
 import { verifyLineIdToken } from "@/lib/line/verify-liff-token";
@@ -96,7 +97,12 @@ export async function POST(request: NextRequest) {
         }),
       });
     } catch (err) {
-      console.error("[line-link-liff] cx-agent unreachable:", err);
+      /* 台帳に届かなければ連携は成立しない。id_token は載せない
+         (載せるのはサーバ確定の顧客 ID だけ)。 */
+      logger.error("api.line-link-liff.cx-agent-unreachable", err, {
+        customerId: auth.customerId,
+        status: 502,
+      });
       return NextResponse.json({ error: "linking_upstream_unreachable" }, { status: 502 });
     }
 
@@ -142,13 +148,23 @@ export async function POST(request: NextRequest) {
     try {
       const data = (await upstream.json()) as { has_purchase_activity?: boolean };
       hasPurchaseActivity = data.has_purchase_activity === true;
-    } catch {
-      // 応答が JSON でない/欠落 → 過大約束しない安全側（false）のまま。
+    } catch (err) {
+      /* 応答が JSON でない/欠落 → 過大約束しない安全側（false）のまま返す。
+         ただし黙って落とさない: これが続くと全員に安全側コピーが出続け、
+         完了画面が静かに劣化したまま誰も気づけない。 */
+      logger.error("api.line-link-liff.purchase-activity-unreadable", err, {
+        customerId: auth.customerId,
+      });
     }
 
     return NextResponse.json({ success: true, hasPurchaseActivity });
   } catch (err) {
-    console.error("[POST /api/user/line-link-liff]", err);
+    /* 連携経路の想定外。連携できたかどうかが誰にも分からない状態なので、
+       Vercel のログ止まりにしない。 */
+    logger.error("api.line-link-liff.link-failed", err, {
+      route: "POST /api/user/line-link-liff",
+      status: 500,
+    });
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

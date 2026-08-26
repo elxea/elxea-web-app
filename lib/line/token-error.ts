@@ -93,6 +93,7 @@ export function readOAuthErrorCode(body: string): string | null {
   try {
     parsed = JSON.parse(body);
   } catch {
+    // expected-failure: LINE の失敗応答は JSON とは限らず、読めないこと自体が「コード不明 (null)」という定義済みの答え。
     return null;
   }
   if (!parsed || typeof parsed !== "object") return null;

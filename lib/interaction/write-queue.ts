@@ -27,6 +27,8 @@
  * 3 回押したのに 1 個しか入らない、という取りこぼしになる。
  */
 
+import { logger } from "@/lib/log";
+
 export type WriteOutcome = "ok" | "failed";
 
 /** 1 件ぶんの送信。 */
@@ -72,8 +74,14 @@ export function createWriteQueue<TPayload>(options?: {
    * (+ と − を 1 回ずつ押して元に戻ったときなど)。
    */
   isEqual?: (a: TPayload, b: TPayload) => boolean;
+  /**
+   * どの操作の列か。Sentry のタグになるので**固定文字列**にする
+   * (`cart.line-quantity` など)。省略すると `unknown` として数えられる。
+   */
+  operation?: string;
 }): WriteQueue<TPayload> {
   const isEqual = options?.isEqual ?? ((a: TPayload, b: TPayload) => Object.is(a, b));
+  const operation = options?.operation ?? "unknown";
   const entries = new Map<string, QueueEntry<TPayload>>();
 
   function settle(key: string, entry: QueueEntry<TPayload>, outcome: WriteOutcome) {
@@ -97,7 +105,12 @@ export function createWriteQueue<TPayload>(options?: {
     try {
       await send(payload);
     } catch (e) {
-      console.error(`write-queue: send failed for "${key}"`, e);
+      /* 画面からの書き込みが失敗した唯一の合流点。ここを `console.error` に
+         していたので、**顧客の操作が落ちたことが誰にも届いていなかった**
+         (着手時点で `components/**` の `captureException` は 0 件)。
+         言い直しは呼び出し側の `onFailure` が受け持つ。ここは「起きたことを
+         残す」だけを受け持つ (憲章 Wave 3 / R1)。 */
+      logger.error("ui.write.send-failed", e, { operation, key });
       /* 失敗したらそこで打ち切る。待たせていた分も送らない — サーバの実体が
          分からない状態で追い撃ちをかけない。呼び出し元は `failed` を受け取り、
          楽観更新はサーバの値へ巻き戻る。 */

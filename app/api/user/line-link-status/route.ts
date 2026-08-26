@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/firebase/auth-guard";
+import { logger } from "@/lib/log";
 import { enforceRateLimit, limiters } from "@/lib/ratelimit";
 import { fetchLineLinkageStatus } from "@/lib/line/linkage-status";
 
@@ -51,9 +52,12 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(status);
   } catch (err) {
-    // ここに来るのは requireAuth 自体が壊れた場合。連携状態は不明として返し、
-    // 画面を落とさない（ただしログには残す）。
-    console.error("[GET /api/user/line-link-status]", err);
+    /* ここに来るのは requireAuth 自体が壊れた場合。連携状態は不明として返し、
+       画面を落とさない。ただし応答が 200「不明」で外からは平常時と見分けが
+       つかないので、認証が壊れている事実は必ず鳴る側に載せる。 */
+    logger.error("api.line-link-status.read-failed", err, {
+      route: "GET /api/user/line-link-status",
+    });
     return NextResponse.json({ linked: null, linkedAt: null });
   }
 }

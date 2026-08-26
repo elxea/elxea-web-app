@@ -3,6 +3,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { parseBody } from "next-sanity/webhook";
 import { env } from "@/lib/config";
 import { isSanityDocumentType, tagsForSanityType } from "@/lib/cache/tags";
+import { logger } from "@/lib/log";
 
 /**
  * Sanity の webhook 受け口。**剥がす側**であり、貼る側は
@@ -70,7 +71,12 @@ export async function POST(req: NextRequest) {
       now: Date.now(),
     });
   } catch (err) {
-    console.error("Revalidation error:", err);
+    /* 剥がせなかった = 古い本文が本番に残る。Sanity 側の webhook 履歴は
+       赤くなるが、それを見に行く人はいないので必ず鳴らす。 */
+    logger.error("api.revalidate.tag-expire-failed", err, {
+      route: "/api/revalidate",
+      status: 500,
+    });
     return new NextResponse("Error revalidating", { status: 500 });
   }
 }

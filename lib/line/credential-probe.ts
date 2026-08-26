@@ -42,6 +42,7 @@
  */
 import { lineApiBaseUrl } from "@/lib/line/endpoints";
 import { classifyTokenExchangeError } from "@/lib/line/token-error";
+import { logger } from "@/lib/log";
 
 /** 資格情報 1 組の判定。 */
 export type CredentialVerdict =
@@ -128,6 +129,12 @@ export async function probeChannelCredentials(
     /* ⚠ 例外の中身をそのまま出さない。fetch の TypeError は URL を含むことがあり、
        ここで組み立てた URL には `client_secret` は載らないものの、載らないことに
        依存した書き方はしない。出すのは種別だけ。 */
+    /* `unknown` は「異常なし」ではない。検査そのものが届かなかったことを残す
+       (公開する本文には出さないので、記録側にだけ詳細を渡す)。 */
+    logger.error("line.credential-probe.request-failed", err, {
+      operation: "token-exchange-probe",
+      verdict: "unknown",
+    });
     return {
       verdict: "unknown",
       detail: `could not reach LINE (${err instanceof Error ? err.name : "error"})`,

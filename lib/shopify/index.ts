@@ -69,6 +69,7 @@ export function normalizeMetafieldValue(value: string | undefined): string | nul
       .join("、");
     return joined || null;
   } catch {
+    // expected-failure: `[` 始まりでも JSON でない普通の文字列は普通にあり、素通しがここの答え。
     return trimmed;
   }
 }

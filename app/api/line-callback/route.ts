@@ -13,6 +13,7 @@ import {
   AUTO_LOGIN_FAILED_PARAM,
   AUTO_LOGIN_FAILED_VALUE,
 } from "@/lib/line/auto-login";
+import { logger } from "@/lib/log";
 import { verifyLineIdToken } from "@/lib/line/verify-liff-token";
 import { lineApiBaseUrl } from "@/lib/line/endpoints";
 import {
@@ -296,8 +297,13 @@ export async function GET(request: NextRequest) {
           }),
         });
       } catch (e) {
-        console.error("[line-callback] Identity link failed:", e);
         // Don't block login on link failure
+        /* ログインは通るが連携は成立していない。無音にすると「LINE でログイン
+           できたのに購入履歴が出ない」だけが顧客側に残る。 */
+        logger.error("api.line-callback.identity-link-failed", e, {
+          route: "/api/line-callback",
+          operation: "identity/link-line",
+        });
       }
     }
 
@@ -360,7 +366,9 @@ export async function GET(request: NextRequest) {
     // Redirect to login complete page
     return clearState(response);
   } catch (err) {
-    console.error("[line-callback] Unexpected error:", err);
+    logger.error("api.line-callback.callback-failed", err, {
+      route: "/api/line-callback",
+    });
     return clearState(NextResponse.redirect(new URL(`/${locale}/login?error=Unexpected`, requestOrigin)));
   }
 }

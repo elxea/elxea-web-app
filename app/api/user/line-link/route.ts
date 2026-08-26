@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/firebase/auth-guard";
 import { unlinkLineUser } from "@/lib/firebase/server-actions";
+import { logger } from "@/lib/log";
 import { enforceRateLimit, limiters } from "@/lib/ratelimit";
 import { requestCxUnlink } from "@/lib/line/unlink";
 import {
@@ -141,7 +142,12 @@ export async function DELETE(request: NextRequest) {
 
     return response;
   } catch (err) {
-    console.error("[DELETE /api/user/line-link]", err);
+    /* 解除が途中で落ちた。正本 (cx-agent) と写し (Firestore) のどちらまで
+       進んだかは応答からは分からないので、必ず鳴らして人が見に行けるようにする。 */
+    logger.error("api.line-link.unlink-failed", err, {
+      route: "DELETE /api/user/line-link",
+      status: 500,
+    });
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

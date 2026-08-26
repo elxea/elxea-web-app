@@ -9,6 +9,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { CX_AGENT_BASE_URL, buildProxyAuth } from "@/lib/chat/proxy";
+import { logger } from "@/lib/log";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,7 @@ export async function POST(request: NextRequest) {
   try {
     body = await request.json();
   } catch {
+    // expected-failure: ブラウザが送る body が壊れているだけで、400 を返すのが答え。
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
@@ -38,7 +40,10 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify(forwardBody),
     });
   } catch (err) {
-    console.error("[chat/event proxy] upstream fetch failed:", err);
+    logger.error("api.chat-event.upstream-unreachable", err, {
+      route: "/api/chat/event",
+      status: 502,
+    });
     return NextResponse.json({ error: "Upstream unavailable" }, { status: 502 });
   }
 

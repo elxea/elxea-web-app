@@ -5,6 +5,7 @@ import * as Sentry from "@sentry/nextjs";
 import { applyLinkageEstablished } from "@/lib/auth/identity-link";
 import { env } from "@/lib/config";
 import { extractCustomerId } from "@/lib/firebase/types";
+import { logger } from "@/lib/log";
 
 /**
  * 「台帳に連携の行が立った」— **合体が走る唯一のきっかけ**（M-2）。
@@ -90,7 +91,13 @@ export async function POST(request: NextRequest) {
   let body: EventBody;
   try {
     body = (await request.json()) as EventBody;
-  } catch {
+  } catch (err) {
+    /* 鍵は既に通っている = cx-agent からの通知である。その body が読めないのは
+       送り手側の不具合で、放っておくと連携が黙って合体しないまま残る。 */
+    logger.error("api.linkage-established.body-parse-failed", err, {
+      route: "/api/internal/linkage-established",
+      status: 400,
+    });
     return NextResponse.json({ error: "invalid_json" }, { status: 400 });
   }
 

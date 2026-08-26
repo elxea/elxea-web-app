@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/firebase/auth-guard";
 import { getUserDashboardData } from "@/lib/firebase/server-actions";
+import { logger } from "@/lib/log";
 import { enforceRateLimit, limiters } from "@/lib/ratelimit";
 
 /**
@@ -20,7 +21,12 @@ export async function GET(request: NextRequest) {
     const data = await getUserDashboardData(auth.customerId);
     return NextResponse.json(data);
   } catch (err) {
-    console.error("[GET /api/user/dashboard]", err);
+    /* マイページの中身が丸ごと出ない。顧客から見て一番目立つ壊れ方なので、
+       Vercel のログではなくアラートの鳴る側に載せる。 */
+    logger.error("api.user-dashboard.load-failed", err, {
+      route: "GET /api/user/dashboard",
+      status: 500,
+    });
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

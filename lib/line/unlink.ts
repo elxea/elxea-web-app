@@ -1,5 +1,6 @@
 import { CX_AGENT_BASE_URL } from "@/lib/chat/proxy";
 import { env } from "@/lib/config";
+import { logger } from "@/lib/log";
 
 /**
  * LINE 連携解除の cx-agent 側呼び出し（解除を「本当に効く」ようにするための片割れ）。
@@ -104,10 +105,12 @@ export async function requestCxUnlink(
 
     return { ok: true, clearedCount };
   } catch (err) {
-    console.warn(
-      "[line-unlink] unreachable:",
-      err instanceof Error ? err.message : err,
-    );
+    /* 解除は書き込みなので失敗は失敗のまま返す (fail-closed)。届かない状態が
+       続くとお客さまは解除できないままなので、記録も必ず残す。 */
+    logger.error("line.unlink.cx-agent-unreachable", err, {
+      customerId: shopifyCustomerId,
+      targeted: Boolean(lineUserId),
+    });
     return { ok: false, reason: "upstream_error" };
   }
 }

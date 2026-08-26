@@ -16,6 +16,7 @@ import {
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
 
 import { env, isProduction } from "@/lib/config";
+import { logger } from "@/lib/log";
 
 import { resolveServerFirestoreTarget } from "./firestore-target";
 
@@ -35,7 +36,13 @@ export function decodePrivateKey(raw: string | undefined): string | undefined {
       if (decoded.includes("-----BEGIN")) {
         return decoded;
       }
-    } catch {
+    } catch (err) {
+      /* 次の形式で読み直すので処理は続けるが、鍵が読めない状態は誰もログイン
+         できない状態に直結するので、黙って落とさない。 */
+      logger.error("firebase.admin.private-key-decode-failed", err, {
+        operation: "decodePrivateKey",
+        format: "base64",
+      });
       // Not valid base64, fall through
     }
   }

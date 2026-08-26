@@ -7,6 +7,7 @@ import {
   getEventRegistrations,
   isRegisteredForEvent,
 } from "@/lib/firebase/server-actions";
+import { logger } from "@/lib/log";
 import { parseJsonBody } from "@/lib/validation/zod-helpers";
 import { enforceRateLimit, limiters } from "@/lib/ratelimit";
 
@@ -70,7 +71,12 @@ export async function GET(request: NextRequest) {
     const registrations = await getEventRegistrations(auth.userKey);
     return NextResponse.json({ registrations });
   } catch (err) {
-    console.error("[GET /api/user/events]", err);
+    /* 申込済みが読めなかっただけなのに、画面では「申し込んでいない」と
+       区別がつかない。届く側に載せる。 */
+    logger.error("api.user-events.list-failed", err, {
+      route: "GET /api/user/events",
+      status: 500,
+    });
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
@@ -101,7 +107,11 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(result);
   } catch (err) {
-    console.error("[POST /api/user/events]", err);
+    /* イベント申込が成立していない。当日の人数に直結するので必ず鳴らす。 */
+    logger.error("api.user-events.register-failed", err, {
+      route: "POST /api/user/events",
+      status: 500,
+    });
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
@@ -129,7 +139,12 @@ export async function DELETE(request: NextRequest) {
     );
     return NextResponse.json(result);
   } catch (err) {
-    console.error("[DELETE /api/user/events]", err);
+    /* キャンセルが通っていない。申込は残ったままなので、
+       当日の人数がずれる前に気づけるようにする。 */
+    logger.error("api.user-events.cancel-failed", err, {
+      route: "DELETE /api/user/events",
+      status: 500,
+    });
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
