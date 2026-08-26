@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { getLocale, getTranslations } from "next-intl/server";
 import type { PortableTextBlock } from "@portabletext/types";
 
-import { getClient } from "@/sanity/lib/client";
+import { sanityFetch } from "@/sanity/lib/fetch";
 import {
   FARMER_BY_SLUG_QUERY,
   OTHER_FARMERS_QUERY,
@@ -128,10 +128,10 @@ export async function generateMetadata({
   // Fictional/seed farmers are hidden until real stories are approved.
   if (isFictionalSlug("farmer", slug)) return {};
   try {
-    const client = getClient();
-    const farmer: Farmer | null = await client.fetch(FARMER_BY_SLUG_QUERY, {
-      slug,
-      language: locale,
+    const farmer: Farmer | null = await sanityFetch({
+      query: FARMER_BY_SLUG_QUERY,
+      params: { slug, language: locale },
+      cache: { tag: "sanity:farmers" },
     });
     if (!farmer) return {};
     const image = farmer.photo?.asset
@@ -196,12 +196,18 @@ export default async function FarmerPage({
   let farmer: Farmer | null;
   let others: OtherFarmer[] = [];
   try {
-    const client = getClient();
-    farmer = await client.fetch(FARMER_BY_SLUG_QUERY, { slug, language: locale });
+    farmer = await sanityFetch({
+      query: FARMER_BY_SLUG_QUERY,
+      params: { slug, language: locale },
+      cache: { tag: "sanity:farmers" },
+    });
     if (farmer) {
       const fetched: OtherFarmer[] =
-        (await client.fetch(OTHER_FARMERS_QUERY, { slug, language: locale })) ??
-        [];
+        (await sanityFetch<OtherFarmer[]>({
+          query: OTHER_FARMERS_QUERY,
+          params: { slug, language: locale },
+          cache: { tag: "sanity:farmers" },
+        })) ?? [];
       others = filterOutFictional("farmer", fetched);
     }
   } catch {

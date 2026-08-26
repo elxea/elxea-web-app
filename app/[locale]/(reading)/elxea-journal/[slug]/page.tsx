@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { getLocale, getTranslations } from "next-intl/server";
 import type { PortableTextBlock } from "@portabletext/types";
 
-import { getClient } from "@/sanity/lib/client";
+import { sanityFetch } from "@/sanity/lib/fetch";
 import { JOURNAL_BY_SLUG_QUERY } from "@/sanity/lib/queries";
 import { urlFor } from "@/sanity/lib/image";
 import { Section } from "@/components/layout/container";
@@ -123,10 +123,10 @@ export async function generateMetadata({
   const { slug } = await params;
   const locale = await getLocale();
   try {
-    const client = getClient();
-    const journal: Journal | null = await client.fetch(JOURNAL_BY_SLUG_QUERY, {
-      slug,
-      language: locale,
+    const journal: Journal | null = await sanityFetch({
+      query: JOURNAL_BY_SLUG_QUERY,
+      params: { slug, language: locale },
+      cache: { tag: "sanity:journals" },
     });
     if (!journal) return {};
     const seo = journal.seo;
@@ -168,8 +168,11 @@ export default async function ElxeaJournalDetailPage({
 
   let journal: Journal | null;
   try {
-    const client = getClient();
-    journal = await client.fetch(JOURNAL_BY_SLUG_QUERY, { slug, language: locale });
+    journal = await sanityFetch({
+      query: JOURNAL_BY_SLUG_QUERY,
+      params: { slug, language: locale },
+      cache: { tag: "sanity:journals" },
+    });
   } catch {
     return (
       <Section spacing="none" className={articlePagePadding}>

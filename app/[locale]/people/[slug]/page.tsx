@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getLocale, getTranslations } from "next-intl/server";
 
-import { getClient } from "@/sanity/lib/client";
+import { sanityFetch } from "@/sanity/lib/fetch";
 import {
   PERSON_BY_SLUG_QUERY,
   OTHER_PEOPLE_QUERY,
@@ -147,8 +147,11 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   try {
-    const client = getClient();
-    const person: Person | null = await client.fetch(PERSON_BY_SLUG_QUERY, { slug });
+    const person: Person | null = await sanityFetch({
+      query: PERSON_BY_SLUG_QUERY,
+      params: { slug },
+      cache: { tag: "sanity:authors" },
+    });
     if (!person) return {};
     const image = person.image?.asset
       ? urlFor(person.image).width(800).url()
@@ -207,17 +210,29 @@ export default async function PeoplePage({
   let others: OtherPerson[] = [];
   let articles: Parameters<typeof ArticleCard>[0]["article"][] = [];
   try {
-    const client = getClient();
-    person = await client.fetch(PERSON_BY_SLUG_QUERY, { slug });
+    person = await sanityFetch({
+      query: PERSON_BY_SLUG_QUERY,
+      params: { slug },
+      cache: { tag: "sanity:authors" },
+    });
     if (person) {
-      others = (await client.fetch(OTHER_PEOPLE_QUERY, { slug })) ?? [];
+      others =
+        (await sanityFetch<OtherPerson[]>({
+          query: OTHER_PEOPLE_QUERY,
+          params: { slug },
+          cache: { tag: "sanity:authors" },
+        })) ?? [];
       // 旧実装は $start / $end を渡しておらず GROQ が失敗していた (上の注記参照)。
       articles =
-        (await client.fetch(ARTICLES_BY_AUTHOR_QUERY, {
-          language: locale,
-          authorSlug: slug,
-          start: 0,
-          end: ARTICLE_LIMIT,
+        (await sanityFetch({
+          query: ARTICLES_BY_AUTHOR_QUERY,
+          params: {
+            language: locale,
+            authorSlug: slug,
+            start: 0,
+            end: ARTICLE_LIMIT,
+          },
+          cache: { tag: "sanity:articles" },
         })) ?? [];
     }
   } catch {

@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { getLocale, getTranslations } from "next-intl/server";
 import type { PortableTextBlock } from "@portabletext/types";
 
-import { getClient } from "@/sanity/lib/client";
+import { sanityFetch } from "@/sanity/lib/fetch";
 import { PAGE_BY_SLUG_QUERY } from "@/sanity/lib/queries";
 import { PortableText } from "@/components/sanity/portable-text";
 import { Breadcrumb } from "@/components/seo/breadcrumb";
@@ -70,8 +70,11 @@ export async function generateMetadata({
   const { slug } = await params;
   const locale = await getLocale();
   try {
-    const client = getClient();
-    const page = await client.fetch(PAGE_BY_SLUG_QUERY, { slug, language: locale });
+    const page = await sanityFetch({
+      query: PAGE_BY_SLUG_QUERY,
+      params: { slug, language: locale },
+      cache: { tag: "sanity:pages" },
+    });
     if (!page) return {};
     return { title: page.title };
   } catch {
@@ -91,8 +94,11 @@ export default async function GenericPage({
 
   let page;
   try {
-    const client = getClient();
-    page = await client.fetch(PAGE_BY_SLUG_QUERY, { slug, language: locale });
+    page = await sanityFetch({
+      query: PAGE_BY_SLUG_QUERY,
+      params: { slug, language: locale },
+      cache: { tag: "sanity:pages" },
+    });
   } catch {
     return (
       <Section spacing="lg">

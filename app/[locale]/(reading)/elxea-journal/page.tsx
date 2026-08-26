@@ -4,7 +4,7 @@ import { getLocale, getTranslations } from "next-intl/server";
 
 import { FilterX, Sprout } from "lucide-react";
 
-import { getClient } from "@/sanity/lib/client";
+import { sanityFetch } from "@/sanity/lib/fetch";
 import { JOURNALS_QUERY } from "@/sanity/lib/queries";
 import { Link } from "@/i18n/navigation";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -180,8 +180,11 @@ async function JournalContent({ params }: { params: SearchParams }) {
 
   let fetched: JournalItem[];
   try {
-    const client = getClient();
-    fetched = await client.fetch(JOURNALS_QUERY, { language: locale });
+    fetched = await sanityFetch({
+      query: JOURNALS_QUERY,
+      params: { language: locale },
+      cache: { tag: "sanity:journals" },
+    });
   } catch {
     return <p className="mt-8 text-sm text-muted-foreground lg:mt-12">{t("loadError")}</p>;
   }

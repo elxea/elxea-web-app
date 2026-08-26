@@ -26,7 +26,7 @@ import { placeholderValue } from "@/lib/placeholders";
 import { isSeedId, withSeedFarmers } from "@/lib/preview-seed";
 import { cn } from "@/lib/utils";
 import { urlFor } from "@/sanity/lib/image";
-import { getClient } from "@/sanity/lib/client";
+import { sanityFetch } from "@/sanity/lib/fetch";
 import { FARMERS_QUERY } from "@/sanity/lib/queries";
 
 /**
@@ -329,8 +329,12 @@ async function MakersSection() {
 
   let fetched: Farmer[] = [];
   try {
-    const client = getClient();
-    fetched = (await client.fetch(FARMERS_QUERY, { language: locale })) ?? [];
+    fetched =
+      (await sanityFetch<Farmer[]>({
+        query: FARMERS_QUERY,
+        params: { language: locale },
+        cache: { tag: "sanity:farmers" },
+      })) ?? [];
   } catch {
     // 取得できないときは節を出さない (エラー文だけの枠を残さない)。
     return null;

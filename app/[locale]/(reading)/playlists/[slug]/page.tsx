@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getLocale, getTranslations } from "next-intl/server";
 
-import { getClient } from "@/sanity/lib/client";
+import { sanityFetch } from "@/sanity/lib/fetch";
 import {
   OTHER_PLAYLISTS_QUERY,
   PLAYLIST_BY_SLUG_QUERY,
@@ -118,7 +118,11 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   try {
-    const pl: Playlist | null = await getClient().fetch(PLAYLIST_BY_SLUG_QUERY, { slug });
+    const pl: Playlist | null = await sanityFetch({
+      query: PLAYLIST_BY_SLUG_QUERY,
+      params: { slug },
+      cache: { tag: "sanity:playlists" },
+    });
     if (!pl) return {};
     const image = pl.albumImage?.asset ? urlFor(pl.albumImage).width(800).url() : undefined;
     const descText = toPlainText(pl.description).slice(0, 160);
@@ -149,9 +153,18 @@ export default async function PlaylistDetailPage({
   let pl: Playlist | null;
   let others: OtherPlaylist[] = [];
   try {
-    const client = getClient();
-    pl = await client.fetch(PLAYLIST_BY_SLUG_QUERY, { slug });
-    if (pl) others = (await client.fetch(OTHER_PLAYLISTS_QUERY, { slug })) ?? [];
+    pl = await sanityFetch({
+      query: PLAYLIST_BY_SLUG_QUERY,
+      params: { slug },
+      cache: { tag: "sanity:playlists" },
+    });
+    if (pl)
+      others =
+        (await sanityFetch<OtherPlaylist[]>({
+          query: OTHER_PLAYLISTS_QUERY,
+          params: { slug },
+          cache: { tag: "sanity:playlists" },
+        })) ?? [];
   } catch {
     return (
       <div className="page-container py-16">

@@ -3,7 +3,7 @@ import { useTranslations } from "next-intl";
 import { getLocale, getTranslations } from "next-intl/server";
 import { Sprout } from "lucide-react";
 import { Link } from "@/i18n/navigation";
-import { getClient } from "@/sanity/lib/client";
+import { sanityFetch } from "@/sanity/lib/fetch";
 import { ImageCard } from "@/components/media/image-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { pillClass } from "@/components/ui/pill-button";
@@ -72,8 +72,15 @@ async function EventsList() {
   const tCommon = await getTranslations("common");
 
   try {
-    const client = getClient();
-    const published = await client.fetch(EVENTS_QUERY, { language: locale });
+    // EVENTS_QUERY は `coalesce(endDate, date) >= now()` を含む — 結果が
+    // **時間の経過だけで変わる**。どの名札を貼っても「終わったイベントが
+    // 一覧から消える」を webhook では起こせないので、名札ではなく noStore で
+    // 扱う (会期切れの取りこぼしは 2026-08 に実際に起きている)。
+    const published = await sanityFetch({
+      query: EVENTS_QUERY,
+      params: { language: locale },
+      cache: { noStore: true },
+    });
 
     // Hide the fictional/seed events (bodies contain "ダミー") still present
     // in the production dataset. Code-only; no Sanity mutation.

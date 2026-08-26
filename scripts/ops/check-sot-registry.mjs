@@ -56,7 +56,7 @@ const REGISTRY_PATH = join(ROOT, 'docs', 'sot-registry.md');
  * を fixture として**わざと書く**ので、テストを走査に含めると検査が自分の
  * fixture で落ちる。走査対象を実装に絞ることで両方解決する。
  */
-const SCAN_DIRS = ['app', 'lib', 'components', 'scripts'];
+const SCAN_DIRS = ['app', 'lib', 'components', 'scripts', 'sanity'];
 const SCAN_FILES = ['middleware.ts', 'instrumentation.ts'];
 const SCAN_EXT = /\.(ts|tsx|mjs|js|jsx)$/;
 const SKIP_DIR = new Set(['node_modules', '.next', 'dist', 'coverage', 'storybook-static', 'scratch']);
@@ -67,6 +67,30 @@ const SKIP_DIR = new Set(['node_modules', '.next', 'dist', 'coverage', 'storyboo
  * (参照) を拾わない。参照まで重複扱いすると、正本を説明する文章が書けなくなる。
  */
 const DECLARATION = /^\s*(?:\*|\/\/|#)?\s*@sot\s+([a-z0-9][a-z0-9-]*)\s*$/;
+
+/**
+ * 宣言の 1 行形: `/** @sot <concept> *\/` を 1 行で書いたもの。
+ *
+ * Wave 1 QA 指摘 (2026-08-27)。上の `DECLARATION` は行末を固定しているため、
+ * 1 行で閉じた JSDoc は**宣言として数えられず参照に落ちる**。結果、その概念は
+ * 「参照はあるが宣言が無い」として落ちる — 書いた本人からは、正しく書いたのに
+ * 検査が理解しない状態に見える。同じ意味の 2 つ目の書き方を黙って無視するのは
+ * 検査の側の欠陥なので、宣言として受け付ける。
+ *
+ * 散文中の参照 (`` `@sot site-origin` ``) を拾わない性質は保たれる。この形は
+ * 行全体がコメントの開閉で閉じていることを要求するので、文章の途中には現れない。
+ */
+const DECLARATION_ONE_LINE = /^\s*\/\*\*?\s*@sot\s+([a-z0-9][a-z0-9-]*)\s*\*\/\s*$/;
+
+/**
+ * 宣言のつもりで書かれたが、上の 2 形のどちらにも一致しない行。
+ *
+ * 行に散文が無く `@sot <何か>` だけがあるのに宣言と見なされない、というのは
+ * ほぼ確実に書式の逸脱 (大文字・末尾の句読点・concept の綴りに使えない文字)。
+ * 落とすほどではないが黙って参照に落とすと原因が分からないので、警告に出す。
+ */
+const DECLARATION_LIKE =
+  /^\s*(?:\*|\/\/|\/\*\*?|#)?\s*@sot\s+([A-Za-z0-9][\w-]*)\s*[.。,、;:]?\s*(?:\*\/)?\s*$/;
 
 /** 参照: 行のどこかに現れる `@sot <concept>`。宣言も一旦ここに含まれる。 */
 const REFERENCE = /@sot\s+([a-z0-9][a-z0-9-]*)/g;
@@ -111,6 +135,8 @@ function scan() {
   const declarations = new Map();
   /** concept -> [{ file, line }] */
   const references = new Map();
+  /** 書式逸脱の疑いがある行 (警告のみ・失敗させない) */
+  const malformed = [];
 
   for (const file of collectFiles()) {
     let text;
@@ -125,13 +151,16 @@ function scan() {
     lines.forEach((line, i) => {
       const at = { file: rel(file), line: i + 1 };
 
-      const decl = line.match(DECLARATION);
+      const decl = line.match(DECLARATION) ?? line.match(DECLARATION_ONE_LINE);
       if (decl) {
         const concept = decl[1];
         if (!declarations.has(concept)) declarations.set(concept, []);
         declarations.get(concept).push(at);
         return; // 宣言行は参照として二重に数えない
       }
+
+      // 宣言のつもりに見えるのに一致しなかった行を控えておく (警告用)。
+      if (DECLARATION_LIKE.test(line)) malformed.push({ ...at, line_text: line.trim() });
 
       for (const m of line.matchAll(REFERENCE)) {
         const concept = m[1];
@@ -141,7 +170,7 @@ function scan() {
     });
   }
 
-  return { declarations, references };
+  return { declarations, references, malformed };
 }
 
 function renderRegistry(declarations) {
@@ -175,7 +204,7 @@ function renderRegistry(declarations) {
 
 function main() {
   const checkOnly = process.argv.includes('--check');
-  const { declarations, references } = scan();
+  const { declarations, references, malformed } = scan();
 
   const problems = [];
 
@@ -215,6 +244,17 @@ function main() {
           '    → node scripts/ops/check-sot-registry.mjs を実行して結果をコミットしてください。'
       );
     }
+  }
+
+  // 書式逸脱の警告。宣言として数えられていない `@sot` 行を可視化する
+  // (落とさない — 失敗は「重複」「未宣言参照」「drift」の 3 つに限る)。
+  for (const m of malformed) {
+    console.warn(
+      `[check-sot-registry] WARN 宣言の書式から外れています: ${m.file}:${m.line}\n` +
+        `    ${m.line_text}\n` +
+        `    → 宣言は \`@sot <concept>\` だけを 1 行に書く (concept は英小文字・数字・ハイフン)。` +
+        ` この行はいま参照として数えられています。`
+    );
   }
 
   if (problems.length > 0) {

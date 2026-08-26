@@ -670,6 +670,21 @@ export const ENV_SPEC = {
     read: () => process.env.E2E_FIRESTORE_STUB,
     schema: optionalTrimmed(),
   },
+
+  /* ---------------- Error reporting (Sentry) ----------------
+   * Wave 1 QA 指摘 (2026-08-27) で見つかった取り残し。`sentry.*.config.ts` と
+   * `instrumentation-client.ts` は Next の起動ファイルで `app/` `lib/`
+   * `components/` のどれでもないため、Wave 1 の lint の `files` に入っておらず
+   * 生読みのまま残っていた。3 ファイル 6 か所が同じ 1 変数を各自で
+   * 「未設定とは何か」を決めながら読んでいた (`!!` で真偽に潰す形)。
+   *
+   * 末尾改行の混入で壊れる型の値 (URL) であることは
+   * `NEXT_PUBLIC_SITE_URL` の事故と同じなので、trim を通す。
+   */
+  NEXT_PUBLIC_SENTRY_DSN: {
+    read: () => process.env.NEXT_PUBLIC_SENTRY_DSN,
+    schema: optionalTrimmed(),
+  },
 } as const satisfies Record<string, EnvEntry>;
 
 /** Every variable name the application is allowed to read. */

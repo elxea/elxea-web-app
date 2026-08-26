@@ -98,6 +98,19 @@ describe("行き止まりにしない", () => {
     ).toEqual({ kind: "all" });
   });
 
+  it("コレクション名の一部だけでは当てない (部分一致への退行を止める)", () => {
+    /* QA 指摘 (憲章 Wave 1 レビュー / 2026-08-27)。
+       `お茶` は 3 つのコレクション名すべての接頭辞であり、`お茶のコレクション`
+       の handle `single-item` を除けば `お茶のアソートセット` にも
+       `お茶の定期便` にも前方一致する。照合を「含む」に緩めた瞬間、`?category=お茶`
+       は **先に見つかった方**へ黙って着地する — 押した人には「なぜかアソート
+       セットだけが出る」に見え、しかもどのテストも赤くならない。
+       照合は正規化した上での完全一致であるべきで、それをここで固定する。 */
+    expect(resolveCategoryFilter("お茶", PRODUCT_TYPES, COLLECTIONS)).toEqual({
+      kind: "all",
+    });
+  });
+
   it("どこにも無い名前は「すべて」", () => {
     expect(resolveCategoryFilter("ほうじ茶", PRODUCT_TYPES, COLLECTIONS)).toEqual({
       kind: "all",

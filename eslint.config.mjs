@@ -199,8 +199,26 @@ const eslintConfig = [
       "components/**/*.tsx",
       "lib/**/*.ts",
       "lib/**/*.tsx",
+      // Wave 2 で追加 (Wave 1 QA 指摘 / 2026-08-27):
+      //   Wave 1 のフェンスは `app` `components` `lib` の 3 区画しか見ておらず、
+      //   Sentry の起動ファイルと `sanity/**` が素通しだった。実際そこに生読みが
+      //   6 件 + 4 件残っていて、「全件移行した」という Wave 1 の主張は網の外に
+      //   ついては成り立っていなかった。網の形が主張の範囲を決めるので、
+      //   移行と同じ変更で網を広げる。
+      //
+      //   `sanity.config.ts` (リポジトリ直下) だけは意図的に外にある。これは
+      //   Studio の設定で、Next 経由 (`app/(studio)/studio`) だけでなく
+      //   **`sanity deploy` が Next の外から直接読む**。`@/lib/config` の別名は
+      //   その経路では解決できないので、ここを移行すると Studio のデプロイが
+      //   壊れる。ファイル冒頭のコメントが同じことを述べている。取りこぼしでは
+      //   なく、動く経路が 2 つあることによる正当な例外。
+      "sanity/**/*.ts",
+      "sanity/**/*.tsx",
       "middleware.ts",
       "instrumentation.ts",
+      "instrumentation-client.ts",
+      "sentry.server.config.ts",
+      "sentry.edge.config.ts",
     ],
     ignores: [
       // 唯一の例外。ここが `process.env` を読む場所であり、読み方の正本。
@@ -209,6 +227,37 @@ const eslintConfig = [
     rules: {
       "no-restricted-syntax": [
         "error",
+        // 憲章 Wave 2「Sanity 境界とキャッシュの対化」(2026-08-27):
+        //   Sanity を読むのは `sanity/lib/fetch.ts` の `sanityFetch` だけ。
+        //   ゲートウェイは `cache` を型で必須にしており、迂回して素の client を
+        //   掴むとその強制がまるごと外れる。
+        //
+        // なぜ規律ではなく lint なのか: 名札を「付けるべき」という規律で運用した
+        // 結果が着手時点の実測 **60 か所中 0 か所**で、一方 webhook 側は
+        // `revalidateTag` を叩き続けていた。剥がす側だけが存在する状態は、
+        // 動いていないことを誰にも知らせない (webhook は 200 を返す)。
+        //
+        // なぜ import を止めるのか (`.fetch` の呼び出しではなく): client を
+        // 手に入れられなければ、別名に代入しようが分割代入しようが読めない。
+        // 呼び出し形を数え上げる書き方は抜け道が残る。動的 import
+        // (`await import("@/sanity/lib/client")` — sitemap が使っていた形) も
+        // `ImportExpression` で同じく塞ぐ。
+        //
+        // 例外はこのブロックの `ignores` に無い場所、すなわち `sanity/**` 配下
+        // (= ゲートウェイ自身) だけ。`app/**` からの逃げ道は用意しない。
+        {
+          selector: "ImportDeclaration[source.value='@/sanity/lib/client']",
+          message:
+            "Sanity の client を直接 import しない。sanityFetch (@/sanity/lib/fetch) を通す " +
+            "(憲章 Wave 2)。理由: ゲートウェイだけがキャッシュの名札を型で必須にしており、" +
+            "迂回すると 2026-08 まで続いた『webhook は 200 を返すが本番は更新されない』に戻る。",
+        },
+        {
+          selector: "ImportExpression[source.value='@/sanity/lib/client']",
+          message:
+            "Sanity の client を動的 import で掴まない。sanityFetch (@/sanity/lib/fetch) を通す " +
+            "(憲章 Wave 2)。app/sitemap.ts が実際にこの形で迂回していた。",
+        },
         {
           selector: "MemberExpression[object.name='process'][property.name='env']",
           message:

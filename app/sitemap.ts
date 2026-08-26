@@ -70,12 +70,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   // Dynamic pages from Sanity
   try {
-    const { getClient } = await import("@/sanity/lib/client");
-    const client = getClient();
+    const { sanityFetch } = await import("@/sanity/lib/fetch");
 
-    const articles = await client.fetch<{ slug: string; _updatedAt: string }[]>(
-      `*[_type == "article" && defined(slug.current)]{ "slug": slug.current, _updatedAt }`
-    );
+    const articles = await sanityFetch<{ slug: string; _updatedAt: string }[]>({
+      query: `*[_type == "article" && defined(slug.current)]{ "slug": slug.current, _updatedAt }`,
+      cache: { tag: "sanity:sitemap" },
+    });
     for (const article of articles) {
       for (const locale of locales) {
         entries.push({
@@ -87,9 +87,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       }
     }
 
-    const events = await client.fetch<{ slug: string; _updatedAt: string }[]>(
-      `*[_type == "event" && defined(slug.current)]{ "slug": slug.current, _updatedAt }`
-    );
+    const events = await sanityFetch<{ slug: string; _updatedAt: string }[]>({
+      query: `*[_type == "event" && defined(slug.current)]{ "slug": slug.current, _updatedAt }`,
+      cache: { tag: "sanity:sitemap" },
+    });
     for (const event of events) {
       // Skip seed events whose bodies literally contain "ダミー".
       if (isFictionalSlug("event", event.slug)) continue;
@@ -103,9 +104,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       }
     }
 
-    const farmers = await client.fetch<{ slug: string; _updatedAt: string }[]>(
-      `*[_type == "farmer" && defined(slug.current)]{ "slug": slug.current, _updatedAt }`
-    );
+    const farmers = await sanityFetch<{ slug: string; _updatedAt: string }[]>({
+      query: `*[_type == "farmer" && defined(slug.current)]{ "slug": slug.current, _updatedAt }`,
+      cache: { tag: "sanity:sitemap" },
+    });
     for (const farmer of farmers) {
       // Skip fictional/seed farmers hidden until real stories are approved.
       if (isFictionalSlug("farmer", farmer.slug)) continue;
@@ -120,9 +122,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }
 
     // Tea menus
-    const teaMenus = await client.fetch<{ slug: string; _updatedAt: string }[]>(
-      `*[_type == "teaMenu" && defined(slug.current)]{ "slug": slug.current, _updatedAt }`
-    );
+    const teaMenus = await sanityFetch<{ slug: string; _updatedAt: string }[]>({
+      query: `*[_type == "teaMenu" && defined(slug.current)]{ "slug": slug.current, _updatedAt }`,
+      cache: { tag: "sanity:sitemap" },
+    });
     for (const tea of teaMenus) {
       // Skip the seed tea menus (no real tea is published yet).
       if (isFictionalSlug("teaMenu", tea.slug)) continue;
@@ -137,9 +140,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }
 
     // Playlists
-    const playlists = await client.fetch<{ slug: string; _updatedAt: string }[]>(
-      `*[_type == "playlist" && defined(slug.current)]{ "slug": slug.current, _updatedAt }`
-    );
+    const playlists = await sanityFetch<{ slug: string; _updatedAt: string }[]>({
+      query: `*[_type == "playlist" && defined(slug.current)]{ "slug": slug.current, _updatedAt }`,
+      cache: { tag: "sanity:sitemap" },
+    });
     for (const pl of playlists) {
       // プレイリストは遮断しない (Setaka 2026-08-26 に 8/22 の非表示判断を上書き)。
       for (const locale of locales) {
@@ -153,9 +157,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }
 
     // elxea Journals
-    const journals = await client.fetch<{ slug: string; _updatedAt: string }[]>(
-      `*[_type == "journal" && defined(slug.current)]{ "slug": slug.current, _updatedAt }`
-    );
+    const journals = await sanityFetch<{ slug: string; _updatedAt: string }[]>({
+      query: `*[_type == "journal" && defined(slug.current)]{ "slug": slug.current, _updatedAt }`,
+      cache: { tag: "sanity:sitemap" },
+    });
     for (const j of journals) {
       for (const locale of locales) {
         entries.push({
@@ -168,9 +173,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }
 
     // Authors/People
-    const authors = await client.fetch<{ slug: string; _updatedAt: string }[]>(
-      `*[_type == "author" && defined(slug.current)]{ "slug": slug.current, _updatedAt }`
-    );
+    const authors = await sanityFetch<{ slug: string; _updatedAt: string }[]>({
+      query: `*[_type == "author" && defined(slug.current)]{ "slug": slug.current, _updatedAt }`,
+      cache: { tag: "sanity:sitemap" },
+    });
     for (const author of authors) {
       for (const locale of locales) {
         entries.push({

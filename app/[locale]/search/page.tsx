@@ -4,7 +4,7 @@ import { getLocale, getTranslations } from "next-intl/server";
 
 import { searchProducts } from "@/lib/shopify";
 import type { Product } from "@/lib/shopify/types";
-import { getClient } from "@/sanity/lib/client";
+import { sanityFetch } from "@/sanity/lib/fetch";
 import {
   ARTICLES_SEARCH_COUNT_QUERY,
   ARTICLES_SEARCH_QUERY,
@@ -90,15 +90,17 @@ export default async function SearchPage({
     const [productSettled, articleSettled] = await Promise.allSettled([
       searchProducts(query),
       (async () => {
-        const client = getClient();
         const [list, total] = await Promise.all([
-          client.fetch(ARTICLES_SEARCH_QUERY, {
-            language: locale,
-            term,
-            start: 0,
-            end: articleShow,
+          sanityFetch({
+            query: ARTICLES_SEARCH_QUERY,
+            params: { language: locale, term, start: 0, end: articleShow },
+            cache: { tag: "sanity:articles" },
           }),
-          client.fetch(ARTICLES_SEARCH_COUNT_QUERY, { language: locale, term }),
+          sanityFetch({
+            query: ARTICLES_SEARCH_COUNT_QUERY,
+            params: { language: locale, term },
+            cache: { tag: "sanity:articles" },
+          }),
         ]);
         return { list: (list ?? []) as ArticleItem[], total: (total ?? 0) as number };
       })(),
