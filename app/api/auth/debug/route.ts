@@ -46,10 +46,10 @@ export async function GET(request: NextRequest) {
   // Test 4: getCustomerFromSession (uses updated query from customer.ts)
   let customerResult: unknown;
   try {
-    const customer = await getCustomerFromSession();
-    customerResult = customer
-      ? { ok: true, data: customer }
-      : { ok: false, value: "null" };
+    const result = await getCustomerFromSession();
+    customerResult = result.ok
+      ? { ok: true, data: result.data }
+      : { ok: false, reason: result.reason };
   } catch (e) {
     customerResult = { ok: false, error: String(e) };
   }

@@ -10,7 +10,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { CX_AGENT_BASE_URL, buildProxyAuth } from "@/lib/chat/proxy";
 
-export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /** ブラウザから引き継ぐ安全なクエリパラメータ (customer_id は含めない) */

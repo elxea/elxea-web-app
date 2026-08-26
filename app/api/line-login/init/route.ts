@@ -5,7 +5,11 @@ import { getBaseUrl, getRequestHostname, isTrustedAuthHost } from "@/lib/base-ur
 import { getCookieSpec, isSecure, resolveCookieDomain } from "@/lib/auth/cookies";
 import { wantsAutoLoginDisabled } from "@/lib/line/auto-login";
 import { lineAuthBaseUrl } from "@/lib/line/endpoints";
-import { loginBotPrompt, loginScopeParam } from "@/lib/line/login-channel";
+import {
+  loginBotPrompt,
+  loginScopeParam,
+  resolveLoginChannelId,
+} from "@/lib/line/login-channel";
 import { reportChannelNamespace } from "@/lib/line/login-channel-report";
 
 /**
@@ -51,7 +55,15 @@ export async function POST(request: NextRequest) {
       { status: 503 },
     );
   }
-  const channelId = process.env.AUTH_LINE_ID;
+  /* 読み方は `resolveLoginChannelId()` に寄せる (生の `process.env.AUTH_LINE_ID` は
+   * 読まない)。理由の本体は `/api/line-login/route.ts` の同じ箇所と
+   * `lib/line/login-channel.ts` の `resolveLoginChannelId` に書いてある —
+   * 要するに trim の有無で認可 URL と token 交換が別の値を使い、しかも
+   * ヘルスチェックは緑のままになる。
+   *
+   * ⚠ ログイン用の `AUTH_LINE_ID` と、連携 (LIFF) 用の `LINE_LIFF_CHANNEL_ID` は
+   *   別のチャネルを指す別の env。ここを後者に置き換えてはならない。 */
+  const channelId = resolveLoginChannelId();
   if (!channelId) {
     /* 503, not 500. The channel is not broken, it is not configured for this
      * deployment — a preview without LINE credentials is an expected state, not
