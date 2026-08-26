@@ -47,9 +47,14 @@ export function CartContent() {
 
   return (
     <div className="flex flex-col gap-10 lg:flex-row lg:items-start lg:gap-12">
-      {/* 書き込みが走っているあいだ、行の操作は `disabled` で止まる。見た目の
-          薄さだけでは支援技術に何も伝わらないので、`aria-busy` で「いま処理中」
-          であることを明示する (監査 #15 の「進行表示が無い」の読み上げ側)。 */}
+      {/* 書き込みが走っていることは `aria-busy` で名乗るが、**操作は止めない**。
+          以前はここから `disabled={isPending}` を全行に配っていて、+ を 1 回
+          押すと本番実測 1,905〜2,062ms のあいだ**全行の数量と削除が固まって**
+          いた。数字自体は 16〜30ms で動いていたのに「2 秒かかる」と感じられて
+          いたのはこれで、250ms 間隔の 2 回目は黙って捨てられていた
+          (6 → 7。本番実測 2026-08-26 / Setaka 実機指摘)。
+          いまは押した回数がそのまま入り、往復は `quantity-write-queue` が
+          1 行 1 本にまとめる。 */}
       <ul
         data-slot="cart-lines"
         aria-busy={isPending}
@@ -79,12 +84,16 @@ export function CartContent() {
               item.cost.totalAmount.currencyCode,
             )}
             quantity={item.quantity}
-            disabled={isPending}
             quantityLabel={t("quantity")}
             removeLabel={t("remove")}
-            onQuantityChange={(next) =>
-              updateQuantity(item.id, item.merchandise.id, next)
-            }
+            onQuantityChange={async (next) => {
+              /* 数量だけは今まで**失敗しても何も出していなかった**
+                 (`cart-context` の `console.error` 止まり)。外れたときに数字が
+                 黙って戻るのは、追加・削除と約束が揃っていない。言い直す。 */
+              if ((await updateQuantity(item.id, item.merchandise.id, next)) === "failed") {
+                toast.error(t("updateQuantityFailed"));
+              }
+            }}
             onRemove={async () => {
               trackRemoveFromCart({
                 id: item.merchandise.id,

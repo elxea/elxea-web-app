@@ -22,6 +22,7 @@
     "viewCart": "カートを見る",
     "removedFromCart": "カートから削除しました",
     "removeFromCartFailed": "カートから削除できませんでした。もう一度お試しください。",
+    "updateQuantityFailed": "数量を変更できませんでした。もう一度お試しください。",
     "checkout": "購入手続きへ",
     "subtotal": "小計",
     "total": "合計",

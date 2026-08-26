@@ -139,6 +139,24 @@ const eslintConfig = [
       "elxea-tokens/no-new-karte-fields": "error",
     },
   },
+
+  // 「押した瞬間に効く」の機械強制（2026-08-26 / Setaka 実機指摘）:
+  //   画面からサーバへ書き込むときは lib/interaction の共通 hook を通す。
+  //   直に Server Action / fetch を呼ぶと、押した瞬間の反応・失敗時の巻き戻し・
+  //   言い直し・連打の整理がどれも付いてこない。実際それが「押しても 2 秒動かない」
+  //   の発生源だった（カート数量の +/- は本番実測 1,905〜2,062ms のあいだ受付を
+  //   閉じていて、250ms 間隔の 2 回目が黙って捨てられていた）。
+  //   error 級（pnpm lint は --max-warnings 0）。逃げ道はルール内の allowlist のみで、
+  //   **縮小方向にのみ更新する**。分類の正本は lib/interaction/mutation-classes.ts。
+  {
+    files: ["components/**/*.tsx", "app/**/*.tsx"],
+    plugins: {
+      "elxea-tokens": elxeaTokens,
+    },
+    rules: {
+      "elxea-tokens/mutation-through-shared-primitive": "error",
+    },
+  },
 ];
 
 export default eslintConfig;
