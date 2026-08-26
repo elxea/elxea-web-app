@@ -20,13 +20,7 @@
  * そのもの** (`messages` の `common.*`) を渡す — 名前の一覧を二重管理しない。
  */
 
-/**
- * 名前の照合用に畳む。全角/半角・大文字小文字・前後の空白の違いで
- * 「同じ名前なのに別物」と判定されないようにする。
- */
-function normalizeTitle(value: string): string {
-  return value.normalize("NFKC").trim().toLowerCase();
-}
+import { normalizeTitle } from "@/lib/text/normalize-title";
 
 /**
  * `reserved` と同じ名前を持つ項目を落とす。

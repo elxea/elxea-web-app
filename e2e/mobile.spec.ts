@@ -391,6 +391,23 @@ async function startAudioPlayback(page: Page): Promise<Rect> {
 }
 
 /**
+ * SP のチャットランチャを呼び戻す。
+ *
+ * 2026-08-27 (通しテスト E-1) から、SP のランチャは **下へ動いたあと静止しても
+ * 戻らない** — 静止時に本文 (商品カード) を覆っていたのが実害だったため。出す
+ * 条件は「画面最上部」と「上へ動かしたとき」の 2 つだけ (規則の正本は
+ * `hooks/use-retreat-on-scroll.ts`)。
+ *
+ * ここより下の検査は「ランチャが出ている」ことが前提だが、`click()` の
+ * 自動スクロールで下へ動いていることがある。**人がやるのと同じ手順**で呼び戻す。
+ */
+async function summonChatLauncher(page: Page) {
+  await page.evaluate(() => window.scrollTo(0, 0));
+  // RETREAT_SETTLE_MS (240ms) より十分長く待って、判定が済んだ状態にする。
+  await page.waitForTimeout(600);
+}
+
+/**
  * 重なった領域の中心で「どちらが手前に描かれているか」を描画順で調べる。
  *
  * ここで `document.elementFromPoint` (単数) を使ってはいけない。Radix の
@@ -605,6 +622,7 @@ test.describe("Bottom-fixed occlusion (SP)", () => {
     page,
   }) => {
     const dock = await startAudioPlayback(page);
+    await summonChatLauncher(page);
 
     const launcher = page.locator('[data-slot="chat-launcher"]');
     await requireVisibleWithin(launcher, "SP でチャットランチャが出ている");
@@ -639,6 +657,7 @@ test.describe("Bottom-fixed occlusion (SP)", () => {
     page,
   }) => {
     await startAudioPlayback(page);
+    await summonChatLauncher(page);
 
     await page.locator('[data-slot="chat-launcher"]').click();
     const panel = page.locator('[data-slot="chat-panel-mobile"]');

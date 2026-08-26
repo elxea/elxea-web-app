@@ -80,8 +80,11 @@ export function ChatLauncher({ onClick, hasMessages }: ChatLauncherProps) {
         // (`transition: all` は禁止なのでプロパティを明示する)。
         "transition-[bottom,transform,opacity] duration-fast ease-enter",
         "hover:scale-105 active:scale-95",
-        // 監査 #17: SP で本文 (商品カードのタイトル) に重なるのを、時間軸で
-        // 避ける。`transform` / `opacity` だけを切り替えるのでコンポジタで動き、
+        // 監査 #17 / 通しテスト E-1: SP で本文 (商品カード) に重なるのを、時間軸で
+        // 避ける。SP の一覧は 2 列で画面幅を敷き詰めるので、右下 48px に空き場所は
+        // 無い (2026-08-27 実測)。**静止時も退いたまま**にし、上へ動かしたときに
+        // 出す (規則の正本は `hooks/use-retreat-on-scroll.ts`)。
+        // `transform` / `opacity` だけを切り替えるのでコンポジタで動き、
         // DOM からは外さないので開いている会話も支援技術上の入口も失われない。
         // `motion-reduce` では動かさず、その場で消えて出る。
         !shown &&

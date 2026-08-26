@@ -3,8 +3,13 @@ import { getLocale, getTranslations } from "next-intl/server";
 
 import { FilterX } from "lucide-react";
 
-import { getProducts } from "@/lib/shopify";
-import { productTypeLabel, productTypeMatches } from "@/lib/shopify/product-type";
+import { getCollectionProductHandles, getCollections, getProducts } from "@/lib/shopify";
+import { productTypeLabel } from "@/lib/shopify/product-type";
+import {
+  categoryFilterValue,
+  resolveCategoryFilter,
+  type CategoryFilter,
+} from "@/lib/shopify/category-filter";
 import type { Product } from "@/lib/shopify/types";
 import { Link } from "@/i18n/navigation";
 import { Breadcrumb } from "@/components/seo/breadcrumb";
@@ -102,24 +107,29 @@ async function ProductsContent({ params }: { params: SearchParams }) {
      だけロケール側 (`緑茶`) に落とす。日本語 UI に英日併記のラベルが出るのを
      やめるための分離で、分類名そのものはコードに持たない。 */
   const categories = [...new Set(products.map((p) => p.productType).filter(Boolean))];
+
+  /* `?category=` は生の productType だけでなく、トップの CATEGORIES タイル /
+     コレクション一覧が渡す**コレクション名** (`お茶のアソートセット`) でも届く。
+     コレクション名は productType にまたがることがあり、旧実装ではそれが黙って
+     「すべて」に落ちて 12 件が全部出ていた (通しテスト E-3)。判断は
+     `resolveCategoryFilter` が正本。コレクションだったときだけ所属 handle を
+     引いて絞る (productType で済むときは追加の往復をしない)。 */
+  const resolved = await resolveCategory(params.category, categories);
+  const { filter } = resolved;
+  const activeCategory = categoryFilterValue(filter);
+
+  /* コレクション絞り込みのときは、そのコレクション名のチップを 1 枚足す。
+     足さないと「すべて」が選択状態のまま件数だけ減り、何で絞られているのかも
+     解除の仕方も画面から分からない。 */
   const chips = [
     { value: "all", label: tl("all") },
     ...categories.map((c) => ({ value: c, label: productTypeLabel(c, locale) })),
+    ...(filter.kind === "collection"
+      ? [{ value: filter.title, label: filter.title }]
+      : []),
   ];
 
-  /* `?category=` は生の productType だけでなく、トップの CATEGORIES タイルが渡す
-     コレクション名 (`緑茶`) でも届く。一致判定を `productTypeMatches` に寄せて
-     どちらでも同じ絞り込みに着地させる (以前は生値一致のみで、タイル経由は
-     すべて「すべて」に落ちていた)。 */
-  const requested = params.category;
-  const activeCategory =
-    (requested
-      ? categories.find((c) => productTypeMatches(c, requested))
-      : undefined) ?? "all";
-  const filtered =
-    activeCategory === "all"
-      ? products
-      : products.filter((p) => p.productType === activeCategory);
+  const filtered = filterProducts(products, resolved);
 
   const show = Math.max(PAGE_SIZE, Number(params.show) || PAGE_SIZE);
   const visible = filtered.slice(0, show);
@@ -193,4 +203,57 @@ async function ProductsContent({ params }: { params: SearchParams }) {
       ) : null}
     </>
   );
+}
+
+type ResolvedCategory = {
+  filter: CategoryFilter;
+  /** コレクション絞り込みのときだけ入る所属 handle。 */
+  memberHandles: ReadonlySet<string> | null;
+};
+
+/**
+ * `?category=` を実際に効く絞り込みへ解決する。
+ *
+ * コレクション一覧を引くのは **productType で拾えなかったときだけ**。緑茶 /
+ * 紅茶 / 烏龍茶のチップ経由 (大半の導線) では往復が 1 回も増えない。
+ *
+ * コレクション側の取得に失敗しても画面は落とさない — 絞り込みなしに落として
+ * 一覧を出す (取得失敗を 0 件表示と混同させない)。
+ */
+async function resolveCategory(
+  requested: string | undefined,
+  productTypes: readonly string[],
+): Promise<ResolvedCategory> {
+  const byProductType = resolveCategoryFilter(requested, productTypes);
+  if (byProductType.kind !== "all" || !requested?.trim()) {
+    return { filter: byProductType, memberHandles: null };
+  }
+
+  try {
+    const collections = await getCollections(50);
+    const filter = resolveCategoryFilter(requested, productTypes, collections);
+    if (filter.kind !== "collection") return { filter, memberHandles: null };
+
+    const handles = await getCollectionProductHandles(filter.handle);
+    /* 所属が 1 件も取れないなら絞り込みとして採用しない。採用すると「押したら
+       0 件」になり、壊れているのと見分けが付かない。 */
+    if (handles.length === 0) return { filter: { kind: "all" }, memberHandles: null };
+    return { filter, memberHandles: new Set(handles) };
+  } catch {
+    return { filter: { kind: "all" }, memberHandles: null };
+  }
+}
+
+function filterProducts(
+  products: readonly Product[],
+  { filter, memberHandles }: ResolvedCategory,
+): Product[] {
+  switch (filter.kind) {
+    case "productType":
+      return products.filter((p) => p.productType === filter.value);
+    case "collection":
+      return products.filter((p) => memberHandles?.has(p.handle) ?? false);
+    default:
+      return [...products];
+  }
 }
