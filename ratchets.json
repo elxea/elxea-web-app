@@ -8,9 +8,10 @@
   ],
   "ratchets": {
     "eslint-inline-disable": {
-      "max": 16,
+      "max": 19,
       "source": "app/** components/** lib/** sanity/** middleware.ts instrumentation.ts の eslint-disable コメント",
-      "why": "ソースに直接書く逃げ道。pnpm lint:prune-suppressions の縮小対象にならないので、放っておくと溜まる一方になる。"
+      "why": "ソースに直接書く逃げ道。pnpm lint:prune-suppressions の縮小対象にならないので、放っておくと溜まる一方になる。",
+      "note": "16 → 19 (2026-08-27)。instrumentation.ts の 3 件で、いずれも process.env を生読みする no-restricted-syntax の disable。これは『例外を足した』のではなく、NEXT_RUNTIME / NODE_ENV をビルド時にリテラルへ畳ませるための必須要件 (畳めないと nodejs 分岐の firebase-admin が Edge の bundle に残り、Vercel のデプロイが unsupported modules で落ちる。#164 マージ後に実際に発生し #168 で修正)。理由の正本は instrumentation.ts の register() の doc comment。再発防止は scripts/ops/check-edge-bundle.mjs (required check の build に接続済み)。"
     },
     "eslint-suppressions-files": {
       "max": 43,
