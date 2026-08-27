@@ -373,6 +373,31 @@ describe("宣言の強制", () => {
 describe("e2e との配線", () => {
   const spec = readFileSync(SPEC, "utf8");
 
+  /**
+   * 画面で観測できる応答だけが e2e の対象。
+   *
+   * `fire-and-forget` を外すのは、その宣言が「誰もこの往復を待っていない」を
+   * 意味するから (先読みの引き金は画面を何も変えないのが正しい挙動)。
+   * **exempt とは別物** — 応答を分類したうえで「観測対象が無い」と言っている。
+   * 正本は spec 側の `OBSERVABLE_RESPONSES` で、ここはそれと同じ集合を見ている
+   * ことを確かめてから使う (2 か所に別々の定義を置かない)。
+   */
+  const OBSERVABLE = ["optimistic", "sync-dom", "asset-load", "router-nav"];
+
+  const observableDeclared = () =>
+    inventory().filter(
+      (r) => !r.exempt && r.response && !["fire-and-forget"].includes(r.response),
+    );
+
+  it("観測できる応答の集合が spec と食い違っていない", () => {
+    /* ここがずれると、片方だけが「検査対象」と思っている行が生まれる。 */
+    for (const kind of OBSERVABLE) {
+      expect(spec, `${kind} が spec の OBSERVABLE_RESPONSES に無い`).toContain(`"${kind}"`);
+    }
+    expect(spec).toContain("OBSERVABLE_RESPONSES");
+    expect(spec).not.toMatch(/OBSERVABLE_RESPONSES = new Set\(\[[^\]]*"fire-and-forget"/);
+  });
+
   it("spec が台帳を読み込んでいる (手書きのリストにしていない)", () => {
     /* ここを手書きリストにすると、台帳に何を書いても検査は変わらない。
        それが `interactive-instant-controls.test.ts` の 3 ファイル配列で
@@ -384,7 +409,7 @@ describe("e2e との配線", () => {
   it("応答を宣言した行には、必ず e2e の操作手順がある", () => {
     /* **宣言だけして検査しない**を原理的に不可能にする。宣言を増やすと
        検査も増える形にしておかないと、台帳は「守っているつもり」の表になる。 */
-    const declared = inventory().filter((r) => !r.exempt && r.response);
+    const declared = observableDeclared();
     expect(declared.length, "応答を宣言した行が 1 件も無い").toBeGreaterThan(0);
 
     const missing = declared.filter((r) => !spec.includes(`"${r.id}"`));
@@ -395,8 +420,7 @@ describe("e2e との配線", () => {
   });
 
   it("宣言に出てくる response は e2e が判定方法を持っている", () => {
-    const declared = inventory().filter((r) => !r.exempt && r.response);
-    for (const row of declared) {
+    for (const row of observableDeclared()) {
       expect(spec, `${row.response} の判定が e2e に無い`).toContain(`case "${row.response}"`);
     }
   });
@@ -418,7 +442,9 @@ describe("e2e との配線", () => {
     const slots = new Set<string>();
     for (const row of inventory()) {
       for (const selector of row.observe ?? []) {
-        const m = /^\[data-slot="([^"]+)"\]$/.exec(selector);
+        /* 複合 selector (`[data-slot="x"][data-pending="true"]`) でも先頭の
+           data-slot は実在を確かめる。末尾を固定すると検査から漏れる。 */
+      const m = /^\[data-slot="([^"]+)"\]/.exec(selector);
         if (m) slots.add(m[1]);
       }
     }

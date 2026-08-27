@@ -1328,6 +1328,30 @@
       "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
     },
     {
+      "id": "components/audio/track-row.tsx#handler:onFocus#1",
+      "file": "components/audio/track-row.tsx",
+      "kind": "handler",
+      "name": "onFocus",
+      "response": "fire-and-forget",
+      "why": "先読みの引き金 (#172)。押す仕草が見えた時点で行き先・アセットを取りにいくだけで、画面は何も変えず、誰もこの往復を待っていない。応答の対象は「その後に押したとき」の操作側。"
+    },
+    {
+      "id": "components/audio/track-row.tsx#handler:onPointerDown#1",
+      "file": "components/audio/track-row.tsx",
+      "kind": "handler",
+      "name": "onPointerDown",
+      "response": "fire-and-forget",
+      "why": "先読みの引き金 (#172)。押す仕草が見えた時点で行き先・アセットを取りにいくだけで、画面は何も変えず、誰もこの往復を待っていない。応答の対象は「その後に押したとき」の操作側。"
+    },
+    {
+      "id": "components/audio/track-row.tsx#handler:onPointerEnter#1",
+      "file": "components/audio/track-row.tsx",
+      "kind": "handler",
+      "name": "onPointerEnter",
+      "response": "fire-and-forget",
+      "why": "先読みの引き金 (#172)。押す仕草が見えた時点で行き先・アセットを取りにいくだけで、画面は何も変えず、誰もこの往復を待っていない。応答の対象は「その後に押したとき」の操作側。"
+    },
+    {
       "id": "components/cart/cart-content.tsx#handler:onCheckout#1",
       "file": "components/cart/cart-content.tsx",
       "kind": "handler",
@@ -1437,7 +1461,11 @@
       "file": "components/catalog/catalog-list.tsx",
       "kind": "link",
       "name": "Link",
-      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+      "response": "router-nav",
+      "observe": [
+        "[data-slot=\"more-row-label\"][data-pending=\"true\"]"
+      ],
+      "why": "網羅表 G6。`?show=` を伸ばして一覧を丸ごと取り直すので、押してから着地まで 画面が 1 ドットも変わらなかった。#172 が `useLinkStatus` で進行の印を足し、押した瞬間に `data-pending` が立つ。遷移の着地前に印が出ることを検査する。"
     },
     {
       "id": "components/catalog/catalog-toolbar.tsx#handler:onChange#1",
@@ -1452,6 +1480,30 @@
       "kind": "handler",
       "name": "onClick",
       "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/catalog/catalog-toolbar.tsx#handler:onFocus#1",
+      "file": "components/catalog/catalog-toolbar.tsx",
+      "kind": "handler",
+      "name": "onFocus",
+      "response": "fire-and-forget",
+      "why": "先読みの引き金 (#172)。押す仕草が見えた時点で行き先・アセットを取りにいくだけで、画面は何も変えず、誰もこの往復を待っていない。応答の対象は「その後に押したとき」の操作側。"
+    },
+    {
+      "id": "components/catalog/catalog-toolbar.tsx#handler:onFocus#2",
+      "file": "components/catalog/catalog-toolbar.tsx",
+      "kind": "handler",
+      "name": "onFocus",
+      "response": "fire-and-forget",
+      "why": "先読みの引き金 (#172)。押す仕草が見えた時点で行き先・アセットを取りにいくだけで、画面は何も変えず、誰もこの往復を待っていない。応答の対象は「その後に押したとき」の操作側。"
+    },
+    {
+      "id": "components/catalog/catalog-toolbar.tsx#handler:onPointerEnter#1",
+      "file": "components/catalog/catalog-toolbar.tsx",
+      "kind": "handler",
+      "name": "onPointerEnter",
+      "response": "fire-and-forget",
+      "why": "先読みの引き金 (#172)。押す仕草が見えた時点で行き先・アセットを取りにいくだけで、画面は何も変えず、誰もこの往復を待っていない。応答の対象は「その後に押したとき」の操作側。"
     },
     {
       "id": "components/catalog/catalog-toolbar.tsx#handler:onScroll#1",
@@ -2370,6 +2422,22 @@
       "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
     },
     {
+      "id": "components/layout/language-switcher.tsx#handler:onFocus#1",
+      "file": "components/layout/language-switcher.tsx",
+      "kind": "handler",
+      "name": "onFocus",
+      "response": "fire-and-forget",
+      "why": "先読みの引き金 (#172)。押す仕草が見えた時点で行き先・アセットを取りにいくだけで、画面は何も変えず、誰もこの往復を待っていない。応答の対象は「その後に押したとき」の操作側。"
+    },
+    {
+      "id": "components/layout/language-switcher.tsx#handler:onPointerEnter#1",
+      "file": "components/layout/language-switcher.tsx",
+      "kind": "handler",
+      "name": "onPointerEnter",
+      "response": "fire-and-forget",
+      "why": "先読みの引き金 (#172)。押す仕草が見えた時点で行き先・アセットを取りにいくだけで、画面は何も変えず、誰もこの往復を待っていない。応答の対象は「その後に押したとき」の操作側。"
+    },
+    {
       "id": "components/marketing/service-overview.tsx#link:Link#1",
       "file": "components/marketing/service-overview.tsx",
       "kind": "link",
@@ -2481,11 +2549,35 @@
       "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
     },
     {
+      "id": "components/product/image-gallery.tsx#handler:onFocus#1",
+      "file": "components/product/image-gallery.tsx",
+      "kind": "handler",
+      "name": "onFocus",
+      "response": "fire-and-forget",
+      "why": "先読みの引き金 (#172)。押す仕草が見えた時点で行き先・アセットを取りにいくだけで、画面は何も変えず、誰もこの往復を待っていない。応答の対象は「その後に押したとき」の操作側。"
+    },
+    {
       "id": "components/product/image-gallery.tsx#handler:onOpenChange#1",
       "file": "components/product/image-gallery.tsx",
       "kind": "handler",
       "name": "onOpenChange",
       "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/product/image-gallery.tsx#handler:onPointerDown#1",
+      "file": "components/product/image-gallery.tsx",
+      "kind": "handler",
+      "name": "onPointerDown",
+      "response": "fire-and-forget",
+      "why": "先読みの引き金 (#172)。押す仕草が見えた時点で行き先・アセットを取りにいくだけで、画面は何も変えず、誰もこの往復を待っていない。応答の対象は「その後に押したとき」の操作側。"
+    },
+    {
+      "id": "components/product/image-gallery.tsx#handler:onPointerEnter#1",
+      "file": "components/product/image-gallery.tsx",
+      "kind": "handler",
+      "name": "onPointerEnter",
+      "response": "fire-and-forget",
+      "why": "先読みの引き金 (#172)。押す仕草が見えた時点で行き先・アセットを取りにいくだけで、画面は何も変えず、誰もこの往復を待っていない。応答の対象は「その後に押したとき」の操作側。"
     },
     {
       "id": "components/product/product-purchase-options.tsx#handler:onSelectPlan#1",

@@ -56,8 +56,28 @@ export const INVENTORY: Interaction[] = JSON.parse(
   readFileSync(join(process.cwd(), "interaction-inventory.json"), "utf8"),
 ).interactions;
 
-/** 応答を宣言した行 (= 検査の対象)。 */
-export const DECLARED = INVENTORY.filter((row) => !row.exempt && row.response);
+/**
+ * 応答を宣言した行のうち、**画面で観測できるもの** (= e2e の対象)。
+ *
+ * `fire-and-forget` を外すのは、その宣言が「誰もこの往復を待っていない」を
+ * 意味するから。待っている人が居ない操作に「押した瞬間どう見えるか」の検査を
+ * 課すのは筋が通らない (先読みの引き金は画面を何も変えないのが正しい挙動)。
+ * **exempt とは別物**で、これは応答を分類したうえで「観測対象が無い」と
+ * 言っている状態。件数は `interaction-exempt` には入らない。
+ */
+export const OBSERVABLE_RESPONSES = new Set([
+  "optimistic",
+  "sync-dom",
+  "asset-load",
+  "router-nav",
+  "pessimistic-commit",
+  "pessimistic-form",
+  "async-fetch",
+]);
+
+export const DECLARED = INVENTORY.filter(
+  (row) => !row.exempt && row.response && OBSERVABLE_RESPONSES.has(row.response),
+);
 
 /**
  * 台帳の 1 行を、実際に「押す」ところまで持っていく手順。
@@ -91,6 +111,20 @@ export const SCENARIOS: Record<
     },
     act: async (page) => {
       await page.locator("[role='listbox'] button").nth(1).click();
+    },
+  },
+
+  "components/catalog/catalog-list.tsx#link:Link#3": {
+    /* 網羅表 G6。「さらに N 件を表示」は一覧を丸ごと取り直すので着地までは
+       時間がかかる。**その時間を短くするのではなく、押されたことを即座に
+       見せる**のが `router-nav` の約束。遷移を保留したまま印が出るかを見る。 */
+    blocks: "**/products**",
+    arrive: async (page) => {
+      await page.goto("/ja/products");
+      await expect(page.locator("[data-slot='more-row-link']")).toBeVisible();
+    },
+    act: async (page) => {
+      await page.locator("[data-slot='more-row-link']").click();
     },
   },
 
@@ -262,6 +296,42 @@ async function assertAssetPrefetched(page: Page, row: Interaction, scenario: (ty
   ).toContain(decodeURIComponent(shown ?? ""));
 }
 
+/**
+ * 遷移の性質検査 — **着地を待たずに「押された」が見えるか**。
+ *
+ * 遷移そのものを速くはできない (取り直す件数はサーバが決める)。できるのは
+ * **押された瞬間に印を出すこと**で、それが出ないと「押しても何も起きない」に
+ * 見えて二度押し・離脱になる (網羅表 G6 / 本番で 1 ドットも変わらなかった)。
+ *
+ * だから遷移の往復を `page.route()` で保留したまま押し、`observe` が
+ * **着地前に**現れることを見る。時間は測らない。
+ */
+async function assertRouterNavFeedback(
+  page: Page,
+  row: Interaction,
+  scenario: (typeof SCENARIOS)[string],
+) {
+  await scenario.arrive(page);
+
+  const observe = row.observe ?? [];
+  expect(observe.length, `${row.id} は observe が空`).toBeGreaterThan(0);
+
+  /* 遷移 (RSC の取得) を保留する。返さないので画面は着地しない。 */
+  await page.route(scenario.blocks ?? "**/*", async () => {
+    await new Promise(() => {});
+  });
+
+  await scenario.act(page);
+
+  for (const selector of observe) {
+    await expect(
+      page.locator(selector).first(),
+      `${row.id}: ${selector} が出ない。遷移の着地を待つあいだ画面が変わらないので、` +
+        "押しても何も起きていないように見える (網羅表 G6 の再発)。",
+    ).toBeVisible({ timeout: 10_000 });
+  }
+}
+
 /* -------------------------------------------------------------------------- */
 
 test.describe("憲章 R9 — 台帳が宣言した応答が、実際にその性質を持つ", () => {
@@ -305,6 +375,9 @@ test.describe("憲章 R9 — 台帳が宣言した応答が、実際にその性
           break;
         case "asset-load":
           await assertAssetPrefetched(page, row, scenario);
+          break;
+        case "router-nav":
+          await assertRouterNavFeedback(page, row, scenario);
           break;
         default:
           throw new Error(
