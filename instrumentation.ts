@@ -1,6 +1,6 @@
 import * as Sentry from "@sentry/nextjs";
 
-import { assertEnvValid, env, isProduction } from "./lib/config";
+import { assertEnvValid, env } from "./lib/config";
 
 /**
  * `register()` はリクエストを受け付ける前に 1 回だけ走る、というのが Next の契約。
@@ -36,15 +36,46 @@ import { assertEnvValid, env, isProduction } from "./lib/config";
  *
  * エラー文に値は出ない (上の実測でも変数名と制約だけ)。設定エラーはしばしば
  * 資格情報についてのエラーなので、received を出すと設定ミスがそのまま漏洩になる。
+ *
+ * ## `NEXT_RUNTIME` だけは生読みする (レジストリに入れてはいけない)
+ *
+ * 下の 2 つの分岐だけ `process.env.NEXT_RUNTIME` を直接読んでいる。これは
+ * 例外の抜け道ではなく、**この値が設定ではないから**。`NEXT_RUNTIME` は人が
+ * ダッシュボードに入れる値ではなく、バンドラが「いま edge 向けにビルドして
+ * いるのか nodejs 向けなのか」をビルド時に文字列リテラルとして埋め込む
+ * コンパイル対象の識別子で、埋め込まれた結果 `if ("edge" === "nodejs")` に
+ * なった分岐は丸ごと消える (dead code elimination)。消えることに意味がある:
+ * nodejs 側の分岐は `sentry.server.config` と `fake-firestore` →
+ * `firebase-admin` を引き込んでおり、これらは node:http / node:fs / node:net
+ * などに依存する。
+ *
+ * `env("NEXT_RUNTIME")` は関数呼び出しなのでビルド時に畳めない。畳めないと
+ * 分岐が消えず、Node 専用モジュールが **Edge Function の bundle に入る**。
+ * 実害 (2026-08-27): Wave 1 (#164) を main にマージしたところ、CI の全 required
+ * check は緑のまま Vercel のデプロイだけが落ちた:
+ *
+ *     Error: The Edge Function "_middleware" is referencing unsupported modules:
+ *       - __vc__ns__/0/index.js: node:http, node:https, node:zlib, node:stream,
+ *         node:net, node:fs, node:path
+ *
+ * `next build` は成功するので required check では捕まらない (Vercel が出力を
+ * 配る段で初めて落ちる)。本番は fail-closed で直前のデプロイを配り続けたが、
+ * main は「マージできるがデプロイできない」状態になった。
+ *
+ * したがって `NEXT_RUNTIME` は `lib/config/spec.ts` から**外してある**。
+ * レジストリに残しておくと `env("NEXT_RUNTIME")` がまた書けてしまい、同じ
+ * 壊れ方が静かに戻る。宣言を消すことが再流入止め (憲章 R8)。
  */
 export async function register() {
   assertEnvValid();
 
-  if (env("NEXT_RUNTIME") === "nodejs") {
+  // eslint-disable-next-line no-restricted-syntax -- ビルド時に畳まれる必要がある。理由は上の doc comment を参照
+  if (process.env.NEXT_RUNTIME === "nodejs") {
     await import("./sentry.server.config");
     await installE2eFirestoreIfRequested();
   }
-  if (env("NEXT_RUNTIME") === "edge") {
+  // eslint-disable-next-line no-restricted-syntax -- 同上
+  if (process.env.NEXT_RUNTIME === "edge") {
     await import("./sentry.edge.config");
   }
 }
@@ -56,16 +87,34 @@ export async function register() {
  * 最初の route handler が `getAdminFirestore()` を呼ぶ時点では必ず差し込みが済んでいる。
  *
  * 3 重に閉じている:
- *   1. `E2E_FIRESTORE_STUB === "1"` … 既定では何もしない
- *   2. `NODE_ENV !== "production"` … ここでも見る（`setInjectedFirestoreForE2E` 側でも throw する）
+ *   1. `NODE_ENV !== "production"` … ここでも見る（`setInjectedFirestoreForE2E` 側でも throw する）
+ *   2. `E2E_FIRESTORE_STUB === "1"` … 既定では何もしない
  *   3. 偽物の import は **この分岐の中の動的 import** … 通常起動では読み込まれない
  *
  * 理由と安全性の議論は `lib/firebase/admin.ts` の差し込み口のコメントに置いてある
  * （二重に書かない）。
+ *
+ * ## `NODE_ENV` の判定を先に、しかも生読みで置く理由
+ *
+ * この 2 つの early return は順序と読み方に意味がある。`next build` は必ず
+ * `NODE_ENV=production` で走るので、`process.env.NODE_ENV === "production"` と
+ * **リテラルで**書いてあればバンドラがこれを `if (true) return;` に畳み、
+ * それ以降が到達不能になって下の動的 import ごと落ちる。落ちることが目的:
+ * `fake-firestore` は `firebase-admin` を引き込み、`firebase-admin` は gaxios /
+ * gcp-metadata / node-fetch 経由で node:http・node:net・node:fs などに依存する。
+ * これらが Edge Function の bundle に入ると Vercel のデプロイが
+ * unsupported modules で落ちる（2026-08-27 実害。詳細は `register()` の
+ * doc comment）。
+ *
+ * `isProduction()` は関数呼び出しなので畳めず、到達不能にならない。よってここは
+ * `env()` 経由にできない。逆に `E2E_FIRESTORE_STUB` は畳む必要が無いので
+ * レジストリ経由のままでよく、production ビルドでは上の return より後ろにある
+ * ぶん丸ごと消える。
  */
 async function installE2eFirestoreIfRequested(): Promise<void> {
+  // eslint-disable-next-line no-restricted-syntax -- ビルド時に畳んで下の動的 import を消すためリテラルで読む。理由は上の doc comment
+  if (process.env.NODE_ENV === "production") return;
   if (env("E2E_FIRESTORE_STUB") !== "1") return;
-  if (isProduction()) return;
 
   const [{ createFakeFirestore }, { setInjectedFirestoreForE2E }] = await Promise.all([
     import("./__tests__/helpers/fake-firestore"),

@@ -216,10 +216,22 @@ export const ENV_SPEC = {
       })
       .default("development"),
   },
-  NEXT_RUNTIME: {
-    read: () => process.env.NEXT_RUNTIME,
-    schema: optionalTrimmed(),
-  },
+  /*
+   * `NEXT_RUNTIME` はここに**入れない**。
+   *
+   * これは人が設定する値ではなく、バンドラが edge / nodejs のどちら向けに
+   * ビルドしているかをリテラルとして埋め込むコンパイル対象の識別子。
+   * `env("NEXT_RUNTIME")` にすると関数呼び出しになってビルド時に畳めず、
+   * `instrumentation.ts` の nodejs 分岐 (sentry.server.config /
+   * firebase-admin) が dead code elimination されずに Edge Function の
+   * bundle に入り、Vercel のデプロイが unsupported modules で落ちる
+   * (2026-08-27 実害。経緯と実際のエラー文は `instrumentation.ts` の
+   * `register()` の doc comment)。
+   *
+   * 唯一の読み手である `instrumentation.ts` が `process.env.NEXT_RUNTIME` を
+   * 直接読み、そこだけ inline disable を置いている。宣言をここに戻すと
+   * `env()` 経由で読めるようになり同じ壊れ方が再流入するので、戻さない。
+   */
   VERCEL: {
     read: () => process.env.VERCEL,
     schema: optionalTrimmed(),
