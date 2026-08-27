@@ -43,7 +43,12 @@
  */
 
 import { env } from "@/lib/config";
-import { SEED_ID_PREFIX, previewImageForKey, previewSeedEnabled } from "@/lib/preview-seed";
+import {
+  SEED_ID_PREFIX,
+  previewImageAt,
+  previewImageForKey,
+  previewSeedEnabled,
+} from "@/lib/preview-seed";
 import type { Product } from "@/lib/shopify/types";
 
 /** 見本カタログを使ってよいか (フラグ側の条件のみ。資格情報判定は呼び出し側)。 */
@@ -172,6 +177,32 @@ function buildProduct(spec: SeedSpec, index: number): Product {
     height: 1067,
   };
 
+  /**
+   * 写真は **3 枚**持たせる。
+   *
+   * 見本は長らく 1 枚だけだった。`components/product/image-gallery.tsx` は
+   * `images.length > 1` のときしかサムネイル列を描かないので、**見本カタログでは
+   * カルーセルが 1 度も描画されない**。つまり「サムネイルを押しても大きい写真が
+   * すぐ出ない」(網羅表 G1 / 本番実測 705〜1,865ms) を、CI では原理的に
+   * 再現できなかった — 不具合が起きていた画面が、検査環境にだけ存在しなかった。
+   *
+   * URL は 1 枚ずつ**必ず**変える。同じ URL を 3 つ並べると `next/image` が同じ
+   * `_next/image?url=...` を返すので、「切替先を押す前に取ってあるか」の検査が
+   * **常に真**になって空回りする (= 見ていない緑)。
+   *
+   * だから `previewImageForKey` (鍵をハッシュして候補から選ぶ) は使わない —
+   * 候補は 6 枚しかなく、3 枚が同じに落ちることがある。代わりに
+   * `previewImageAt` へ **連番**を渡して、隣り合わない 3 枚を確定で取る。
+   * (`PREVIEW_SEED_DETERMINISTIC=1` のときは意図どおり 1 枚に潰れる。
+   *  そちらはスクリーンショット回帰用で、e2e は使わない。)
+   */
+  const galleryImages = [0, 1, 2].map((offset) => ({
+    url: previewImageAt(index * 3 + offset),
+    altText: offset === 0 ? spec.title : `${spec.title} ${offset + 1}`,
+    width: 1600,
+    height: 1067,
+  }));
+
   /* 1 件だけ売り切れにして在庫バッジの描画経路も見本で通す。
    *
    * ただし **createdAt が最も古い 1 件** を選ぶ。商品一覧の既定は
@@ -203,7 +234,7 @@ function buildProduct(spec: SeedSpec, index: number): Product {
     descriptionHtml: `<p>${spec.description}</p>`,
     availableForSale,
     featuredImage: image,
-    images: [image],
+    images: galleryImages,
     options: [{ id: `${SEED_ID_PREFIX}option-${spec.handle}`, name: "内容量", values: ["50g", "100g"] }],
     variants: [variant("50g", spec.price, "50g"), variant("100g", doubled, "100g")],
     priceRange: { minVariantPrice: jpy(spec.price), maxVariantPrice: jpy(doubled) },

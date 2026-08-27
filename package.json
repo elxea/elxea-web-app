@@ -13,6 +13,8 @@
     "lint:prune-suppressions": "eslint . --prune-suppressions",
     "check:sot": "node scripts/ops/check-sot-registry.mjs --check",
     "check:ratchet": "node scripts/ops/check-ratchet.mjs --check",
+    "check:interactions": "node scripts/ops/generate-interaction-inventory.mjs --check",
+    "generate:interactions": "node scripts/ops/generate-interaction-inventory.mjs",
     "update:ratchet": "node scripts/ops/check-ratchet.mjs --update",
     "generate:sot": "node scripts/ops/check-sot-registry.mjs",
     "typecheck:clean": "node -e \"const fs=require('node:fs');for(const p of ['.next/types','.next/dev/types'])fs.rmSync(p,{recursive:true,force:true});fs.rmSync('tsconfig.tsbuildinfo',{force:true})\"",

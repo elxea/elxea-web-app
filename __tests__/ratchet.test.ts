@@ -34,6 +34,16 @@ function tree(overrides: Record<string, string> = {}): string {
   made.push(dir);
 
   const files: Record<string, string> = {
+    /* 憲章 R9 の操作台帳。`interaction-unclassified` (max 0) と
+       `interaction-exempt` の数え方がここを読むので、最小の形で置いておく。
+       置かないと `countInventory` が「表が見つからない」で落ちる — それは
+       正しい挙動 (0 件と数えて上限だけ残す方が危険) なので、テスト側が用意する。 */
+    "interaction-inventory.json": JSON.stringify({
+      interactions: [
+        { id: "components/a.tsx#handler:onClick#1", kind: "handler", exempt: "据え置き" },
+        { id: "components/b.tsx#handler:onClick#1", kind: "handler", response: "sync-dom" },
+      ],
+    }),
     "eslint-suppressions.json": JSON.stringify({
       "a.ts": { "some/rule": { count: 2 } },
       "b.ts": { "some/rule": { count: 1 } },
@@ -108,6 +118,8 @@ describe("正常系", () => {
     expect(r["silent-catch-grandfathered"].max).toBe(0);
     expect(r["z-layer-fixed-allowlist"].max).toBe(2);
     expect(r["z-layer-pinned-exemptions"].max).toBe(1);
+    expect(r["interaction-exempt"].max).toBe(1);
+    expect(r["interaction-unclassified"].max).toBe(0);
 
     expect(run(dir, ["--check"]).code).toBe(0);
   });

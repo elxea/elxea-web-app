@@ -151,7 +151,12 @@ export function CartLine({
         className="col-start-3 col-end-4 row-start-2 row-end-3 flex flex-col items-end text-right lg:row-start-1 lg:row-end-3 lg:gap-1 lg:self-start"
       >
         <p className={cn(bodySmClass, "text-muted-foreground")}>{unitPrice}</p>
-        <p className={cn(TITLE_SCALE, "text-foreground")}>{linePrice}</p>
+        {/* `cart-line-total` は台帳 (`interaction-inventory.json`) の `observe` から
+            名指しされる。数量を押したときに**この行が更新完了するまで**が検査対象で、
+            ここが古いままだと e2e が落ちる。名前を変えるなら台帳も一緒に直す。 */}
+        <p data-slot="cart-line-total" className={cn(TITLE_SCALE, "text-foreground")}>
+          {linePrice}
+        </p>
       </div>
     </li>
   );
