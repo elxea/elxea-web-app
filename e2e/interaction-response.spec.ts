@@ -242,28 +242,41 @@ async function assertAssetPrefetched(page: Page, row: Interaction, scenario: (ty
 
      いま待つのは **先読み用の隠しコンテナの `<img>` が全部 `complete` になること**。
      これは「先読みが終わった」の直接の表現で、枚数にも速さにも依存しない。 */
-  const PREFETCH_IMAGES = "[aria-hidden] img";
+  /* 待つのは **これから押す 1 枚だけ**。
+     先読みコンテナは `images` と同じ順で並ぶので、押す先 (nth(1)) がそれ。
+
+     全 3 枚を待っていたら CI で 3/3 落ちた (run 33066349720 / `Received: 0` =
+     コンテナは出ているが取得が終わらない)。`next dev` の `/_next/image` は
+     要求のたびに変換するので、3 枚ぶんの変換を待つと 30 秒に収まらないことがある。
+     しかも**後段の assert が見るのは押した 1 枚だけ**なので、3 枚待つのは
+     検査の中身を増やさずに落ちる確率だけ上げていた。 */
+  const PREFETCH_CONTAINER = ".sr-only[aria-hidden] img";
+  const TARGET_INDEX = 1;
 
   await expect
     .poll(
       async () =>
-        page.evaluate((selector) => {
-          const imgs = [...document.querySelectorAll<HTMLImageElement>(selector)];
-          if (imgs.length === 0) return -1;
-          return imgs.every((img) => img.complete && img.currentSrc !== "")
-            ? imgs.length
-            : 0;
-        }, PREFETCH_IMAGES),
+        page.evaluate(
+          ([selector, index]) => {
+            const imgs = [...document.querySelectorAll<HTMLImageElement>(selector as string)];
+            if (imgs.length === 0) return -1;
+            const target = imgs[index as number];
+            if (!target) return -2;
+            return target.complete && target.currentSrc !== "" ? 1 : 0;
+          },
+          [PREFETCH_CONTAINER, TARGET_INDEX] as const,
+        ),
       {
         message:
           `${row.id}: 押される前に切替先の画像を取り終えていない。` +
           "サムネイルを押してから取りにいくと、未取得の 1 枚を取り終わるまで " +
           "見た目は旧画像のまま (網羅表 G1 / 本番実測 705〜1,865ms)。" +
-          "(-1 = 先読みのコンテナ自体が描かれていない / 0 = まだ取得中)",
+          "(-1 = 先読みのコンテナ自体が描かれていない / -2 = 切替先の枚数が足りない / " +
+          "0 = まだ取得中)",
         timeout: 30_000,
       },
     )
-    .toBeGreaterThan(1);
+    .toBe(1);
 
   const beforeClick = await page.evaluate(() =>
     performance
