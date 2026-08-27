@@ -179,13 +179,22 @@ const eslintConfig = [
   // 141 件 / 62 ファイルは全件移行した（例外表を用意していたが使わずに済んだ）。
   // 憲章 R8 の「全件移行 + 再流入止めで 1 セット」は残件ゼロで満たしている。
   //
-  // 逃げ道は 1 箇所だけあり、inline disable で明示してある:
-  //   app/__fixtures__/origin-leak/origin-like.ts
-  // これは `__tests__/auth-cookie-registry.test.ts` の negative fixture で、
-  // **生読みそのものが検査対象**（AST スキャナがそれを報告できることを assert
-  // している）。書き換えるとスキャナが何も報告しなくなり、「スキャナが動いて
-  // いる証拠」が消える。同じ欠陥を別々に見張る 2 つのガードなので、片方を武装
-  // させる fixture がもう片方から外れるのは正しい。
+  // 逃げ道は 2 箇所だけあり、どちらも inline disable で明示してある:
+  //
+  //   1. app/__fixtures__/origin-leak/origin-like.ts
+  //      `__tests__/auth-cookie-registry.test.ts` の negative fixture で、
+  //      **生読みそのものが検査対象**（AST スキャナがそれを報告できることを
+  //      assert している）。書き換えるとスキャナが何も報告しなくなり、
+  //      「スキャナが動いている証拠」が消える。同じ欠陥を別々に見張る 2 つの
+  //      ガードなので、片方を武装させる fixture がもう片方から外れるのは正しい。
+  //
+  //   2. instrumentation.ts の `process.env.NEXT_RUNTIME`
+  //      これは設定ではなくビルド対象（edge / nodejs）の識別子で、バンドラが
+  //      リテラルに畳んで分岐ごと消すことに意味がある。`env()` にすると畳めず、
+  //      nodejs 分岐が引き込む firebase-admin / sentry.server.config が Edge
+  //      Function の bundle に入って Vercel のデプロイが落ちる（2026-08-27 実害。
+  //      `next build` は通るので required check では捕まらない）。理由の正本は
+  //      `instrumentation.ts` の `register()` の doc comment。
   //
   // したがって新しい違反は 1 件目から落ちる。将来どうしても例外が要るなら
   // `eslint --suppress-rule no-restricted-syntax` で eslint-suppressions.json に
