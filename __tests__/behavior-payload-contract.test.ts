@@ -29,8 +29,8 @@ import {
   trackAudioPlay,
 } from "@/lib/firebase/behavior-tracker";
 
-/** 送り手が投げた本文を集める。 */
-const sent: unknown[] = [];
+/** 送り手が投げた本文と、それに付いた Content-Type を集める。 */
+const sent: { body: unknown; contentType: string; url: string }[] = [];
 
 beforeEach(() => {
   sent.length = 0;
@@ -39,14 +39,26 @@ beforeEach(() => {
   (globalThis as { document?: { cookie: string } }).document = {
     cookie: "shop_auth=1",
   };
-  globalThis.fetch = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
-    sent.push(JSON.parse(String(init?.body ?? "{}")));
-    return { ok: true, status: 200, json: async () => ({ success: true }) };
-  }) as unknown as typeof fetch;
+  /* 送り口は `navigator.sendBeacon` (2026-08-27 / 憲章 R9 で `fetch` から移行)。
+     `fetch` を差し替えても**もう何も通らない**ので、偽物もこちらに置く。
+     `sendBeacon` は Blob を受け取り、その `type` がそのまま Content-Type になる。 */
+  vi.stubGlobal("navigator", {
+    sendBeacon: vi.fn((url: string, blob: Blob) => {
+      /* Blob.text() は Promise なので、本文の取り出しは同期にはできない。
+         テスト側は `vi.waitFor` で着地を待つ。 */
+      void blob.text().then((text) => {
+        sent.push({ body: JSON.parse(text), contentType: blob.type, url });
+      });
+      return true;
+    }),
+  });
 });
 
 afterEach(() => {
   vi.restoreAllMocks();
+  /* `globalThis.navigator` は Node 22 では getter のみで代入できない
+     (`Cannot set property navigator`)。stubGlobal / unstubAllGlobals で差し替える。 */
+  vi.unstubAllGlobals();
   delete (globalThis as { document?: unknown }).document;
 });
 
@@ -54,7 +66,7 @@ afterEach(() => {
 async function payloadOf(send: () => void): Promise<unknown> {
   send();
   await vi.waitFor(() => expect(sent).toHaveLength(1));
-  return sent[0];
+  return sent[0].body;
 }
 
 describe("送り手が組み立てた本文は、そのままサーバの受け口を通る", () => {
@@ -105,6 +117,31 @@ describe("送り手が組み立てた本文は、そのままサーバの受け�
       trackAudioPlay({ contentId: "slug", kind: "interview", title: "第 1 回" }),
     );
     expect(BehaviorBodySchema.safeParse(body).success).toBe(true);
+  });
+});
+
+describe("送り口の契約 (sendBeacon)", () => {
+  /* `sendBeacon` は Blob の `type` をそのまま Content-Type にする。省くと
+     `text/plain` で届き、サーバの `parseJsonBody` が本文を読む前に弾く。
+     しかも返事は誰も見ないので、**落ちたことがどこにも出ない** — 読了イベントを
+     数か月落とした監査 P1-3 と全く同じ形の失敗になる。だから型を明示で assert する。 */
+  it("JSON として届く (Content-Type が application/json)", async () => {
+    trackSearch({ query: "煎茶" });
+    await vi.waitFor(() => expect(sent).toHaveLength(1));
+    expect(sent[0].contentType).toBe("application/json");
+    expect(sent[0].url).toBe("/api/user/behavior");
+  });
+
+  it("ログインしていなければ 1 件も送らない", async () => {
+    (globalThis as { document?: { cookie: string } }).document = { cookie: "" };
+    trackSearch({ query: "煎茶" });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(sent).toHaveLength(0);
+  });
+
+  it("sendBeacon が無いブラウザでも例外を投げない", () => {
+    vi.stubGlobal("navigator", {});
+    expect(() => trackSearch({ query: "煎茶" })).not.toThrow();
   });
 });
 

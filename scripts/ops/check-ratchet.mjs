@@ -243,22 +243,47 @@ function loadRatchets() {
   return JSON.parse(readFileSync(RATCHETS_PATH, 'utf8'));
 }
 
-function render(entries, actual) {
+/** 既存ファイルが無いときに置く $comment。あるときは既存をそのまま持ち越す。 */
+const DEFAULT_COMMENT = [
+  'GENERATED-ASSISTED FILE — max は scripts/ops/check-ratchet.mjs --update が書く。',
+  'source / why は人が書く (何の表で、なぜ例外が要るのか)。',
+  'max を手で増やすだけの変更は、例外を増やしたことの申告である。',
+  '検査は両方向: 増えたら落ちる (例外を足した) / 減ったのに max が残っていても落ちる',
+  '(緩んだ枠を残すと、その分だけ黙って増やせる)。',
+];
+
+/**
+ * `--update` の書き戻し。**人が書いたものを 1 文字も落とさない**。
+ *
+ * 初版は `{ max, source, why }` の 3 つだけを組み立て直して書いていた。つまり
+ * `--update` を 1 回走らせるだけで、
+ *
+ *   - 各エントリの `note` (なぜその件数になったのかの経緯。`eslint-inline-disable`
+ *     には Edge バンドルの事情が 5 行ぶん書いてある)
+ *   - `$comment` の 4〜5 行目 (両方向検査の説明)
+ *
+ * が**黙って消えていた**。しかも消えるのは「表を減らしたので --update してね」と
+ * スクリプト自身が指示した直後で、消えたことはエラーにならない。例外の件数は
+ * 守っておきながら、**なぜ例外なのかの記録のほうを機械が捨てる**という、この
+ * 仕組みが最も嫌う形の失敗になっていた (憲章 R8)。
+ *
+ * よって書き戻しは「既存エントリをそのまま持ち、`max` だけ実測に差し替える」形に
+ * する。新しい表が増えたときだけ `source` / `why` の空欄を用意する (人が埋める)。
+ */
+function render(entries, actual, existingComment) {
   const ordered = {};
   for (const id of Object.keys(COUNTERS).sort()) {
-    ordered[id] = {
-      max: actual[id],
-      source: entries[id]?.source ?? '',
-      why: entries[id]?.why ?? '',
-    };
+    const previous = entries[id];
+    ordered[id] = previous
+      ? { ...previous, max: actual[id] }
+      : { max: actual[id], source: '', why: '' };
   }
   return `${JSON.stringify(
     {
-      $comment: [
-        'GENERATED-ASSISTED FILE — max は scripts/ops/check-ratchet.mjs --update が書く。',
-        'source / why は人が書く (何の表で、なぜ例外が要るのか)。',
-        'max を手で増やすだけの変更は、例外を増やしたことの申告である。',
-      ],
+      $comment:
+        Array.isArray(existingComment) && existingComment.length > 0
+          ? existingComment
+          : DEFAULT_COMMENT,
       ratchets: ordered,
     },
     null,
@@ -271,8 +296,9 @@ function main() {
   const actual = measure();
 
   if (update) {
-    const existing = existsSync(RATCHETS_PATH) ? loadRatchets().ratchets ?? {} : {};
-    writeFileSync(RATCHETS_PATH, render(existing, actual));
+    const previous = existsSync(RATCHETS_PATH) ? loadRatchets() : {};
+    const existing = previous.ratchets ?? {};
+    writeFileSync(RATCHETS_PATH, render(existing, actual, previous.$comment));
     console.log(`[check-ratchet] wrote ratchets.json (${Object.keys(actual).length} entries)`);
     for (const [id, n] of Object.entries(actual)) console.log(`  ${id} = ${n}`);
     return;

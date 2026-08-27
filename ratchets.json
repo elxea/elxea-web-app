@@ -24,12 +24,12 @@
       "why": "デザイントークン移行の積み残し。縮小方向にのみ動かす (pnpm lint:prune-suppressions)。"
     },
     "expected-failure-escapes": {
-      "max": 13,
+      "max": 12,
       "source": "app/** lib/** の `expected-failure:` コメント",
       "why": "「失敗が答えである」の明示。正当な逃げ道だが、理由さえ書けば何でも通る形でもあるので数を固定する。"
     },
     "interaction-allowlist": {
-      "max": 16,
+      "max": 15,
       "source": "eslint-rules/mutation-through-shared-primitive.mjs の ALLOWLIST",
       "why": "「押した瞬間に効く」共通 hook への未移行画面。表そのものが残りの移行計画を兼ねている。"
     },

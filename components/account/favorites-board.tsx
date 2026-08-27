@@ -21,7 +21,7 @@ import {
   type FavoriteEntry,
   type FavoriteGroup,
 } from "@/lib/account-favorites";
-import { applyLocalFavorite } from "@/lib/favorites/client-store";
+import { applyLocalFavorite, removeFavorite } from "@/lib/favorites/client-store";
 import { cn } from "@/lib/utils";
 
 /**
@@ -87,21 +87,20 @@ export function FavoritesBoard({ groups: initialGroups }: { groups: FavoriteGrou
        商品ページへ移ったとき「保存済み」のままに見える (事実が 2 か所に割れる)。 */
     applyLocalFavorite(entry.kind, entry.targetId, false);
 
-    try {
-      const res = await fetch("/api/user/favorites", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: entry.kind, targetId: entry.targetId }),
-      });
-      if (!res.ok) throw new Error(`Failed to remove favorite (${res.status})`);
-      toast(t("removedFromFavorites"));
-    } catch {
+    /* 往復は倉庫側の共通の通り道へ寄せる (`removeFavorite`)。ここで直に fetch を
+       書くと、同じ相手への DELETE が保存トグルと別々の交通整理で飛び、どちらが
+       最後にサーバへ残るかが運になる。画面の巻き戻し (並び順を保った復元) だけは
+       一覧固有なので、引き続きここが持つ。失敗の記録は通り道が Sentry へ残す。 */
+    const outcome = await removeFavorite(entry.kind, entry.targetId);
+
+    if (outcome === "failed") {
       setGroups((current) => insertFavoriteIntoGroups(current, entry, originalIndex));
       applyLocalFavorite(entry.kind, entry.targetId, true);
       toast.error(t("actionError"));
-    } finally {
-      setPendingId(null);
+    } else {
+      toast(t("removedFromFavorites"));
     }
+    setPendingId(null);
   }
 
   return (
