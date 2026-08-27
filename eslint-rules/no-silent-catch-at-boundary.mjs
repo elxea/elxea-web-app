@@ -83,6 +83,9 @@
  * kill switch: eslint.config.mjs の該当行を "off" にする。
  */
 
+import { readFileSync } from "node:fs";
+import nodePath from "node:path";
+
 /**
  * 着手時点で存在した握り潰し。**縮小方向にのみ更新する**。
  *
@@ -125,6 +128,93 @@ const REPORT_HELPER = /^report[A-Z]/;
 
 /** 失敗が答えである場所の明示。理由の記述を必須にする。 */
 const EXPECTED_FAILURE = /expected-failure:\s*\S/;
+
+/**
+ * `report*` を import している相手が**本当に報告しているか**を 1 ホップだけ確かめる。
+ *
+ * ## 塞いでいる穴 (Wave 3 QA 指摘 / 2026-08-27)
+ *
+ * 以前はここが「名前が `report` で始まれば、どこから import しても報告先」だった。
+ * 同じファイル内で定義された `reportX` については「そのファイルが本物の報告先を
+ * import しているか」を条件にしていたのに、**別ファイルから import した `reportX`
+ * には同じ条件が掛かっていなかった**。つまり
+ *
+ *   // noop.ts
+ *   export function reportNothing() {}
+ *   // 使う側
+ *   import { reportNothing } from "./noop";
+ *   catch (e) { reportNothing(e); }   // ← これでルールが黙る
+ *
+ * が通った。ルールが止めたい状態そのもの (届かない記録) を、ルール自身が
+ * 用意していたことになる。
+ *
+ * ## どこまで塞げて、どこが残るか (正直に書く)
+ *
+ * import 元のファイルを読み、**そのファイルが `@/lib/log` か `@sentry/nextjs` を
+ * import しているか**だけを見る。これで上の noop は落ちる。
+ *
+ * 残る限界は 2 つ。どちらも「重いので今はやらない」ではなく、
+ * **費用に見合わない**と判断した結果である:
+ *
+ *  1. **多段の連鎖**: A が B から `reportX` を import し、B は何もしないが
+ *     `@sentry/nextjs` を import だけしている、という形は通る。追うには
+ *     モジュールグラフ全体の解決が要り、lint 1 ファイルあたりの費用が跳ねる。
+ *  2. **import はしているが呼んでいない**: 報告先を import しつつ `reportX` の
+ *     中身が空、という形も通る。中身の到達可能性まで見るのは型情報が要る。
+ *
+ * どちらも「そう書けば黙らせられる」と知っている人が意図的に書く必要がある形で、
+ * うっかり書ける形ではなくなった。うっかり書ける形を塞ぐのがこのルールの目的なので、
+ * ここで止める。解決できないファイル (第三者パッケージ・解決失敗) は
+ * **報告先として数えない** — 「分からないから通す」は検査ではないため。
+ */
+const REPORT_HELPER_EXTENSIONS = [
+  ".ts",
+  ".tsx",
+  ".mjs",
+  ".js",
+  "/index.ts",
+  "/index.tsx",
+  "/index.mjs",
+];
+
+/** 一度読んだファイルの判定を憶えておく (同じヘルパは何度も import される)。 */
+const reportingModuleCache = new Map();
+
+function resolveImportPath(source, fromFile) {
+  if (source.startsWith("@/")) {
+    return nodePath.join(process.cwd(), source.slice(2));
+  }
+  if (source.startsWith("./") || source.startsWith("../")) {
+    return nodePath.resolve(nodePath.dirname(fromFile), source);
+  }
+  // 第三者パッケージ。解決しない = 報告先として数えない。
+  return null;
+}
+
+/** そのモジュールが本物の報告先を import しているか。1 ホップだけ見る。 */
+function moduleReachesReporter(source, fromFile) {
+  const base = resolveImportPath(source, fromFile);
+  if (!base) return false;
+
+  if (reportingModuleCache.has(base)) return reportingModuleCache.get(base);
+
+  let reaches = false;
+  for (const ext of REPORT_HELPER_EXTENSIONS) {
+    let text;
+    try {
+      text = readFileSync(base + ext, "utf8");
+    } catch {
+      continue;
+    }
+    reaches = [...REPORTING_MODULES].some((mod) =>
+      new RegExp(`from\\s+["']${mod.replace(/[/\\^$*+?.()|[\]{}]/g, "\\$&")}["']`).test(text),
+    );
+    break;
+  }
+
+  reportingModuleCache.set(base, reaches);
+  return reaches;
+}
 
 function toPosix(filename) {
   return filename.replace(/\\/g, "/");
@@ -293,8 +383,14 @@ const rule = {
             continue;
           }
 
-          /* `reportLoadFailure` 系は Wave 0 のヘルパ。どこから来てもよい。 */
-          if (REPORT_HELPER.test(local)) reporters.add(local);
+          /* `reportLoadFailure` 系は Wave 0 のヘルパ。ただし **import 元が本当に
+             報告しているか**を 1 ホップ確かめる (`moduleReachesReporter` 冒頭に
+             塞いだ穴と残る限界を書いてある)。以前はここが名前だけの判定で、
+             `export function reportNothing() {}` を import すればルールを黙らせ
+             られた。 */
+          if (REPORT_HELPER.test(local) && moduleReachesReporter(from, filename)) {
+            reporters.add(local);
+          }
         }
       },
 

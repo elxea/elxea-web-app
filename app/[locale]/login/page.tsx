@@ -28,6 +28,7 @@ import {
 } from "@/components/auth/auth-card";
 import { Button } from "@/components/ui/button";
 import { Link } from "@/i18n/navigation";
+import { hasLineSessionCookies } from "@/lib/auth/cookies";
 import { LineLoginButton, LineLoginButtonFallback } from "./line-login-button";
 import { LinkSuccessBanner } from "./link-success-banner";
 import { AuthErrorBanner } from "./auth-error-banner";
@@ -49,7 +50,10 @@ export default async function LoginPage() {
    * 無いため)。LINE だけの人はここが連携の入口なので画面を出す必要があるが、素の
    * ログイン画面に見えると「ログアウトしている」と誤解する。もう入っていることと、
    * メールで入ると同じアカウントにまとまることを 1 行で言う。 */
-  const signedInWithLineOnly = (await cookies()).has("line_session");
+  const loginCookies = await cookies();
+  const signedInWithLineOnly = hasLineSessionCookies((name) =>
+    loginCookies.has(name),
+  );
 
   return (
     <AuthSection>

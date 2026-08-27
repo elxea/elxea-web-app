@@ -1,0 +1,52 @@
+{
+  "$comment": [
+    "GENERATED-ASSISTED FILE — max は scripts/ops/check-ratchet.mjs --update が書く。",
+    "source / why は人が書く (何の表で、なぜ例外が要るのか)。",
+    "max を手で増やすだけの変更は、例外を増やしたことの申告である。",
+    "検査は両方向: 増えたら落ちる (例外を足した) / 減ったのに max が残っていても落ちる",
+    "(緩んだ枠を残すと、その分だけ黙って増やせる)。"
+  ],
+  "ratchets": {
+    "eslint-inline-disable": {
+      "max": 19,
+      "source": "app/** components/** lib/** sanity/** middleware.ts instrumentation.ts の eslint-disable コメント",
+      "why": "ソースに直接書く逃げ道。pnpm lint:prune-suppressions の縮小対象にならないので、放っておくと溜まる一方になる。",
+      "note": "16 → 19 (2026-08-27)。instrumentation.ts の 3 件で、いずれも process.env を生読みする no-restricted-syntax の disable。これは『例外を足した』のではなく、NEXT_RUNTIME / NODE_ENV をビルド時にリテラルへ畳ませるための必須要件 (畳めないと nodejs 分岐の firebase-admin が Edge の bundle に残り、Vercel のデプロイが unsupported modules で落ちる。#164 マージ後に実際に発生し #168 で修正)。理由の正本は instrumentation.ts の register() の doc comment。再発防止は scripts/ops/check-edge-bundle.mjs (required check の build に接続済み)。"
+    },
+    "eslint-suppressions-files": {
+      "max": 43,
+      "source": "eslint-suppressions.json のキー数",
+      "why": "件数だけでなく「どれだけ広い範囲が例外か」を別の角度で固定する。"
+    },
+    "eslint-suppressions-total": {
+      "max": 65,
+      "source": "eslint-suppressions.json の count 合計 (no-raw-colors 55 / section-spacing-utility 10)",
+      "why": "デザイントークン移行の積み残し。縮小方向にのみ動かす (pnpm lint:prune-suppressions)。"
+    },
+    "expected-failure-escapes": {
+      "max": 13,
+      "source": "app/** lib/** の `expected-failure:` コメント",
+      "why": "「失敗が答えである」の明示。正当な逃げ道だが、理由さえ書けば何でも通る形でもあるので数を固定する。"
+    },
+    "interaction-allowlist": {
+      "max": 16,
+      "source": "eslint-rules/mutation-through-shared-primitive.mjs の ALLOWLIST",
+      "why": "「押した瞬間に効く」共通 hook への未移行画面。表そのものが残りの移行計画を兼ねている。"
+    },
+    "silent-catch-grandfathered": {
+      "max": 0,
+      "source": "eslint-rules/no-silent-catch-at-boundary.mjs の GRANDFATHERED",
+      "why": "憲章 R1 の例外表。Wave 3 で着手時 75 件を全件処置して 0 になった。0 を維持する — 1 行足すと落ちる。"
+    },
+    "z-layer-fixed-allowlist": {
+      "max": 4,
+      "source": "__tests__/design-system/z-layer-scan.ts の FIXED_Z_ALLOWLIST",
+      "why": "名前付き z レイヤーの走査から外す区画 (shadcn 上流・dev プレビュー・Storybook)。"
+    },
+    "z-layer-pinned-exemptions": {
+      "max": 1,
+      "source": "__tests__/design-system/z-layer-scan.ts の PINNED_EXEMPTIONS",
+      "why": "生の z スケールを残している箇所。直った瞬間にテストが赤くなる形で運用しており、惰性で残らない。"
+    }
+  }
+}

@@ -16,6 +16,7 @@ import {
   parsePendingAuths,
   serializePendingAuths,
 } from "@/lib/shopify/oauth-state";
+import { COOKIE_NAME } from "@/lib/auth/cookie-names";
 
 export async function GET(request: NextRequest) {
   /* Refuse to start an OAuth round trip we know cannot come back.
@@ -138,12 +139,12 @@ export async function GET(request: NextRequest) {
    * /api/auth/login で始まり、新 build の callback に戻ってくる往復）を落とさない
    * ため。callback は新クッキーを先に見て、無いときだけこちらに落ちる。
    * 単独の試行しか無ければ両者は同じ値を指すので、挙動は変わらない。 */
-  response.cookies.set("shop_cv", codeVerifier, cookieOptions);
-  response.cookies.set("shop_state", state, cookieOptions);
-  response.cookies.set("shop_nonce", nonce, cookieOptions);
-  response.cookies.set("shop_locale", locale, cookieOptions);
+  response.cookies.set(COOKIE_NAME.shopCodeVerifier, codeVerifier, cookieOptions);
+  response.cookies.set(COOKIE_NAME.shopState, state, cookieOptions);
+  response.cookies.set(COOKIE_NAME.shopNonce, nonce, cookieOptions);
+  response.cookies.set(COOKIE_NAME.shopLocale, locale, cookieOptions);
   if (returnTo) {
-    response.cookies.set("shop_return_to", returnTo, cookieOptions);
+    response.cookies.set(COOKIE_NAME.shopReturnTo, returnTo, cookieOptions);
   }
 
   return response;

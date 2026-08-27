@@ -25,6 +25,7 @@ import { cookies } from "next/headers";
 import { getSession } from "@/lib/shopify/auth";
 import { getCustomer, decryptToken } from "@/lib/shopify/customer";
 import { extractCustomerId } from "@/lib/firebase/types";
+import { COOKIE_NAME } from "@/lib/auth/cookie-names";
 
 // --------------------------------------------------------------------------
 // Persona display labels (Japanese)
@@ -52,7 +53,7 @@ async function resolveCustomerId(): Promise<string | null> {
     if (!session) return null;
 
     const cookieStore = await cookies();
-    const cidEnc = cookieStore.get("shop_cid")?.value;
+    const cidEnc = cookieStore.get(COOKIE_NAME.shopCustomerId)?.value;
     if (cidEnc) {
       const customerId = decryptToken(cidEnc);
       if (customerId) return customerId;

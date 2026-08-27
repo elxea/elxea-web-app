@@ -124,6 +124,20 @@ jobs:
         # 既存の static-checks に相乗りさせている (新規ジョブは作らない)。
         run: pnpm check:sot
 
+      - name: Validate exception ratchets
+        # 憲章 R8「装置導入は全件移行 + 再流入止めで 1 セット」の機械強制。
+        # 各例外表 (eslint-suppressions / 各 lint ルールの ALLOWLIST・
+        # GRANDFATHERED / z-layer の免除 / expected-failure) の件数を
+        # ratchets.json に固定し、増えたら落とす。
+        #
+        # 「縮小方向にのみ更新する」は Wave 1-3 の各ルールに**コメントで**
+        # 書いてあっただけで、増やしても CI は緑のままだった。原則には強制機構が要る。
+        #
+        # 減った場合も落とす: 緩んだ枠を残すと、その分だけ黙って増やせてしまう。
+        # 直し方はどちらも `node scripts/ops/check-ratchet.mjs --update` の 1 回。
+        # 既存の static-checks に相乗りさせている (新規ジョブは作らない)。
+        run: node scripts/ops/check-ratchet.mjs --check
+
       - name: Validate design tokens
         # Fails the build (validate-tokens.ts exits 1) when tokens drift from
         # the Style Dictionary source. Previously defined as a script but never

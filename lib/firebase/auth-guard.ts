@@ -14,6 +14,7 @@ import { getCustomer, decryptToken } from "@/lib/shopify/customer";
 import { fetchShopifyCustomerIdForLineUser } from "@/lib/line/linkage-status";
 import { readVerifiedLineUserIdFrom } from "@/lib/line/session";
 import { extractCustomerId } from "./types";
+import { COOKIE_NAME } from "@/lib/auth/cookie-names";
 
 type AuthResult =
   | { authenticated: true; customerId: string; customerName: string }
@@ -57,7 +58,7 @@ export async function requireAuth(): Promise<AuthResult> {
 
     // Fast path: use cached customer ID from id_token (set at login)
     const cookieStore = await cookies();
-    const cidEnc = cookieStore.get("shop_cid")?.value;
+    const cidEnc = cookieStore.get(COOKIE_NAME.shopCustomerId)?.value;
     if (cidEnc) {
       const customerId = decryptToken(cidEnc);
       if (customerId) {
@@ -144,7 +145,7 @@ async function loadIdentity(): Promise<Identity> {
     //    semantics so Shopify-auth'd users keep the existing `userKey` shape.
     const session = await getSession();
     if (session) {
-      const cidEnc = cookieStore.get("shop_cid")?.value;
+      const cidEnc = cookieStore.get(COOKIE_NAME.shopCustomerId)?.value;
       if (cidEnc) {
         const customerId = decryptToken(cidEnc);
         if (customerId) {
@@ -184,7 +185,7 @@ async function loadIdentity(): Promise<Identity> {
       const lineUserId = readVerifiedLineUserIdFrom(cookieStore);
       if (lineUserId) {
         let displayName = "LINE User";
-        const lineUserCookie = cookieStore.get("line_user")?.value;
+        const lineUserCookie = cookieStore.get(COOKIE_NAME.lineUser)?.value;
         if (lineUserCookie) {
           try {
             const parsed = JSON.parse(lineUserCookie);

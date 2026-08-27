@@ -32,6 +32,7 @@ import {
   serializePendingAuths,
   type PendingAuth,
 } from "@/lib/shopify/oauth-state";
+import { COOKIE_NAME } from "@/lib/auth/cookie-names";
 
 /**
  * クエリから拾った値をログに載せる前に均す。
@@ -54,11 +55,11 @@ function forLog(value: string | null, maxLength = 200): string {
 
 /** 1 回きりの値を載せている旧クッキー。成否によらず必ず落とす。 */
 const ONE_SHOT_COOKIES = [
-  "shop_cv",
-  "shop_state",
-  "shop_nonce",
-  "shop_locale",
-  "shop_return_to",
+  COOKIE_NAME.shopCodeVerifier,
+  COOKIE_NAME.shopState,
+  COOKIE_NAME.shopNonce,
+  COOKIE_NAME.shopLocale,
+  COOKIE_NAME.shopReturnTo,
 ] as const;
 
 /**
@@ -80,8 +81,8 @@ function resolvePendingAuth(
     // 新クッキーはあるが、この state はそこに無い。旧クッキーも見る（移行期）。
   }
 
-  const codeVerifier = request.cookies.get("shop_cv")?.value;
-  const savedState = request.cookies.get("shop_state")?.value;
+  const codeVerifier = request.cookies.get(COOKIE_NAME.shopCodeVerifier)?.value;
+  const savedState = request.cookies.get(COOKIE_NAME.shopState)?.value;
   if (!codeVerifier || !savedState || savedState !== state) {
     return { entry: null, remaining: stored ? parsePendingAuths(stored) : null };
   }
@@ -90,9 +91,9 @@ function resolvePendingAuth(
     entry: {
       state: savedState,
       verifier: codeVerifier,
-      nonce: request.cookies.get("shop_nonce")?.value ?? "",
-      locale: request.cookies.get("shop_locale")?.value || "ja",
-      returnTo: sanitizeReturnTo(request.cookies.get("shop_return_to")?.value),
+      nonce: request.cookies.get(COOKIE_NAME.shopNonce)?.value ?? "",
+      locale: request.cookies.get(COOKIE_NAME.shopLocale)?.value || "ja",
+      returnTo: sanitizeReturnTo(request.cookies.get(COOKIE_NAME.shopReturnTo)?.value),
       createdAt: Date.now(),
     },
     remaining: stored ? parsePendingAuths(stored) : null,
@@ -120,8 +121,8 @@ function resolvePendingAuth(
  * 誤認しないため。
  */
 function hasUsableSession(request: NextRequest): boolean {
-  const accessToken = request.cookies.get("shop_at")?.value;
-  const refreshToken = request.cookies.get("shop_rt")?.value;
+  const accessToken = request.cookies.get(COOKIE_NAME.shopAccessToken)?.value;
+  const refreshToken = request.cookies.get(COOKIE_NAME.shopRefreshToken)?.value;
   if (!accessToken || !refreshToken) return false;
   return Boolean(decryptToken(accessToken)) && Boolean(decryptToken(refreshToken));
 }
@@ -138,7 +139,7 @@ export async function GET(request: NextRequest) {
   const state = searchParams.get("state");
 
   const pending = state ? resolvePendingAuth(request, state) : { entry: null, remaining: null };
-  const locale = pending.entry?.locale ?? request.cookies.get("shop_locale")?.value ?? "ja";
+  const locale = pending.entry?.locale ?? request.cookies.get(COOKIE_NAME.shopLocale)?.value ?? "ja";
 
   /* 失敗の出口はここ 1 本に寄せる。以前は 3 か所がばらばらに redirect していて、
    * そのうち 2 か所（state 不一致と catch-all）は **ログを 1 行も残さず**
@@ -337,19 +338,19 @@ export async function GET(request: NextRequest) {
       encrypt: encryptToken,
     });
 
-    response.cookies.set("shop_at", sessionCookies.accessToken.value, {
+    response.cookies.set(COOKIE_NAME.shopAccessToken, sessionCookies.accessToken.value, {
       ...cookieOptions,
       maxAge: sessionCookies.accessToken.maxAge,
     });
-    response.cookies.set("shop_rt", sessionCookies.refreshToken.value, {
+    response.cookies.set(COOKIE_NAME.shopRefreshToken, sessionCookies.refreshToken.value, {
       ...cookieOptions,
       maxAge: sessionCookies.refreshToken.maxAge,
     });
-    response.cookies.set("shop_exp", sessionCookies.expiresAt.value, {
+    response.cookies.set(COOKIE_NAME.shopExpiresAt, sessionCookies.expiresAt.value, {
       ...cookieOptions,
       maxAge: sessionCookies.expiresAt.maxAge,
     });
-    response.cookies.set("shop_auth", sessionCookies.authFlag.value, {
+    response.cookies.set(COOKIE_NAME.shopAuthFlag, sessionCookies.authFlag.value, {
       httpOnly: false,
       secure: isProduction(),
       sameSite: "lax",
@@ -361,7 +362,7 @@ export async function GET(request: NextRequest) {
     // Shopify logout endpoint at sign-out time. Without this, RP-initiated
     // logout cannot identify the session to terminate and Shopify SSO
     // cookies are left in place (causing silent re-login on shared PCs).
-    response.cookies.set("shop_it", encryptToken(tokens.id_token), {
+    response.cookies.set(COOKIE_NAME.shopIdToken, encryptToken(tokens.id_token), {
       ...cookieOptions,
       maxAge: 60 * 60 * 24 * 30, // 30 days (must outlive access token)
     });
@@ -378,7 +379,7 @@ export async function GET(request: NextRequest) {
      * `extractCustomerId` in `lib/shopify/id-token.ts`. */
     const customerId = verified.customerId;
     if (customerId) {
-      response.cookies.set("shop_cid", encryptToken(customerId), {
+      response.cookies.set(COOKIE_NAME.shopCustomerId, encryptToken(customerId), {
         ...cookieOptions,
         maxAge: 60 * 60 * 24 * 30, // 30 days (same as refresh token)
       });
@@ -421,7 +422,7 @@ export async function GET(request: NextRequest) {
      *
      * ログインは決して失敗させない。`completeLineLinkage` は throw せず、
      * 起きたことを自分で記録する。 */
-    const lineUidEnc = request.cookies.get("line_uid")?.value;
+    const lineUidEnc = request.cookies.get(COOKIE_NAME.lineUid)?.value;
     if (lineUidEnc && customerId) {
       const lineUserId = decryptToken(lineUidEnc);
 

@@ -11,6 +11,7 @@ import {
   resolveLoginChannelId,
 } from "@/lib/line/login-channel";
 import { reportChannelNamespace } from "@/lib/line/login-channel-report";
+import { COOKIE_NAME } from "@/lib/auth/cookie-names";
 
 /**
  * LINE Login state initialization endpoint.
@@ -90,12 +91,12 @@ export async function POST(request: NextRequest) {
    * request actually arrived on. */
   const baseUrl = getBaseUrl(request);
   const cookieDomain = resolveCookieDomain(request);
-  const stateSpec = getCookieSpec("line_oauth_state")!;
+  const stateSpec = getCookieSpec(COOKIE_NAME.lineOauthState)!;
 
-  const nonceSpec = getCookieSpec("line_oauth_nonce")!;
+  const nonceSpec = getCookieSpec(COOKIE_NAME.lineOauthNonce)!;
 
   const cookieStore = await cookies();
-  cookieStore.set("line_oauth_state", state, {
+  cookieStore.set(COOKIE_NAME.lineOauthState, state, {
     httpOnly: true,
     secure: isSecure(stateSpec),
     sameSite: "lax",
@@ -105,7 +106,7 @@ export async function POST(request: NextRequest) {
   });
   /* nonce cookie は state cookie と同じ scope・同じ寿命で出す。片方だけが届く状態
    * （= 検証できない状態）を作らないため、条件分岐なしで必ず両方を出す。 */
-  cookieStore.set("line_oauth_nonce", nonce, {
+  cookieStore.set(COOKIE_NAME.lineOauthNonce, nonce, {
     httpOnly: true,
     secure: isSecure(nonceSpec),
     sameSite: "lax",

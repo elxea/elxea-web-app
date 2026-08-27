@@ -15,11 +15,13 @@
  *   （リファラ経由で外部に漏らさない）を徹底する。
  */
 
+import { COOKIE_NAME } from "@/lib/auth/cookie-names";
+
 /**
  * 未ログインでログインへ迂回する間、linkToken を退避する httpOnly クッキー名。
  * URL に linkToken を持ち回らせない（戻り先 URL に載せない）ためのもの。
  */
-export const ACCOUNT_LINK_TOKEN_COOKIE = "acct_link_tk";
+export const ACCOUNT_LINK_TOKEN_COOKIE = COOKIE_NAME.accountLinkToken;
 
 /** 退避クッキーの寿命（秒）。linkToken 自体が 10 分で失効するため、それ以上持たせない。 */
 export const ACCOUNT_LINK_TOKEN_COOKIE_MAX_AGE = 10 * 60;

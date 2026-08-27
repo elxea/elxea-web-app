@@ -21,6 +21,7 @@ import { decryptToken } from "@/lib/shopify/customer";
 import { getSession } from "@/lib/shopify/auth";
 import { getCustomer } from "@/lib/shopify/customer";
 import { extractCustomerId } from "@/lib/firebase/types";
+import { COOKIE_NAME } from "@/lib/auth/cookie-names";
 
 type Props = {
   heading?: string;
@@ -38,7 +39,7 @@ async function resolveCustomerId(): Promise<string | null> {
 
     // Fast path: cached from id_token
     const cookieStore = await cookies();
-    const cidEnc = cookieStore.get("shop_cid")?.value;
+    const cidEnc = cookieStore.get(COOKIE_NAME.shopCustomerId)?.value;
     if (cidEnc) {
       const customerId = decryptToken(cidEnc);
       if (customerId) return customerId;

@@ -24,6 +24,7 @@ import {
   classifyTokenExchangeError,
   reportMisconfiguredChannel,
 } from "@/lib/line/token-error";
+import { COOKIE_NAME } from "@/lib/auth/cookie-names";
 
 /**
  * LINE Login OAuth 2.0 callback endpoint.
@@ -92,10 +93,10 @@ export async function GET(request: NextRequest) {
    * 「往復が終わったら必ず落とす」を守れる唯一の書き方は、**掃除の定義を、途中で
    * return しうるどの分岐よりも前に置く**こと。 */
   const clearState = <T extends NextResponse>(res: T): T => {
-    clearFlowCookie(res, "line_oauth_state");
+    clearFlowCookie(res, COOKIE_NAME.lineOauthState);
     /* nonce も同じ往復の使い捨て値。state だけ消して nonce を残すと、次の試行が
      * 前回の nonce と突き合わせられる状態が生まれる。必ず一緒に落とす。 */
-    clearFlowCookie(res, "line_oauth_nonce");
+    clearFlowCookie(res, COOKIE_NAME.lineOauthNonce);
     return res;
   };
 
@@ -114,7 +115,7 @@ export async function GET(request: NextRequest) {
 
   // Verify state (CSRF protection)
   const cookieStore = await cookies();
-  const savedState = cookieStore.get("line_oauth_state")?.value;
+  const savedState = cookieStore.get(COOKIE_NAME.lineOauthState)?.value;
 
   if (!savedState || savedState !== state) {
     /* A mismatch has two possible causes and LINE says they are indistinguishable:
@@ -240,7 +241,7 @@ export async function GET(request: NextRequest) {
       );
     };
 
-    const savedNonce = cookieStore.get("line_oauth_nonce")?.value;
+    const savedNonce = cookieStore.get(COOKIE_NAME.lineOauthNonce)?.value;
     if (!savedNonce) return rejectIdToken("no nonce cookie for this round trip");
 
     const verified = await verifyLineIdToken(tokens.id_token, channelId, {
@@ -266,7 +267,7 @@ export async function GET(request: NextRequest) {
       env("NEXT_PUBLIC_CHAT_API_URL") ?? "http://localhost:8787/api/chat"
     ).replace(/\/api\/chat\/?$/, "");
 
-    const chatSessionId = cookieStore.get("chat_session_id")?.value;
+    const chatSessionId = cookieStore.get(COOKIE_NAME.chatSessionId)?.value;
 
     // C1: Include X-API-Key for identity linking. In production, never call the worker without it
     // (avoids silently sending unauthenticated requests).
@@ -323,7 +324,7 @@ export async function GET(request: NextRequest) {
      * observable over plain http locally and in Ring 2, where a Secure cookie is
      * simply not stored and the Domain-scoped deletion under test could never be
      * verified. */
-    const lineSessionSecure = isSecure(getCookieSpec("line_session")!);
+    const lineSessionSecure = isSecure(getCookieSpec(COOKIE_NAME.lineSession)!);
     const sharedCookieOpts = {
       ...(stateDomain ? { domain: stateDomain } : {}),
       secure: lineSessionSecure,
@@ -332,7 +333,7 @@ export async function GET(request: NextRequest) {
       path: "/",
     };
 
-    response.cookies.set("line_user", lineUserCookie, {
+    response.cookies.set(COOKIE_NAME.lineUser, lineUserCookie, {
       ...sharedCookieOpts,
       httpOnly: false, // readable by client
     });
@@ -342,7 +343,7 @@ export async function GET(request: NextRequest) {
     // masquerading as a Shopify session. We intentionally DO NOT set
     // `shop_auth` here — that cookie is reserved for genuine Shopify
     // sessions so that identity resolution (auth-guard) stays unambiguous.
-    response.cookies.set("line_auth", "1", {
+    response.cookies.set(COOKIE_NAME.lineAuth, "1", {
       ...sharedCookieOpts,
       httpOnly: false,
     });
@@ -351,14 +352,14 @@ export async function GET(request: NextRequest) {
     // `userKey = "line:" + lineUserId` for Firestore subcollection lookups,
     // and by the Shopify OAuth callback to merge LINE-only data into the
     // Shopify user key after account linking.
-    response.cookies.set("line_uid", encryptToken(lineUserId), {
+    response.cookies.set(COOKIE_NAME.lineUid, encryptToken(lineUserId), {
       ...sharedCookieOpts,
       httpOnly: true,
     });
 
     // P1-fix: Set line_session=1 (httpOnly) so middleware can recognize LINE-authenticated users
     // for /account route protection without requiring Shopify tokens.
-    response.cookies.set("line_session", "1", {
+    response.cookies.set(COOKIE_NAME.lineSession, "1", {
       ...sharedCookieOpts,
       httpOnly: true,
     });
