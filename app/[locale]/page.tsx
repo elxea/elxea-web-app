@@ -25,7 +25,7 @@ import {
   TopSectionHead,
   type FeedItem,
 } from "@/components/marketing/top-blocks";
-import { getClient } from "@/sanity/lib/client";
+import { sanityFetch } from "@/sanity/lib/fetch";
 import { filterOutFictional } from "@/lib/fictional-content";
 import { excludeReservedTitles } from "@/lib/navigation/reserved-destinations";
 import {
@@ -240,10 +240,10 @@ async function SeasonalSection() {
   try {
     articles = previewSeedEnabled()
       ? seedTopNotices()
-      : await getClient().fetch(ARTICLES_QUERY, {
-          language: locale,
-          start: 0,
-          end: 3,
+      : await sanityFetch({
+          query: ARTICLES_QUERY,
+          params: { language: locale, start: 0, end: 3 },
+          cache: { tag: "sanity:articles" },
         });
   } catch {
     return null;
@@ -441,7 +441,11 @@ async function JournalSection() {
   try {
     articles = previewSeedEnabled()
       ? seedTopNotices("journal")
-      : await getClient().fetch(FEATURED_ARTICLES_QUERY, { language: locale });
+      : await sanityFetch({
+          query: FEATURED_ARTICLES_QUERY,
+          params: { language: locale },
+          cache: { tag: "sanity:articles" },
+        });
   } catch {
     return null;
   }
@@ -481,7 +485,12 @@ async function EventsSection() {
       // Hide the fictional/seed events still present in the production dataset.
       : filterOutFictional(
           "event",
-          await getClient().fetch(EVENTS_QUERY, { language: locale }),
+          // 一覧 (`/events`) と同じ理由で時刻依存のため名札を貼らない。
+          await sanityFetch({
+            query: EVENTS_QUERY,
+            params: { language: locale },
+            cache: { noStore: true },
+          }),
         );
   } catch {
     return null;
@@ -561,8 +570,10 @@ async function VoicesSection() {
         // deny-list を通しておく。
         filterOutFictional(
           "farmer",
-          await getClient().fetch<FarmerVoice[]>(TOP_FARMER_VOICES_QUERY, {
-            language: locale,
+          await sanityFetch<FarmerVoice[]>({
+            query: TOP_FARMER_VOICES_QUERY,
+            params: { language: locale },
+            cache: { tag: "sanity:farmers" },
           }),
         );
   } catch {

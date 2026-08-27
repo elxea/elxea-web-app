@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { getLocale, getTranslations } from "next-intl/server";
 import { FilterX, Sprout } from "lucide-react";
 
-import { getClient } from "@/sanity/lib/client";
+import { sanityFetch } from "@/sanity/lib/fetch";
 import {
   ARTICLES_ASC_QUERY,
   ARTICLES_BY_CATEGORY_ASC_QUERY,
@@ -139,7 +139,6 @@ async function JournalContent({ params }: { params: SearchParams }) {
   const tCommon = await getTranslations("common");
   const tl = await getTranslations("catalog");
 
-  const client = getClient();
   const sort = params.sort === "oldest" || params.sort === "newest" ? params.sort : "recommended";
   const show = Math.max(PAGE_SIZE, Number(params.show) || PAGE_SIZE);
 
@@ -170,7 +169,11 @@ async function JournalContent({ params }: { params: SearchParams }) {
   //    以降にしか記事が無いカテゴリはチップごと消えていた。
   const categoriesPromise: Promise<
     { _id: string; title: string; slug: { current: string }; count: number }[]
-  > = client.fetch(CATEGORIES_WITH_COUNTS_QUERY, { language: locale });
+  > = sanityFetch({
+    query: CATEGORIES_WITH_COUNTS_QUERY,
+    params: { language: locale },
+    cache: { tag: "sanity:categories" },
+  });
 
   // 人気の記事は全ユーザー共通の集計なので、記事の取得と並べて引く
   // (失敗しても空配列が返るだけで一覧の描画は止まらない)。
@@ -212,22 +215,35 @@ async function JournalContent({ params }: { params: SearchParams }) {
         : { language: locale, categorySlug: activeCategory, start: 0, end: fetchEnd };
 
     return Promise.all([
-      client.fetch(listQuery, listParams) as Promise<ArticleItem[]>,
+      sanityFetch<ArticleItem[]>({
+        query: listQuery,
+        params: listParams,
+        cache: { tag: "sanity:articles" },
+      }),
       // 特集候補 (最大 4 件・新しい順)。ヒーローとサイドバーの並びに使う。
       // 絞り込み中もサイドバーは全体の並びを出すので常に引く。
-      client.fetch(FEATURED_ARTICLES_QUERY, { language: locale }) as Promise<ArticleItem[]>,
+      sanityFetch<ArticleItem[]>({
+        query: FEATURED_ARTICLES_QUERY,
+        params: { language: locale },
+        cache: { tag: "sanity:articles" },
+      }),
       // サイドバー「人気の記事」の穴埋め用の最新記事。
-      client.fetch(ARTICLES_QUERY, {
-        language: locale,
-        start: 0,
-        end: RAIL_SIZE,
-      }) as Promise<ArticleItem[]>,
-      (activeCategory === "all"
-        ? client.fetch(ARTICLES_COUNT_QUERY, { language: locale })
-        : client.fetch(ARTICLES_BY_CATEGORY_COUNT_QUERY, {
-            language: locale,
-            categorySlug: activeCategory,
-          })) as Promise<number>,
+      sanityFetch<ArticleItem[]>({
+        query: ARTICLES_QUERY,
+        params: { language: locale, start: 0, end: RAIL_SIZE },
+        cache: { tag: "sanity:articles" },
+      }),
+      activeCategory === "all"
+        ? sanityFetch<number>({
+            query: ARTICLES_COUNT_QUERY,
+            params: { language: locale },
+            cache: { tag: "sanity:articles" },
+          })
+        : sanityFetch<number>({
+            query: ARTICLES_BY_CATEGORY_COUNT_QUERY,
+            params: { language: locale, categorySlug: activeCategory },
+            cache: { tag: "sanity:articles" },
+          }),
     ]);
   };
 

@@ -15,7 +15,7 @@ import { TasteMap, type TastePoint } from "@/components/product/taste-map";
 import { Breadcrumb } from "@/components/seo/breadcrumb";
 import { CatalogCard, CatalogGrid } from "@/components/catalog/catalog-list";
 import { ArticleCard } from "@/components/journal/article-card";
-import { getClient } from "@/sanity/lib/client";
+import { sanityFetch } from "@/sanity/lib/fetch";
 import { ARTICLES_BY_PRODUCT_QUERY } from "@/sanity/lib/queries";
 import { ChapterBreak, bodySmClass, captionClass, overlineClass } from "@/components/editorial/rule-list";
 import {
@@ -147,10 +147,10 @@ export default async function ProductPage({
    */
   let readingArticles: Parameters<typeof ArticleCard>[0]["article"][] = [];
   try {
-    readingArticles = await getClient().fetch(ARTICLES_BY_PRODUCT_QUERY, {
-      language: locale,
-      productHandle: handle,
-      limit: 3,
+    readingArticles = await sanityFetch({
+      query: ARTICLES_BY_PRODUCT_QUERY,
+      params: { language: locale, productHandle: handle, limit: 3 },
+      cache: { tag: "sanity:articles" },
     });
   } catch {
     readingArticles = [];

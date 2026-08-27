@@ -4,7 +4,7 @@ import { getLocale, getTranslations } from "next-intl/server";
 
 import { FilterX, Sprout } from "lucide-react";
 
-import { getClient } from "@/sanity/lib/client";
+import { sanityFetch } from "@/sanity/lib/fetch";
 import { PLAYLISTS_QUERY } from "@/sanity/lib/queries";
 import { Link } from "@/i18n/navigation";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -148,7 +148,10 @@ async function PlaylistContent({ params }: { params: SearchParams }) {
     // プレイリストは deny-list に載せない (Setaka 2026-08-26)。8/22 に seed 由来と
     // して隠したが、本人が「以前あげた音源を自前プレイヤーで聴けるように戻す」と
     // 判断を上書きしたため、公開側で素通しする。詳細は lib/fictional-content.ts。
-    raw = await getClient().fetch(PLAYLISTS_QUERY);
+    raw = await sanityFetch({
+      query: PLAYLISTS_QUERY,
+      cache: { tag: "sanity:playlists" },
+    });
   } catch {
     return <p className="mt-8 text-sm text-muted-foreground lg:mt-12">{t("loadError")}</p>;
   }

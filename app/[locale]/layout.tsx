@@ -13,7 +13,7 @@ import { ChatProvider } from "@/components/chat/chat-provider";
 import { ChatBar } from "@/components/chat/chat-bar";
 import { ArticleAudioProvider } from "@/components/audio/article-audio-provider";
 import { AudioDock } from "@/components/audio/audio-dock";
-import { getClient } from "@/sanity/lib/client";
+import { sanityFetch } from "@/sanity/lib/fetch";
 import { SITE_SETTINGS_QUERY } from "@/sanity/lib/queries";
 import { env } from "@/lib/config";
 
@@ -76,7 +76,10 @@ export default async function LocaleLayout({
   let footerGroups: { label: string; items: { href: string; label: string }[] }[] = [];
 
   try {
-    const settings = await getClient().fetch(SITE_SETTINGS_QUERY);
+    const settings = await sanityFetch({
+      query: SITE_SETTINGS_QUERY,
+      cache: { tag: "sanity:site-settings" },
+    });
     if (settings?.navigation) {
       headerNavItems = settings.navigation
         .filter((item: any) => item.showInHeader)

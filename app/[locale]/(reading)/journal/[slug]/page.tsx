@@ -3,7 +3,7 @@ import Image from "next/image";
 import { notFound } from "next/navigation";
 import { getLocale, getTranslations } from "next-intl/server";
 
-import { getClient } from "@/sanity/lib/client";
+import { sanityFetch } from "@/sanity/lib/fetch";
 import { ARTICLE_BY_SLUG_QUERY, RELATED_ARTICLES_QUERY } from "@/sanity/lib/queries";
 import { urlFor } from "@/sanity/lib/image";
 import { getProductByHandle } from "@/lib/shopify";
@@ -80,8 +80,11 @@ export async function generateMetadata({
   const { slug } = await params;
   const locale = await getLocale();
   try {
-    const client = getClient();
-    const article = await client.fetch(ARTICLE_BY_SLUG_QUERY, { slug, language: locale });
+    const article = await sanityFetch({
+      query: ARTICLE_BY_SLUG_QUERY,
+      params: { slug, language: locale },
+      cache: { tag: "sanity:articles" },
+    });
     if (!article) return {};
     const seo = article.seo;
     const title = seo?.title || article.title;
@@ -110,8 +113,11 @@ export default async function ArticlePage({
 
   let article;
   try {
-    const client = getClient();
-    article = await client.fetch(ARTICLE_BY_SLUG_QUERY, { slug, language: locale });
+    article = await sanityFetch({
+      query: ARTICLE_BY_SLUG_QUERY,
+      params: { slug, language: locale },
+      cache: { tag: "sanity:articles" },
+    });
   } catch {
     return (
       <Section spacing="none" className="pt-6 pb-16 lg:pb-28">
@@ -142,15 +148,18 @@ export default async function ArticlePage({
   let relatedArticles: RelatedArticle[] = [];
   if (hasAccess && (article.category?._id || tagIds.length > 0)) {
     try {
-      const client = getClient();
-      relatedArticles = await client.fetch(RELATED_ARTICLES_QUERY, {
-        language: locale,
-        currentId: article._id,
-        // カテゴリ未設定のときに null を渡すと `category._ref == null` が
-        // 「カテゴリ未設定の記事すべて」に当たってしまう。決して一致しない
-        // 番兵を渡してタグ一致だけを効かせる。
-        categoryId: article.category?._id ?? "__no-category__",
-        tagIds,
+      relatedArticles = await sanityFetch({
+        query: RELATED_ARTICLES_QUERY,
+        params: {
+          language: locale,
+          currentId: article._id,
+          // カテゴリ未設定のときに null を渡すと `category._ref == null` が
+          // 「カテゴリ未設定の記事すべて」に当たってしまう。決して一致しない
+          // 番兵を渡してタグ一致だけを効かせる。
+          categoryId: article.category?._id ?? "__no-category__",
+          tagIds,
+        },
+        cache: { tag: "sanity:articles" },
       });
     } catch {
       // 関連記事は本文の必須要素ではないので黙って落とす

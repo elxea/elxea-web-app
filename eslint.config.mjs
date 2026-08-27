@@ -208,8 +208,26 @@ const eslintConfig = [
       "components/**/*.tsx",
       "lib/**/*.ts",
       "lib/**/*.tsx",
+      // Wave 2 で追加 (Wave 1 QA 指摘 / 2026-08-27):
+      //   Wave 1 のフェンスは `app` `components` `lib` の 3 区画しか見ておらず、
+      //   Sentry の起動ファイルと `sanity/**` が素通しだった。実際そこに生読みが
+      //   6 件 + 4 件残っていて、「全件移行した」という Wave 1 の主張は網の外に
+      //   ついては成り立っていなかった。網の形が主張の範囲を決めるので、
+      //   移行と同じ変更で網を広げる。
+      //
+      //   `sanity.config.ts` (リポジトリ直下) だけは意図的に外にある。これは
+      //   Studio の設定で、Next 経由 (`app/(studio)/studio`) だけでなく
+      //   **`sanity deploy` が Next の外から直接読む**。`@/lib/config` の別名は
+      //   その経路では解決できないので、ここを移行すると Studio のデプロイが
+      //   壊れる。ファイル冒頭のコメントが同じことを述べている。取りこぼしでは
+      //   なく、動く経路が 2 つあることによる正当な例外。
+      "sanity/**/*.ts",
+      "sanity/**/*.tsx",
       "middleware.ts",
       "instrumentation.ts",
+      "instrumentation-client.ts",
+      "sentry.server.config.ts",
+      "sentry.edge.config.ts",
     ],
     ignores: [
       // 唯一の例外。ここが `process.env` を読む場所であり、読み方の正本。
@@ -218,12 +236,84 @@ const eslintConfig = [
     rules: {
       "no-restricted-syntax": [
         "error",
+        // 憲章 Wave 2「Sanity 境界とキャッシュの対化」(2026-08-27):
+        //   Sanity を読むのは `sanity/lib/fetch.ts` の `sanityFetch` だけ。
+        //   ゲートウェイは `cache` を型で必須にしており、迂回して素の client を
+        //   掴むとその強制がまるごと外れる。
+        //
+        // なぜ規律ではなく lint なのか: 名札を「付けるべき」という規律で運用した
+        // 結果が着手時点の実測 **60 か所中 0 か所**で、一方 webhook 側は
+        // `revalidateTag` を叩き続けていた。剥がす側だけが存在する状態は、
+        // 動いていないことを誰にも知らせない (webhook は 200 を返す)。
+        //
+        // なぜ import を止めるのか (`.fetch` の呼び出しではなく): client を
+        // 手に入れられなければ、別名に代入しようが分割代入しようが読めない。
+        // 呼び出し形を数え上げる書き方は抜け道が残る。動的 import
+        // (`await import("@/sanity/lib/client")` — sitemap が使っていた形) も
+        // `ImportExpression` で同じく塞ぐ。
+        //
+        // 例外はこのブロックの `files` に無い場所、すなわち `sanity/lib/**`
+        // (= ゲートウェイ自身と、client の設定だけを使う image.ts) だけ。
+        //
+        // **綴りを 1 つだけ禁止する検査は、綴りを変えれば通るので検査でない**
+        // (QA 指摘 2026-08-27 / 2 回)。同じモジュールを指す書き方は複数ある:
+        //   `@/sanity/lib/client` (別名)
+        //   `../../sanity/lib/client` (相対)
+        //   `../sanity/lib/./client` (dot-segment。Node も TS も正規化して同じ
+        //     モジュールに解決するが、素朴な文字列一致には当たらない)
+        // よって **末尾が `sanity/lib/client` に解決される指定**を、途中に
+        // `/.` が挟まっていても捕まえる。
+        //
+        // ここで正規表現が届かない形 (`sanity/lib/../lib/client` のような `..`
+        // を含む往復) は、`__tests__/cache-tags-registry.test.ts` 側が
+        // **指定子を実際に正規化してから**照合するので落ちる。lint は速い一次
+        // 検査、テストが網羅側、という役割分担にしてある (どちらか片方に穴が
+        // あっても、もう片方が拾う)。
+        {
+          selector:
+            "ImportDeclaration[source.value=/(^|\\/)sanity(\\/\\.)*\\/lib(\\/\\.)*\\/client$/]",
+          message:
+            "Sanity の client を直接 import しない。sanityFetch (@/sanity/lib/fetch) を通す " +
+            "(憲章 Wave 2)。相対パス・dot-segment (`../sanity/lib/./client`) も同じく不可。" +
+            "理由: ゲートウェイだけがキャッシュの名札を型で必須にしており、" +
+            "迂回すると 2026-08 まで続いた『webhook は 200 を返すが本番は更新されない』に戻る。",
+        },
+        {
+          selector:
+            "ImportExpression[source.value=/(^|\\/)sanity(\\/\\.)*\\/lib(\\/\\.)*\\/client$/]",
+          message:
+            "Sanity の client を動的 import で掴まない。sanityFetch (@/sanity/lib/fetch) を通す " +
+            "(憲章 Wave 2)。app/sitemap.ts が実際にこの形で迂回していた。" +
+            "相対パス・dot-segment も同じく不可。",
+        },
         {
           selector: "MemberExpression[object.name='process'][property.name='env']",
           message:
             'process.env を直接読まない。lib/config/spec.ts に宣言して env("NAME") で読む ' +
             "(憲章 R4)。理由: 生読みは値の正規化と『未設定とは何か』を呼び出し側ごとに" +
             "再定義し、実際に sitemap 全 172 件と LINE 連携を本番で壊している。",
+        },
+      ],
+
+      // 同じ禁止を **別の標準ルールでも**張る (QA 指摘 2026-08-27)。
+      //
+      // なぜ二重に張るのか: 上の `no-restricted-syntax` は AST セレクタなので
+      // `ImportDeclaration` と `ImportExpression` (動的 import) の両方に届くが、
+      // セレクタ 1 本の書き損じが即そのまま穴になる。`no-restricted-imports` は
+      // 逆に **import 指定子の判定に特化した標準ルール**で、`export ... from`
+      // 経由の再輸出も見る (動的 import は見ないので、上のセレクタと役割が
+      // 補い合う)。同じ規則を性質の違う 2 本で張ると、片方の穴をもう片方が塞ぐ。
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              regex: "(^|/)sanity(/\\.)*/lib(/\\.)*/client$",
+              message:
+                "Sanity の client を直接 import しない。sanityFetch (@/sanity/lib/fetch) を通す " +
+                "(憲章 Wave 2)。別名・相対パス・dot-segment のどれでも不可。",
+            },
+          ],
         },
       ],
     },

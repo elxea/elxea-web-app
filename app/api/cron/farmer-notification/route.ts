@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import { env } from "@/lib/config";
 import { getAdminFirestore } from "@/lib/firebase/admin";
-import { sanityClient } from "@/sanity/lib/client";
+import { sanityFetch } from "@/sanity/lib/fetch";
 import {
   sendFarmerNotification,
   type FarmerNotificationItem,
@@ -81,7 +81,13 @@ async function fetchFarmersWithNewContent(
     imageUrl: string | null;
     excerpt: string | null;
     farmerSlugs: string[];
-  }> = await sanityClient.fetch(articlesQuery, { since: sinceISO });
+  }> = await sanityFetch({
+    query: articlesQuery,
+    params: { since: sinceISO },
+    // cron は「前回実行以降に増えた記事」を毎回実データで見る。名札で無効化
+    // する対象ではない (キャッシュに当たると同じ通知を送らない/送りすぎる)。
+    cache: { noStore: true },
+  });
 
   // Build a map: farmerSlug -> new articles
   const farmerArticleMap = new Map<string, (typeof articles)[0][]>();
@@ -104,7 +110,11 @@ async function fetchFarmersWithNewContent(
     }
   `;
   const fetchedFarmers: Array<{ slug: string; name: string }> =
-    await sanityClient.fetch(farmersQuery, { slugs: involvedSlugs });
+    await sanityFetch({
+      query: farmersQuery,
+      params: { slugs: involvedSlugs },
+      cache: { noStore: true },
+    });
 
   /**
    * 架空の農家についてはメールを組み立てない。この経路は公開ページではなく
