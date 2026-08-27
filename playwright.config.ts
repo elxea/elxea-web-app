@@ -35,6 +35,13 @@ process.env.E2E_WARMUP_BASE_URL = baseURL.replace("localhost", "127.0.0.1");
 process.env.E2E_WARMUP_PATHS = [
   "/ja",
   "/ja/products",
+  /* 商品詳細は**動的セグメント**。存在しない handle でも `[handle]` の
+     ルートモジュールはコンパイルされる (その後 404 になるが応答は見ない) ので、
+     温める目的にはこれで足りる。ここを抜くと、詳細ページの初回コンパイルが
+     テストの制限時間の中に居座る — `warm-dev-server.ts` が自ら記録した穴 (2)
+     「温める先が足りなかった」そのもので、実際 CI で 35.2 秒かけて
+     サムネイルを待ちきれずに落ちた (run 33058567506 の retry #1)。 */
+  "/ja/products/warmup-compiles-the-route",
   "/ja/cart",
   "/ja/search",
   "/ja/journal",

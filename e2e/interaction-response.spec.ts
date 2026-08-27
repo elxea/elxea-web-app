@@ -186,23 +186,37 @@ async function assertOptimistic(
 async function assertAssetPrefetched(page: Page, row: Interaction, scenario: (typeof SCENARIOS)[string]) {
   await scenario.arrive(page);
 
-  /* 先読みは 1 枚目が落ち着いてから (requestIdleCallback) 動く。
-     取り終わるのを待つのであって、速さは測らない。 */
+  /* 先読みは 1 枚目が落ち着いてから (`requestIdleCallback`) 動くので、**終わるのを待つ**。
+     待つのであって、速さは測らない (何 ms で終わったかは一切見ない)。
+
+     ## 何を待つかを間違えると flaky になる
+     初版は「`/_next/image` の取得が 2 件を超えたら先読み完了」と見なしていた。
+     これは**先読みとは無関係の枚数でも満たされる** — メイン画像 1 枚と
+     サムネイル 1 枚で既に 2 件になる。結果、先読みが終わる前に先へ進み、
+     CI で 2 回落ちて retry #2 でだけ通った (run 33058567506)。
+     `--retries=2` に隠された緑は、この spec が無くそうとしているものそのもの。
+
+     いま待つのは **先読み用の隠しコンテナの `<img>` が全部 `complete` になること**。
+     これは「先読みが終わった」の直接の表現で、枚数にも速さにも依存しない。 */
+  const PREFETCH_IMAGES = "[aria-hidden] img";
+
   await expect
     .poll(
       async () =>
-        page.evaluate(
-          () =>
-            performance
-              .getEntriesByType("resource")
-              .filter((e) => e.name.includes("/_next/image")).length,
-        ),
+        page.evaluate((selector) => {
+          const imgs = [...document.querySelectorAll<HTMLImageElement>(selector)];
+          if (imgs.length === 0) return -1;
+          return imgs.every((img) => img.complete && img.currentSrc !== "")
+            ? imgs.length
+            : 0;
+        }, PREFETCH_IMAGES),
       {
         message:
-          `${row.id}: 押される前に切替先の画像を取っていない。` +
+          `${row.id}: 押される前に切替先の画像を取り終えていない。` +
           "サムネイルを押してから取りにいくと、未取得の 1 枚を取り終わるまで " +
-          "見た目は旧画像のまま (網羅表 G1 / 本番実測 705〜1,865ms)。",
-        timeout: 15_000,
+          "見た目は旧画像のまま (網羅表 G1 / 本番実測 705〜1,865ms)。" +
+          "(-1 = 先読みのコンテナ自体が描かれていない / 0 = まだ取得中)",
+        timeout: 30_000,
       },
     )
     .toBeGreaterThan(1);
