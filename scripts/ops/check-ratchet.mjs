@@ -141,6 +141,32 @@ function collect(dirs, files = []) {
 
 const rel = (f) => relative(ROOT, f).split(sep).join('/');
 
+/**
+ * 操作台帳 (JSON) の行を数える。
+ *
+ * 表が見つからない / 形が違うときは **0 件と数えずに落とす**。
+ * `countCollectionEntries` が同じ理由で落ちるのと揃えてある — 見つからないまま
+ * 0 と数えると、上限だけが残って検査が永久に緑になる (最も危険な壊れ方)。
+ */
+function countInventory(predicate) {
+  const path = join(ROOT, 'interaction-inventory.json');
+  if (!existsSync(path)) {
+    throw new Error(
+      '[check-ratchet] interaction-inventory.json がありません。' +
+        'node scripts/ops/generate-interaction-inventory.mjs で作ってください。' +
+        '(無いまま 0 件と数えると、上限だけが残って検査が空回りします)',
+    );
+  }
+  const parsed = JSON.parse(readFileSync(path, 'utf8'));
+  if (!Array.isArray(parsed.interactions)) {
+    throw new Error(
+      '[check-ratchet] interaction-inventory.json の形が変わっています ' +
+        '(interactions が配列ではない)。数え方を直してください。',
+    );
+  }
+  return parsed.interactions.filter(predicate).length;
+}
+
 /** 全走査ファイルにわたって正規表現の一致数を合計する。 */
 function countMatches(dirs, files, pattern) {
   let total = 0;
@@ -206,6 +232,18 @@ const COUNTERS = {
      何でも通る**形でもあるので数を固定する。 */
   'expected-failure-escapes': () =>
     countMatches(['app', 'lib'], [], /expected-failure:/g),
+
+  /* 憲章 R9 の操作台帳 (interaction-inventory.json)。
+     **既存の `countCollectionEntries` は JS リテラル専用で JSON を数えられない**
+     (`const ALLOWLIST = new Set([` を文字列で探し、`']);'` を終端に使う実装)。
+     だから数行足す。両方向検査・エラー文言・`--update` の作法はそのまま継承する。
+
+     - unclassified … 応答を宣言していない操作。**max 0** を維持する。
+       1 件でも増えたら落ちる = 「押せるものが台帳に載らないまま増える」を止める。
+     - exempt … 「この操作は応答を検査しない」と申告した操作。導入時の据え置きを
+       含むので初期値は大きいが、**縮小方向にのみ動く**。 */
+  'interaction-unclassified': () => countInventory((row) => !row.response && !row.exempt),
+  'interaction-exempt': () => countInventory((row) => Boolean(row.exempt)),
 
   /* z 段の免除表 2 種 (design-system)。 */
   'z-layer-fixed-allowlist': () =>

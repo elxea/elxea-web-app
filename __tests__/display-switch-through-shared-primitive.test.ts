@@ -38,6 +38,11 @@ import { describe, it, expect } from "vitest";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 
+import {
+  findDirectNavigations,
+  navigatesOnGestureAst,
+} from "../scripts/ops/lib/direct-navigation.mjs";
+
 const ROOT = process.cwd();
 /**
  * 走査範囲。**拡張子と配置で絞らない**。
@@ -85,29 +90,42 @@ function listSources(dir: string, acc: string[] = []): string[] {
   return acc;
 }
 
-/**
- * コメントを落とす。**注記の中の `router.replace`** を実装と数えないため
- * (`variant-selection-context.tsx` はまさにそれで、実装はもう即時描画に
- * 移してあるのに冒頭の説明文に語が残っている)。
- */
-function stripComments(source: string): string {
-  return source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
-}
+/* 注記の中の `router.replace` を実装と数えない件は、構文木で見るように
+   なったので自動的に解決している (コメントは AST に現れない)。 */
 
 export function navigatesOnGesture(source: string): boolean {
-  return /\brouter\.(push|replace)\s*\(/.test(stripComments(source));
+  return navigatesOnGestureAst("scan.tsx", source);
 }
 
 /**
- * ハンドラの中から**直に**遷移しているか (= 通り道を通っていない形)。
+ * 通り道を通っていない `router.push` / `router.replace` があるか。
  *
- * `onClick={() => router.push(...)}` は当たり、
- * `onClick={() => nav.navigate(v, () => router.push(...))}` は当たらない
- * (途中に `.navigate(` があるため)。
+ * ## 正規表現をやめた理由 (敵対 QA 指摘 M4 / 2026-08-27)
+ *
+ * 初版はこう書いていた:
+ *
+ *     /on[A-Z]\w*=\{(?:(?!\.navigate\()[^}])*?\brouter\.(push|replace)\s*\(/
+ *
+ * 「`on*={` から `router.push(` までに `.navigate(` が無ければ違反」。
+ * ところが `[^}]` は **`}` を跨げない**ので、ハンドラを名前付き関数に切り出すと
+ * 判定の視界から外れる:
+ *
+ *     const nav = useOptimisticNavigation();  // import は残っている
+ *     function go() { router.push("/x"); }    // ← regex は届かない
+ *     return <button onClick={go}>x</button>; // ← ここには push が無い
+ *
+ * これで **10/10 pass**。`import` の有無しか見ないもう一方の条件も同時に満たす
+ * ので、「通り道を通している」と申告しながら通っていない状態が緑になる。
+ * QA が実証した。
+ *
+ * regex を足し引きしても次は 2 段の入れ子で抜けられる —
+ * **括弧の対応を数えられない道具で括弧の対応を判定している**のが根本原因なので、
+ * 構文木で見る側へ移した (`scripts/ops/lib/direct-navigation.mjs`)。
+ * いまは「その `router.push` を囲む祖先に `.navigate(` があるか」を見るので、
+ * 名前付き関数に出そうが何段入れ子にしようが判定は変わらない。
  */
 export function hasDirectHandlerNavigation(source: string): boolean {
-  const stripped = stripComments(source);
-  return /on[A-Z]\w*=\{(?:(?!\.navigate\()[^}])*?\brouter\.(push|replace)\s*\(/.test(stripped);
+  return findDirectNavigations("scan.tsx", source).length > 0;
 }
 
 const FILES = SCAN_DIRS.flatMap((dir) => listSources(join(ROOT, dir))).map((f) =>
@@ -184,6 +202,51 @@ describe("この検査は壊れた入力で落ちる", () => {
       }`;
     expect(navigatesOnGesture(good)).toBe(true);
     expect(hasDirectHandlerNavigation(good)).toBe(false);
+  });
+
+  it("名前付き関数に切り出した遷移も見つける (QA 指摘 M4 の再現)", () => {
+    /* **これが正規表現版をすり抜けていた形**。hook の import を残したまま
+       ハンドラを名前付き関数に出すと、`[^}]` が `}` を跨げないので当たらず、
+       import の有無しか見ないもう一方の条件も満たして 10/10 pass になった。 */
+    const sneak = `"use client";
+      import { useOptimisticNavigation } from "@/hooks/use-optimistic-navigation";
+      export function Sneak() {
+        const nav = useOptimisticNavigation();
+        function go() {
+          router.push("/x");
+        }
+        return <button onClick={go}>x</button>;
+      }`;
+    expect(navigatesOnGesture(sneak)).toBe(true);
+    expect(hasDirectHandlerNavigation(sneak)).toBe(true);
+  });
+
+  it("何段入れ子にしても見つける", () => {
+    const nested = `"use client";
+      export function Nested() {
+        const run = () => {
+          if (cond) {
+            setTimeout(() => { router.replace("/x"); }, 0);
+          }
+        };
+        return <button onClick={run}>x</button>;
+      }`;
+    expect(hasDirectHandlerNavigation(nested)).toBe(true);
+  });
+
+  it("通り道の中なら何段入れ子でも見逃す", () => {
+    const good = `"use client";
+      export function Good() {
+        const run = () => nav.navigate("x", () => {
+          if (cond) router.push("/x");
+        });
+        return <button onClick={run}>x</button>;
+      }`;
+    expect(hasDirectHandlerNavigation(good)).toBe(false);
+  });
+
+  it("array.push を遷移と数えない", () => {
+    expect(navigatesOnGesture("const a = []; a.push(1);")).toBe(false);
   });
 
   it("注記の中の router.replace は実装と数えない", () => {

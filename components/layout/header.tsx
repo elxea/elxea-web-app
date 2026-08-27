@@ -192,7 +192,14 @@ export function Header({ navItems: externalNavItems }: HeaderProps) {
                 <Link href="/cart">
                   {t("cart")}
                   {cartCount > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-foreground text-background text-[10px] font-medium size-4 flex items-center justify-center">
+                    /* `cart-badge-count` は台帳 (`interaction-inventory.json`) の
+                       `observe` から名指しされる。「カートに追加」を押したとき、
+                       **サーバの往復を遮断した状態でも**この数字が動くことが
+                       検査対象。名前を変えるなら台帳も一緒に直す。 */
+                    <span
+                      data-slot="cart-badge-count"
+                      className="absolute -top-1 -right-1 bg-foreground text-background text-[10px] font-medium size-4 flex items-center justify-center"
+                    >
                       {cartCount > 99 ? "99+" : cartCount}
                     </span>
                   )}

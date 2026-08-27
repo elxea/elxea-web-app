@@ -7,8 +7,49 @@ import { defineConfig } from "@playwright/test";
  */
 const baseURL = process.env.E2E_BASE_URL ?? "http://localhost:3000";
 
+/**
+ * テストが始まる前に dev サーバーを温めておく (`e2e/support/warm-dev-server.ts`)。
+ *
+ * ## なぜ本体 config にも要るのか
+ *
+ * `next dev` はルートを**最初のリクエストで初めてコンパイルする**。冷えた
+ * Turbopack と GitHub runner の組み合わせでは、最初の `page.goto` 1 本がテストの
+ * 制限時間を食い潰し、しかも素直なタイムアウトではなく
+ * `net::ERR_ABORTED; maybe frame was detached?` として出る —
+ * **ハーネスの遅さがプロダクトの不具合の顔をして出る**。
+ *
+ * この仕組みは 2026-08-23 の実測 (初回 `page.goto` が 2.1 分かけて上記の形で
+ * 失敗) を根拠に既に作られていたが、**配線されていたのは補助 config 2 本
+ * (`playwright-auth-flow.config.ts` / `playwright-line-linkage.config.ts`) だけ**
+ * で、スイート本体のこの config には入っていなかった。憲章 R9 の応答検査は
+ * 「押した瞬間に効くか」を見るので、ハーネス由来の遅さと混ざると意味を失う。
+ * よってここで配線する。
+ *
+ * 温める先は**台帳から引かず手で列挙する**。台帳は「押せるもの」の表で
+ * 「どのルートを通るか」の表ではないので、そこから機械的に導くと
+ * `[handle]` のような動的セグメントを埋められず、温めたつもりで温まらない
+ * (同ファイルが自ら記録した穴 (2) がまさにこれ)。代わりに **e2e が実際に
+ * `page.goto` するルート**を並べる。
+ */
+process.env.E2E_WARMUP_BASE_URL = baseURL.replace("localhost", "127.0.0.1");
+process.env.E2E_WARMUP_PATHS = [
+  "/ja",
+  "/ja/products",
+  /* 商品詳細は**動的セグメント**。存在しない handle でも `[handle]` の
+     ルートモジュールはコンパイルされる (その後 404 になるが応答は見ない) ので、
+     温める目的にはこれで足りる。ここを抜くと、詳細ページの初回コンパイルが
+     テストの制限時間の中に居座る — `warm-dev-server.ts` が自ら記録した穴 (2)
+     「温める先が足りなかった」そのもので、実際 CI で 35.2 秒かけて
+     サムネイルを待ちきれずに落ちた (run 33058567506 の retry #1)。 */
+  "/ja/products/warmup-compiles-the-route",
+  "/ja/cart",
+  "/ja/search",
+  "/ja/journal",
+].join(",");
+
 export default defineConfig({
   testDir: "./e2e",
+  globalSetup: "./e2e/support/warm-dev-server.ts",
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,

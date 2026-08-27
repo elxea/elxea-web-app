@@ -138,6 +138,23 @@ jobs:
         # 既存の static-checks に相乗りさせている (新規ジョブは作らない)。
         run: node scripts/ops/check-ratchet.mjs --check
 
+      - name: Validate interaction inventory
+        # 憲章 R9「押せるものは、全部台帳に載る」の機械強制。
+        # app/ components/ lib/ hooks/ を AST で走査し、ユーザーが押せるもの
+        # 5 種 (JSX の on* / 書き込み / 内部リンク / form action / addEventListener)
+        # を interaction-inventory.json と突き合わせる。押せるものが増えたのに
+        # 台帳に無ければ落ちる。応答の宣言 (response) が無い行があっても落ちる。
+        #
+        # なぜ要るのか: 「押した瞬間に効く」の lint は**書き込みしか見ておらず**、
+        # 表示切替 78 件は一度も数えられたことがなかった。商品画像カルーセルが
+        # 未取得 URL の取得待ちで固まる不具合 (本番実測 705〜1,865ms) は、
+        # 母集団に入っていないので原理的に見えなかった。
+        # 母集団を「押せるもの全部」に広げるのがこの検査。
+        #
+        # 数秒で終わる静的検査なので、既存の static-checks に相乗りさせている
+        # (新規ジョブは作らない — 緑の push 1 回 = 15 分 / docs/ci-gates.md)。
+        run: pnpm check:interactions
+
       - name: Validate design tokens
         # Fails the build (validate-tokens.ts exits 1) when tokens drift from
         # the Style Dictionary source. Previously defined as a script but never

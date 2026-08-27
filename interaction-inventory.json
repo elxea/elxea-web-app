@@ -1,0 +1,3138 @@
+{
+  "$comment": [
+    "GENERATED-ASSISTED FILE — 行の集合は scripts/ops/generate-interaction-inventory.mjs が書く。",
+    "response / observe / exempt / why は人が書く (応答の出し方と、何が更新されるか)。",
+    "observe は「その操作で必ず更新される要素」。optimistic / sync-dom では必須。",
+    "exempt は「この操作は応答を検査しない」の申告。理由の文字列が必須で、response も残す。",
+    "行番号は持たない (無関係な編集で差分が出ると、本当に操作が増えた差分が埋もれるため)。",
+    "件数の固定は ratchets.json (interaction-unclassified / interaction-exempt)。"
+  ],
+  "interactions": [
+    {
+      "id": "app/[locale]/(reading)/about/page.tsx#link:Link#1",
+      "file": "app/[locale]/(reading)/about/page.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "app/[locale]/(reading)/about/page.tsx#link:Link#2",
+      "file": "app/[locale]/(reading)/about/page.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "app/[locale]/(reading)/elxea-journal/[slug]/page.tsx#link:Link#1",
+      "file": "app/[locale]/(reading)/elxea-journal/[slug]/page.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ。href はテンプレートリテラル (`/people/${slug}`) で 静的に読めないため自動判定の対象外だが、前段が固定で ? も # も持たない 純粋なページ遷移。動的 href を安全側 (分類必須) に倒す既定は維持する。"
+    },
+    {
+      "id": "app/[locale]/(reading)/elxea-journal/page.tsx#link:Link#1",
+      "file": "app/[locale]/(reading)/elxea-journal/page.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "app/[locale]/(reading)/elxea-journal/page.tsx#link:Link#2",
+      "file": "app/[locale]/(reading)/elxea-journal/page.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "app/[locale]/(reading)/journal/[slug]/page.tsx#link:Link#1",
+      "file": "app/[locale]/(reading)/journal/[slug]/page.tsx",
+      "kind": "link",
+      "name": "Link",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/[locale]/(reading)/journal/[slug]/page.tsx#link:Link#2",
+      "file": "app/[locale]/(reading)/journal/[slug]/page.tsx",
+      "kind": "link",
+      "name": "Link",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/[locale]/(reading)/journal/[slug]/page.tsx#link:a#1",
+      "file": "app/[locale]/(reading)/journal/[slug]/page.tsx",
+      "kind": "link",
+      "name": "a",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/[locale]/(reading)/journal/category/[slug]/page.tsx#link:Link#1",
+      "file": "app/[locale]/(reading)/journal/category/[slug]/page.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "app/[locale]/(reading)/journal/category/page.tsx#link:Link#1",
+      "file": "app/[locale]/(reading)/journal/category/page.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "app/[locale]/(reading)/journal/page.tsx#link:Link#1",
+      "file": "app/[locale]/(reading)/journal/page.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "app/[locale]/(reading)/journal/page.tsx#link:Link#2",
+      "file": "app/[locale]/(reading)/journal/page.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "app/[locale]/(reading)/journal/tag/[slug]/page.tsx#link:Link#1",
+      "file": "app/[locale]/(reading)/journal/tag/[slug]/page.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "app/[locale]/(reading)/playlists/page.tsx#link:Link#1",
+      "file": "app/[locale]/(reading)/playlists/page.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "app/[locale]/(reading)/playlists/page.tsx#link:Link#2",
+      "file": "app/[locale]/(reading)/playlists/page.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "app/[locale]/(reading)/tasting-note/feedback/tasting-note-form.tsx#handler:onChange#1",
+      "file": "app/[locale]/(reading)/tasting-note/feedback/tasting-note-form.tsx",
+      "kind": "handler",
+      "name": "onChange",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/[locale]/(reading)/tasting-note/feedback/tasting-note-form.tsx#handler:onChange#2",
+      "file": "app/[locale]/(reading)/tasting-note/feedback/tasting-note-form.tsx",
+      "kind": "handler",
+      "name": "onChange",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/[locale]/(reading)/tasting-note/feedback/tasting-note-form.tsx#handler:onChange#3",
+      "file": "app/[locale]/(reading)/tasting-note/feedback/tasting-note-form.tsx",
+      "kind": "handler",
+      "name": "onChange",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/[locale]/(reading)/tasting-note/feedback/tasting-note-form.tsx#handler:onChange#4",
+      "file": "app/[locale]/(reading)/tasting-note/feedback/tasting-note-form.tsx",
+      "kind": "handler",
+      "name": "onChange",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/[locale]/(reading)/tasting-note/feedback/tasting-note-form.tsx#handler:onChange#5",
+      "file": "app/[locale]/(reading)/tasting-note/feedback/tasting-note-form.tsx",
+      "kind": "handler",
+      "name": "onChange",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/[locale]/(reading)/tasting-note/feedback/tasting-note-form.tsx#handler:onChange#6",
+      "file": "app/[locale]/(reading)/tasting-note/feedback/tasting-note-form.tsx",
+      "kind": "handler",
+      "name": "onChange",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/[locale]/(reading)/tasting-note/feedback/tasting-note-form.tsx#handler:onClick#1",
+      "file": "app/[locale]/(reading)/tasting-note/feedback/tasting-note-form.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/[locale]/(reading)/tasting-note/feedback/tasting-note-form.tsx#handler:onClick#2",
+      "file": "app/[locale]/(reading)/tasting-note/feedback/tasting-note-form.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/[locale]/(reading)/tasting-note/feedback/tasting-note-form.tsx#handler:onClick#3",
+      "file": "app/[locale]/(reading)/tasting-note/feedback/tasting-note-form.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/[locale]/(reading)/tasting-note/feedback/tasting-note-form.tsx#handler:onClick#4",
+      "file": "app/[locale]/(reading)/tasting-note/feedback/tasting-note-form.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/[locale]/(reading)/tasting-note/feedback/tasting-note-form.tsx#handler:onClick#5",
+      "file": "app/[locale]/(reading)/tasting-note/feedback/tasting-note-form.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/[locale]/(reading)/tasting-note/feedback/tasting-note-form.tsx#handler:onClick#6",
+      "file": "app/[locale]/(reading)/tasting-note/feedback/tasting-note-form.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/[locale]/(reading)/tasting-note/feedback/tasting-note-form.tsx#handler:onClick#7",
+      "file": "app/[locale]/(reading)/tasting-note/feedback/tasting-note-form.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/[locale]/(reading)/tasting-note/feedback/tasting-note-form.tsx#handler:onClick#8",
+      "file": "app/[locale]/(reading)/tasting-note/feedback/tasting-note-form.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/[locale]/(reading)/tasting-note/feedback/tasting-note-form.tsx#handler:onClick#9",
+      "file": "app/[locale]/(reading)/tasting-note/feedback/tasting-note-form.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/[locale]/(reading)/tasting-note/feedback/tasting-note-form.tsx#handler:onNext#1",
+      "file": "app/[locale]/(reading)/tasting-note/feedback/tasting-note-form.tsx",
+      "kind": "handler",
+      "name": "onNext",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/[locale]/(reading)/tasting-note/feedback/tasting-note-form.tsx#handler:onStart#1",
+      "file": "app/[locale]/(reading)/tasting-note/feedback/tasting-note-form.tsx",
+      "kind": "handler",
+      "name": "onStart",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/[locale]/(reading)/tasting-note/feedback/tasting-note-form.tsx#link:Link#1",
+      "file": "app/[locale]/(reading)/tasting-note/feedback/tasting-note-form.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "app/[locale]/(reading)/tasting-note/feedback/tasting-note-form.tsx#write:fetch:POST#1",
+      "file": "app/[locale]/(reading)/tasting-note/feedback/tasting-note-form.tsx",
+      "kind": "write",
+      "name": "fetch:POST",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/[locale]/(reading)/tasting-note/page.tsx#link:Link#1",
+      "file": "app/[locale]/(reading)/tasting-note/page.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "app/[locale]/(reading)/tasting-note/page.tsx#link:Link#2",
+      "file": "app/[locale]/(reading)/tasting-note/page.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "app/[locale]/(reading)/tea-menu/[slug]/page.tsx#link:Link#1",
+      "file": "app/[locale]/(reading)/tea-menu/[slug]/page.tsx",
+      "kind": "link",
+      "name": "Link",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/[locale]/(reading)/tea-menu/[slug]/page.tsx#link:Link#2",
+      "file": "app/[locale]/(reading)/tea-menu/[slug]/page.tsx",
+      "kind": "link",
+      "name": "Link",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/[locale]/(reading)/tea-menu/page.tsx#link:Link#1",
+      "file": "app/[locale]/(reading)/tea-menu/page.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "app/[locale]/account/error.tsx#handler:onClick#1",
+      "file": "app/[locale]/account/error.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/[locale]/account/error.tsx#link:a#1",
+      "file": "app/[locale]/account/error.tsx",
+      "kind": "link",
+      "name": "a",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/[locale]/account/page.tsx#link:a#1",
+      "file": "app/[locale]/account/page.tsx",
+      "kind": "link",
+      "name": "a",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/[locale]/account/page.tsx#link:a#2",
+      "file": "app/[locale]/account/page.tsx",
+      "kind": "link",
+      "name": "a",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/[locale]/account/page.tsx#link:a#3",
+      "file": "app/[locale]/account/page.tsx",
+      "kind": "link",
+      "name": "a",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/[locale]/account/subscriptions/page.tsx#link:Link#1",
+      "file": "app/[locale]/account/subscriptions/page.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "app/[locale]/account/subscriptions/page.tsx#link:Link#2",
+      "file": "app/[locale]/account/subscriptions/page.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "app/[locale]/account/subscriptions/page.tsx#link:Link#3",
+      "file": "app/[locale]/account/subscriptions/page.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "app/[locale]/account/subscriptions/page.tsx#link:Link#4",
+      "file": "app/[locale]/account/subscriptions/page.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "app/[locale]/account/subscriptions/page.tsx#link:a#1",
+      "file": "app/[locale]/account/subscriptions/page.tsx",
+      "kind": "link",
+      "name": "a",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/[locale]/account/subscriptions/page.tsx#link:a#2",
+      "file": "app/[locale]/account/subscriptions/page.tsx",
+      "kind": "link",
+      "name": "a",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/[locale]/account/subscriptions/page.tsx#link:a#3",
+      "file": "app/[locale]/account/subscriptions/page.tsx",
+      "kind": "link",
+      "name": "a",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/[locale]/account/subscriptions/page.tsx#link:a#4",
+      "file": "app/[locale]/account/subscriptions/page.tsx",
+      "kind": "link",
+      "name": "a",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/[locale]/collections/page.tsx#link:Link#1",
+      "file": "app/[locale]/collections/page.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "app/[locale]/contact/contact-form.tsx#handler:onSubmit#1",
+      "file": "app/[locale]/contact/contact-form.tsx",
+      "kind": "handler",
+      "name": "onSubmit",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/[locale]/contact/contact-form.tsx#link:Link#1",
+      "file": "app/[locale]/contact/contact-form.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "app/[locale]/contact/contact-form.tsx#write:fetch:POST#1",
+      "file": "app/[locale]/contact/contact-form.tsx",
+      "kind": "write",
+      "name": "fetch:POST",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/[locale]/error.tsx#handler:onClick#1",
+      "file": "app/[locale]/error.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/[locale]/events/page.tsx#link:Link#1",
+      "file": "app/[locale]/events/page.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "app/[locale]/events/page.tsx#link:Link#2",
+      "file": "app/[locale]/events/page.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "app/[locale]/events/page.tsx#link:Link#3",
+      "file": "app/[locale]/events/page.tsx",
+      "kind": "link",
+      "name": "Link",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/[locale]/events/page.tsx#link:a#1",
+      "file": "app/[locale]/events/page.tsx",
+      "kind": "link",
+      "name": "a",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/[locale]/legal/privacy/page.tsx#link:a#1",
+      "file": "app/[locale]/legal/privacy/page.tsx",
+      "kind": "link",
+      "name": "a",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/[locale]/legal/returns/page.tsx#link:Link#1",
+      "file": "app/[locale]/legal/returns/page.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "app/[locale]/legal/returns/page.tsx#link:Link#2",
+      "file": "app/[locale]/legal/returns/page.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "app/[locale]/legal/returns/page.tsx#link:Link#3",
+      "file": "app/[locale]/legal/returns/page.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "app/[locale]/legal/terms/page.tsx#link:a#1",
+      "file": "app/[locale]/legal/terms/page.tsx",
+      "kind": "link",
+      "name": "a",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/[locale]/legal/tokushoho/page.tsx#link:Link#1",
+      "file": "app/[locale]/legal/tokushoho/page.tsx",
+      "kind": "link",
+      "name": "Link",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/[locale]/liff/link/liff-link-client.tsx#handler:onClick#1",
+      "file": "app/[locale]/liff/link/liff-link-client.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/[locale]/liff/link/liff-link-client.tsx#handler:onClick#2",
+      "file": "app/[locale]/liff/link/liff-link-client.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/[locale]/liff/link/liff-link-client.tsx#handler:onClick#3",
+      "file": "app/[locale]/liff/link/liff-link-client.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/[locale]/liff/link/liff-link-client.tsx#link:a#1",
+      "file": "app/[locale]/liff/link/liff-link-client.tsx",
+      "kind": "link",
+      "name": "a",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/[locale]/liff/link/liff-link-client.tsx#write:fetch:POST#1",
+      "file": "app/[locale]/liff/link/liff-link-client.tsx",
+      "kind": "write",
+      "name": "fetch:POST",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/[locale]/login/complete/login-complete-content.tsx#handler:onClick#1",
+      "file": "app/[locale]/login/complete/login-complete-content.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/[locale]/login/complete/login-complete-content.tsx#link:Link#1",
+      "file": "app/[locale]/login/complete/login-complete-content.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "app/[locale]/login/line-login-button.tsx#handler:onClick#1",
+      "file": "app/[locale]/login/line-login-button.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/[locale]/login/line-login-button.tsx#link:a#1",
+      "file": "app/[locale]/login/line-login-button.tsx",
+      "kind": "link",
+      "name": "a",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/[locale]/login/line-login-button.tsx#write:fetch:POST#1",
+      "file": "app/[locale]/login/line-login-button.tsx",
+      "kind": "write",
+      "name": "fetch:POST",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/[locale]/login/page.tsx#link:Link#1",
+      "file": "app/[locale]/login/page.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "app/[locale]/login/page.tsx#link:Link#2",
+      "file": "app/[locale]/login/page.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "app/[locale]/login/page.tsx#link:a#1",
+      "file": "app/[locale]/login/page.tsx",
+      "kind": "link",
+      "name": "a",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/[locale]/not-found.tsx#link:Link#1",
+      "file": "app/[locale]/not-found.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "app/[locale]/page.tsx#link:Link#1",
+      "file": "app/[locale]/page.tsx",
+      "kind": "link",
+      "name": "Link",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/[locale]/people/[slug]/page.tsx#link:a#1",
+      "file": "app/[locale]/people/[slug]/page.tsx",
+      "kind": "link",
+      "name": "a",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/[locale]/products/page.tsx#link:Link#1",
+      "file": "app/[locale]/products/page.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "app/[locale]/search/page.tsx#link:Link#1",
+      "file": "app/[locale]/search/page.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "app/[locale]/search/page.tsx#link:Link#2",
+      "file": "app/[locale]/search/page.tsx",
+      "kind": "link",
+      "name": "Link",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/[locale]/search/page.tsx#link:Link#3",
+      "file": "app/[locale]/search/page.tsx",
+      "kind": "link",
+      "name": "Link",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/[locale]/shipping/page.tsx#link:Link#1",
+      "file": "app/[locale]/shipping/page.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "app/[locale]/shipping/page.tsx#link:Link#2",
+      "file": "app/[locale]/shipping/page.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "app/[locale]/signs/note-feed.tsx#handler:onSelectReaction#1",
+      "file": "app/[locale]/signs/note-feed.tsx",
+      "kind": "handler",
+      "name": "onSelectReaction",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/[locale]/signs/page.tsx#link:Link#1",
+      "file": "app/[locale]/signs/page.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "app/[locale]/subscription/page.tsx#link:Link#1",
+      "file": "app/[locale]/subscription/page.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "app/[locale]/subscription/page.tsx#link:a#1",
+      "file": "app/[locale]/subscription/page.tsx",
+      "kind": "link",
+      "name": "a",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/dev/motion/showcase.tsx#handler:onAnimationEnd#1",
+      "file": "app/dev/motion/showcase.tsx",
+      "kind": "handler",
+      "name": "onAnimationEnd",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/dev/motion/showcase.tsx#handler:onAnimationEnd#2",
+      "file": "app/dev/motion/showcase.tsx",
+      "kind": "handler",
+      "name": "onAnimationEnd",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/dev/motion/showcase.tsx#handler:onAnimationEnd#3",
+      "file": "app/dev/motion/showcase.tsx",
+      "kind": "handler",
+      "name": "onAnimationEnd",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/dev/motion/showcase.tsx#handler:onAnimationEnd#4",
+      "file": "app/dev/motion/showcase.tsx",
+      "kind": "handler",
+      "name": "onAnimationEnd",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/dev/motion/showcase.tsx#handler:onAnimationEnd#5",
+      "file": "app/dev/motion/showcase.tsx",
+      "kind": "handler",
+      "name": "onAnimationEnd",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/dev/motion/showcase.tsx#handler:onAnimationEnd#6",
+      "file": "app/dev/motion/showcase.tsx",
+      "kind": "handler",
+      "name": "onAnimationEnd",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/dev/motion/showcase.tsx#handler:onAnimationEnd#7",
+      "file": "app/dev/motion/showcase.tsx",
+      "kind": "handler",
+      "name": "onAnimationEnd",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/dev/motion/showcase.tsx#handler:onClick#1",
+      "file": "app/dev/motion/showcase.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/dev/motion/showcase.tsx#handler:onClick#10",
+      "file": "app/dev/motion/showcase.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/dev/motion/showcase.tsx#handler:onClick#11",
+      "file": "app/dev/motion/showcase.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/dev/motion/showcase.tsx#handler:onClick#12",
+      "file": "app/dev/motion/showcase.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/dev/motion/showcase.tsx#handler:onClick#2",
+      "file": "app/dev/motion/showcase.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/dev/motion/showcase.tsx#handler:onClick#3",
+      "file": "app/dev/motion/showcase.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/dev/motion/showcase.tsx#handler:onClick#4",
+      "file": "app/dev/motion/showcase.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/dev/motion/showcase.tsx#handler:onClick#5",
+      "file": "app/dev/motion/showcase.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/dev/motion/showcase.tsx#handler:onClick#6",
+      "file": "app/dev/motion/showcase.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/dev/motion/showcase.tsx#handler:onClick#7",
+      "file": "app/dev/motion/showcase.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/dev/motion/showcase.tsx#handler:onClick#8",
+      "file": "app/dev/motion/showcase.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/dev/motion/showcase.tsx#handler:onClick#9",
+      "file": "app/dev/motion/showcase.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/global-error.tsx#handler:onClick#1",
+      "file": "app/global-error.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/password/page.tsx#handler:onChange#1",
+      "file": "app/password/page.tsx",
+      "kind": "handler",
+      "name": "onChange",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/password/page.tsx#handler:onSubmit#1",
+      "file": "app/password/page.tsx",
+      "kind": "handler",
+      "name": "onSubmit",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/password/page.tsx#write:fetch:POST#1",
+      "file": "app/password/page.tsx",
+      "kind": "write",
+      "name": "fetch:POST",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/account/account-parts.tsx#link:Link#1",
+      "file": "components/account/account-parts.tsx",
+      "kind": "link",
+      "name": "Link",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/account/account-parts.tsx#link:Link#2",
+      "file": "components/account/account-parts.tsx",
+      "kind": "link",
+      "name": "Link",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/account/account-parts.tsx#link:Link#3",
+      "file": "components/account/account-parts.tsx",
+      "kind": "link",
+      "name": "Link",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/account/account-parts.tsx#link:Link#4",
+      "file": "components/account/account-parts.tsx",
+      "kind": "link",
+      "name": "Link",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/account/account-parts.tsx#link:Link#5",
+      "file": "components/account/account-parts.tsx",
+      "kind": "link",
+      "name": "Link",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/account/account-parts.tsx#link:a#1",
+      "file": "components/account/account-parts.tsx",
+      "kind": "link",
+      "name": "a",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/account/account-parts.tsx#link:a#2",
+      "file": "components/account/account-parts.tsx",
+      "kind": "link",
+      "name": "a",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/account/account-parts.tsx#link:a#3",
+      "file": "components/account/account-parts.tsx",
+      "kind": "link",
+      "name": "a",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/account/dashboard-summary.tsx#link:Link#1",
+      "file": "components/account/dashboard-summary.tsx",
+      "kind": "link",
+      "name": "Link",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/account/events-section.tsx#handler:onClick#1",
+      "file": "components/account/events-section.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/account/events-section.tsx#link:a#1",
+      "file": "components/account/events-section.tsx",
+      "kind": "link",
+      "name": "a",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/account/events-section.tsx#link:a#2",
+      "file": "components/account/events-section.tsx",
+      "kind": "link",
+      "name": "a",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/account/events-section.tsx#write:fetch:DELETE#1",
+      "file": "components/account/events-section.tsx",
+      "kind": "write",
+      "name": "fetch:DELETE",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/account/favorites-board.tsx#handler:onClick#1",
+      "file": "components/account/favorites-board.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/account/line-linkage-cta.tsx#handler:onClick#1",
+      "file": "components/account/line-linkage-cta.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/account/line-linkage-cta.tsx#link:a#1",
+      "file": "components/account/line-linkage-cta.tsx",
+      "kind": "link",
+      "name": "a",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/account/line-linkage-cta.tsx#write:fetch:POST#1",
+      "file": "components/account/line-linkage-cta.tsx",
+      "kind": "write",
+      "name": "fetch:POST",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/account/line-linkage-entry.tsx#link:a#1",
+      "file": "components/account/line-linkage-entry.tsx",
+      "kind": "link",
+      "name": "a",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/account/line-unlink-control.tsx#handler:onClick#1",
+      "file": "components/account/line-unlink-control.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/account/line-unlink-control.tsx#handler:onOpenChange#1",
+      "file": "components/account/line-unlink-control.tsx",
+      "kind": "handler",
+      "name": "onOpenChange",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/account/line-unlink-control.tsx#write:fetch:DELETE#1",
+      "file": "components/account/line-unlink-control.tsx",
+      "kind": "write",
+      "name": "fetch:DELETE",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/account/member-gate.tsx#link:Link#1",
+      "file": "components/account/member-gate.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "components/account/member-gate.tsx#link:a#1",
+      "file": "components/account/member-gate.tsx",
+      "kind": "link",
+      "name": "a",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/account/subscription-actions.tsx#handler:onClick#1",
+      "file": "components/account/subscription-actions.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/account/subscription-actions.tsx#handler:onClick#2",
+      "file": "components/account/subscription-actions.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/account/subscription-actions.tsx#handler:onClick#3",
+      "file": "components/account/subscription-actions.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/account/subscription-actions.tsx#handler:onClick#4",
+      "file": "components/account/subscription-actions.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/account/subscription-actions.tsx#handler:onClick#5",
+      "file": "components/account/subscription-actions.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/account/subscription-actions.tsx#handler:onClick#6",
+      "file": "components/account/subscription-actions.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/account/subscription-actions.tsx#handler:onClick#7",
+      "file": "components/account/subscription-actions.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/account/subscription-actions.tsx#handler:onClick#8",
+      "file": "components/account/subscription-actions.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/account/subscription-actions.tsx#handler:onClick#9",
+      "file": "components/account/subscription-actions.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/account/subscription-actions.tsx#write:action:activateSubscriptionAction#1",
+      "file": "components/account/subscription-actions.tsx",
+      "kind": "write",
+      "name": "action:activateSubscriptionAction",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/account/subscription-actions.tsx#write:action:cancelSubscriptionAction#1",
+      "file": "components/account/subscription-actions.tsx",
+      "kind": "write",
+      "name": "action:cancelSubscriptionAction",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/account/subscription-actions.tsx#write:action:changeDeliveryFrequencyAction#1",
+      "file": "components/account/subscription-actions.tsx",
+      "kind": "write",
+      "name": "action:changeDeliveryFrequencyAction",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/account/subscription-actions.tsx#write:action:pauseSubscriptionAction#1",
+      "file": "components/account/subscription-actions.tsx",
+      "kind": "write",
+      "name": "action:pauseSubscriptionAction",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/account/subscription-actions.tsx#write:action:skipNextDeliveryAction#1",
+      "file": "components/account/subscription-actions.tsx",
+      "kind": "write",
+      "name": "action:skipNextDeliveryAction",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/account/subscription-parts.tsx#link:Link#1",
+      "file": "components/account/subscription-parts.tsx",
+      "kind": "link",
+      "name": "Link",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/audio/article-audio-provider.tsx#listener:ended#1",
+      "file": "components/audio/article-audio-provider.tsx",
+      "kind": "listener",
+      "name": "ended",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/audio/article-audio-provider.tsx#listener:error#1",
+      "file": "components/audio/article-audio-provider.tsx",
+      "kind": "listener",
+      "name": "error",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/audio/article-audio-provider.tsx#listener:loadedmetadata#1",
+      "file": "components/audio/article-audio-provider.tsx",
+      "kind": "listener",
+      "name": "loadedmetadata",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/audio/article-audio-provider.tsx#listener:pause#1",
+      "file": "components/audio/article-audio-provider.tsx",
+      "kind": "listener",
+      "name": "pause",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/audio/article-audio-provider.tsx#listener:play#1",
+      "file": "components/audio/article-audio-provider.tsx",
+      "kind": "listener",
+      "name": "play",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/audio/article-audio-provider.tsx#listener:playing#1",
+      "file": "components/audio/article-audio-provider.tsx",
+      "kind": "listener",
+      "name": "playing",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/audio/article-audio-provider.tsx#listener:timeupdate#1",
+      "file": "components/audio/article-audio-provider.tsx",
+      "kind": "listener",
+      "name": "timeupdate",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/audio/article-audio-provider.tsx#listener:waiting#1",
+      "file": "components/audio/article-audio-provider.tsx",
+      "kind": "listener",
+      "name": "waiting",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/audio/audio-dock.tsx#handler:onAnimationEnd#1",
+      "file": "components/audio/audio-dock.tsx",
+      "kind": "handler",
+      "name": "onAnimationEnd",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/audio/audio-dock.tsx#handler:onAnimationEnd#2",
+      "file": "components/audio/audio-dock.tsx",
+      "kind": "handler",
+      "name": "onAnimationEnd",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/audio/audio-dock.tsx#handler:onClick#1",
+      "file": "components/audio/audio-dock.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/audio/audio-dock.tsx#handler:onClick#2",
+      "file": "components/audio/audio-dock.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/audio/audio-dock.tsx#handler:onClick#3",
+      "file": "components/audio/audio-dock.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/audio/audio-dock.tsx#handler:onClick#4",
+      "file": "components/audio/audio-dock.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/audio/audio-dock.tsx#handler:onClick#5",
+      "file": "components/audio/audio-dock.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/audio/audio-dock.tsx#handler:onClick#6",
+      "file": "components/audio/audio-dock.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/audio/audio-dock.tsx#handler:onClick#7",
+      "file": "components/audio/audio-dock.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/audio/audio-dock.tsx#handler:onScrub#1",
+      "file": "components/audio/audio-dock.tsx",
+      "kind": "handler",
+      "name": "onScrub",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/audio/audio-dock.tsx#handler:onSeek#1",
+      "file": "components/audio/audio-dock.tsx",
+      "kind": "handler",
+      "name": "onSeek",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/audio/audio-dock.tsx#link:Link#1",
+      "file": "components/audio/audio-dock.tsx",
+      "kind": "link",
+      "name": "Link",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/audio/audio-dock.tsx#listener:keydown#1",
+      "file": "components/audio/audio-dock.tsx",
+      "kind": "listener",
+      "name": "keydown",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/audio/audio-player.tsx#handler:onChange#1",
+      "file": "components/audio/audio-player.tsx",
+      "kind": "handler",
+      "name": "onChange",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/audio/audio-player.tsx#handler:onClick#1",
+      "file": "components/audio/audio-player.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/audio/audio-waveform.tsx#handler:onKeyDown#1",
+      "file": "components/audio/audio-waveform.tsx",
+      "kind": "handler",
+      "name": "onKeyDown",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/audio/audio-waveform.tsx#handler:onPointerCancel#1",
+      "file": "components/audio/audio-waveform.tsx",
+      "kind": "handler",
+      "name": "onPointerCancel",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/audio/audio-waveform.tsx#handler:onPointerDown#1",
+      "file": "components/audio/audio-waveform.tsx",
+      "kind": "handler",
+      "name": "onPointerDown",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/audio/audio-waveform.tsx#handler:onPointerMove#1",
+      "file": "components/audio/audio-waveform.tsx",
+      "kind": "handler",
+      "name": "onPointerMove",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/audio/audio-waveform.tsx#handler:onPointerUp#1",
+      "file": "components/audio/audio-waveform.tsx",
+      "kind": "handler",
+      "name": "onPointerUp",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/audio/track-row.tsx#handler:onClick#1",
+      "file": "components/audio/track-row.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/audio/track-row.tsx#handler:onFocus#1",
+      "file": "components/audio/track-row.tsx",
+      "kind": "handler",
+      "name": "onFocus",
+      "response": "fire-and-forget",
+      "why": "先読みの引き金 (#172)。押す仕草が見えた時点で行き先・アセットを取りにいくだけで、画面は何も変えず、誰もこの往復を待っていない。応答の対象は「その後に押したとき」の操作側。"
+    },
+    {
+      "id": "components/audio/track-row.tsx#handler:onPointerDown#1",
+      "file": "components/audio/track-row.tsx",
+      "kind": "handler",
+      "name": "onPointerDown",
+      "response": "fire-and-forget",
+      "why": "先読みの引き金 (#172)。押す仕草が見えた時点で行き先・アセットを取りにいくだけで、画面は何も変えず、誰もこの往復を待っていない。応答の対象は「その後に押したとき」の操作側。"
+    },
+    {
+      "id": "components/audio/track-row.tsx#handler:onPointerEnter#1",
+      "file": "components/audio/track-row.tsx",
+      "kind": "handler",
+      "name": "onPointerEnter",
+      "response": "fire-and-forget",
+      "why": "先読みの引き金 (#172)。押す仕草が見えた時点で行き先・アセットを取りにいくだけで、画面は何も変えず、誰もこの往復を待っていない。応答の対象は「その後に押したとき」の操作側。"
+    },
+    {
+      "id": "components/cart/cart-content.tsx#handler:onCheckout#1",
+      "file": "components/cart/cart-content.tsx",
+      "kind": "handler",
+      "name": "onCheckout",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/cart/cart-content.tsx#handler:onQuantityChange#1",
+      "file": "components/cart/cart-content.tsx",
+      "kind": "handler",
+      "name": "onQuantityChange",
+      "response": "optimistic",
+      "observe": [
+        "[data-slot=\"quantity-stepper-value\"]",
+        "[data-slot=\"cart-line-total\"]",
+        "[data-slot=\"cart-subtotal\"]",
+        "[data-slot=\"cart-total\"]"
+      ],
+      "why": "網羅表 G2 の本体。数量は本番実測 16〜75ms で動くのに金額は 2,139〜2,417ms 古いままだった (「2 個になっているのに 1 個ぶんの金額」)。金額 3 つを observe に書くことが、cartReducer の覆い漏れを機械的に赤くする唯一の経路。#169 で直っており、ここはその再発を止める。"
+    },
+    {
+      "id": "components/cart/cart-content.tsx#handler:onRemove#1",
+      "file": "components/cart/cart-content.tsx",
+      "kind": "handler",
+      "name": "onRemove",
+      "response": "optimistic",
+      "observe": [
+        "[data-slot=\"cart-line\"]",
+        "[data-slot=\"cart-subtotal\"]",
+        "[data-slot=\"cart-total\"]"
+      ],
+      "why": "行が消えるだけでなく小計・合計も同時に動く。行だけ即時で金額が往復待ちだと G2 と同じ中間状態になる。"
+    },
+    {
+      "id": "components/cart/cart-content.tsx#link:Link#1",
+      "file": "components/cart/cart-content.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "components/cart/cart-context.tsx#write:action:addItem#1",
+      "file": "components/cart/cart-context.tsx",
+      "kind": "write",
+      "name": "action:addItem",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/cart/cart-context.tsx#write:action:removeItem#1",
+      "file": "components/cart/cart-context.tsx",
+      "kind": "write",
+      "name": "action:removeItem",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/cart/cart-context.tsx#write:action:updateItem#1",
+      "file": "components/cart/cart-context.tsx",
+      "kind": "write",
+      "name": "action:updateItem",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/cart/cart-line.tsx#handler:onChange#1",
+      "file": "components/cart/cart-line.tsx",
+      "kind": "handler",
+      "name": "onChange",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/cart/cart-line.tsx#handler:onClick#1",
+      "file": "components/cart/cart-line.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/cart/order-summary.tsx#handler:onClick#1",
+      "file": "components/cart/order-summary.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/cart/order-summary.tsx#link:a#1",
+      "file": "components/cart/order-summary.tsx",
+      "kind": "link",
+      "name": "a",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/catalog/catalog-list.tsx#link:Link#1",
+      "file": "components/catalog/catalog-list.tsx",
+      "kind": "link",
+      "name": "Link",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/catalog/catalog-list.tsx#link:Link#2",
+      "file": "components/catalog/catalog-list.tsx",
+      "kind": "link",
+      "name": "Link",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/catalog/catalog-list.tsx#link:Link#3",
+      "file": "components/catalog/catalog-list.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "observe": [
+        "[data-slot=\"more-row-label\"][data-pending=\"true\"]"
+      ],
+      "why": "網羅表 G6。`?show=` を伸ばして一覧を丸ごと取り直すので、押してから着地まで 画面が 1 ドットも変わらなかった。#172 が `useLinkStatus` で進行の印を足し、押した瞬間に `data-pending` が立つ。遷移の着地前に印が出ることを検査する。"
+    },
+    {
+      "id": "components/catalog/catalog-toolbar.tsx#handler:onChange#1",
+      "file": "components/catalog/catalog-toolbar.tsx",
+      "kind": "handler",
+      "name": "onChange",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/catalog/catalog-toolbar.tsx#handler:onClick#1",
+      "file": "components/catalog/catalog-toolbar.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/catalog/catalog-toolbar.tsx#handler:onFocus#1",
+      "file": "components/catalog/catalog-toolbar.tsx",
+      "kind": "handler",
+      "name": "onFocus",
+      "response": "fire-and-forget",
+      "why": "先読みの引き金 (#172)。押す仕草が見えた時点で行き先・アセットを取りにいくだけで、画面は何も変えず、誰もこの往復を待っていない。応答の対象は「その後に押したとき」の操作側。"
+    },
+    {
+      "id": "components/catalog/catalog-toolbar.tsx#handler:onFocus#2",
+      "file": "components/catalog/catalog-toolbar.tsx",
+      "kind": "handler",
+      "name": "onFocus",
+      "response": "fire-and-forget",
+      "why": "先読みの引き金 (#172)。押す仕草が見えた時点で行き先・アセットを取りにいくだけで、画面は何も変えず、誰もこの往復を待っていない。応答の対象は「その後に押したとき」の操作側。"
+    },
+    {
+      "id": "components/catalog/catalog-toolbar.tsx#handler:onPointerEnter#1",
+      "file": "components/catalog/catalog-toolbar.tsx",
+      "kind": "handler",
+      "name": "onPointerEnter",
+      "response": "fire-and-forget",
+      "why": "先読みの引き金 (#172)。押す仕草が見えた時点で行き先・アセットを取りにいくだけで、画面は何も変えず、誰もこの往復を待っていない。応答の対象は「その後に押したとき」の操作側。"
+    },
+    {
+      "id": "components/catalog/catalog-toolbar.tsx#handler:onScroll#1",
+      "file": "components/catalog/catalog-toolbar.tsx",
+      "kind": "handler",
+      "name": "onScroll",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/catalog/catalog-toolbar.tsx#link:Link#1",
+      "file": "components/catalog/catalog-toolbar.tsx",
+      "kind": "link",
+      "name": "Link",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/chat/chat-bar.tsx#handler:onChange#1",
+      "file": "components/chat/chat-bar.tsx",
+      "kind": "handler",
+      "name": "onChange",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/chat/chat-bar.tsx#handler:onClick#1",
+      "file": "components/chat/chat-bar.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/chat/chat-bar.tsx#handler:onClick#2",
+      "file": "components/chat/chat-bar.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/chat/chat-bar.tsx#handler:onClick#3",
+      "file": "components/chat/chat-bar.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/chat/chat-bar.tsx#handler:onClick#4",
+      "file": "components/chat/chat-bar.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/chat/chat-bar.tsx#handler:onClose#1",
+      "file": "components/chat/chat-bar.tsx",
+      "kind": "handler",
+      "name": "onClose",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/chat/chat-bar.tsx#handler:onFocus#1",
+      "file": "components/chat/chat-bar.tsx",
+      "kind": "handler",
+      "name": "onFocus",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/chat/chat-bar.tsx#handler:onKeyDown#1",
+      "file": "components/chat/chat-bar.tsx",
+      "kind": "handler",
+      "name": "onKeyDown",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/chat/chat-bar.tsx#handler:onKeyDown#2",
+      "file": "components/chat/chat-bar.tsx",
+      "kind": "handler",
+      "name": "onKeyDown",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/chat/chat-bar.tsx#handler:onKeyDown#3",
+      "file": "components/chat/chat-bar.tsx",
+      "kind": "handler",
+      "name": "onKeyDown",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/chat/chat-bar.tsx#handler:onSelect#1",
+      "file": "components/chat/chat-bar.tsx",
+      "kind": "handler",
+      "name": "onSelect",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/chat/chat-bar.tsx#handler:onSubmit#1",
+      "file": "components/chat/chat-bar.tsx",
+      "kind": "handler",
+      "name": "onSubmit",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/chat/chat-bar.tsx#handler:onSubmit#2",
+      "file": "components/chat/chat-bar.tsx",
+      "kind": "handler",
+      "name": "onSubmit",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/chat/chat-bar.tsx#handler:onSubmit#3",
+      "file": "components/chat/chat-bar.tsx",
+      "kind": "handler",
+      "name": "onSubmit",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/chat/chat-bar.tsx#handler:onWheel#1",
+      "file": "components/chat/chat-bar.tsx",
+      "kind": "handler",
+      "name": "onWheel",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/chat/chat-bar.tsx#listener:mousedown#1",
+      "file": "components/chat/chat-bar.tsx",
+      "kind": "listener",
+      "name": "mousedown",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/chat/chat-bar.tsx#write:fetch:POST#1",
+      "file": "components/chat/chat-bar.tsx",
+      "kind": "write",
+      "name": "fetch:POST",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/chat/chat-launcher.tsx#handler:onClick#1",
+      "file": "components/chat/chat-launcher.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/chat/chat-message.tsx#handler:onChange#1",
+      "file": "components/chat/chat-message.tsx",
+      "kind": "handler",
+      "name": "onChange",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/chat/chat-message.tsx#handler:onClick#1",
+      "file": "components/chat/chat-message.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/chat/chat-message.tsx#handler:onClick#2",
+      "file": "components/chat/chat-message.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/chat/chat-message.tsx#handler:onClick#3",
+      "file": "components/chat/chat-message.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/chat/chat-message.tsx#handler:onClick#4",
+      "file": "components/chat/chat-message.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/chat/chat-message.tsx#link:a#1",
+      "file": "components/chat/chat-message.tsx",
+      "kind": "link",
+      "name": "a",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/chat/chat-message.tsx#write:fetch:POST#1",
+      "file": "components/chat/chat-message.tsx",
+      "kind": "write",
+      "name": "fetch:POST",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/chat/chat-panel.tsx#handler:onClick#1",
+      "file": "components/chat/chat-panel.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/chat/elxea-chat-transport.ts#write:fetch:POST#1",
+      "file": "components/chat/elxea-chat-transport.ts",
+      "kind": "write",
+      "name": "fetch:POST",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/chat/line-cta.tsx#link:a#1",
+      "file": "components/chat/line-cta.tsx",
+      "kind": "link",
+      "name": "a",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/chat/product-card.tsx#link:a#1",
+      "file": "components/chat/product-card.tsx",
+      "kind": "link",
+      "name": "a",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/chat/quick-replies.tsx#handler:onClick#1",
+      "file": "components/chat/quick-replies.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/chat/tasting-note-cta.tsx#link:Link#1",
+      "file": "components/chat/tasting-note-cta.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "components/community/comment-section.tsx#handler:onChange#1",
+      "file": "components/community/comment-section.tsx",
+      "kind": "handler",
+      "name": "onChange",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/community/comment-section.tsx#handler:onClick#1",
+      "file": "components/community/comment-section.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/community/comment-section.tsx#handler:onSubmit#1",
+      "file": "components/community/comment-section.tsx",
+      "kind": "handler",
+      "name": "onSubmit",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/community/comment-section.tsx#write:fetch:DELETE#1",
+      "file": "components/community/comment-section.tsx",
+      "kind": "write",
+      "name": "fetch:DELETE",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/community/comment-section.tsx#write:fetch:POST#1",
+      "file": "components/community/comment-section.tsx",
+      "kind": "write",
+      "name": "fetch:POST",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/community/note-card.tsx#handler:onClick#1",
+      "file": "components/community/note-card.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/community/reaction-chip.tsx#handler:spread#1",
+      "file": "components/community/reaction-chip.tsx",
+      "kind": "handler",
+      "name": "spread",
+      "exempt": "素の要素への prop 受け渡しのみ。この行自体は操作を発生させず、ハンドラは呼び出し側から渡される (呼び出し側は handler 行として台帳に載っている)。中身が読めないので安全側に 1 行立ててあるが、応答の責任は呼び出し側にある。"
+    },
+    {
+      "id": "components/editorial/rule-list.tsx#link:Link#1",
+      "file": "components/editorial/rule-list.tsx",
+      "kind": "link",
+      "name": "Link",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/editorial/rule-list.tsx#link:Link#2",
+      "file": "components/editorial/rule-list.tsx",
+      "kind": "link",
+      "name": "Link",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/editorial/rule-list.tsx#link:a#1",
+      "file": "components/editorial/rule-list.tsx",
+      "kind": "link",
+      "name": "a",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/events/event-detail.tsx#link:a#1",
+      "file": "components/events/event-detail.tsx",
+      "kind": "link",
+      "name": "a",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/events/event-register-button.tsx#handler:onClick#1",
+      "file": "components/events/event-register-button.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/events/event-register-button.tsx#write:fetch:DELETE#1",
+      "file": "components/events/event-register-button.tsx",
+      "kind": "write",
+      "name": "fetch:DELETE",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/events/event-register-button.tsx#write:fetch:POST#1",
+      "file": "components/events/event-register-button.tsx",
+      "kind": "write",
+      "name": "fetch:POST",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/farmers/farmer-detail.tsx#link:Link#1",
+      "file": "components/farmers/farmer-detail.tsx",
+      "kind": "link",
+      "name": "Link",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/journal/article-blocks.tsx#link:Link#1",
+      "file": "components/journal/article-blocks.tsx",
+      "kind": "link",
+      "name": "Link",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/journal/article-blocks.tsx#link:Link#2",
+      "file": "components/journal/article-blocks.tsx",
+      "kind": "link",
+      "name": "Link",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/journal/article-blocks.tsx#link:Link#3",
+      "file": "components/journal/article-blocks.tsx",
+      "kind": "link",
+      "name": "Link",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/journal/article-card.tsx#link:Link#1",
+      "file": "components/journal/article-card.tsx",
+      "kind": "link",
+      "name": "Link",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/journal/article-card.tsx#link:Link#2",
+      "file": "components/journal/article-card.tsx",
+      "kind": "link",
+      "name": "Link",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/journal/article-card.tsx#link:Link#3",
+      "file": "components/journal/article-card.tsx",
+      "kind": "link",
+      "name": "Link",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/journal/article-modal-sections.tsx#handler:onClick#1",
+      "file": "components/journal/article-modal-sections.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/journal/article-modal-sections.tsx#handler:onClick#2",
+      "file": "components/journal/article-modal-sections.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/journal/article-modal-sections.tsx#handler:onClick#3",
+      "file": "components/journal/article-modal-sections.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/journal/article-modal-sections.tsx#handler:onOpenChange#1",
+      "file": "components/journal/article-modal-sections.tsx",
+      "kind": "handler",
+      "name": "onOpenChange",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/journal/article-modal-sections.tsx#handler:onOpenChange#2",
+      "file": "components/journal/article-modal-sections.tsx",
+      "kind": "handler",
+      "name": "onOpenChange",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/journal/article-modal-sections.tsx#handler:onSelect#1",
+      "file": "components/journal/article-modal-sections.tsx",
+      "kind": "handler",
+      "name": "onSelect",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/journal/article-modal-sections.tsx#handler:onSelect#2",
+      "file": "components/journal/article-modal-sections.tsx",
+      "kind": "handler",
+      "name": "onSelect",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/journal/article-modal-sections.tsx#link:Link#1",
+      "file": "components/journal/article-modal-sections.tsx",
+      "kind": "link",
+      "name": "Link",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/journal/article-modal-sections.tsx#link:Link#2",
+      "file": "components/journal/article-modal-sections.tsx",
+      "kind": "link",
+      "name": "Link",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/journal/article-read-tracker.tsx#listener:scroll#1",
+      "file": "components/journal/article-read-tracker.tsx",
+      "kind": "listener",
+      "name": "scroll",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/journal/article-read-tracker.tsx#listener:visibilitychange#1",
+      "file": "components/journal/article-read-tracker.tsx",
+      "kind": "listener",
+      "name": "visibilitychange",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/journal/audio-block.tsx#link:a#1",
+      "file": "components/journal/audio-block.tsx",
+      "kind": "link",
+      "name": "a",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/journal/author-profile.tsx#link:Link#1",
+      "file": "components/journal/author-profile.tsx",
+      "kind": "link",
+      "name": "Link",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/journal/author-profile.tsx#link:Link#2",
+      "file": "components/journal/author-profile.tsx",
+      "kind": "link",
+      "name": "Link",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/journal/author-profile.tsx#link:a#1",
+      "file": "components/journal/author-profile.tsx",
+      "kind": "link",
+      "name": "a",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/journal/journal-list.tsx#link:Link#1",
+      "file": "components/journal/journal-list.tsx",
+      "kind": "link",
+      "name": "Link",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/journal/journal-list.tsx#link:Link#2",
+      "file": "components/journal/journal-list.tsx",
+      "kind": "link",
+      "name": "Link",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/journal/journal-list.tsx#link:Link#3",
+      "file": "components/journal/journal-list.tsx",
+      "kind": "link",
+      "name": "Link",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/journal/journal-list.tsx#link:Link#4",
+      "file": "components/journal/journal-list.tsx",
+      "kind": "link",
+      "name": "Link",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/journal/journal-list.tsx#link:Link#5",
+      "file": "components/journal/journal-list.tsx",
+      "kind": "link",
+      "name": "Link",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/journal/journal-modal.tsx#handler:onOpenChange#1",
+      "file": "components/journal/journal-modal.tsx",
+      "kind": "handler",
+      "name": "onOpenChange",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/journal/journal-modal.tsx#handler:spread#1",
+      "file": "components/journal/journal-modal.tsx",
+      "kind": "handler",
+      "name": "spread",
+      "exempt": "素の要素への prop 受け渡しのみ。この行自体は操作を発生させず、ハンドラは呼び出し側から渡される (呼び出し側は handler 行として台帳に載っている)。中身が読めないので安全側に 1 行立ててあるが、応答の責任は呼び出し側にある。"
+    },
+    {
+      "id": "components/journal/reading-progress.tsx#listener:resize#1",
+      "file": "components/journal/reading-progress.tsx",
+      "kind": "listener",
+      "name": "resize",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/journal/reading-progress.tsx#listener:scroll#1",
+      "file": "components/journal/reading-progress.tsx",
+      "kind": "listener",
+      "name": "scroll",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/journal/related-articles.tsx#link:Link#1",
+      "file": "components/journal/related-articles.tsx",
+      "kind": "link",
+      "name": "Link",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/karte/tasting-notes.tsx#link:Link#1",
+      "file": "components/karte/tasting-notes.tsx",
+      "kind": "link",
+      "name": "Link",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/karte/tasting-notes.tsx#link:Link#2",
+      "file": "components/karte/tasting-notes.tsx",
+      "kind": "link",
+      "name": "Link",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/layout/cookie-consent.tsx#handler:onClick#1",
+      "file": "components/layout/cookie-consent.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/layout/cookie-consent.tsx#handler:onClick#2",
+      "file": "components/layout/cookie-consent.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/layout/cookie-consent.tsx#link:Link#1",
+      "file": "components/layout/cookie-consent.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "components/layout/cookie-settings-button.tsx#handler:onClick#1",
+      "file": "components/layout/cookie-settings-button.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/layout/footer.tsx#link:Link#1",
+      "file": "components/layout/footer.tsx",
+      "kind": "link",
+      "name": "Link",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/layout/footer.tsx#link:Link#10",
+      "file": "components/layout/footer.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "components/layout/footer.tsx#link:Link#11",
+      "file": "components/layout/footer.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "components/layout/footer.tsx#link:Link#12",
+      "file": "components/layout/footer.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "components/layout/footer.tsx#link:Link#13",
+      "file": "components/layout/footer.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "components/layout/footer.tsx#link:Link#14",
+      "file": "components/layout/footer.tsx",
+      "kind": "link",
+      "name": "Link",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/layout/footer.tsx#link:Link#15",
+      "file": "components/layout/footer.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "components/layout/footer.tsx#link:Link#16",
+      "file": "components/layout/footer.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "components/layout/footer.tsx#link:Link#17",
+      "file": "components/layout/footer.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "components/layout/footer.tsx#link:Link#18",
+      "file": "components/layout/footer.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "components/layout/footer.tsx#link:Link#2",
+      "file": "components/layout/footer.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "components/layout/footer.tsx#link:Link#3",
+      "file": "components/layout/footer.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "components/layout/footer.tsx#link:Link#4",
+      "file": "components/layout/footer.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "components/layout/footer.tsx#link:Link#5",
+      "file": "components/layout/footer.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "components/layout/footer.tsx#link:Link#6",
+      "file": "components/layout/footer.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "components/layout/footer.tsx#link:Link#7",
+      "file": "components/layout/footer.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "components/layout/footer.tsx#link:Link#8",
+      "file": "components/layout/footer.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "components/layout/footer.tsx#link:Link#9",
+      "file": "components/layout/footer.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "components/layout/header.tsx#handler:onClick#1",
+      "file": "components/layout/header.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/layout/header.tsx#handler:onClick#2",
+      "file": "components/layout/header.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/layout/header.tsx#handler:onClick#3",
+      "file": "components/layout/header.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/layout/header.tsx#handler:onClick#4",
+      "file": "components/layout/header.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/layout/header.tsx#handler:onClick#5",
+      "file": "components/layout/header.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/layout/header.tsx#handler:onClick#6",
+      "file": "components/layout/header.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/layout/header.tsx#handler:onOpenChange#1",
+      "file": "components/layout/header.tsx",
+      "kind": "handler",
+      "name": "onOpenChange",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/layout/header.tsx#link:Link#1",
+      "file": "components/layout/header.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "components/layout/header.tsx#link:Link#10",
+      "file": "components/layout/header.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "components/layout/header.tsx#link:Link#11",
+      "file": "components/layout/header.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "components/layout/header.tsx#link:Link#2",
+      "file": "components/layout/header.tsx",
+      "kind": "link",
+      "name": "Link",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/layout/header.tsx#link:Link#3",
+      "file": "components/layout/header.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "components/layout/header.tsx#link:Link#4",
+      "file": "components/layout/header.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "components/layout/header.tsx#link:Link#5",
+      "file": "components/layout/header.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "components/layout/header.tsx#link:Link#6",
+      "file": "components/layout/header.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "components/layout/header.tsx#link:Link#7",
+      "file": "components/layout/header.tsx",
+      "kind": "link",
+      "name": "Link",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/layout/header.tsx#link:Link#8",
+      "file": "components/layout/header.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "components/layout/header.tsx#link:Link#9",
+      "file": "components/layout/header.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "components/layout/header.tsx#link:a#1",
+      "file": "components/layout/header.tsx",
+      "kind": "link",
+      "name": "a",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/layout/header.tsx#link:a#2",
+      "file": "components/layout/header.tsx",
+      "kind": "link",
+      "name": "a",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/layout/header.tsx#listener:visibilitychange#1",
+      "file": "components/layout/header.tsx",
+      "kind": "listener",
+      "name": "visibilitychange",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/layout/hero-section.tsx#link:a#1",
+      "file": "components/layout/hero-section.tsx",
+      "kind": "link",
+      "name": "a",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/layout/hero-section.tsx#link:a#2",
+      "file": "components/layout/hero-section.tsx",
+      "kind": "link",
+      "name": "a",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/layout/language-switcher.tsx#handler:onClick#1",
+      "file": "components/layout/language-switcher.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/layout/language-switcher.tsx#handler:onFocus#1",
+      "file": "components/layout/language-switcher.tsx",
+      "kind": "handler",
+      "name": "onFocus",
+      "response": "fire-and-forget",
+      "why": "先読みの引き金 (#172)。押す仕草が見えた時点で行き先・アセットを取りにいくだけで、画面は何も変えず、誰もこの往復を待っていない。応答の対象は「その後に押したとき」の操作側。"
+    },
+    {
+      "id": "components/layout/language-switcher.tsx#handler:onPointerEnter#1",
+      "file": "components/layout/language-switcher.tsx",
+      "kind": "handler",
+      "name": "onPointerEnter",
+      "response": "fire-and-forget",
+      "why": "先読みの引き金 (#172)。押す仕草が見えた時点で行き先・アセットを取りにいくだけで、画面は何も変えず、誰もこの往復を待っていない。応答の対象は「その後に押したとき」の操作側。"
+    },
+    {
+      "id": "components/marketing/service-overview.tsx#link:Link#1",
+      "file": "components/marketing/service-overview.tsx",
+      "kind": "link",
+      "name": "Link",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/marketing/top-blocks.tsx#link:Link#1",
+      "file": "components/marketing/top-blocks.tsx",
+      "kind": "link",
+      "name": "Link",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/marketing/top-blocks.tsx#link:Link#2",
+      "file": "components/marketing/top-blocks.tsx",
+      "kind": "link",
+      "name": "Link",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/marketing/top-blocks.tsx#link:Link#3",
+      "file": "components/marketing/top-blocks.tsx",
+      "kind": "link",
+      "name": "Link",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/marketing/top-blocks.tsx#link:Link#4",
+      "file": "components/marketing/top-blocks.tsx",
+      "kind": "link",
+      "name": "Link",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/marketing/top-blocks.tsx#link:Link#5",
+      "file": "components/marketing/top-blocks.tsx",
+      "kind": "link",
+      "name": "Link",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/marketing/top-blocks.tsx#link:Link#6",
+      "file": "components/marketing/top-blocks.tsx",
+      "kind": "link",
+      "name": "Link",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/marketing/top-blocks.tsx#link:Link#7",
+      "file": "components/marketing/top-blocks.tsx",
+      "kind": "link",
+      "name": "Link",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/media/image-with-fallback.tsx#handler:onError#1",
+      "file": "components/media/image-with-fallback.tsx",
+      "kind": "handler",
+      "name": "onError",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/playlist/playlist-detail.tsx#link:Link#1",
+      "file": "components/playlist/playlist-detail.tsx",
+      "kind": "link",
+      "name": "Link",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/product/add-to-cart-button.tsx#handler:onClick#1",
+      "file": "components/product/add-to-cart-button.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "response": "optimistic",
+      "observe": [
+        "[data-slot=\"cart-badge-count\"]"
+      ],
+      "why": "網羅表 A1。カートのバッジは押した瞬間に動く (mode:\"all\" — 3 回押したら 3 個入る加算なので latest では回数が消える)。"
+    },
+    {
+      "id": "components/product/image-gallery.tsx#handler:onClick#1",
+      "file": "components/product/image-gallery.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/product/image-gallery.tsx#handler:onClick#2",
+      "file": "components/product/image-gallery.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "response": "asset-load",
+      "observe": [],
+      "why": "網羅表 G1/B1。サムネイルを押すと <Image> は同じ DOM のまま src が差し替わるので、未取得なら取り終わるまで旧画像のまま (本番実測 705〜1,865ms / 温まっていれば 19〜174ms)。#169 が requestIdleCallback で先読みを入れた。asset-load の検査は「切替先が操作前に取得済みか」で、時間ではなく事前取得の有無を見る。"
+    },
+    {
+      "id": "components/product/image-gallery.tsx#handler:onClick#3",
+      "file": "components/product/image-gallery.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/product/image-gallery.tsx#handler:onClick#4",
+      "file": "components/product/image-gallery.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/product/image-gallery.tsx#handler:onFocus#1",
+      "file": "components/product/image-gallery.tsx",
+      "kind": "handler",
+      "name": "onFocus",
+      "response": "fire-and-forget",
+      "why": "先読みの引き金 (#172)。押す仕草が見えた時点で行き先・アセットを取りにいくだけで、画面は何も変えず、誰もこの往復を待っていない。応答の対象は「その後に押したとき」の操作側。"
+    },
+    {
+      "id": "components/product/image-gallery.tsx#handler:onOpenChange#1",
+      "file": "components/product/image-gallery.tsx",
+      "kind": "handler",
+      "name": "onOpenChange",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/product/image-gallery.tsx#handler:onPointerDown#1",
+      "file": "components/product/image-gallery.tsx",
+      "kind": "handler",
+      "name": "onPointerDown",
+      "response": "fire-and-forget",
+      "why": "先読みの引き金 (#172)。押す仕草が見えた時点で行き先・アセットを取りにいくだけで、画面は何も変えず、誰もこの往復を待っていない。応答の対象は「その後に押したとき」の操作側。"
+    },
+    {
+      "id": "components/product/image-gallery.tsx#handler:onPointerEnter#1",
+      "file": "components/product/image-gallery.tsx",
+      "kind": "handler",
+      "name": "onPointerEnter",
+      "response": "fire-and-forget",
+      "why": "先読みの引き金 (#172)。押す仕草が見えた時点で行き先・アセットを取りにいくだけで、画面は何も変えず、誰もこの往復を待っていない。応答の対象は「その後に押したとき」の操作側。"
+    },
+    {
+      "id": "components/product/product-purchase-options.tsx#handler:onSelectPlan#1",
+      "file": "components/product/product-purchase-options.tsx",
+      "kind": "handler",
+      "name": "onSelectPlan",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/product/product-recommend-section.tsx#link:Link#1",
+      "file": "components/product/product-recommend-section.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "components/product/product-recommend-section.tsx#link:Link#2",
+      "file": "components/product/product-recommend-section.tsx",
+      "kind": "link",
+      "name": "Link",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/product/product-recommend-sidebar.tsx#link:Link#1",
+      "file": "components/product/product-recommend-sidebar.tsx",
+      "kind": "link",
+      "name": "Link",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/product/product-recommend-sidebar.tsx#link:Link#2",
+      "file": "components/product/product-recommend-sidebar.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "components/product/selling-plan-selector.tsx#handler:onClick#1",
+      "file": "components/product/selling-plan-selector.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/product/selling-plan-selector.tsx#handler:onClick#2",
+      "file": "components/product/selling-plan-selector.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/product/selling-plan-selector.tsx#handler:onClick#3",
+      "file": "components/product/selling-plan-selector.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/product/variant-selector.tsx#handler:onClick#1",
+      "file": "components/product/variant-selector.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/sanity/portable-text.tsx#link:a#1",
+      "file": "components/sanity/portable-text.tsx",
+      "kind": "link",
+      "name": "a",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/sanity/portable-text.tsx#link:a#2",
+      "file": "components/sanity/portable-text.tsx",
+      "kind": "link",
+      "name": "a",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/search-form.tsx#handler:onChange#1",
+      "file": "components/search-form.tsx",
+      "kind": "handler",
+      "name": "onChange",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/search-form.tsx#handler:onSubmit#1",
+      "file": "components/search-form.tsx",
+      "kind": "handler",
+      "name": "onSubmit",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/search/search-panel.tsx#handler:spread#1",
+      "file": "components/search/search-panel.tsx",
+      "kind": "handler",
+      "name": "spread",
+      "exempt": "素の要素への prop 受け渡しのみ。この行自体は操作を発生させず、ハンドラは呼び出し側から渡される (呼び出し側は handler 行として台帳に載っている)。中身が読めないので安全側に 1 行立ててあるが、応答の責任は呼び出し側にある。"
+    },
+    {
+      "id": "components/search/search-panel.tsx#link:Link#1",
+      "file": "components/search/search-panel.tsx",
+      "kind": "link",
+      "name": "Link",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/seo/breadcrumb.tsx#link:Link#1",
+      "file": "components/seo/breadcrumb.tsx",
+      "kind": "link",
+      "name": "Link",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/set-edition/tea-spec-card.tsx#link:Link#1",
+      "file": "components/set-edition/tea-spec-card.tsx",
+      "kind": "link",
+      "name": "Link",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/ui/carousel.tsx#handler:onClick#1",
+      "file": "components/ui/carousel.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/ui/carousel.tsx#handler:onClick#2",
+      "file": "components/ui/carousel.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/ui/carousel.tsx#handler:onKeyDownCapture#1",
+      "file": "components/ui/carousel.tsx",
+      "kind": "handler",
+      "name": "onKeyDownCapture",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/ui/input-group.tsx#handler:onClick#1",
+      "file": "components/ui/input-group.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/ui/input.tsx#handler:spread#1",
+      "file": "components/ui/input.tsx",
+      "kind": "handler",
+      "name": "spread",
+      "exempt": "素の要素への prop 受け渡しのみ。この行自体は操作を発生させず、ハンドラは呼び出し側から渡される (呼び出し側は handler 行として台帳に載っている)。中身が読めないので安全側に 1 行立ててあるが、応答の責任は呼び出し側にある。"
+    },
+    {
+      "id": "components/ui/native-select.tsx#handler:spread#1",
+      "file": "components/ui/native-select.tsx",
+      "kind": "handler",
+      "name": "spread",
+      "exempt": "素の要素への prop 受け渡しのみ。この行自体は操作を発生させず、ハンドラは呼び出し側から渡される (呼び出し側は handler 行として台帳に載っている)。中身が読めないので安全側に 1 行立ててあるが、応答の責任は呼び出し側にある。"
+    },
+    {
+      "id": "components/ui/pagination.tsx#handler:spread#1",
+      "file": "components/ui/pagination.tsx",
+      "kind": "handler",
+      "name": "spread",
+      "exempt": "素の要素への prop 受け渡しのみ。この行自体は操作を発生させず、ハンドラは呼び出し側から渡される (呼び出し側は handler 行として台帳に載っている)。中身が読めないので安全側に 1 行立ててあるが、応答の責任は呼び出し側にある。"
+    },
+    {
+      "id": "components/ui/pill-button.tsx#handler:spread#1",
+      "file": "components/ui/pill-button.tsx",
+      "kind": "handler",
+      "name": "spread",
+      "exempt": "素の要素への prop 受け渡しのみ。この行自体は操作を発生させず、ハンドラは呼び出し側から渡される (呼び出し側は handler 行として台帳に載っている)。中身が読めないので安全側に 1 行立ててあるが、応答の責任は呼び出し側にある。"
+    },
+    {
+      "id": "components/ui/quantity-stepper.tsx#handler:onClick#1",
+      "file": "components/ui/quantity-stepper.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/ui/quantity-stepper.tsx#handler:onClick#2",
+      "file": "components/ui/quantity-stepper.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/ui/sidebar.tsx#handler:onClick#1",
+      "file": "components/ui/sidebar.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/ui/sidebar.tsx#handler:onClick#2",
+      "file": "components/ui/sidebar.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/ui/sidebar.tsx#handler:onOpenChange#1",
+      "file": "components/ui/sidebar.tsx",
+      "kind": "handler",
+      "name": "onOpenChange",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/ui/sidebar.tsx#handler:spread#1",
+      "file": "components/ui/sidebar.tsx",
+      "kind": "handler",
+      "name": "spread",
+      "exempt": "素の要素への prop 受け渡しのみ。この行自体は操作を発生させず、ハンドラは呼び出し側から渡される (呼び出し側は handler 行として台帳に載っている)。中身が読めないので安全側に 1 行立ててあるが、応答の責任は呼び出し側にある。"
+    },
+    {
+      "id": "components/ui/sidebar.tsx#listener:keydown#1",
+      "file": "components/ui/sidebar.tsx",
+      "kind": "listener",
+      "name": "keydown",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/ui/textarea.tsx#handler:spread#1",
+      "file": "components/ui/textarea.tsx",
+      "kind": "handler",
+      "name": "spread",
+      "exempt": "素の要素への prop 受け渡しのみ。この行自体は操作を発生させず、ハンドラは呼び出し側から渡される (呼び出し側は handler 行として台帳に載っている)。中身が読めないので安全側に 1 行立ててあるが、応答の責任は呼び出し側にある。"
+    },
+    {
+      "id": "components/viz/me/community/community-lens.tsx#handler:onKeyDown#1",
+      "file": "components/viz/me/community/community-lens.tsx",
+      "kind": "handler",
+      "name": "onKeyDown",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/viz/me/community/community-lens.tsx#handler:onPointerCancel#1",
+      "file": "components/viz/me/community/community-lens.tsx",
+      "kind": "handler",
+      "name": "onPointerCancel",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/viz/me/community/community-lens.tsx#handler:onPointerDown#1",
+      "file": "components/viz/me/community/community-lens.tsx",
+      "kind": "handler",
+      "name": "onPointerDown",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/viz/me/community/community-lens.tsx#handler:onPointerDown#2",
+      "file": "components/viz/me/community/community-lens.tsx",
+      "kind": "handler",
+      "name": "onPointerDown",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/viz/me/community/community-lens.tsx#handler:onPointerLeave#1",
+      "file": "components/viz/me/community/community-lens.tsx",
+      "kind": "handler",
+      "name": "onPointerLeave",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/viz/me/community/community-lens.tsx#handler:onPointerMove#1",
+      "file": "components/viz/me/community/community-lens.tsx",
+      "kind": "handler",
+      "name": "onPointerMove",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/viz/me/community/community-lens.tsx#handler:onPointerMove#2",
+      "file": "components/viz/me/community/community-lens.tsx",
+      "kind": "handler",
+      "name": "onPointerMove",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/viz/me/community/community-lens.tsx#handler:onPointerUp#1",
+      "file": "components/viz/me/community/community-lens.tsx",
+      "kind": "handler",
+      "name": "onPointerUp",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/viz/me/flavor-lens/flavor-lens-scene.tsx#handler:onClick#1",
+      "file": "components/viz/me/flavor-lens/flavor-lens-scene.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/viz/me/flavor-lens/flavor-lens-scene.tsx#handler:onClick#2",
+      "file": "components/viz/me/flavor-lens/flavor-lens-scene.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/viz/me/flavor-lens/flavor-lens-scene.tsx#handler:onClick#3",
+      "file": "components/viz/me/flavor-lens/flavor-lens-scene.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/viz/me/flavor-lens/flavor-lens-scene.tsx#handler:onClick#4",
+      "file": "components/viz/me/flavor-lens/flavor-lens-scene.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/viz/me/flavor-lens/flavor-lens-scene.tsx#handler:onClick#5",
+      "file": "components/viz/me/flavor-lens/flavor-lens-scene.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/viz/me/flavor-lens/flavor-lens-scene.tsx#handler:onClick#6",
+      "file": "components/viz/me/flavor-lens/flavor-lens-scene.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/viz/me/flavor-lens/flavor-lens-scene.tsx#listener:click#1",
+      "file": "components/viz/me/flavor-lens/flavor-lens-scene.tsx",
+      "kind": "listener",
+      "name": "click",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/viz/me/flavor-lens/flavor-lens-scene.tsx#listener:pointerleave#1",
+      "file": "components/viz/me/flavor-lens/flavor-lens-scene.tsx",
+      "kind": "listener",
+      "name": "pointerleave",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/viz/me/flavor-lens/flavor-lens-scene.tsx#listener:pointermove#1",
+      "file": "components/viz/me/flavor-lens/flavor-lens-scene.tsx",
+      "kind": "listener",
+      "name": "pointermove",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/viz/me/footprints/footprints-scene.tsx#handler:onClick#1",
+      "file": "components/viz/me/footprints/footprints-scene.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/viz/me/footprints/footprints-scene.tsx#handler:onKeyDown#1",
+      "file": "components/viz/me/footprints/footprints-scene.tsx",
+      "kind": "handler",
+      "name": "onKeyDown",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/viz/me/footprints/footprints-scene.tsx#handler:onPointerCancel#1",
+      "file": "components/viz/me/footprints/footprints-scene.tsx",
+      "kind": "handler",
+      "name": "onPointerCancel",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/viz/me/footprints/footprints-scene.tsx#handler:onPointerDown#1",
+      "file": "components/viz/me/footprints/footprints-scene.tsx",
+      "kind": "handler",
+      "name": "onPointerDown",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/viz/me/footprints/footprints-scene.tsx#handler:onPointerMove#1",
+      "file": "components/viz/me/footprints/footprints-scene.tsx",
+      "kind": "handler",
+      "name": "onPointerMove",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/viz/me/footprints/footprints-scene.tsx#handler:onPointerUp#1",
+      "file": "components/viz/me/footprints/footprints-scene.tsx",
+      "kind": "handler",
+      "name": "onPointerUp",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/viz/me/footprints/footprints-scene.tsx#listener:keydown#1",
+      "file": "components/viz/me/footprints/footprints-scene.tsx",
+      "kind": "listener",
+      "name": "keydown",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/viz/me/footprints/footprints-scene.tsx#listener:pointerdown#1",
+      "file": "components/viz/me/footprints/footprints-scene.tsx",
+      "kind": "listener",
+      "name": "pointerdown",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/viz/me/garden/word-garden.tsx#handler:onBlur#1",
+      "file": "components/viz/me/garden/word-garden.tsx",
+      "kind": "handler",
+      "name": "onBlur",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/viz/me/garden/word-garden.tsx#handler:onClick#1",
+      "file": "components/viz/me/garden/word-garden.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/viz/me/garden/word-garden.tsx#handler:onClick#2",
+      "file": "components/viz/me/garden/word-garden.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/viz/me/garden/word-garden.tsx#handler:onFocus#1",
+      "file": "components/viz/me/garden/word-garden.tsx",
+      "kind": "handler",
+      "name": "onFocus",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/viz/me/garden/word-garden.tsx#handler:onKeyDown#1",
+      "file": "components/viz/me/garden/word-garden.tsx",
+      "kind": "handler",
+      "name": "onKeyDown",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/viz/me/garden/word-garden.tsx#handler:onPointerDown#1",
+      "file": "components/viz/me/garden/word-garden.tsx",
+      "kind": "handler",
+      "name": "onPointerDown",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/viz/me/garden/word-garden.tsx#handler:onPointerDown#2",
+      "file": "components/viz/me/garden/word-garden.tsx",
+      "kind": "handler",
+      "name": "onPointerDown",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/viz/me/garden/word-garden.tsx#handler:onPointerEnter#1",
+      "file": "components/viz/me/garden/word-garden.tsx",
+      "kind": "handler",
+      "name": "onPointerEnter",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/viz/me/garden/word-garden.tsx#handler:onPointerLeave#1",
+      "file": "components/viz/me/garden/word-garden.tsx",
+      "kind": "handler",
+      "name": "onPointerLeave",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/viz/me/garden/word-garden.tsx#handler:onPointerLeave#2",
+      "file": "components/viz/me/garden/word-garden.tsx",
+      "kind": "handler",
+      "name": "onPointerLeave",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/viz/terroir/terroir-lens-map.tsx#handler:onClick#1",
+      "file": "components/viz/terroir/terroir-lens-map.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/viz/terroir/terroir-lens-map.tsx#handler:onClick#2",
+      "file": "components/viz/terroir/terroir-lens-map.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/viz/terroir/terroir-lens-map.tsx#handler:onClick#3",
+      "file": "components/viz/terroir/terroir-lens-map.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/viz/terroir/terroir-overview-map.tsx#link:a#1",
+      "file": "components/viz/terroir/terroir-overview-map.tsx",
+      "kind": "link",
+      "name": "a",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/viz/wash/seasonal-wash.tsx#listener:change#1",
+      "file": "components/viz/wash/seasonal-wash.tsx",
+      "kind": "listener",
+      "name": "change",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/viz/wash/seasonal-wash.tsx#listener:visibilitychange#1",
+      "file": "components/viz/wash/seasonal-wash.tsx",
+      "kind": "listener",
+      "name": "visibilitychange",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "hooks/use-mobile.ts#listener:change#1",
+      "file": "hooks/use-mobile.ts",
+      "kind": "listener",
+      "name": "change",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "hooks/use-retreat-on-scroll.ts#listener:scroll#1",
+      "file": "hooks/use-retreat-on-scroll.ts",
+      "kind": "listener",
+      "name": "scroll",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "lib/consent-store.ts#listener:storage#1",
+      "file": "lib/consent-store.ts",
+      "kind": "listener",
+      "name": "storage",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "lib/favorites/client-store.ts#write:fetch:DELETE#1",
+      "file": "lib/favorites/client-store.ts",
+      "kind": "write",
+      "name": "fetch:DELETE",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "lib/favorites/client-store.ts#write:fetch:POST#1",
+      "file": "lib/favorites/client-store.ts",
+      "kind": "write",
+      "name": "fetch:POST",
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    }
+  ]
+}
