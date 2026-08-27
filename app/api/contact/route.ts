@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
 import { z } from "zod";
 import { env } from "@/lib/config";
+import { logger } from "@/lib/log";
 import { parseJsonBody } from "@/lib/validation/zod-helpers";
 import { enforceRateLimit, limiters, getClientIp } from "@/lib/ratelimit";
 
@@ -95,7 +96,12 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Contact form error:", error);
+    /* 送れなかった問い合わせは顧客側から再送されない。無音にすると
+       「送ったのに返事が来ない」だけが残る。 */
+    logger.error("api.contact.submit-failed", error, {
+      route: "/api/contact",
+      status: 500,
+    });
     return NextResponse.json(
       { error: "Failed to send email" },
       { status: 500 }

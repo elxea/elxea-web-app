@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { env, isProduction } from "@/lib/config";
+import { logger } from "@/lib/log";
 
 const CX_AGENT_BASE_URL = (
   env("NEXT_PUBLIC_CHAT_API_URL") ?? "http://localhost:8787/api/chat"
@@ -64,7 +65,10 @@ export async function POST(request: NextRequest) {
     const result = await res.json();
     return NextResponse.json(result);
   } catch (err) {
-    console.error("Survey route error:", err);
+    logger.error("api.survey.submit-failed", err, {
+      route: "/api/survey",
+      status: 500,
+    });
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

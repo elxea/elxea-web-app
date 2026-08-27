@@ -11,6 +11,7 @@
 
 import { env } from "@/lib/config";
 import { lineApiBaseUrl } from "@/lib/line/endpoints";
+import { logger } from "@/lib/log";
 
 /** Messaging API の push エンドポイント。ホストは `LINE_API_BASE_URL` で差し替え可能
  *  （未設定なら本物の LINE）。テストが実際に LINE へ push してしまうのを防ぐため。 */
@@ -68,6 +69,8 @@ export async function sendLineNotify({
       console.error("[LINE Notify] Push failed:", response.status, errorText);
     }
   } catch (error) {
-    console.error("[LINE Notify] Unexpected error:", error);
+    /* push が届かないこと自体が監視の穴になる。件名・本文は運営宛の定型文で
+       個人情報を含まないが、記録には種別だけを添える。 */
+    logger.error("line.notify.push-request-failed", error, { level });
   }
 }

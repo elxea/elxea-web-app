@@ -42,6 +42,7 @@
  *     --collection-group=_subscriptionCycleResets --enable-ttl
  */
 import { getAdminFirestore } from "@/lib/firebase/admin";
+import { logger } from "@/lib/log";
 
 /** マーカーの置き場。`_` 始まりは運用用コレクションの既存慣習 (`_webhookLogs`)。 */
 export const CYCLE_RESET_COLLECTION = "_subscriptionCycleResets";
@@ -99,11 +100,12 @@ export async function recordBillingCycleReset(
       });
     return true;
   } catch (error) {
-    // 再開操作そのものは成功させる。ここで throw すると顧客が「再開できない」に化ける。
-    console.error(
-      `[BillingCycleReset] 記録に失敗しました (contract=${docId}):`,
-      error
-    );
+    /* 再開操作そのものは成功させる。ここで throw すると顧客が「再開できない」に化ける。
+       ただしマーカーが書けていないと、再開したはずの契約が翌日また停止する
+       (このファイルが直している欠陥そのもの) ので、必ず届く形で残す。 */
+    logger.error("shopify.billing-cycle-reset.write-failed", error, {
+      contractId,
+    });
     return false;
   }
 }
@@ -135,10 +137,11 @@ export async function getBillingCycleResetAt(
 
     return toDate(data.resetAtIso) ?? toDate(data.resetAt);
   } catch (error) {
-    console.error(
-      `[BillingCycleReset] 読み取りに失敗しました (contract=${docId}):`,
-      error
-    );
+    /* 読めないときは「マーカー無し」= 従来の判定に倒す (誤課金側には倒れない)。
+       とはいえ再開済みの契約が再停止する側の間違いなので、黙って落とさない。 */
+    logger.error("shopify.billing-cycle-reset.read-failed", error, {
+      contractId,
+    });
     return null;
   }
 }
@@ -163,7 +166,10 @@ function toDate(value: unknown): Date | null {
       return date instanceof Date && Number.isFinite(date.getTime())
         ? date
         : null;
-    } catch {
+    } catch (error) {
+      /* 保存したのはこちら側の値なので、読めないのは壊れているということ。
+         マーカー無し扱いで進めるが、原因は追えるようにしておく。 */
+      logger.error("shopify.billing-cycle-reset.timestamp-unreadable", error);
       return null;
     }
   }

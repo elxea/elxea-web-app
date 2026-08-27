@@ -14,6 +14,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { logger } from "@/lib/log";
 import { BehaviorBodySchema } from "@/lib/validation/behavior-schema";
 import { resolveIdentity } from "@/lib/firebase/auth-guard";
 import { addBehaviorLog } from "@/lib/firebase/server-actions";
@@ -55,8 +56,12 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(result);
   } catch (err) {
-    // Non-critical: log but return 200 to avoid disrupting client UX
-    console.error("[POST /api/user/behavior]", err);
+    /* クライアントには 200 を返し続ける (行動記録の失敗で画面を壊さない) が、
+       返し方が同じである以上、記録が落ちていることは**こちら側でしか気づけない**。
+       アラートの鳴る側に載せる。応答は変えない。 */
+    logger.error("api.user-behavior.record-failed", err, {
+      route: "POST /api/user/behavior",
+    });
     return NextResponse.json({ skipped: true, reason: "internal_error" });
   }
 }

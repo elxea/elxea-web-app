@@ -1,10 +1,15 @@
 "use client";
 
-import * as Sentry from "@sentry/nextjs";
 import { useTranslations } from "next-intl";
 import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import { logger } from "@/lib/log";
 
+/**
+ * 一般ページの受け皿。記録は `lib/log` を通す (憲章 Wave 3 / R1)。
+ * どの受け皿で落ちたかをタグに残さないと、「エラー画面を見た人が何人いるか」を
+ * 区画ごとに数えられない。
+ */
 export default function Error({
   error,
   reset,
@@ -15,7 +20,7 @@ export default function Error({
   const t = useTranslations("common");
 
   useEffect(() => {
-    Sentry.captureException(error);
+    logger.error("ui.boundary.locale", error, { digest: error.digest });
   }, [error]);
 
   return (

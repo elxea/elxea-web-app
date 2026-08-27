@@ -158,6 +158,41 @@ const eslintConfig = [
     },
   },
 
+  // 憲章 R1「失敗は握り潰さない」の全域展開（2026-08-27 / Wave 3）:
+  //   外部と話す場所 (Shopify / Firebase / LINE / API ルート) の catch は、
+  //   投げ直すか、調査できる形 (Sentry / lib/log) に残す。console だけで
+  //   終わる catch は握り潰しとして落とす。
+  //
+  // なぜ規律ではなく lint なのか: Wave 0 で `lib/shopify` のセッション読み出しには
+  // 同じ処方を入れたが、**入れたのはその 1 区画だけ**で、同じ書き方は残り全域に
+  // そのまま残っていた。着手時点の実測で `captureException` は `lib/firebase`
+  // `lib/line` `components/**` に 0 件。装置を足しただけでは再流入が止まらない、
+  // というのが憲章 R8 の指す失敗型そのもの。
+  //
+  // 対象を 4 区画に絞ってある。ここが「外の世界と話す境界」であり、握り潰しが
+  // そのまま顧客への嘘 (「ログアウト」「契約 0 件」) になる場所だから。
+  // `components/**` の画面側は Sentry 配線 (lib/interaction / error boundary) で
+  // 受けるので、lint の網は広げない (誤検出で例外表が肥大する)。
+  //
+  // 逃げ道は 2 つだけで、どちらも差分に必ず現れる:
+  //   - ルール内の GRANDFATHERED (件数付き・縮小方向にのみ更新)
+  //   - catch の中の `expected-failure: <理由>` コメント (理由の記述が必須)
+  // kill switch: 下の行を "off" にする。
+  {
+    files: [
+      "lib/shopify/**/*.ts",
+      "lib/firebase/**/*.ts",
+      "lib/line/**/*.ts",
+      "app/api/**/*.ts",
+    ],
+    plugins: {
+      "elxea-tokens": elxeaTokens,
+    },
+    rules: {
+      "elxea-tokens/no-silent-catch-at-boundary": "error",
+    },
+  },
+
   // 憲章 R4「設定値は起動時検証・raw 読み禁止」の機械強制（2026-08-27）:
   //   アプリの実行コードは `process.env` に触らない。設定は `lib/config/spec.ts`
   //   に宣言し、`env("NAME")` で読む。

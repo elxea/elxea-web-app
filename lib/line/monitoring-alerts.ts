@@ -17,6 +17,8 @@
  *
  * 文面は機能的マイクロコピー: 何が起きたか / 数と識別子 / 次にどこを見るか。
  */
+import { logger } from "@/lib/log";
+
 import { sendLineNotify, type LineNotifyPayload } from "./notify";
 
 /** 本文に列挙する識別子の上限。超えた分は「他 N 件」に畳む。 */
@@ -70,7 +72,12 @@ async function push(payload: LineNotifyPayload): Promise<void> {
   try {
     await sendLineNotify(payload);
   } catch (error) {
-    console.error("[LINE Notify] 監視通知の送信に失敗しました:", error);
+    /* 本処理は落とさない。ただし通知が届かないことに気づける経路が
+       console しか無いと、異常そのものが運営に届かないまま消える。 */
+    logger.error("line.monitoring-alert.push-failed", error, {
+      level: payload.level,
+      subject: payload.subject,
+    });
   }
 }
 

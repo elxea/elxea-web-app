@@ -9,6 +9,7 @@ import {
 } from "@/lib/firebase/server-actions";
 import { FAVORITE_KINDS } from "@/lib/account-favorites";
 import type { FavoriteType } from "@/lib/firebase/types";
+import { logger } from "@/lib/log";
 import { parseJsonBody } from "@/lib/validation/zod-helpers";
 import { enforceRateLimit, limiters } from "@/lib/ratelimit";
 
@@ -71,7 +72,12 @@ export async function GET(request: NextRequest) {
     const favorites = await getFavorites(auth.userKey, type ?? undefined);
     return NextResponse.json({ favorites });
   } catch (err) {
-    console.error("[GET /api/user/favorites]", err);
+    /* 引けなかっただけなのに、画面では「お気に入り 0 件」と見分けがつかない。
+       消えたように見える壊れ方なので、届く側に載せる。 */
+    logger.error("api.user-favorites.list-failed", err, {
+      route: "GET /api/user/favorites",
+      status: 500,
+    });
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
@@ -102,7 +108,11 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(result);
   } catch (err) {
-    console.error("[POST /api/user/favorites]", err);
+    /* 保存できていない。次に開いたとき「入れたはずのものが無い」になる。 */
+    logger.error("api.user-favorites.add-failed", err, {
+      route: "POST /api/user/favorites",
+      status: 500,
+    });
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
@@ -131,7 +141,11 @@ export async function DELETE(request: NextRequest) {
     );
     return NextResponse.json(result);
   } catch (err) {
-    console.error("[DELETE /api/user/favorites]", err);
+    /* 外せていない。外したはずのものが残り続けるので、こちらが気づく側に載せる。 */
+    logger.error("api.user-favorites.remove-failed", err, {
+      route: "DELETE /api/user/favorites",
+      status: 500,
+    });
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

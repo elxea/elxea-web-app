@@ -1,6 +1,7 @@
 import { createHash, createPublicKey, timingSafeEqual, verify as cryptoVerify } from "crypto";
 
 import { env } from "@/lib/config";
+import { logger } from "@/lib/log";
 
 /**
  * Shopify Customer Account API の `id_token` を **署名まで含めて** 検証する。
@@ -181,6 +182,7 @@ function safeOrigin(url: string): string | null {
   try {
     return new URL(url).origin;
   } catch {
+    // expected-failure: 未設定・書き間違いの URL はここで null にして既定ドメインへ落とすのが仕様。
     return null;
   }
 }
@@ -206,7 +208,12 @@ async function refreshJwks(fetchImpl: typeof fetch, now: number): Promise<boolea
     const res = await fetchImpl(discoveryUrl(), { headers: { Accept: "application/json" } });
     if (!res.ok) return false;
     discovery = (await res.json()) as typeof discovery;
-  } catch {
+  } catch (err) {
+    /* discovery が引けないと鍵を取り直せない。古い鍵で検証を続けるので画面上は
+       何も起きないが、これが続くと寿命切れで全ログインが止まる。 */
+    logger.error("shopify.id-token.discovery-fetch-failed", err, {
+      discoveryUrl: discoveryUrl(),
+    });
     return false;
   }
 
@@ -219,7 +226,9 @@ async function refreshJwks(fetchImpl: typeof fetch, now: number): Promise<boolea
     const res = await fetchImpl(jwksUri, { headers: { Accept: "application/json" } });
     if (!res.ok) return false;
     jwks = (await res.json()) as typeof jwks;
-  } catch {
+  } catch (err) {
+    /* 鍵そのものが取れていない。上流の障害がこちらの検証の劣化として静かに残る。 */
+    logger.error("shopify.id-token.jwks-fetch-failed", err, { jwksUri });
     return false;
   }
 
@@ -239,8 +248,10 @@ async function refreshJwks(fetchImpl: typeof fetch, now: number): Promise<boolea
         raw.kid,
         createPublicKey({ key: { kty: "RSA", n: raw.n, e: raw.e }, format: "jwk" }),
       );
-    } catch {
-      /* 1 本壊れていても他の鍵は使える。ここで全体を落とさない。 */
+    } catch (err) {
+      /* 1 本壊れていても他の鍵は使える。ここで全体を落とさないが、上流が読めない鍵を
+         配っていること自体は検証が静かに痩せる話なので残す。 */
+      logger.error("shopify.id-token.jwks-key-unusable", err, { kid: raw.kid });
     }
   }
 
@@ -310,6 +321,7 @@ export async function verifyShopifyIdToken(
     header = decodeSegment(headerB64) as typeof header;
     claims = decodeSegment(payloadB64) as ShopifyIdTokenClaims;
   } catch {
+    // expected-failure: token は誰でも投げ込める入力で、開けないものを拒否するのがこの関数の仕事。
     return { ok: false, reason: "id_token_undecodable" };
   }
   if (!header || typeof header !== "object" || !claims || typeof claims !== "object") {
@@ -343,6 +355,7 @@ export async function verifyShopifyIdToken(
   try {
     signature = Buffer.from(signatureB64, "base64url");
   } catch {
+    // expected-failure: 署名部が base64url ですらない token は偽物。拒否がそのまま答え。
     return { ok: false, reason: "signature_undecodable" };
   }
 
@@ -350,6 +363,7 @@ export async function verifyShopifyIdToken(
   try {
     signatureValid = cryptoVerify("sha256", signingInput, key, signature);
   } catch {
+    // expected-failure: 鍵と形の合わない署名は verify 自体が例外になる。不一致 = 拒否で答えは出ている。
     signatureValid = false;
   }
   if (!signatureValid) return { ok: false, reason: "signature_invalid" };

@@ -7,6 +7,7 @@ import { getBaseUrl, getRequestOrigin } from "@/lib/base-url";
 import { getCookieSpec, resolveCookieDomain } from "@/lib/auth/cookies";
 import { CX_AGENT_BASE_URL } from "@/lib/chat/proxy";
 import { env } from "@/lib/config";
+import { logger } from "@/lib/log";
 import { verifyLineIdToken } from "@/lib/line/verify-liff-token";
 import { lineApiBaseUrl } from "@/lib/line/endpoints";
 import {
@@ -224,6 +225,11 @@ export async function GET(request: NextRequest) {
     const tokens = (await tokenRes.json()) as { id_token?: string };
     idToken = tokens.id_token;
   } catch (err) {
+    /* `fail` は console.warn で 1 行残すだけなので、誰にも届かないまま
+       連携が全滅しうる。到達不能・タイムアウトはここでしか分からない。 */
+    logger.error("api.line-link-callback.token-exchange-failed", err, {
+      customerId: auth.customerId,
+    });
     return fail(returnTo, `token exchange threw: ${String(err)}`);
   }
 
@@ -272,6 +278,11 @@ export async function GET(request: NextRequest) {
       return fail(returnTo, `cx-agent returned ${upstream.status}: ${detail}`);
     }
   } catch (err) {
+    /* 台帳に届かなければ連携は成立していない。利用者にはマイページで
+       「連携できませんでした」と出るだけなので、原因はこちらで拾う。 */
+    logger.error("api.line-link-callback.ledger-unreachable", err, {
+      customerId: auth.customerId,
+    });
     return fail(returnTo, `cx-agent unreachable: ${String(err)}`);
   }
 
@@ -335,7 +346,11 @@ function describeLineError(rawBody: string): string {
       parts.push(`error_description=${record.error_description}`);
     }
     return parts.length > 0 ? parts.join(" ") : "(no error body)";
-  } catch {
+  } catch (err) {
+    /* 本文が JSON で来なかった = LINE 側の返し方が変わった可能性がある。
+       ここが黙ると、以後どの連携失敗も理由なしのまま流れる。**本文は載せない**
+       (交換の応答には秘密が入りうる)。 */
+    logger.error("api.line-link-callback.error-body-unparseable", err);
     return "(unparseable error body)";
   }
 }

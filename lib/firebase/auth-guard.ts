@@ -8,6 +8,7 @@
  */
 import { cache } from "react";
 import { cookies } from "next/headers";
+import { logger } from "@/lib/log";
 import { getSession } from "@/lib/shopify/auth";
 import { getCustomer, decryptToken } from "@/lib/shopify/customer";
 import { fetchShopifyCustomerIdForLineUser } from "@/lib/line/linkage-status";
@@ -76,7 +77,12 @@ export async function requireAuth(): Promise<AuthResult> {
       .join(" ") || "Anonymous";
 
     return { authenticated: true, customerId, customerName };
-  } catch {
+  } catch (err) {
+    /* ここは上流 (Shopify) の障害を「未ログイン」に畳んで返す場所。返し方は変えない
+       が、残さないと障害はお客さまの画面上の「ログアウト」としてしか現れない。 */
+    logger.error("firebase.auth-guard.require-auth-failed", err, {
+      operation: "requireAuth",
+    });
     return { authenticated: false, error: "Authentication failed", status: 401 };
   }
 }
@@ -185,7 +191,12 @@ async function loadIdentity(): Promise<Identity> {
             if (typeof parsed?.displayName === "string" && parsed.displayName) {
               displayName = parsed.displayName;
             }
-          } catch {
+          } catch (err) {
+            /* 表示名が既定値に落ちるだけで本人判定には効かないが、cookie の書式が
+               変わると全員の表示名が黙って "LINE User" になるので残す。 */
+            logger.error("firebase.auth-guard.line-user-cookie-unreadable", err, {
+              operation: "resolveIdentity",
+            });
             // Ignore malformed cookie — keep default display name.
           }
         }
@@ -231,7 +242,12 @@ async function loadIdentity(): Promise<Identity> {
     }
 
     return { authenticated: false, error: "Not authenticated", status: 401 };
-  } catch {
+  } catch (err) {
+    /* `requireAuth` と同じ理由。本人解決の失敗を「未ログイン」に畳むので、
+       ここで残さないと上流の障害が誰にも届かない。 */
+    logger.error("firebase.auth-guard.identity-resolve-failed", err, {
+      operation: "resolveIdentity",
+    });
     return { authenticated: false, error: "Authentication failed", status: 401 };
   }
 }

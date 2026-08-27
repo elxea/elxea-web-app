@@ -4,6 +4,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { validateWebhookRequest } from "@/lib/shopify/webhooks/verify";
 import { eraseInCxAgent } from "@/lib/erase/cx-agent";
 import { getAdminFirestore } from "@/lib/firebase/admin";
+import { logger } from "@/lib/log";
 import {
   userDoc,
   ordersCol,
@@ -201,10 +202,13 @@ export async function POST(request: NextRequest) {
         `[Webhook:GDPR] Deleted user document: ${userDoc(customerId)}`,
       );
     } catch (userDocErr) {
-      console.error(
-        `[Webhook:GDPR] Failed to delete user document ${userDoc(customerId)}:`,
-        userDocErr,
-      );
+      /* 子は消えたのに本人の文書だけ残る = 消し残り。法令上の義務なので、
+         Shopify の再送に任せきりにせず人が気づける側にも載せる。 */
+      logger.error("api.gdpr-customers-redact.user-doc-delete-failed", userDocErr, {
+        customerId,
+        shopDomain: body.shop_domain,
+        status: 500,
+      });
       return NextResponse.json(
         { error: "User document deletion failed" },
         { status: 500 },
@@ -228,9 +232,16 @@ export async function POST(request: NextRequest) {
       });
     }
   } catch (error) {
-    // Unhandled error — return 500 so Shopify retries. Previous behavior
-    // returned 200 which silently dropped GDPR requests.
-    console.error("[Webhook:GDPR] Error deleting customer data:", error);
+    /* Unhandled error — return 500 so Shopify retries. Previous behavior
+       returned 200 which silently dropped GDPR requests.
+       再送は Shopify 任せなので、再送も尽きたまま消えていない状態に
+       誰も気づけない事態を避けるため、ここは必ず鳴らす。
+       webhook の本文は個人情報なので載せない。 */
+    logger.error("api.gdpr-customers-redact.erase-failed", error, {
+      customerId,
+      shopDomain: body.shop_domain,
+      status: 500,
+    });
     return NextResponse.json(
       { error: "Internal Server Error" },
       { status: 500 },

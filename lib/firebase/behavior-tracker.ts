@@ -13,6 +13,7 @@
  */
 
 import type { FavoriteKind } from "@/lib/account-favorites";
+import { logger } from "@/lib/log";
 
 export type TrackPageViewParams = {
   contentId: string;
@@ -84,7 +85,10 @@ async function sendEvent(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action, channel: "web", metadata }),
     });
-  } catch {
+  } catch (err) {
+    /* 画面は今までどおり止めない。ただし送信が全滅してもパーソナライズの入力が
+       静かに欠けるだけだったので、行動の中身ではなく種別だけを残す。 */
+    logger.error("firebase.behavior-tracker.send-failed", err, { action });
     // Silently ignore — behavior tracking must never break UX
   }
 }

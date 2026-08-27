@@ -90,6 +90,7 @@ export function parsePendingAuths(
   try {
     decoded = Buffer.from(cookieValue, "base64url").toString("utf8");
   } catch {
+    // expected-failure: 古い形式や壊れた cookie はブラウザから普通に来る。捨てて「進行中の認証なし」に倒すのが仕様。
     return [];
   }
 
@@ -97,6 +98,7 @@ export function parsePendingAuths(
   try {
     parsed = JSON.parse(decoded);
   } catch {
+    // expected-failure: cookie の中身は信用できない。読めなければログインをやり直せば済むので誰も呼ばない。
     return [];
   }
 

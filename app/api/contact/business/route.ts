@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
 import { z } from "zod";
 import { env } from "@/lib/config";
+import { logger } from "@/lib/log";
 import { parseJsonBody } from "@/lib/validation/zod-helpers";
 import { enforceRateLimit, limiters, getClientIp } from "@/lib/ratelimit";
 
@@ -62,7 +63,12 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Business contact form error:", error);
+    /* 送れなかった問い合わせは顧客側から再送されない。無音にすると商談が
+       そのまま消える。 */
+    logger.error("api.contact-business.submit-failed", error, {
+      route: "/api/contact/business",
+      status: 500,
+    });
     return NextResponse.json(
       { error: "Failed to send email" },
       { status: 500 }

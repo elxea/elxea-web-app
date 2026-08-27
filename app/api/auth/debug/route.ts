@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { env, isProduction } from "@/lib/config";
+import { logger } from "@/lib/log";
 import { decryptToken } from "@/lib/shopify/customer";
 import { getSession, getCustomerFromSession } from "@/lib/shopify/auth";
 
@@ -41,6 +42,12 @@ export async function GET(request: NextRequest) {
     const session = await getSession();
     sessionResult = session ? `OK (token starts: ${session.accessToken.substring(0, 10)}...)` : "null";
   } catch (e) {
+    /* 応答本文は手元で読むためのもの。セッションが引けないこと自体は
+       ログイン全体の異常なので、調査できる形にも残す。 */
+    logger.error("api.auth-debug.session-probe-failed", e, {
+      route: "/api/auth/debug",
+      probe: "getSession",
+    });
     sessionResult = `ERROR: ${String(e)}`;
   }
 
@@ -52,6 +59,10 @@ export async function GET(request: NextRequest) {
       ? { ok: true, data: result.data }
       : { ok: false, reason: result.reason };
   } catch (e) {
+    logger.error("api.auth-debug.customer-probe-failed", e, {
+      route: "/api/auth/debug",
+      probe: "getCustomerFromSession",
+    });
     customerResult = { ok: false, error: String(e) };
   }
 

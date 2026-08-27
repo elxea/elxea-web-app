@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useOptimistic, useRef, useState, useTransition } from "react";
 
+import { logger } from "@/lib/log";
+
 import type { MutationClass } from "./mutation-classes";
 import { createWriteQueue, type WriteMode, type WriteOutcome } from "./write-queue";
 
@@ -32,6 +34,12 @@ export type { WriteOutcome };
 /* -------------------------------------------------------------------------- */
 
 export type OptimisticMutationOptions<TValue, TInput> = {
+  /**
+   * この操作の名乗り。**固定文字列**にすること (`cart.line-quantity` など)。
+   * 失敗の記録に付くタグなので、テンプレート文字列で毎回変えると数えられない
+   * (憲章 Wave 3 / R1)。
+   */
+  operation: string;
   /** サーバが持っている本当の値 (RSC の props など)。 */
   value: TValue;
   /** 押されたときに画面へ**その場で**反映する規則。純関数にすること。 */
@@ -72,6 +80,7 @@ export type OptimisticMutation<TValue, TInput> = {
 };
 
 export function useOptimisticMutation<TValue, TInput>({
+  operation,
   value,
   reduce,
   send,
@@ -83,8 +92,9 @@ export function useOptimisticMutation<TValue, TInput>({
   const [isPending, startTransition] = useTransition();
 
   /* 交通整理は**この hook の生存期間で 1 つ**。描き直しのたびに作り直すと、
-     行きがかりの往復を見失って直列化が効かなくなる。 */
-  const queue = useRef(createWriteQueue<TInput>());
+     行きがかりの往復を見失って直列化が効かなくなる。
+     失敗の記録も交通整理の側が受け持つ (`write-queue` が唯一の合流点)。 */
+  const queue = useRef(createWriteQueue<TInput>({ operation }));
 
   /* `send` / `onFailure` は呼び出し側で毎回新しく作られるのが普通なので、
      `run` の同一性を保つために ref 越しに読む (押すたびに子が描き直るのを防ぐ)。
@@ -129,6 +139,11 @@ export function useOptimisticMutation<TValue, TInput>({
 /* -------------------------------------------------------------------------- */
 
 export type PessimisticMutationOptions<TInput> = {
+  /**
+   * この操作の名乗り。**固定文字列**にすること (`subscription.cancel` など)。
+   * 失敗の記録に付くタグになる (憲章 Wave 3 / R1)。
+   */
+  operation: string;
   /** どちらの悲観か。`mutation-classes.ts` の表を参照。 */
   mutationClass: Extract<MutationClass, "pessimistic-commit" | "pessimistic-form">;
   /** 実際の書き込み。 */
@@ -158,6 +173,7 @@ export type PessimisticMutation<TInput> = {
  * 0.3 秒どころか次の描画で進行を出せる。
  */
 export function usePessimisticMutation<TInput>({
+  operation,
   mutationClass,
   send,
   onSuccess,
@@ -183,13 +199,17 @@ export function usePessimisticMutation<TInput>({
       latest.current.onSuccess?.(input);
       return "ok";
     } catch (e) {
+      /* 金銭・契約・フォームが落ちた。顧客には `onFailure` で言い直すが、
+         それだけでは**こちら側が気づけない**ので必ず記録も残す
+         (憲章 Wave 3 / R1)。 */
+      logger.error("ui.mutation.commit-failed", e, { operation, mutationClass });
       latest.current.onFailure(input, e);
       return "failed";
     } finally {
       inFlight.current = false;
       setIsPending(false);
     }
-  }, []);
+  }, [operation, mutationClass]);
 
   return { run, isPending, mutationClass };
 }

@@ -10,6 +10,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { CX_AGENT_BASE_URL, buildProxyAuth, clientIpForwardHeaders } from "@/lib/chat/proxy";
+import { logger } from "@/lib/log";
 
 /* cookies() でセッションを参照し SSE を中継するため動的レンダリング固定。
    ランタイム指定は書かない — Route Handler の既定が nodejs なので
@@ -22,6 +23,7 @@ export async function POST(request: NextRequest) {
   try {
     body = await request.json();
   } catch {
+    // expected-failure: ブラウザが送る body が壊れているだけで、400 を返すのが答え。
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
@@ -48,7 +50,10 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify(forwardBody),
     });
   } catch (err) {
-    console.error("[chat proxy] upstream fetch failed:", err);
+    logger.error("api.chat.upstream-unreachable", err, {
+      route: "/api/chat",
+      status: 502,
+    });
     return NextResponse.json({ error: "Upstream unavailable" }, { status: 502 });
   }
 

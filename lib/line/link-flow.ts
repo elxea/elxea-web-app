@@ -1,6 +1,7 @@
 import crypto from "crypto";
 
 import { env } from "@/lib/config";
+import { logger } from "@/lib/log";
 import { encryptToken, decryptToken } from "@/lib/shopify/customer";
 
 /**
@@ -274,7 +275,13 @@ export function openLinkState(
   let payload: SealedState;
   try {
     payload = JSON.parse(decrypted) as SealedState;
-  } catch {
+  } catch (err) {
+    /* 復号は通ったのに中身が読めない = 我々が封じた形が壊れている。連携が
+       通らなくなる原因なので、fail-closed のまま記録だけ残す。 */
+    logger.error("line.link-flow.sealed-state-unreadable", err, {
+      operation: "openLinkState",
+      reason: "state_malformed",
+    });
     return { ok: false, reason: "state_malformed" };
   }
 

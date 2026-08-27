@@ -9,6 +9,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { CX_AGENT_BASE_URL, buildProxyAuth } from "@/lib/chat/proxy";
+import { logger } from "@/lib/log";
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +38,10 @@ export async function GET(request: NextRequest) {
       headers,
     });
   } catch (err) {
-    console.error("[chat/history proxy] upstream fetch failed:", err);
+    logger.error("api.chat-history.upstream-unreachable", err, {
+      route: "/api/chat/history",
+      status: 502,
+    });
     return NextResponse.json({ error: "Upstream unavailable" }, { status: 502 });
   }
 

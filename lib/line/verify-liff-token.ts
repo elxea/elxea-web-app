@@ -24,6 +24,7 @@
 import { createHash, timingSafeEqual } from "crypto";
 
 import { lineApiBaseUrl, lineAuthBaseUrl } from "@/lib/line/endpoints";
+import { logger } from "@/lib/log";
 
 /** verify API が返す最小の payload（本フローで使うフィールドのみ）。 */
 export interface LiffIdTokenPayload {
@@ -138,6 +139,11 @@ export async function verifyLineIdToken(
       body: form.toString(),
     });
   } catch (err) {
+    /* verify に届かない = 連携がその場で全滅する。fail-closed は変えずに、
+       届かなかったこと自体は必ず残す。 */
+    logger.error("line.verify-liff-token.request-failed", err, {
+      operation: "verifyLineIdToken",
+    });
     return {
       ok: false,
       reason: `LINE verify request failed: ${err instanceof Error ? err.message : String(err)}`,
@@ -152,7 +158,13 @@ export async function verifyLineIdToken(
   let payload: LiffIdTokenPayload;
   try {
     payload = (await res.json()) as LiffIdTokenPayload;
-  } catch {
+  } catch (err) {
+    /* 200 なのに JSON でない = LINE 側の仕様変更か手前の何かが応答を差し替えて
+       いる。本人確認が通らなくなる話なので、黙って失敗させない。 */
+    logger.error("line.verify-liff-token.response-not-json", err, {
+      operation: "verifyLineIdToken",
+      status: res.status,
+    });
     return { ok: false, reason: "LINE verify returned non-JSON" };
   }
 

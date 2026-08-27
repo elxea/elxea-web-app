@@ -9,6 +9,7 @@ import {
   updateSubscriptionContract,
 } from "@/lib/shopify/subscription-admin";
 import { env } from "@/lib/config";
+import { logger } from "@/lib/log";
 import { sendDunningEmail } from "@/lib/email/dunning";
 import {
   notifyBillingCronFatal,
@@ -199,7 +200,13 @@ function isAuthorizedCronRequest(authHeader: string | null): boolean {
   if (a.length !== b.length) return false;
   try {
     return crypto.timingSafeEqual(a, b);
-  } catch {
+  } catch (err) {
+    /* 長さは手前で揃えてあるので、ここに来ること自体が想定外。黙って
+       「不許可」にすると、鍵の壊れで課金 cron が毎日止まっても気付けない。 */
+    logger.error("api.cron-billing.secret-compare-failed", err, {
+      route: "/api/cron/billing",
+      operation: "cron-secret-compare",
+    });
     return false;
   }
 }

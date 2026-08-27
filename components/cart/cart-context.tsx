@@ -94,6 +94,7 @@ export function CartProvider({
   const noop = useCallback(() => {}, []);
 
   const cart = useOptimisticMutation<Cart | null, CartInput>({
+    operation: "cart.write",
     value: initialCart,
     reduce: cartReducer,
     send,

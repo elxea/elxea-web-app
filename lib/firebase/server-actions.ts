@@ -7,6 +7,7 @@ import {
   favoriteDocId,
   partitionFavoriteDuplicates,
 } from "@/lib/account-favorites";
+import { logger } from "@/lib/log";
 import { getAdminFirestore } from "./admin";
 import { COLLECTIONS, favoritesCol, followsCol, eventRegistrationsCol, behaviorLogCol, userDoc } from "./collections";
 import type {
@@ -89,8 +90,13 @@ export async function addFavorite(
         for (const doc of legacy) await doc.ref.delete();
       } catch (err) {
         /* 移せなくても「保存済み」であることは変わらない。読み出し側の片付けが
-           次に拾うので、ここで利用者に失敗を見せる理由は無い。 */
-        console.error("[favorites] legacy id migration failed:", err);
+           次に拾うので、ここで利用者に失敗を見せる理由は無い。ただし移行が
+           ずっと失敗し続けているなら気づけるようにしておく。 */
+        logger.error("firebase.favorites.legacy-id-migration-failed", err, {
+          customerId,
+          type: data.type,
+          targetId: data.targetId,
+        });
       }
     }
 
@@ -180,7 +186,12 @@ export async function getFavorites(customerId: string, type?: FavoriteType) {
         `[favorites] removed ${duplicates.length} duplicate document(s) while reading a favorites shelf`,
       );
     } catch (err) {
-      console.error("[favorites] duplicate cleanup failed:", err);
+      /* 読み出しは成功させる (画面は「残す側」だけを見る)。片付けが効かないまま
+         棚に重複が積み上がる状態を、無音にはしない。 */
+      logger.error("firebase.favorites.duplicate-cleanup-failed", err, {
+        customerId,
+        duplicateCount: duplicates.length,
+      });
     }
   }
 

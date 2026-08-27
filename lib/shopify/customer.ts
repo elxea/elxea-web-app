@@ -11,6 +11,7 @@ import {
 } from "@/lib/subscription-view";
 
 import { env, isTest } from "@/lib/config";
+import { logger } from "@/lib/log";
 
 import { SHOPIFY_API_VERSION } from "./api-version";
 import {
@@ -615,7 +616,12 @@ export async function resolveNextBillingCycle(
 
     json = await res.json();
   } catch (e) {
-    console.error("[resolveNextBillingCycleIndex] request failed:", e);
+    /* 周期が引けないと「次回お届けをスキップ」の対象が決まらない。顧客には
+       操作が通らなかったようにしか見えないので、原因はこちら側で拾う。 */
+    logger.error("shopify.subscription.upcoming-cycles-fetch-failed", e, {
+      subscriptionId: subscriptionContractId,
+      operation: "resolveNextBillingCycle",
+    });
     return null;
   }
 
@@ -976,7 +982,13 @@ export function decryptToken(encrypted: string): string | null {
     let decrypted = decipher.update(data, "base64", "utf8");
     decrypted += decipher.final("utf8");
     return decrypted;
-  } catch {
+  } catch (err) {
+    /* 復号できないのは SESSION_SECRET のローテーションか暗号文の破損で、原因は
+       こちら側にある。顧客には「ログインし直し」としか見えないので、まとまった数が
+       出たことに気付けるようにしておく (暗号文そのものは記録に載せない)。 */
+    logger.error("shopify.session.token-decrypt-failed", err, {
+      operation: "decryptToken",
+    });
     return null;
   }
 }

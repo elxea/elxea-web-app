@@ -10,6 +10,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { CX_AGENT_BASE_URL, buildProxyAuth, clientIpForwardHeaders } from "@/lib/chat/proxy";
+import { logger } from "@/lib/log";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,7 @@ export async function POST(request: NextRequest) {
   try {
     form = await request.formData();
   } catch {
+    // expected-failure: multipart が壊れて届いただけで、400 を返すのが答え。
     return NextResponse.json({ error: "Invalid form data" }, { status: 400 });
   }
 
@@ -50,7 +52,10 @@ export async function POST(request: NextRequest) {
       body: forwardForm,
     });
   } catch (err) {
-    console.error("[chat/image proxy] upstream fetch failed:", err);
+    logger.error("api.chat-image.upstream-unreachable", err, {
+      route: "/api/chat/image",
+      status: 502,
+    });
     return NextResponse.json({ error: "Upstream unavailable" }, { status: 502 });
   }
 

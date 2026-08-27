@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import { isProduction } from "@/lib/config";
+import { logger } from "@/lib/log";
 import {
   exchangeToken,
   encryptToken,
@@ -569,14 +570,19 @@ export async function GET(request: NextRequest) {
           }
         }
       } catch (err) {
-        // Non-blocking: welcome email failure should not affect login
-        console.error("[Auth Callback] Welcome email error:", err);
+        /* ログインは止めない。ただし黙らせない — 初回登録の歓迎メールが
+           届かなかったことは、顧客からは分からず誰も気付けない。 */
+        logger.error("api.auth-callback.welcome-email-failed", err, {
+          route: "/api/auth/callback",
+        });
       }
     })();
 
     return response;
   } catch (error) {
-    console.error("Auth callback error:", error);
+    logger.error("api.auth-callback.token-exchange-failed", error, {
+      route: "/api/auth/callback",
+    });
     /* ここに来る典型が **authorization code の二度目の提示**（Shopify は
      * `invalid_grant` を返す）。1 回目で既にログインが成立しているので、`fail` は
      * セッションを見てエラーを出さずに完了させる。従来はここが無条件で
