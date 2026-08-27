@@ -105,10 +105,52 @@ export const CACHE_TAGS = [
 export type CacheTag = (typeof CACHE_TAGS)[number];
 
 /**
+ * 各ドキュメント型の**自分自身の読み取り**が載る名札。
+ *
+ * 「`journal` を読むページのキャッシュはどの名札で剥がせるか」を 1 対 1 で
+ * 与える表。扇形 (`SANITY_TYPE_TO_TAGS`) の検算に使う:
+ *
+ *   スキーマ上 `journal.playlist -> playlist` という参照があり、かつ
+ *   `JOURNAL_BY_SLUG_QUERY` がそれを `playlist->{...}` と展開しているなら、
+ *   **playlist の更新は journal のページのキャッシュを捨てなければならない**。
+ *   すなわち `SANITY_TYPE_TO_TAGS.playlist` に `OWN_TAG.journal` が要る。
+ *
+ * この検算を `__tests__/cache-tags-registry.test.ts` が
+ * **スキーマ (`sanity/schemas/*.ts`) と GROQ から自動で導出**して行う。
+ * 手で書いた表どうしを突き合わせるのではなく、**参照の実体**と突き合わせる
+ * ので、Studio 側で参照フィールドを 1 本足した時点で検査が要求を出す。
+ */
+export const SANITY_TYPE_TO_OWN_TAG = {
+  article: "sanity:articles",
+  author: "sanity:authors",
+  category: "sanity:categories",
+  event: "sanity:events",
+  farmer: "sanity:farmers",
+  journal: "sanity:journals",
+  page: "sanity:pages",
+  playlist: "sanity:playlists",
+  siteSettings: "sanity:site-settings",
+  tag: "sanity:tags",
+  teaMenu: "sanity:tea-menus",
+} as const satisfies Record<SanityDocumentType, CacheTag>;
+
+/**
  * 剥がす側の表 — **どのドキュメント型が変わったら、どの名札を捨てるか**。
  *
  * 各行の根拠 (なぜその名札まで飛ぶのか) を併記する。ここが薄いと
  * 「反映されない」が別の形で戻ってくるので、参照関係は必ず理由付きで残す。
+ *
+ * ## 一度この表は薄すぎた (QA 指摘 / 2026-08-27)
+ *
+ * 最初の版は「その型を主役にするページ」しか見ておらず、**参照されて他の型の
+ * ページの中に描かれている**ぶんを 8 辺取りこぼしていた。たとえば elxea Journal
+ * の記事ページは `playlist->{title, albumImage}` を展開して曲名とジャケットを
+ * 出すが、`playlist` の行に `sanity:journals` が無かったので、プレイリストの
+ * 改題は Journal のページに反映されなかった。片翼だけの機構を直したつもりで、
+ * 別の形の片翼が残っていた。
+ *
+ * 目視で足すと同じ取りこぼしを繰り返すので、いまはスキーマの参照フィールドから
+ * 必要な辺を機械で導出してテストが要求する (`SANITY_TYPE_TO_OWN_TAG` 参照)。
  */
 export const SANITY_TYPE_TO_TAGS = {
   /**
@@ -119,15 +161,36 @@ export const SANITY_TYPE_TO_TAGS = {
    *   (`ARTICLES_BY_AUTHOR_QUERY`)
    * - `sitemap`: 記事 URL が sitemap に載る
    */
-  article: ["sanity:articles", "sanity:categories", "sanity:tags", "sanity:authors", "sanity:sitemap"],
+  article: [
+    "sanity:articles",
+    "sanity:categories",
+    "sanity:tags",
+    "sanity:authors",
+    // お茶メニュー詳細が `relatedArticle->{title, slug}` を展開している
+    // (`teaMenu.relatedArticle -> article` / TEA_MENU_BY_SLUG_QUERY)
+    "sanity:tea-menus",
+    // Journal 記事が `relatedPost->` と `otherReads[]->` を展開している
+    // (`journal.relatedPost` / `journal.otherReads` -> article)
+    "sanity:journals",
+    "sanity:sitemap",
+  ],
 
   /**
-   * 著者。
+   * 著者。参照で他の型のページに描かれる範囲が広い。
    * - `articles`: 記事詳細が `author->{name, slug, image, role, bio}` を展開している
    * - `farmers`: 生産者詳細が `interviewer->{name, role, image}` を展開している
+   * - `playlists`: プレイリストが `artist->` / `artists[]->` を展開している
+   * - `journals`: Journal 記事が `author->{name, role, image, slug}` を展開している
    * - `sitemap`: 人物 URL (`/people/[slug]`) が sitemap に載る
    */
-  author: ["sanity:authors", "sanity:articles", "sanity:farmers", "sanity:sitemap"],
+  author: [
+    "sanity:authors",
+    "sanity:articles",
+    "sanity:farmers",
+    "sanity:playlists",
+    "sanity:journals",
+    "sanity:sitemap",
+  ],
 
   /**
    * カテゴリ。
@@ -148,8 +211,12 @@ export const SANITY_TYPE_TO_TAGS = {
   /** 自由ページ。sitemap には載らない (静的 URL 表の側で扱っている)。 */
   page: ["sanity:pages"],
 
-  /** プレイリスト。 */
-  playlist: ["sanity:playlists", "sanity:sitemap"],
+  /**
+   * プレイリスト。
+   * - `journals`: Journal 記事が `playlist->{title, slug, albumImage, spotifyUrl}`
+   *   を展開して曲名とジャケットを出している
+   */
+  playlist: ["sanity:playlists", "sanity:journals", "sanity:sitemap"],
 
   /** サイト設定。ヘッダー・フッターのナビゲーションだけを持つ。 */
   siteSettings: ["sanity:site-settings"],
@@ -157,12 +224,17 @@ export const SANITY_TYPE_TO_TAGS = {
   /**
    * タグ。
    * - `articles`: 記事詳細が `tags[]->{title, slug}` を展開している
+   * - `playlists`: プレイリスト詳細が `tags[]->` を展開している
+   * - `journals`: Journal 記事が `nextReadTags[]->` を回遊ボタンに出している
    * - sitemap にタグ URL は無い
    */
-  tag: ["sanity:tags", "sanity:articles"],
+  tag: ["sanity:tags", "sanity:articles", "sanity:playlists", "sanity:journals"],
 
-  /** お茶メニュー。 */
-  teaMenu: ["sanity:tea-menus", "sanity:sitemap"],
+  /**
+   * お茶メニュー。
+   * - `journals`: Journal 記事が `teaMenus[]->` を展開している
+   */
+  teaMenu: ["sanity:tea-menus", "sanity:journals", "sanity:sitemap"],
 } as const satisfies Record<SanityDocumentType, readonly [CacheTag, ...CacheTag[]]>;
 
 /** webhook が名乗ってきた `_type` が、この表の知っている型かどうか。 */
