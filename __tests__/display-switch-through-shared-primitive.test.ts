@@ -39,7 +39,16 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 
 const ROOT = process.cwd();
-const SCAN_DIRS = ["app", "components"];
+/**
+ * 走査範囲。**拡張子と配置で絞らない**。
+ *
+ * 網羅表 S1 が挙げた穴と同じものを、この検査自身が作らないため。eslint の
+ * `files` glob は `components/**\/*.tsx` と `app/**\/*.tsx` しか見ておらず、
+ * その結果 `.tsx` を `.ts` に変えるだけで監査から消える状態になっていた。
+ * ここは `hooks/` も、`.ts` も見る。
+ */
+const SCAN_DIRS = ["app", "components", "hooks"];
+const SCAN_EXTENSIONS = [".tsx", ".ts"];
 const HOOK_IMPORT = "@/hooks/use-optimistic-navigation";
 
 /**
@@ -60,16 +69,17 @@ const ALLOWLIST: Record<string, string> = {
 /* 走査                                                                        */
 /* -------------------------------------------------------------------------- */
 
-function listTsx(dir: string, acc: string[] = []): string[] {
+function listSources(dir: string, acc: string[] = []): string[] {
   for (const entry of readdirSync(dir)) {
     const full = join(dir, entry);
     if (statSync(full).isDirectory()) {
       if (entry === "node_modules" || entry === "__tests__") continue;
-      listTsx(full, acc);
+      listSources(full, acc);
       continue;
     }
-    if (!entry.endsWith(".tsx")) continue;
-    if (entry.endsWith(".stories.tsx") || entry.endsWith(".test.tsx")) continue;
+    if (!SCAN_EXTENSIONS.some((ext) => entry.endsWith(ext))) continue;
+    if (/\.(stories|test)\.tsx?$/.test(entry)) continue;
+    if (entry.endsWith(".d.ts")) continue;
     acc.push(full);
   }
   return acc;
@@ -100,7 +110,7 @@ export function hasDirectHandlerNavigation(source: string): boolean {
   return /on[A-Z]\w*=\{(?:(?!\.navigate\()[^}])*?\brouter\.(push|replace)\s*\(/.test(stripped);
 }
 
-const FILES = SCAN_DIRS.flatMap((dir) => listTsx(join(ROOT, dir))).map((f) =>
+const FILES = SCAN_DIRS.flatMap((dir) => listSources(join(ROOT, dir))).map((f) =>
   relative(ROOT, f),
 );
 

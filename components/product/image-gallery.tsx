@@ -170,7 +170,9 @@ export function ImageGallery({ images }: { images: ImageType[] }) {
           温める枚数は `zoomWarmTargets` が決める (全部は取らない)。 */}
       {zoomWarm.length > 0 && (
         <div className="sr-only" aria-hidden data-slot="gallery-prefetch-zoom">
-          {zoomWarm.map((i) => (
+          {/* 番号で覚えているので、写真の枚数が変わったときに実体が居ないことが
+              ありうる。落とすのではなく黙って飛ばす (先読みは best effort)。 */}
+          {zoomWarm.filter((i) => images[i]).map((i) => (
             <Image
               key={i}
               src={images[i].url}

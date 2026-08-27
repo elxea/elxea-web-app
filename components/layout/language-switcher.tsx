@@ -33,6 +33,11 @@ export function LanguageSwitcher() {
     nav.navigate(newLocale, () => router.replace(pathname, { locale: newLocale }));
   }
 
+  function warmOther(target: Locale) {
+    if (target === locale) return;
+    router.prefetch(pathname, { locale: target });
+  }
+
   // 公開中の locale が 1 つしかないときは切替 UI 自体を出さない。押しても
   // 何も起きないボタン (あるいは 301 で戻されるだけの「English」) をフッターに
   // 残すと、実装が無いのに選べるように見える。`localeLabels` もコンポーネント
@@ -47,9 +52,10 @@ export function LanguageSwitcher() {
           variant="ghost"
           size="sm"
           onClick={() => handleChange(l)}
-          /* 押す仕草が見えた時点で相手の言語のページを取りにいく。 */
-          onPointerEnter={() => router.prefetch(pathname, { locale: l })}
-          onFocus={() => router.prefetch(pathname, { locale: l })}
+          /* 押す仕草が見えた時点で相手の言語のページを取りにいく。いま居る言語は
+             取りにいかない (もう手元にある)。 */
+          onPointerEnter={() => warmOther(l)}
+          onFocus={() => warmOther(l)}
           data-slot="language-option"
           aria-pressed={nav.value === l}
           className={
