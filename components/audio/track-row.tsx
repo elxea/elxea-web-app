@@ -11,6 +11,7 @@ import {
   useArticleAudio,
   type ArticleAudioTrack,
 } from "./article-audio-provider";
+import { warmTrack } from "./track-warm";
 
 /**
  * TrackRow — Figma `TrackRow (Module) — elxea/Journal 楽曲行` (8174:25)。
@@ -64,6 +65,12 @@ export function TrackRow({
       <button
         type="button"
         onClick={() => toggle(track)}
+        /* 押す仕草が見えた時点で音源の先頭を取っておく (網羅表 G8)。押されて
+           から取り始めると、その取得ぶんがそのまま「押しても鳴らない時間」に
+           なる。何をどこまで取るかは `track-warm.ts` が持つ。 */
+        onPointerEnter={() => warmTrack(track.src)}
+        onPointerDown={() => warmTrack(track.src)}
+        onFocus={() => warmTrack(track.src)}
         aria-label={`${isPlaying ? labels.pause : labels.play}: ${track.title}`}
         aria-busy={isLoading}
         className={cn(
