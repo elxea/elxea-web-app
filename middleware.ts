@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import createMiddleware from "next-intl/middleware";
 import { hasShopifySessionCookies } from "./lib/auth/cookies";
+import { env } from "./lib/config";
 import { routing } from "./i18n/routing";
 import { defaultLocale, disabledLocales } from "./i18n/config";
 
@@ -17,7 +18,7 @@ const DISABLED_LOCALE_PREFIX =
     ? new RegExp(`^/(?:${disabledLocales.join("|")})(?=/|$)`)
     : null;
 
-const SITE_PASSWORD = process.env.SITE_PASSWORD;
+const SITE_PASSWORD = env("SITE_PASSWORD");
 
 /**
  * Compute HMAC-SHA256 hash of the site password using the Web Crypto API
@@ -64,7 +65,7 @@ async function hashSitePasswordEdge(password: string): Promise<string> {
  * かつ fail-closed にする**ために使う。`VERCEL_ENV` は Vercel が自動注入する
  * 値なので、判定そのものは引き続きコードだけで完結する。
  */
-const IS_VERCEL_PREVIEW = process.env.VERCEL_ENV === "preview";
+const IS_VERCEL_PREVIEW = env("VERCEL_ENV") === "preview";
 
 /**
  * `SITE_PASSWORD` が入っていない Preview デプロイを丸ごと閉じる応答。
@@ -102,7 +103,7 @@ function previewMisconfiguredResponse(): NextResponse {
  * 操作も env の追加も要らない。ローカル (`VERCEL_ENV` 未設定) は false なので
  * 開発時の `/dev/*` はこれまでどおり開く。
  */
-const IS_VERCEL_PRODUCTION = process.env.VERCEL_ENV === "production";
+const IS_VERCEL_PRODUCTION = env("VERCEL_ENV") === "production";
 
 async function checkSitePassword(request: NextRequest): Promise<NextResponse | null> {
   if (!SITE_PASSWORD) {

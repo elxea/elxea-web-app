@@ -1,5 +1,7 @@
 import type { NextRequest } from "next/server";
 
+import { env, isProduction } from "@/lib/config";
+
 import { AUTH_COOKIE_APEX } from "@/lib/auth/cookies";
 import { normalizeHost } from "@/lib/auth/normalize-host";
 
@@ -64,7 +66,7 @@ import { normalizeHost } from "@/lib/auth/normalize-host";
  * deployment host, this contributes nothing and the env chain runs as before.
  */
 function isPreviewDeployment(): boolean {
-  return process.env.VERCEL_ENV === "preview";
+  return env("VERCEL_ENV") === "preview";
 }
 
 /**
@@ -73,7 +75,7 @@ function isPreviewDeployment(): boolean {
  * is the stable per-branch alias). Both are set by Vercel, never by a client.
  */
 function platformDeploymentHosts(): string[] {
-  return [process.env.VERCEL_URL, process.env.VERCEL_BRANCH_URL]
+  return [env("VERCEL_URL"), env("VERCEL_BRANCH_URL")]
     .map((h) => normalizeHost(h ?? ""))
     .filter(Boolean);
 }
@@ -104,19 +106,22 @@ function resolvePreviewOrigin(request?: NextRequest): string | null {
 
 /** Priority is unchanged from the original implementation. */
 function resolveFromEnv(): string {
-  if (process.env.NEXTAUTH_URL) {
-    return process.env.NEXTAUTH_URL;
+  const nextAuthUrl = env("NEXTAUTH_URL");
+  if (nextAuthUrl) {
+    return nextAuthUrl;
   }
 
-  if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
-    return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
+  const productionUrl = env("VERCEL_PROJECT_PRODUCTION_URL");
+  if (productionUrl) {
+    return `https://${productionUrl}`;
   }
 
-  if (process.env.VERCEL_URL) {
-    return `https://${process.env.VERCEL_URL}`;
+  const vercelUrl = env("VERCEL_URL");
+  if (vercelUrl) {
+    return `https://${vercelUrl}`;
   }
 
-  if (process.env.NODE_ENV === "production") {
+  if (isProduction()) {
     throw new Error(
       "Missing base URL: set NEXTAUTH_URL, VERCEL_PROJECT_PRODUCTION_URL, or VERCEL_URL in production"
     );
@@ -152,7 +157,7 @@ function readRequestAuthority(request: NextRequest): string {
  * gate on.
  */
 export function isRegisteredAuthHost(hostname: string): boolean {
-  const configured = process.env.LINE_ALLOWED_CALLBACK_HOSTS;
+  const configured = env("LINE_ALLOWED_CALLBACK_HOSTS");
   if (!configured) return true;
 
   const allowed = configured
@@ -192,7 +197,7 @@ export function isTrustedAuthHost(hostname: string): boolean {
    * The platform told this process which hosts those are, so they are ours by
    * the same standard the apex test applies — and only on a preview. */
   if (isPreviewDeployment() && platformDeploymentHosts().includes(hostname)) return true;
-  return Boolean(process.env.LINE_ALLOWED_CALLBACK_HOSTS) && isRegisteredAuthHost(hostname);
+  return Boolean(env("LINE_ALLOWED_CALLBACK_HOSTS")) && isRegisteredAuthHost(hostname);
 }
 
 /**
@@ -208,7 +213,7 @@ export function isTrustedAuthHost(hostname: string): boolean {
  * deployment, say) can never become a `redirect_uri` we send to an IdP.
  */
 export function getBaseUrl(request?: NextRequest): string {
-  if (request && process.env.LINE_ALLOWED_CALLBACK_HOSTS) {
+  if (request && env("LINE_ALLOWED_CALLBACK_HOSTS")) {
     const authority = readRequestAuthority(request);
     if (authority && isRegisteredAuthHost(authority)) {
       /* `request.nextUrl.protocol` reports the server's own scheme, which is

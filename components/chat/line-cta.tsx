@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
+import { env } from "@/lib/config";
 import { useChatContext } from "./chat-provider";
 
 // ---------------------------------------------------------------------------
@@ -12,7 +13,7 @@ import { useChatContext } from "./chat-provider";
 // - ログイン済み: LINE 友だち追加リンク
 // ---------------------------------------------------------------------------
 
-const LINE_FRIEND_URL = process.env.NEXT_PUBLIC_LINE_FRIEND_URL;
+const LINE_FRIEND_URL = env("NEXT_PUBLIC_LINE_FRIEND_URL");
 
 /**
  * LINE icon (simplified official logo shape).

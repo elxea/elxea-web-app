@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { getBaseUrl, getRequestOrigin } from "@/lib/base-url";
+import { env, isProduction } from "@/lib/config";
 import { encryptToken } from "@/lib/shopify/customer";
 import {
   clearFlowCookie,
@@ -261,15 +262,15 @@ export async function GET(request: NextRequest) {
 
     // Link LINE userId to cx-agent identity
     const chatApiBase = (
-      process.env.NEXT_PUBLIC_CHAT_API_URL ?? "http://localhost:8787/api/chat"
+      env("NEXT_PUBLIC_CHAT_API_URL") ?? "http://localhost:8787/api/chat"
     ).replace(/\/api\/chat\/?$/, "");
 
     const chatSessionId = cookieStore.get("chat_session_id")?.value;
 
     // C1: Include X-API-Key for identity linking. In production, never call the worker without it
     // (avoids silently sending unauthenticated requests).
-    const syncApiSecret = process.env.SYNC_API_SECRET;
-    const isProd = process.env.NODE_ENV === "production";
+    const syncApiSecret = env("SYNC_API_SECRET");
+    const isProd = isProduction();
     const shouldLinkIdentity = !isProd || Boolean(syncApiSecret);
 
     if (isProd && !syncApiSecret) {

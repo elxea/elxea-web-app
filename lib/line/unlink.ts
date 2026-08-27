@@ -1,4 +1,5 @@
 import { CX_AGENT_BASE_URL } from "@/lib/chat/proxy";
+import { env } from "@/lib/config";
 
 /**
  * LINE 連携解除の cx-agent 側呼び出し（解除を「本当に効く」ようにするための片割れ）。
@@ -68,7 +69,7 @@ export async function requestCxUnlink(
 ): Promise<CxUnlinkResult> {
   if (!shopifyCustomerId) return { ok: false, reason: "upstream_error" };
 
-  const secret = process.env.SYNC_API_SECRET;
+  const secret = env("SYNC_API_SECRET");
   if (!secret) {
     // 秘密が無ければ cx-agent は 401 を返す。無駄打ちせず「設定が無い」として失敗させる。
     // ここを成功に倒すと、設定漏れのデプロイで解除が静かに効かなくなる。

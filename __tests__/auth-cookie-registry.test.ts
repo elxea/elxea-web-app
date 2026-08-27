@@ -40,10 +40,33 @@ const ROOT = path.resolve(__dirname, "..");
 const SCAN_DIRS = ["app", "lib", "components"];
 const SCAN_FILES = ["middleware.ts"];
 
-/** Modules permitted to reference origin env vars / apex literals. */
+/**
+ * Modules permitted to reference origin env vars / apex literals.
+ *
+ * The first two are the *resolution* owners: they decide which origin an IdP
+ * gets and which host the cookie jar spans. That is the concentration this
+ * check exists to protect, and it is unchanged.
+ *
+ * `lib/config/spec.ts` was added 2026-08-27 (憲章 R4) and is a different kind
+ * of entry. It does not resolve anything — it is the registry where every
+ * environment variable declares how it is read and what shape it must have,
+ * one `read` closure and one schema per name. Origin variables appear there for
+ * the same reason every other variable does.
+ *
+ * It has to be listed because the two rules genuinely collide: R4 says every
+ * `process.env` read lives in `lib/config/**`, and this check says origin reads
+ * live in the two modules above. Exempting the registry keeps both — the
+ * declaration is centralised, the *logic* stays where it was.
+ *
+ * What this costs: the scanner can no longer tell if someone puts origin
+ * resolution logic into spec.ts. That is accepted because spec.ts is
+ * structurally declarations-only (each entry is exactly `{ read, schema }`) and
+ * because `__tests__/config-env.test.ts` pins that shape for every entry.
+ */
 const ORIGIN_OWNERS = [
   path.join("lib", "base-url.ts"),
   path.join("lib", "auth", "cookies.ts"),
+  path.join("lib", "config", "spec.ts"),
 ];
 
 const ORIGIN_ENV_VARS = [

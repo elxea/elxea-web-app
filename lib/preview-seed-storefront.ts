@@ -42,12 +42,13 @@
  * カート書き込みで必ず失敗する。定期便系 e2e は資格情報ゲートのまま残す。
  */
 
+import { env } from "@/lib/config";
 import { SEED_ID_PREFIX, previewImageForKey, previewSeedEnabled } from "@/lib/preview-seed";
 import type { Product } from "@/lib/shopify/types";
 
 /** 見本カタログを使ってよいか (フラグ側の条件のみ。資格情報判定は呼び出し側)。 */
 export function previewSeedStorefrontEnabled(): boolean {
-  return process.env.PREVIEW_SEED_STOREFRONT === "1" || previewSeedEnabled();
+  return env("PREVIEW_SEED_STOREFRONT") === "1" || previewSeedEnabled();
 }
 
 type SeedSpec = {

@@ -15,6 +15,8 @@ import {
 } from "firebase-admin/app";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
 
+import { env, isProduction } from "@/lib/config";
+
 import { resolveServerFirestoreTarget } from "./firestore-target";
 
 /**
@@ -59,7 +61,7 @@ function getAdminApp(): App {
      「手元で開発したいだけなのに本番の鍵が要る」という妙な依存が残る。
      Admin SDK は FIRESTORE_EMULATOR_HOST が立っていれば Firestore の通信先を
      そこへ固定するので、この app から本番へ出て行く経路は無い。 */
-  if (process.env.FIRESTORE_EMULATOR_HOST) {
+  if (env("FIRESTORE_EMULATOR_HOST")) {
     const target = resolveServerFirestoreTarget();
     if (target.kind === "emulator") {
       if (existingApp) return existingApp;
@@ -71,9 +73,11 @@ function getAdminApp(): App {
     }
   }
 
-  const projectId = process.env.FIREBASE_PROJECT_ID;
-  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-  const privateKey = decodePrivateKey(process.env.FIREBASE_PRIVATE_KEY);
+  const projectId = env("FIREBASE_PROJECT_ID");
+  const clientEmail = env("FIREBASE_CLIENT_EMAIL");
+  /* `FIREBASE_PRIVATE_KEY` は spec.ts で `raw` 宣言。PEM の改行が書式そのものなので
+     trim せず byte 単位で渡し、デコードは従来どおり decodePrivateKey が一手に持つ。 */
+  const privateKey = decodePrivateKey(env("FIREBASE_PRIVATE_KEY"));
 
   if (!projectId || !clientEmail || !privateKey) {
     throw new Error(
@@ -137,7 +141,7 @@ type E2eFirestoreGlobal = typeof globalThis & {
 };
 
 export function setInjectedFirestoreForE2E(db: Firestore): void {
-  if (process.env.NODE_ENV === "production") {
+  if (isProduction()) {
     throw new Error(
       "setInjectedFirestoreForE2E must never run in production. " +
         "The in-memory Firestore is a test double; using it in production would " +

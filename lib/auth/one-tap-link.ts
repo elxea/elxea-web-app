@@ -26,8 +26,8 @@
  */
 import * as Sentry from "@sentry/nextjs";
 
+import { env } from "@/lib/config";
 import { CX_AGENT_BASE_URL } from "@/lib/chat/proxy";
-import { readSecretEnvTrimmed } from "@/lib/env";
 import type { LinkageCompletion } from "@/lib/auth/identity-link";
 import type { LinkResult } from "@/lib/line/link-flow";
 
@@ -64,7 +64,7 @@ export async function establishLinkageFromIntent({
   shopifyCustomerId: string;
   fetchImpl?: typeof fetch;
 }): Promise<OneTapLinkResult> {
-  const secret = readSecretEnvTrimmed(process.env.SYNC_API_SECRET);
+  const secret = env("SYNC_API_SECRET");
   if (!secret) {
     /* fail-closed。鍵が無ければ cx-agent は 401 を返すので、無駄打ちもしない。
        ワンタップが成立しないだけで、ログインも既存の連携も壊れない。 */

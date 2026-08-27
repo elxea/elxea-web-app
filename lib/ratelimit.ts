@@ -45,6 +45,7 @@ import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 import * as Sentry from "@sentry/nextjs";
 import crypto from "crypto";
+import { env, isProduction, isTest } from "@/lib/config";
 
 export interface Ratelimiter {
   name: string;
@@ -66,12 +67,14 @@ export interface Ratelimiter {
 // Env detection
 // ---------------------------------------------------------------------------
 
-// Trim to defend against accidental whitespace / newline in env var values
+// Trimming defends against accidental whitespace / newline in env var values
 // (common when env vars are set via `echo "$v" | vercel env add ...` which
-// appends a trailing newline). Upstash Redis client rejects whitespace,
-// so we normalize here instead of failing at module load.
-const UPSTASH_URL = process.env.UPSTASH_REDIS_REST_URL?.trim();
-const UPSTASH_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN?.trim();
+// appends a trailing newline). Upstash Redis client rejects whitespace, so the
+// value is normalized rather than failing at module load — both variables are
+// declared `optionalTrimmed` in `lib/config/spec.ts`, which also maps a
+// blank value to `undefined` (the same "unset" semantics as before).
+const UPSTASH_URL = env("UPSTASH_REDIS_REST_URL");
+const UPSTASH_TOKEN = env("UPSTASH_REDIS_REST_TOKEN");
 const USE_UPSTASH = Boolean(UPSTASH_URL && UPSTASH_TOKEN);
 
 // Detect partial (broken) Upstash configuration. Setting one without the
@@ -87,7 +90,7 @@ if (!USE_UPSTASH && (UPSTASH_URL || UPSTASH_TOKEN)) {
 }
 
 // In production, warn if an Upstash-intended limiter cannot reach Upstash.
-if (!USE_UPSTASH && process.env.NODE_ENV === "production") {
+if (!USE_UPSTASH && isProduction()) {
   console.warn(
     `[ratelimit] Running in production without Upstash. Counters are per-instance only; ` +
       `concurrent requests across Vercel serverless instances can exceed configured limits.`
@@ -499,7 +502,7 @@ export function __getUpstashCircuitStateForTests(): {
 
 // Startup signal. Log once so ops knows which backend is active per
 // deployment. Skipped in test env to keep test output clean.
-if (process.env.NODE_ENV !== "test") {
+if (!isTest()) {
   const upstashPaths = Object.values(limiters)
     .filter((l) => l.backend === "upstash")
     .map((l) => l.name);

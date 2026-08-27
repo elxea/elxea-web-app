@@ -30,6 +30,8 @@
  * 素通りさせるより 3 を明示的に書かせたほうが安全なので、CI の例外は作らない。
  */
 
+import { envSnapshot } from "@/lib/config";
+
 /** 手元から本番 Firestore へ繋ぐことを明示的に許すフラグ（サーバー側）。 */
 export const ALLOW_PRODUCTION_ENV = "ALLOW_PRODUCTION_FIRESTORE";
 
@@ -99,8 +101,12 @@ function guardMessage(side: "server" | "client"): string {
 /**
  * サーバー側（Admin SDK）の向き先を決める。
  * 手元で本番へ向かおうとしたら {@link LocalFirestoreGuardError} を投げる。
+ *
+ * `env` 引数はテストが差し込むための seam なので残す。既定値だけを `process.env` から
+ * `envSnapshot()`（`lib/config/spec.ts` の literal read 経由の正規化済みスナップショット）
+ * に移した。
  */
-export function resolveServerFirestoreTarget(env: EnvLike = process.env): FirestoreTarget {
+export function resolveServerFirestoreTarget(env: EnvLike = envSnapshot()): FirestoreTarget {
   const host = readTrimmed(env, EMULATOR_HOST_ENV);
   if (host) {
     return {
@@ -124,8 +130,14 @@ export function resolveServerFirestoreTarget(env: EnvLike = process.env): Firest
  * バンドルに入らない）ので、本番判定は `NODE_ENV` だけで行う。Next はクライアント
  * ビルドで `process.env.NODE_ENV` を "production" に畳むため、本番バンドルでは
  * この分岐ごと消える。
+ *
+ * `env` 引数はテストが差し込む seam なので残し、既定値だけ `envSnapshot()` にした。
+ * これは挙動の修正でもある: 既定が `process.env` だった頃、下の `EMULATOR_HOST_ENV_CLIENT`
+ * は動的な `env[name]` 添字で読まれていたため Next のビルド時インライン化に当たらず、
+ * ブラウザでは常に undefined だった（= クライアント側エミュレーター分岐が発火しなかった）。
+ * `envSnapshot()` は spec.ts の literal read 経由なので、ブラウザでも値が届く。
  */
-export function resolveClientFirestoreTarget(env: EnvLike = process.env): FirestoreTarget {
+export function resolveClientFirestoreTarget(env: EnvLike = envSnapshot()): FirestoreTarget {
   const host = readTrimmed(env, EMULATOR_HOST_ENV_CLIENT);
   if (host) {
     return {

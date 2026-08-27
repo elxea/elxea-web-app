@@ -40,6 +40,7 @@
  *
  * 3 本の env が割れている状態は、まさに旧構成が壊れていた形そのものである。
  */
+import { env as configEnv, envSnapshot } from "@/lib/config";
 import { readSecretEnvTrimmed } from "@/lib/env";
 
 /**
@@ -75,7 +76,7 @@ const BASE_SCOPES: readonly string[] = ["profile", "openid"];
  * 「降りた日に env を 1 本足せば有効になる」形にしてある。
  */
 export function isEmailScopeEnabled(): boolean {
-  const raw = readSecretEnvTrimmed(process.env.LINE_LOGIN_EMAIL_SCOPE);
+  const raw = configEnv("LINE_LOGIN_EMAIL_SCOPE");
   return raw === "enabled";
 }
 
@@ -111,7 +112,7 @@ export function loginScopeParam(): string {
  * でパラメータ自体を送らない。
  */
 export function loginBotPrompt(): "aggressive" | "normal" | null {
-  const raw = readSecretEnvTrimmed(process.env.LINE_LOGIN_BOT_PROMPT);
+  const raw = configEnv("LINE_LOGIN_BOT_PROMPT");
   if (raw === "off") return null;
   if (raw === "normal") return "normal";
   return "aggressive";
@@ -141,12 +142,12 @@ export function loginBotPrompt(): "aggressive" | "normal" | null {
  * 未設定・空文字は `undefined`。空の資格情報を LINE に送って「認可エラー」に化けさせない。
  */
 export function resolveLoginChannelId(): string | undefined {
-  return readSecretEnvTrimmed(process.env.AUTH_LINE_ID);
+  return configEnv("AUTH_LINE_ID");
 }
 
 /** @see resolveLoginChannelId */
 export function resolveLoginChannelSecret(): string | undefined {
-  return readSecretEnvTrimmed(process.env.AUTH_LINE_SECRET);
+  return configEnv("AUTH_LINE_SECRET");
 }
 
 /** 名前空間ガードの検査結果。 */
@@ -188,7 +189,7 @@ export function channelIdFromLiffId(liffId: string | undefined): string | null {
  * 未設定のものは検査から外す（`not-configured`）。「無い」を「違う」に丸めない。
  */
 export function checkChannelNamespace(
-  env: Readonly<Record<string, string | undefined>> = process.env,
+  env: Readonly<Record<string, string | undefined>> = envSnapshot(),
 ): ChannelNamespaceCheck {
   const candidates: Array<{ name: string; value: string | null }> = [
     { name: "AUTH_LINE_ID", value: readSecretEnvTrimmed(env.AUTH_LINE_ID) ?? null },

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { env, isProduction } from "@/lib/config";
 
 const CX_AGENT_BASE_URL = (
-  process.env.NEXT_PUBLIC_CHAT_API_URL ?? "http://localhost:8787/api/chat"
+  env("NEXT_PUBLIC_CHAT_API_URL") ?? "http://localhost:8787/api/chat"
 ).replace(/\/api\/chat\/?$/, "");
 
 export async function POST(request: NextRequest) {
@@ -26,8 +27,8 @@ export async function POST(request: NextRequest) {
 
     // C: Forward X-API-Key so the cx-agent survey endpoint (fail-closed) accepts the request.
     // The worker rejects unauthenticated calls; this proxy holds the shared secret.
-    const syncApiSecret = process.env.SYNC_API_SECRET;
-    const isProd = process.env.NODE_ENV === "production";
+    const syncApiSecret = env("SYNC_API_SECRET");
+    const isProd = isProduction();
     if (isProd && !syncApiSecret) {
       console.error(
         "[survey] SYNC_API_SECRET not set; cx-agent will reject the request (set in production)",

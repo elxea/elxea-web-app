@@ -16,13 +16,15 @@
  * facts the read side needs (manifest key + R2 public domain), both env-overridable.
  */
 
+import { env } from '@/lib/config';
+
 /**
  * R2 managed public domain that serves the site manifest and cropped images.
  * Mirrors elxea-asset-hub lib/r2.ts R2_PUBLIC_DOMAIN. Overridable via env for
  * staging/preview buckets (rarely needed).
  */
 export const R2_PUBLIC_DOMAIN =
-  process.env.R2_PUBLIC_DOMAIN?.trim() ||
+  env('R2_PUBLIC_DOMAIN') ??
   'pub-90a0485599904fee8228ef56bb51c2e6.r2.dev';
 
 /** The elxea org token used in the manifest / R2 key path. */

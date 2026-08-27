@@ -1,5 +1,7 @@
 import { createHash, createPublicKey, timingSafeEqual, verify as cryptoVerify } from "crypto";
 
+import { env } from "@/lib/config";
+
 /**
  * Shopify Customer Account API の `id_token` を **署名まで含めて** 検証する。
  *
@@ -162,13 +164,13 @@ export function __resetShopifyJwksCacheForTests(): void {
 }
 
 function discoveryUrl(): string {
-  const explicit = process.env.SHOPIFY_CUSTOMER_ACCOUNT_DISCOVERY_URL;
+  const explicit = env("SHOPIFY_CUSTOMER_ACCOUNT_DISCOVERY_URL");
   if (explicit) return explicit;
 
   /* authorize URL と同じ origin から組み立てる。テストストアを指す preview では
    * `SHOPIFY_CUSTOMER_ACCOUNT_AUTHORIZE_URL` が本番と別 origin になるため、
    * discovery だけ本番に張り付いてしまう事故を防ぐ。 */
-  const authorizeUrl = process.env.SHOPIFY_CUSTOMER_ACCOUNT_AUTHORIZE_URL;
+  const authorizeUrl = env("SHOPIFY_CUSTOMER_ACCOUNT_AUTHORIZE_URL");
   const origin = authorizeUrl
     ? safeOrigin(authorizeUrl) ?? `https://${DEFAULT_ACCOUNT_DOMAIN}`
     : `https://${DEFAULT_ACCOUNT_DOMAIN}`;
@@ -358,7 +360,7 @@ export async function verifyShopifyIdToken(
     return { ok: false, reason: "iss_mismatch" };
   }
 
-  const clientId = process.env.SHOPIFY_CUSTOMER_ACCOUNT_CLIENT_ID || "";
+  const clientId = env("SHOPIFY_CUSTOMER_ACCOUNT_CLIENT_ID") ?? "";
   if (!clientId) return { ok: false, reason: "client_id_not_configured" };
   const audiences = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
   if (!audiences.some((a) => typeof a === "string" && a === clientId)) {

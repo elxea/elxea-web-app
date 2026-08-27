@@ -15,7 +15,24 @@
  *
  * The fix is not "clean up the Vercel value once" — it is to make the code
  * immune to it, so a re-introduced newline can never reach a URL again.
+ *
+ * ## What is left here after Wave 1 (2026-08-27)
+ *
+ * The rule this file introduced was right; the migration onto it was never
+ * finished. Three call sites adopted it and ~60 kept reading `process.env`
+ * raw, which is how the LINE Channel Secret defect below still reached
+ * production. Wave 1 moves the declaration of every variable into
+ * `lib/config/spec.ts` and makes `process.env` unreachable outside
+ * `lib/config/**` via lint, so the trim rules below are now applied **by
+ * declaration** rather than by each caller remembering to call them.
+ *
+ * The `read*` helpers stay exported because `lib/config/spec.ts` states the
+ * same three policies in schema form and several tests pin their behaviour
+ * directly. Prefer `env("NAME")` from `@/lib/config` in new code.
  */
+
+import { env } from "@/lib/config";
+import { siteUrl } from "@/lib/site-url";
 
 /**
  * Trim surrounding whitespace (spaces, tabs, CR, LF) off an env value and fall
@@ -72,17 +89,25 @@ export function readSecretEnvTrimmed(raw: string | undefined): string | undefine
 }
 
 /** Canonical public origin of the site, with no trailing slash. */
-export const SITE_URL_FALLBACK = "https://elxea.com";
+export { SITE_URL_FALLBACK } from "@/lib/config/spec";
 
 /**
- * The single accessor for `NEXT_PUBLIC_SITE_URL`.
+ * @deprecated Use `siteUrl()` from `@/lib/site-url` — that is the single
+ * definition (`@sot site-origin`). This alias remains only so existing call
+ * sites keep compiling.
  *
- * Every consumer (sitemap, email templates, cron routes) must go through this
- * rather than reading `process.env` directly, so the trim/normalisation rule
- * has exactly one definition.
+ * ## Why this became an alias
+ *
+ * This function and `siteUrl()` were two implementations of one concept with
+ * **different rules**: this one trimmed only the edges, `siteUrl()` stripped
+ * all whitespace. `lib/email/dunning.ts` and
+ * `lib/email/subscription-reminder.ts` imported both. Collapsing onto the
+ * stricter rule is a deliberate behaviour change: a value with interior
+ * whitespace used to survive this path and now does not, which is the point —
+ * that is the shape the broken production sitemap had.
  */
 export function getSiteUrl(): string {
-  return readUrlEnvTrimmed(process.env.NEXT_PUBLIC_SITE_URL, SITE_URL_FALLBACK);
+  return siteUrl();
 }
 
 /**
@@ -91,12 +116,13 @@ export function getSiteUrl(): string {
  * `<script>` and into a `googletagmanager.com` URL, so stray whitespace breaks
  * the tag and stray punctuation would be an injection sink.
  *
+ * The trim now comes from the `NEXT_PUBLIC_GTM_ID` declaration in
+ * `lib/config/spec.ts`; the character filter stays here because it is this
+ * value's own rule rather than a general env rule.
+ *
  * Returns `undefined` when unset/empty so callers can render nothing.
  */
 export function getGtmId(): string | undefined {
-  const id = readEnvTrimmed(process.env.NEXT_PUBLIC_GTM_ID, "").replace(
-    /[^A-Za-z0-9_-]/g,
-    ""
-  );
+  const id = (env("NEXT_PUBLIC_GTM_ID") ?? "").replace(/[^A-Za-z0-9_-]/g, "");
   return id === "" ? undefined : id;
 }

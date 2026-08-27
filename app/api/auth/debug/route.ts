@@ -1,16 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import { env, isProduction } from "@/lib/config";
 import { decryptToken } from "@/lib/shopify/customer";
 import { getSession, getCustomerFromSession } from "@/lib/shopify/auth";
 
 export async function GET(request: NextRequest) {
   // Block in production AND on preview deployments. Only allow when
   // DEBUG_AUTH_SECRET is configured and matches the query parameter.
-  const debugSecret = process.env.DEBUG_AUTH_SECRET;
+  const debugSecret = env("DEBUG_AUTH_SECRET");
   const providedSecret = request.nextUrl.searchParams.get("secret");
 
   if (
-    process.env.NODE_ENV === "production" ||
+    isProduction() ||
     !debugSecret ||
     providedSecret !== debugSecret
   ) {

@@ -29,7 +29,7 @@
  * たびに読むことで、同一プロセスで「既定値」と「差し替え」の両方を検証できる。URL 文字列を組む
  * だけなのでコストは無視できる。
  */
-import { readUrlEnvTrimmed } from "@/lib/env";
+import { env } from "@/lib/config";
 
 /** LINE の認可ホスト（LINE Login の authorize / 連携ダイアログ / ID トークンの `iss`）。 */
 export const LINE_AUTH_BASE_URL_DEFAULT = "https://access.line.me";
@@ -40,18 +40,19 @@ export const LINE_API_BASE_URL_DEFAULT = "https://api.line.me";
 /**
  * LINE 認可ホストのベース URL。env `LINE_AUTH_BASE_URL`、未設定なら本物の LINE。
  *
- * `readUrlEnvTrimmed` を通すのは、`vercel env add` などで末尾改行が紛れ込むと
- * `https://access.line.me\n/oauth2/...` という壊れた URL になり、ダッシュボードでもログでも
- * 気づけない失敗になるため（lib/env.ts の冒頭に経緯）。末尾スラッシュも落ちるので、呼び出し側は
+ * 設定レジストリ (`lib/config/spec.ts`) を通すのは、`vercel env add` などで末尾改行が
+ * 紛れ込むと `https://access.line.me\n/oauth2/...` という壊れた URL になり、ダッシュボードでも
+ * ログでも気づけない失敗になるため（spec.ts の冒頭に経緯）。この 2 本は
+ * `trimmedNoTrailingSlash` で宣言してあるので末尾スラッシュも落ち、呼び出し側は
  * 常に `${base}/path` と書ける。
  */
 export function lineAuthBaseUrl(): string {
-  return readUrlEnvTrimmed(process.env.LINE_AUTH_BASE_URL, LINE_AUTH_BASE_URL_DEFAULT);
+  return env("LINE_AUTH_BASE_URL") ?? LINE_AUTH_BASE_URL_DEFAULT;
 }
 
 /** LINE API ホストのベース URL。env `LINE_API_BASE_URL`、未設定なら本物の LINE。 */
 export function lineApiBaseUrl(): string {
-  return readUrlEnvTrimmed(process.env.LINE_API_BASE_URL, LINE_API_BASE_URL_DEFAULT);
+  return env("LINE_API_BASE_URL") ?? LINE_API_BASE_URL_DEFAULT;
 }
 
 /**

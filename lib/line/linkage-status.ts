@@ -1,6 +1,7 @@
 import * as Sentry from "@sentry/nextjs";
 
 import { CX_AGENT_BASE_URL } from "@/lib/chat/proxy";
+import { env } from "@/lib/config";
 import { extractCustomerId } from "@/lib/firebase/types";
 
 /**
@@ -90,7 +91,7 @@ async function loadLineLinkageStatus(
   shopifyCustomerId: string,
   now: number,
 ): Promise<LineLinkageStatus> {
-  const secret = process.env.SYNC_API_SECRET;
+  const secret = env("SYNC_API_SECRET");
   if (!secret) {
     // 秘密が無ければ cx-agent は 401 を返すので、無駄打ちせず「不明」に倒す。
     // （連携していないと決めつけない。設定漏れは未連携ではない。）
@@ -563,7 +564,7 @@ async function loadReverseLinkage(
 ): Promise<ReverseLinkage> {
   const unknown: ReverseLinkage = { customer: null, linkedAt: null };
 
-  const secret = process.env.SYNC_API_SECRET;
+  const secret = env("SYNC_API_SECRET");
   if (!secret) {
     // 秘密が無ければ cx-agent は 401 を返すので、無駄打ちせず「不明」に倒す。
     // 設定漏れを「未連携」と決めつけない。

@@ -39,7 +39,7 @@
  * しないことだけが要件で、1 回で終わらせる必要はない。
  */
 import { CX_AGENT_BASE_URL } from "@/lib/chat/proxy";
-import { readSecretEnvTrimmed } from "@/lib/env";
+import { env } from "@/lib/config";
 
 /** 誰を消すか。cx-agent の `subject_kind` / `subject_id` にそのまま対応する。 */
 export type EraseSubject =
@@ -107,7 +107,7 @@ export async function eraseInCxAgent(
     now?: () => number;
   } = {},
 ): Promise<EraseResult> {
-  const secret = readSecretEnvTrimmed(process.env.ERASE_API_SECRET);
+  const secret = env("ERASE_API_SECRET");
   if (!secret) {
     /* ここを「設定が無いので何もしなくてよい」に倒すと、**消えていないのに
        消しましたと答える**状態が env の不備だけで復活する。それは今回直している

@@ -9,6 +9,7 @@
  *   LINE_API_BASE_URL         - Optional. Overrides the LINE API host (tests only).
  */
 
+import { env } from "@/lib/config";
 import { lineApiBaseUrl } from "@/lib/line/endpoints";
 
 /** Messaging API の push エンドポイント。ホストは `LINE_API_BASE_URL` で差し替え可能
@@ -38,8 +39,8 @@ export async function sendLineNotify({
   //      while the runtime value is present.
   //   2. A module-level snapshot makes the "not configured" branch untestable
   //      without resetting the module registry.
-  const accessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN || "";
-  const adminUserId = process.env.LINE_ADMIN_USER_ID || "";
+  const accessToken = env("LINE_CHANNEL_ACCESS_TOKEN") ?? "";
+  const adminUserId = env("LINE_ADMIN_USER_ID") ?? "";
 
   if (!accessToken || !adminUserId) {
     console.warn("[LINE Notify] Credentials not configured, skipping notification.");

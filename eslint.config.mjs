@@ -157,6 +157,68 @@ const eslintConfig = [
       "elxea-tokens/mutation-through-shared-primitive": "error",
     },
   },
+
+  // 憲章 R4「設定値は起動時検証・raw 読み禁止」の機械強制（2026-08-27）:
+  //   アプリの実行コードは `process.env` に触らない。設定は `lib/config/spec.ts`
+  //   に宣言し、`env("NAME")` で読む。
+  //
+  // なぜ規律ではなく lint なのか: 同じ処方を一度やって失敗しているから。
+  // `lib/env.ts` は 2026-08 の sitemap 事故のあとに「生読みをやめる」ために作られ、
+  // 中身も正しかったが、移行したのは 3 か所だけで、残りは生読みのままだった。
+  // そこに LINE の Channel Secret 末尾改行が落ちて 2026-08-22 に本番の連携が
+  // 落ちている（経緯は `lib/config/spec.ts` 冒頭）。装置を足すだけでは再流入が
+  // 止まらない、というのが憲章 R8 の指す失敗型そのもの。
+  //
+  // 自作 AST ルールではなく標準の `no-restricted-syntax` で書いている。
+  // `process.env` は member expression 1 つで、セレクタ 1 本で過不足なく当たる
+  // ため、eslint-rules/ に 6 本目を足す理由が無い（保守対象を増やさない）。
+  // セレクタは `process.env` ノード自体に当たるので、`process.env.FOO`・
+  // `process.env[name]`・`const { FOO } = process.env` の 3 形すべてを 1 本で捕まえる。
+  //
+  // **eslint-suppressions.json への grandfather は 0 件**。着手時点の違反
+  // 141 件 / 62 ファイルは全件移行した（例外表を用意していたが使わずに済んだ）。
+  // 憲章 R8 の「全件移行 + 再流入止めで 1 セット」は残件ゼロで満たしている。
+  //
+  // 逃げ道は 1 箇所だけあり、inline disable で明示してある:
+  //   app/__fixtures__/origin-leak/origin-like.ts
+  // これは `__tests__/auth-cookie-registry.test.ts` の negative fixture で、
+  // **生読みそのものが検査対象**（AST スキャナがそれを報告できることを assert
+  // している）。書き換えるとスキャナが何も報告しなくなり、「スキャナが動いて
+  // いる証拠」が消える。同じ欠陥を別々に見張る 2 つのガードなので、片方を武装
+  // させる fixture がもう片方から外れるのは正しい。
+  //
+  // したがって新しい違反は 1 件目から落ちる。将来どうしても例外が要るなら
+  // `eslint --suppress-rule no-restricted-syntax` で eslint-suppressions.json に
+  // 件数付きで記録する（`pnpm lint:prune-suppressions` で縮小方向にのみ更新）。
+  // 記録に残さず済ませる逃げ道は用意しない。
+  {
+    files: [
+      "app/**/*.ts",
+      "app/**/*.tsx",
+      "components/**/*.ts",
+      "components/**/*.tsx",
+      "lib/**/*.ts",
+      "lib/**/*.tsx",
+      "middleware.ts",
+      "instrumentation.ts",
+    ],
+    ignores: [
+      // 唯一の例外。ここが `process.env` を読む場所であり、読み方の正本。
+      "lib/config/**",
+    ],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: "MemberExpression[object.name='process'][property.name='env']",
+          message:
+            'process.env を直接読まない。lib/config/spec.ts に宣言して env("NAME") で読む ' +
+            "(憲章 R4)。理由: 生読みは値の正規化と『未設定とは何か』を呼び出し側ごとに" +
+            "再定義し、実際に sitemap 全 172 件と LINE 連携を本番で壊している。",
+        },
+      ],
+    },
+  },
 ];
 
 export default eslintConfig;

@@ -15,6 +15,7 @@ import { ArticleAudioProvider } from "@/components/audio/article-audio-provider"
 import { AudioDock } from "@/components/audio/audio-dock";
 import { getClient } from "@/sanity/lib/client";
 import { SITE_SETTINGS_QUERY } from "@/sanity/lib/queries";
+import { env } from "@/lib/config";
 
 export const metadata: Metadata = {
   title: {
@@ -52,7 +53,7 @@ export const metadata: Metadata = {
      * `?? "local"` marks a build with no VCS metadata (a local dev server). CI
      * treats that literal as a failure rather than a pass, so the check cannot go
      * green by simply not knowing. */
-    "x-elxea-commit": process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? "local",
+    "x-elxea-commit": env("VERCEL_GIT_COMMIT_SHA")?.slice(0, 7) ?? "local",
   },
 };
 
