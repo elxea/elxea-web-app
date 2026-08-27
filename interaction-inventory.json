@@ -29,7 +29,8 @@
       "file": "app/[locale]/(reading)/elxea-journal/[slug]/page.tsx",
       "kind": "link",
       "name": "Link",
-      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ。href はテンプレートリテラル (`/people/${slug}`) で 静的に読めないため自動判定の対象外だが、前段が固定で ? も # も持たない 純粋なページ遷移。動的 href を安全側 (分類必須) に倒す既定は維持する。"
     },
     {
       "id": "app/[locale]/(reading)/elxea-journal/page.tsx#link:Link#1",
@@ -332,20 +333,6 @@
       "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
     },
     {
-      "id": "app/[locale]/account/page.tsx#write:action:getEventRegistrations#1",
-      "file": "app/[locale]/account/page.tsx",
-      "kind": "write",
-      "name": "action:getEventRegistrations",
-      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
-    },
-    {
-      "id": "app/[locale]/account/page.tsx#write:action:getFavorites#1",
-      "file": "app/[locale]/account/page.tsx",
-      "kind": "write",
-      "name": "action:getFavorites",
-      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
-    },
-    {
       "id": "app/[locale]/account/subscriptions/page.tsx#link:Link#1",
       "file": "app/[locale]/account/subscriptions/page.tsx",
       "kind": "link",
@@ -553,13 +540,6 @@
       "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
     },
     {
-      "id": "app/[locale]/link/route.ts#write:fetch:POST#1",
-      "file": "app/[locale]/link/route.ts",
-      "kind": "write",
-      "name": "fetch:POST",
-      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
-    },
-    {
       "id": "app/[locale]/login/complete/login-complete-content.tsx#handler:onClick#1",
       "file": "app/[locale]/login/complete/login-complete-content.tsx",
       "kind": "handler",
@@ -714,174 +694,6 @@
       "file": "app/[locale]/subscription/page.tsx",
       "kind": "link",
       "name": "a",
-      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
-    },
-    {
-      "id": "app/api/chat/event/route.ts#write:fetch:POST#1",
-      "file": "app/api/chat/event/route.ts",
-      "kind": "write",
-      "name": "fetch:POST",
-      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
-    },
-    {
-      "id": "app/api/chat/route.ts#write:fetch:POST#1",
-      "file": "app/api/chat/route.ts",
-      "kind": "write",
-      "name": "fetch:POST",
-      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
-    },
-    {
-      "id": "app/api/line-callback/route.ts#write:fetch:POST#1",
-      "file": "app/api/line-callback/route.ts",
-      "kind": "write",
-      "name": "fetch:POST",
-      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
-    },
-    {
-      "id": "app/api/line-callback/route.ts#write:fetch:POST#2",
-      "file": "app/api/line-callback/route.ts",
-      "kind": "write",
-      "name": "fetch:POST",
-      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
-    },
-    {
-      "id": "app/api/survey/route.ts#write:fetch:POST#1",
-      "file": "app/api/survey/route.ts",
-      "kind": "write",
-      "name": "fetch:POST",
-      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
-    },
-    {
-      "id": "app/api/user/behavior/route.ts#write:action:addBehaviorLog#1",
-      "file": "app/api/user/behavior/route.ts",
-      "kind": "write",
-      "name": "action:addBehaviorLog",
-      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
-    },
-    {
-      "id": "app/api/user/comments/route.ts#write:action:addComment#1",
-      "file": "app/api/user/comments/route.ts",
-      "kind": "write",
-      "name": "action:addComment",
-      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
-    },
-    {
-      "id": "app/api/user/comments/route.ts#write:action:deleteComment#1",
-      "file": "app/api/user/comments/route.ts",
-      "kind": "write",
-      "name": "action:deleteComment",
-      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
-    },
-    {
-      "id": "app/api/user/comments/route.ts#write:action:getCommentById#1",
-      "file": "app/api/user/comments/route.ts",
-      "kind": "write",
-      "name": "action:getCommentById",
-      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
-    },
-    {
-      "id": "app/api/user/comments/route.ts#write:action:getComments#1",
-      "file": "app/api/user/comments/route.ts",
-      "kind": "write",
-      "name": "action:getComments",
-      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
-    },
-    {
-      "id": "app/api/user/dashboard/route.ts#write:action:getUserDashboardData#1",
-      "file": "app/api/user/dashboard/route.ts",
-      "kind": "write",
-      "name": "action:getUserDashboardData",
-      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
-    },
-    {
-      "id": "app/api/user/events/route.ts#write:action:cancelEventRegistration#1",
-      "file": "app/api/user/events/route.ts",
-      "kind": "write",
-      "name": "action:cancelEventRegistration",
-      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
-    },
-    {
-      "id": "app/api/user/events/route.ts#write:action:getEventRegistrations#1",
-      "file": "app/api/user/events/route.ts",
-      "kind": "write",
-      "name": "action:getEventRegistrations",
-      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
-    },
-    {
-      "id": "app/api/user/events/route.ts#write:action:isRegisteredForEvent#1",
-      "file": "app/api/user/events/route.ts",
-      "kind": "write",
-      "name": "action:isRegisteredForEvent",
-      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
-    },
-    {
-      "id": "app/api/user/events/route.ts#write:action:registerForEvent#1",
-      "file": "app/api/user/events/route.ts",
-      "kind": "write",
-      "name": "action:registerForEvent",
-      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
-    },
-    {
-      "id": "app/api/user/favorites/route.ts#write:action:addFavorite#1",
-      "file": "app/api/user/favorites/route.ts",
-      "kind": "write",
-      "name": "action:addFavorite",
-      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
-    },
-    {
-      "id": "app/api/user/favorites/route.ts#write:action:getFavorites#1",
-      "file": "app/api/user/favorites/route.ts",
-      "kind": "write",
-      "name": "action:getFavorites",
-      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
-    },
-    {
-      "id": "app/api/user/favorites/route.ts#write:action:isFavorited#1",
-      "file": "app/api/user/favorites/route.ts",
-      "kind": "write",
-      "name": "action:isFavorited",
-      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
-    },
-    {
-      "id": "app/api/user/favorites/route.ts#write:action:removeFavorite#1",
-      "file": "app/api/user/favorites/route.ts",
-      "kind": "write",
-      "name": "action:removeFavorite",
-      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
-    },
-    {
-      "id": "app/api/user/line-link-liff/route.ts#write:fetch:POST#1",
-      "file": "app/api/user/line-link-liff/route.ts",
-      "kind": "write",
-      "name": "fetch:POST",
-      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
-    },
-    {
-      "id": "app/api/user/line-link/callback/route.ts#write:fetch:POST#1",
-      "file": "app/api/user/line-link/callback/route.ts",
-      "kind": "write",
-      "name": "fetch:POST",
-      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
-    },
-    {
-      "id": "app/api/user/line-link/callback/route.ts#write:fetch:POST#2",
-      "file": "app/api/user/line-link/callback/route.ts",
-      "kind": "write",
-      "name": "fetch:POST",
-      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
-    },
-    {
-      "id": "app/api/user/line-link/route.ts#write:action:unlinkLineUser#1",
-      "file": "app/api/user/line-link/route.ts",
-      "kind": "write",
-      "name": "action:unlinkLineUser",
-      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
-    },
-    {
-      "id": "app/api/webhooks/inventory/route.ts#write:fetch:POST#1",
-      "file": "app/api/webhooks/inventory/route.ts",
-      "kind": "write",
-      "name": "fetch:POST",
       "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
     },
     {
@@ -1916,6 +1728,13 @@
       "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
     },
     {
+      "id": "components/community/reaction-chip.tsx#handler:spread#1",
+      "file": "components/community/reaction-chip.tsx",
+      "kind": "handler",
+      "name": "spread",
+      "exempt": "素の要素への prop 受け渡しのみ。この行自体は操作を発生させず、ハンドラは呼び出し側から渡される (呼び出し側は handler 行として台帳に載っている)。中身が読めないので安全側に 1 行立ててあるが、応答の責任は呼び出し側にある。"
+    },
+    {
       "id": "components/editorial/rule-list.tsx#link:Link#1",
       "file": "components/editorial/rule-list.tsx",
       "kind": "link",
@@ -2159,6 +1978,13 @@
       "kind": "handler",
       "name": "onOpenChange",
       "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/journal/journal-modal.tsx#handler:spread#1",
+      "file": "components/journal/journal-modal.tsx",
+      "kind": "handler",
+      "name": "spread",
+      "exempt": "素の要素への prop 受け渡しのみ。この行自体は操作を発生させず、ハンドラは呼び出し側から渡される (呼び出し側は handler 行として台帳に載っている)。中身が読めないので安全側に 1 行立ててあるが、応答の責任は呼び出し側にある。"
     },
     {
       "id": "components/journal/reading-progress.tsx#listener:resize#1",
@@ -2755,6 +2581,13 @@
       "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
     },
     {
+      "id": "components/search/search-panel.tsx#handler:spread#1",
+      "file": "components/search/search-panel.tsx",
+      "kind": "handler",
+      "name": "spread",
+      "exempt": "素の要素への prop 受け渡しのみ。この行自体は操作を発生させず、ハンドラは呼び出し側から渡される (呼び出し側は handler 行として台帳に載っている)。中身が読めないので安全側に 1 行立ててあるが、応答の責任は呼び出し側にある。"
+    },
+    {
       "id": "components/search/search-panel.tsx#link:Link#1",
       "file": "components/search/search-panel.tsx",
       "kind": "link",
@@ -2804,6 +2637,34 @@
       "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
     },
     {
+      "id": "components/ui/input.tsx#handler:spread#1",
+      "file": "components/ui/input.tsx",
+      "kind": "handler",
+      "name": "spread",
+      "exempt": "素の要素への prop 受け渡しのみ。この行自体は操作を発生させず、ハンドラは呼び出し側から渡される (呼び出し側は handler 行として台帳に載っている)。中身が読めないので安全側に 1 行立ててあるが、応答の責任は呼び出し側にある。"
+    },
+    {
+      "id": "components/ui/native-select.tsx#handler:spread#1",
+      "file": "components/ui/native-select.tsx",
+      "kind": "handler",
+      "name": "spread",
+      "exempt": "素の要素への prop 受け渡しのみ。この行自体は操作を発生させず、ハンドラは呼び出し側から渡される (呼び出し側は handler 行として台帳に載っている)。中身が読めないので安全側に 1 行立ててあるが、応答の責任は呼び出し側にある。"
+    },
+    {
+      "id": "components/ui/pagination.tsx#handler:spread#1",
+      "file": "components/ui/pagination.tsx",
+      "kind": "handler",
+      "name": "spread",
+      "exempt": "素の要素への prop 受け渡しのみ。この行自体は操作を発生させず、ハンドラは呼び出し側から渡される (呼び出し側は handler 行として台帳に載っている)。中身が読めないので安全側に 1 行立ててあるが、応答の責任は呼び出し側にある。"
+    },
+    {
+      "id": "components/ui/pill-button.tsx#handler:spread#1",
+      "file": "components/ui/pill-button.tsx",
+      "kind": "handler",
+      "name": "spread",
+      "exempt": "素の要素への prop 受け渡しのみ。この行自体は操作を発生させず、ハンドラは呼び出し側から渡される (呼び出し側は handler 行として台帳に載っている)。中身が読めないので安全側に 1 行立ててあるが、応答の責任は呼び出し側にある。"
+    },
+    {
       "id": "components/ui/quantity-stepper.tsx#handler:onClick#1",
       "file": "components/ui/quantity-stepper.tsx",
       "kind": "handler",
@@ -2839,11 +2700,25 @@
       "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
     },
     {
+      "id": "components/ui/sidebar.tsx#handler:spread#1",
+      "file": "components/ui/sidebar.tsx",
+      "kind": "handler",
+      "name": "spread",
+      "exempt": "素の要素への prop 受け渡しのみ。この行自体は操作を発生させず、ハンドラは呼び出し側から渡される (呼び出し側は handler 行として台帳に載っている)。中身が読めないので安全側に 1 行立ててあるが、応答の責任は呼び出し側にある。"
+    },
+    {
       "id": "components/ui/sidebar.tsx#listener:keydown#1",
       "file": "components/ui/sidebar.tsx",
       "kind": "listener",
       "name": "keydown",
       "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/ui/textarea.tsx#handler:spread#1",
+      "file": "components/ui/textarea.tsx",
+      "kind": "handler",
+      "name": "spread",
+      "exempt": "素の要素への prop 受け渡しのみ。この行自体は操作を発生させず、ハンドラは呼び出し側から渡される (呼び出し側は handler 行として台帳に載っている)。中身が読めないので安全側に 1 行立ててあるが、応答の責任は呼び出し側にある。"
     },
     {
       "id": "components/viz/me/community/community-lens.tsx#handler:onKeyDown#1",
@@ -3163,76 +3038,6 @@
     {
       "id": "lib/favorites/client-store.ts#write:fetch:POST#1",
       "file": "lib/favorites/client-store.ts",
-      "kind": "write",
-      "name": "fetch:POST",
-      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
-    },
-    {
-      "id": "lib/line/notify.ts#write:fetch:POST#1",
-      "file": "lib/line/notify.ts",
-      "kind": "write",
-      "name": "fetch:POST",
-      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
-    },
-    {
-      "id": "lib/line/unlink.ts#write:fetch:POST#1",
-      "file": "lib/line/unlink.ts",
-      "kind": "write",
-      "name": "fetch:POST",
-      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
-    },
-    {
-      "id": "lib/shopify/admin-client.ts#write:fetch:POST#1",
-      "file": "lib/shopify/admin-client.ts",
-      "kind": "write",
-      "name": "fetch:POST",
-      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
-    },
-    {
-      "id": "lib/shopify/customer.ts#write:fetch:POST#1",
-      "file": "lib/shopify/customer.ts",
-      "kind": "write",
-      "name": "fetch:POST",
-      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
-    },
-    {
-      "id": "lib/shopify/customer.ts#write:fetch:POST#2",
-      "file": "lib/shopify/customer.ts",
-      "kind": "write",
-      "name": "fetch:POST",
-      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
-    },
-    {
-      "id": "lib/shopify/customer.ts#write:fetch:POST#3",
-      "file": "lib/shopify/customer.ts",
-      "kind": "write",
-      "name": "fetch:POST",
-      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
-    },
-    {
-      "id": "lib/shopify/customer.ts#write:fetch:POST#4",
-      "file": "lib/shopify/customer.ts",
-      "kind": "write",
-      "name": "fetch:POST",
-      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
-    },
-    {
-      "id": "lib/shopify/customer.ts#write:fetch:POST#5",
-      "file": "lib/shopify/customer.ts",
-      "kind": "write",
-      "name": "fetch:POST",
-      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
-    },
-    {
-      "id": "lib/shopify/customer.ts#write:fetch:POST#6",
-      "file": "lib/shopify/customer.ts",
-      "kind": "write",
-      "name": "fetch:POST",
-      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
-    },
-    {
-      "id": "lib/shopify/customer.ts#write:fetch:POST#7",
-      "file": "lib/shopify/customer.ts",
       "kind": "write",
       "name": "fetch:POST",
       "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"

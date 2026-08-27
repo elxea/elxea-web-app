@@ -126,6 +126,23 @@ gatewayへの取り込み) は未着手。**未着手であることをここに
 | form | `<form action={...}>` のServer Action参照 | 現状0件。`useActionState` へ寄せた瞬間に書き込みが丸ごと消えるので、ゼロのうちに塞ぐ |
 | listener | client側の `addEventListener` | `useEffect` 内で張られるのでハンドラ属性では原理的に見えない |
 
+**書き方を変えて逃げる道も塞いである** (敵対 QA 指摘 / いずれも着手時の実例は 0〜9 件):
+素の要素への `{...props}` (中身が読めないので安全側に 1 行立てる) /
+`React.createElement` の `on*` / `fetch` の init を外に出した形
+(`const init = { method: "POST" }` — `mutation-through-shared-primitive` も同じ形で抜ける) /
+`globalThis.fetch` / 角括弧の `el["addEventListener"]` /
+副作用だけの `import "./m"` (到達可能性の辺として数える)。
+
+**サーバ専用モジュールの書き込みは載せない。** `app/api/**` や `lib/line/*` の往復は
+「ユーザーが押せるもの」ではなく押した結果サーバ側で起きること。載せると台帳が
+「押せるものの表」でなくなり、本当に押せる行が埋もれる。判定は eslint 側と同じ
+ブラウザ到達可能性を使う (二重の定義を作らない)。
+
+**内部リンクの自動 exempt は毎回 href から付け直す。** 台帳の id は
+`file#link:Link#n` で **href を含まない**ので、引き継ぐと href に `?` を足すだけで
+「別ページへ移るだけ」の exempt を維持したまま、ページ内で見た目が変わる遷移
+(G6 と同型) を宣言なしで復活させられる。
+
 各行は `response` (応答の出し方) の宣言を必須とし、`optimistic` / `sync-dom` は
 `observe` (その操作で必ず更新される要素) も必須にする。
 

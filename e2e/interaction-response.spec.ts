@@ -168,11 +168,21 @@ async function assertOptimistic(
   await scenario.act(page);
 
   for (const [i, selector] of observe.entries()) {
-    await expect(
-      page.locator(selector).first(),
+    const target = page.locator(selector).first();
+    const label =
       `${row.id}: ${selector} がサーバの往復を待っている ` +
-        "(楽観更新が画面の描く項目を覆っていない = 網羅表 G2 と同じ形)",
-    ).not.toHaveText(before[i] ?? "", { timeout: 10_000 });
+      "(楽観更新が画面の描く項目を覆っていない = 網羅表 G2 と同じ形)";
+
+    /* **`not.toHaveText(旧値)` だけでは弱い。**
+       要素が消えた・空になった・そもそも selector が 0 件、のいずれでも
+       「旧値と違う」は成立してしまう。つまり画面が壊れたときに緑になる向きが
+       ある — この spec が無くそうとしている「見ていない緑」そのもの。
+       だから (1) 見えている (2) 中身が空でない (3) 旧値と違う、の 3 つを見る。
+       行が消えるのが正しい操作 (カート削除の cart-line) は数が変わるので、
+       「見えている」は最初の 1 件に対してだけ課す。 */
+    await expect(target, `${label} — 要素が見えなくなった`).toBeVisible({ timeout: 10_000 });
+    await expect(target, label).not.toHaveText(before[i] ?? "", { timeout: 10_000 });
+    await expect(target, `${label} — 中身が空になった`).not.toHaveText("", { timeout: 10_000 });
   }
 }
 
@@ -273,12 +283,19 @@ test.describe("憲章 R9 — 台帳が宣言した応答が、実際にその性
     }
 
     test(`${row.id} (${row.response})`, async ({ page }) => {
+      /* **この skip は既知で、Boss が暫定許容している** (2026-08-27 の敵対 QA 判定)。
+         CI に Shopify の資格情報が無いため、カート書き込みを要する 3 件
+         (数量 / 削除 / 追加) は CI では走らない = G2 の回帰ガードは資格情報の
+         ある環境でしか働かない。これは検査の弱点として**報告済み**であり、
+         隠していない: skip は `pnpm report:e2e-skips` が CI サマリに理由付きで
+         出す (ci.yml の「Report skipped tests (no-op green visibility)」)。
+         恒久解 (CI への資格情報投入 or 見本カートでの代替) は別件。 */
       test.skip(
         Boolean(scenario.requiresCart) && !STOREFRONT_CONFIGURED,
         "Shopify Storefront の資格情報 (SHOPIFY_STORE_DOMAIN / " +
           "SHOPIFY_STOREFRONT_ACCESS_TOKEN) が未設定 — カートへの書き込みは実ストアに " +
           "しか無く、見本カタログでは楽観更新の対象そのものが作れない " +
-          "(既存の Checkout happy path と同じ理由)",
+          "(既存の Checkout happy path と同じ理由 / Boss 暫定許容 2026-08-27)",
       );
 
       switch (row.response) {

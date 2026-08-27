@@ -77,15 +77,13 @@
 //
 // ## 内部リンクの既定 (Boss 確定 2026-08-27)
 //
-// 内部リンクは 150 本超あり、全部を手で分類させると第 1 段の導入自体が頓挫する。
-// よって **`response: "router-nav"` + `exempt` を自動付与**し、
-// **ページ内の見た目が変わる遷移だけを分類必須**にする:
+// 内部リンクは 150 本超。全部を手で分類させると導入自体が頓挫するので、
+// **別ページへ移るだけの遷移は自動 exempt** にし、**ページ内の見た目が変わる遷移
+// (`?` 付き / `#` / 動的 href) だけを分類必須**にする。判定は `classifyLink`。
 //
-//   - クエリ付き (`?`) … 同じページの絞り込み・並び替え・追加表示。G6 はここ。
-//   - 同一ルート内 (`#` だけ / 現在のパスと同じ) … ページ内移動。
-//
-// `href` が静的に読めない (変数・テンプレート) ときは **安全側 = 分類必須**。
-// 「読めないから除外」にすると、動的な href に逃がすだけで台帳から消せてしまう。
+// 動的 href を安全側 (分類必須) に倒すのは、除外にすると変数へ逃がすだけで
+// 台帳から消せてしまうため。自動 exempt は毎回 href から付け直す (id が href を
+// 含まないので、引き継ぐと href 書き換えで宣言を回避できる)。
 // =============================================================================
 
 import { readdirSync, statSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
@@ -103,6 +101,16 @@ const INVENTORY_PATH = join(ROOT, 'interaction-inventory.json');
 
 /** 走査の起点。「画面から押せるもの」が置かれうる場所すべて。 */
 const ROOTS = ['app', 'components', 'lib', 'hooks'];
+
+/**
+ * ディレクトリに属さない client 側の入口。
+ *
+ * `instrumentation-client.ts` はブラウザで走るのに `ROOTS` のどれにも入らない。
+ * 拡張子と配置で絞らないと決めた以上、**リポジトリ直下の client 入口も見る**
+ * (ここを空けておくと「root に置けば台帳から消える」逃げ道が残る)。
+ * `middleware.ts` は Edge で走るサーバ側なので入れない。
+ */
+const EXTRA_FILES = ['instrumentation-client.ts'];
 
 const SKIP_DIR = new Set([
   'node_modules',
@@ -163,6 +171,10 @@ function walk(dir, out) {
 function sourceFiles() {
   const out = [];
   for (const dir of ROOTS) walk(join(ROOT, dir), out);
+  for (const file of EXTRA_FILES) {
+    const full = join(ROOT, file);
+    if (existsSync(full)) out.push(full);
+  }
   return out.sort();
 }
 
@@ -174,6 +186,22 @@ const rel = (f) => toPosix(relative(ROOT, f).split(sep).join('/'));
 
 const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 const ACTION_MODULE = /^@\/lib\/.*(-actions|\/actions)$/;
+
+/**
+ * spread されたら中身が読めなくなる「素の対話要素」。
+ *
+ * ここに `{...props}` が付くと `onClick` が隠れる。独自コンポーネントは対象外
+ * (`{...props}` の大半は見た目の受け渡しで、拾うと台帳が使い物にならない)。
+ */
+const SPREADABLE_INTERACTIVE = new Set([
+  'button',
+  'a',
+  'form',
+  'input',
+  'select',
+  'textarea',
+  'label',
+]);
 
 /** 外部・メール・電話。ページ内の状態を変える遷移ではない。 */
 const EXTERNAL_HREF = /^(https?:|mailto:|tel:|\/\/)/;
@@ -230,6 +258,28 @@ function extract(file, text, isBrowserSide) {
     });
   }
 
+  /**
+   * ファイル内で `const X = { method: "POST", ... }` と書かれた init オブジェクト。
+   *
+   * `fetch(url, init)` と外へ出されると、`fetch` の第 2 引数は Identifier に
+   * なるので**インラインのリテラルしか見ない検査は素通りする**。
+   * `mutation-through-shared-primitive` も同じ形で抜ける (QA 指摘 / 現行コードに
+   * 実例は 0 件だが、1 行の書き換えで検査を外せる状態を残さない)。
+   */
+  const hoistedWriteInits = new Set();
+
+  /** そのオブジェクトリテラルが書き込みメソッドを持つか。 */
+  function isWriteInit(node) {
+    if (!node || !ts.isObjectLiteralExpression(node)) return null;
+    for (const prop of node.properties) {
+      if (!ts.isPropertyAssignment(prop)) continue;
+      if (prop.name.getText().replace(/["']/g, '') !== 'method') continue;
+      const method = literalText(prop.initializer);
+      if (method && WRITE_METHODS.has(method.toUpperCase())) return method.toUpperCase();
+    }
+    return null;
+  }
+
   /** import された Server Action の名前。 */
   const actionNames = new Set();
   source.forEachChild((node) => {
@@ -242,14 +292,36 @@ function extract(file, text, isBrowserSide) {
     }
   });
 
+  /* `const X = { method: "POST" }` を先に集める。ESLint と違い 1 パスではないので、
+     宣言が使用より後にあっても拾える。 */
+  (function collectHoisted(node) {
+    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name)) {
+      if (isWriteInit(node.initializer)) hoistedWriteInits.add(node.name.text);
+    }
+    ts.forEachChild(node, collectHoisted);
+  })(source);
+
   function visit(node) {
     /* (a) JSX の on* ハンドラ属性 --------------------------------------- */
     if (ts.isJsxSelfClosingElement(node) || ts.isJsxOpeningElement(node)) {
+      const tag = node.tagName.getText();
       for (const attr of node.attributes.properties) {
+        /* **素の対話要素への spread は中身が読めない。**
+           `<button {...handlers}>` と書かれると `onClick` が居ても属性としては
+           見えず、台帳から丸ごと消える。読めない以上「無い」とは言えないので、
+           安全側に倒して 1 行立てる (現行コードに実例は 0 件。ゼロのうちに塞ぐ)。
+           独自コンポーネントへの `{...props}` は対象外 — 大半が見た目の受け渡しで、
+           拾うと 364 件が台帳に流れ込んで表が読めなくなる。 */
+        if (ts.isJsxSpreadAttribute(attr)) {
+          if (SPREADABLE_INTERACTIVE.has(tag)) {
+            push('handler', 'spread', attr, { element: tag });
+          }
+          continue;
+        }
         if (!ts.isJsxAttribute(attr)) continue;
         const name = attr.name.getText();
         if (!/^on[A-Z]/.test(name)) continue;
-        push('handler', name, attr, { element: node.tagName.getText() });
+        push('handler', name, attr, { element: tag });
       }
     }
 
@@ -286,33 +358,66 @@ function extract(file, text, isBrowserSide) {
     /* (b) 書き込み呼び出し ---------------------------------------------- */
     if (ts.isCallExpression(node)) {
       const callee = node.expression;
-      if (ts.isIdentifier(callee) && callee.text === 'fetch') {
+
+      /* `fetch(...)` / `globalThis.fetch(...)` / `window.fetch(...)` を同じに扱う。
+         受け側の名前で逃げられないようにする (現行コードに実例 0 件)。 */
+      const isFetchCallee =
+        (ts.isIdentifier(callee) && callee.text === 'fetch') ||
+        (ts.isPropertyAccessExpression(callee) &&
+          callee.name.getText() === 'fetch' &&
+          /^(globalThis|window|self)$/.test(callee.expression.getText()));
+
+      /* **サーバ専用モジュールの書き込みは台帳に載せない。**
+         `lib/shopify/client.ts` の GraphQL POST は「ユーザーが押せるもの」では
+         なく、押した結果サーバ側で起きること。載せると台帳が「押せるものの表」
+         でなくなり、本当に押せる行がサーバ内部の往復に埋もれる (QA 指摘)。
+         判定は eslint 側と同じブラウザ到達可能性を使う (二重の定義を作らない)。 */
+      if (isFetchCallee && isBrowserSide) {
         const init = node.arguments[1];
-        if (init && ts.isObjectLiteralExpression(init)) {
-          for (const prop of init.properties) {
-            if (!ts.isPropertyAssignment(prop)) continue;
-            if (prop.name.getText().replace(/["']/g, '') !== 'method') continue;
-            const method = literalText(prop.initializer);
-            if (method && WRITE_METHODS.has(method.toUpperCase())) {
-              push('write', `fetch:${method.toUpperCase()}`, node, {
-                url: literalText(node.arguments[0]),
-              });
-            }
+        /* インラインのリテラルと、外に出した init の両方を見る。 */
+        const method =
+          isWriteInit(init) ??
+          (init && ts.isIdentifier(init) && hoistedWriteInits.has(init.text)
+            ? 'HOISTED'
+            : null);
+        if (method) {
+          push('write', `fetch:${method}`, node, { url: literalText(node.arguments[0]) });
+        }
+      }
+
+      /* `React.createElement("button", { onClick })` — JSX を経由しない書き方。 */
+      if (
+        (ts.isIdentifier(callee) && callee.text === 'createElement') ||
+        (ts.isPropertyAccessExpression(callee) &&
+          callee.name.getText() === 'createElement' &&
+          /^(React)$/.test(callee.expression.getText()))
+      ) {
+        const props = node.arguments[1];
+        if (props && ts.isObjectLiteralExpression(props)) {
+          for (const prop of props.properties) {
+            const name = prop.name?.getText().replace(/["']/g, '') ?? '';
+            if (/^on[A-Z]/.test(name)) push('handler', name, prop, { element: 'createElement' });
           }
         }
       }
-      if (ts.isIdentifier(callee) && actionNames.has(callee.text)) {
+      if (isBrowserSide && ts.isIdentifier(callee) && actionNames.has(callee.text)) {
         push('write', `action:${callee.text}`, node);
       }
 
       /* (e) client 側の addEventListener ---------------------------------- */
-      if (
-        isBrowserSide &&
-        ts.isPropertyAccessExpression(callee) &&
-        callee.name.getText() === 'addEventListener'
-      ) {
+      /* `el.addEventListener(...)` と `el["addEventListener"](...)` は同じこと。
+         角括弧で書けば逃げられる、を作らない (現行コードに実例 0 件)。 */
+      const listenerTarget =
+        ts.isPropertyAccessExpression(callee) && callee.name.getText() === 'addEventListener'
+          ? callee.expression
+          : ts.isElementAccessExpression(callee) &&
+              literalText(callee.argumentExpression) === 'addEventListener'
+            ? callee.expression
+            : null;
+
+      if (isBrowserSide && listenerTarget) {
         const eventName = literalText(node.arguments[0]) ?? 'unknown';
-        push('listener', eventName, node, { target: callee.expression.getText() });
+        push('listener', eventName, node, { target: listenerTarget.getText() });
       }
     }
 
@@ -334,20 +439,16 @@ function extract(file, text, isBrowserSide) {
  * 後者は **分類必須** — 絞り込み・並び替え・追加表示は、押した瞬間に何かが
  * 変わって見えるべき操作で、G6 (「さらに N 件を表示」) がまさにこれ。
  */
+const AUTO_LINK_EXEMPT = '別ページへの遷移のみ (ページ内の見た目は変わらない)';
+
 function classifyLink(row) {
-  if (row.dynamic) {
-    /* href が静的に読めない。安全側に倒して分類必須にする。 */
-    return null;
-  }
+  /* href が静的に読めないときは安全側 = 分類必須。「読めないから除外」に
+     すると、変数へ逃がすだけで台帳から消せてしまう。 */
+  if (row.dynamic) return null;
   const href = row.href ?? '';
-  if (href.startsWith('#') || href.includes('?')) {
-    /* ページ内移動 / クエリ遷移 = 同じ画面の中身が変わる。 */
-    return null;
-  }
-  return {
-    response: 'router-nav',
-    exempt: '別ページへの遷移のみ (ページ内の見た目は変わらない)',
-  };
+  /* ページ内移動 (#) / クエリ遷移 (?) = 同じ画面の中身が変わる = 分類必須。 */
+  if (href.startsWith('#') || href.includes('?')) return null;
+  return { response: 'router-nav', exempt: AUTO_LINK_EXEMPT };
 }
 
 /* -------------------------------------------------------------------------- */
@@ -421,6 +522,21 @@ function build() {
     if (previous) {
       for (const field of DECLARED_FIELDS) {
         if (previous[field] !== undefined) out[field] = previous[field];
+      }
+      /* **自動で付けた exempt は、毎回 href から付け直す。**
+         id は href を含まない (`file#link:Link#n`) ので、href に `?` を足しても
+         id は変わらず、古い「遷移のみ」の exempt がそのまま引き継がれる。
+         その結果、G6 型の操作 (クエリでページ内が変わる遷移) を**宣言なしで
+         復活させられた** (QA 指摘 HIGH)。人が書いた exempt は触らない。 */
+      if (row.kind === 'link' && previous.exempt === AUTO_LINK_EXEMPT) {
+        const auto = classifyLink(row);
+        if (auto) {
+          Object.assign(out, auto);
+        } else {
+          /* href がページ内遷移になった。自動 exempt は失効させ、分類を求める。 */
+          delete out.exempt;
+          delete out.response;
+        }
       }
     } else if (row.kind === 'link') {
       /* 新しく現れた内部リンクだけは既定を自動で付ける (前述)。 */
@@ -574,7 +690,34 @@ function main() {
     );
   }
 
-  /* (3) exempt の形。理由の無い exempt は台帳を素通りする穴になる。 */
+  /* (3) 内部リンクの自動 exempt が、現在の href と矛盾していないか。
+         **id は href を含まないので、href を書き換えても id は変わらない。**
+         「別ページへ移るだけ」として自動 exempt になった行の href に後から `?`
+         を足すと、旧 exempt が引き継がれて検査は緑のまま — ページ内の見た目が
+         変わる遷移 (網羅表 G6 と同型) を宣言なしで復活させられた (QA 指摘 HIGH)。 */
+  const fresh = new Map(measure().map((r) => [r.id, r]));
+  const staleLinks = committed.filter((row) => {
+    if (row.kind !== 'link' || row.exempt !== AUTO_LINK_EXEMPT) return false;
+    const now = fresh.get(row.id);
+    return now ? classifyLink(now) === null : false;
+  });
+  if (staleLinks.length > 0) {
+    problems.push(
+      `href が変わってページ内遷移になったのに、自動 exempt が残っている行が ${staleLinks.length} 件あります:\n` +
+        staleLinks
+          .map((r) => {
+            const now = fresh.get(r.id);
+            const shown = now?.dynamic ? '(静的に読めない href)' : now?.href;
+            return `      ! ${r.id}  →  ${shown}`;
+          })
+          .join('\n') +
+        '\n    → この操作は「別ページへ移るだけ」ではなくなっています。\n' +
+        '      node scripts/ops/generate-interaction-inventory.mjs を実行し、\n' +
+        '      response (と observe) を宣言してください。',
+    );
+  }
+
+  /* (4) exempt の形。理由の無い exempt は台帳を素通りする穴になる。 */
   const bad = malformedExempt(committed);
   if (bad.length > 0) {
     problems.push(

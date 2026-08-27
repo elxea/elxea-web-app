@@ -115,7 +115,16 @@ function valueImports(text) {
     "",
   );
   return [
-    ...withoutTypeImports.matchAll(/(?:\bfrom\s*|\bimport\s*\(\s*)["']([^"']+)["']/g),
+    /* 3 通りを拾う:
+         import { x } from "./m"   … 名前付き
+         import("./m")             … 動的
+         import "./m"              … **副作用だけの import**
+       3 つ目を落とすと「値としては使っていないが読み込まれる」モジュールが
+       到達不能に見える。実際に走るのに検査の外に出るので、`import "./writer"`
+       と 1 行書くだけで lint も台帳も抜けられた (テストで発覚)。 */
+    ...withoutTypeImports.matchAll(
+      /(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)["']([^"']+)["']/g,
+    ),
   ].map((m) => m[1]);
 }
 

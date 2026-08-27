@@ -134,6 +134,162 @@ describe("生成物と実体の同期", () => {
 });
 
 /* -------------------------------------------------------------------------- */
+/* 1b. href を書き換えて自動 exempt を引き継げないか (QA 指摘 HIGH)               */
+/* -------------------------------------------------------------------------- */
+
+describe("内部リンクの自動 exempt は href に追随する", () => {
+  /**
+   * 台帳の id は `file#link:Link#n` で **href を含まない**。
+   * よって「別ページへ移るだけ」として自動 exempt になった行の href に後から
+   * `?` を足しても id は変わらず、旧 exempt がそのまま引き継がれる。
+   * その状態では `--check` が緑のままなので、**網羅表 G6 と同型の操作
+   * (クエリでページ内の見た目が変わる遷移) を宣言なしで復活させられた**。
+   */
+  const linkTree = (href: string) =>
+    tree({
+      "components/host.tsx": [
+        '"use client";',
+        "export function Host() {",
+        `  return <a href=${JSON.stringify(href)}>行く</a>;`,
+        "}",
+      ].join("\n"),
+    });
+
+  it("静的な別ページ遷移は自動 exempt になる", () => {
+    const dir = linkTree("/products");
+    expect(run(dir, ["--seed-baseline"]).code).toBe(0);
+    const rows = JSON.parse(readFileSync(join(dir, "interaction-inventory.json"), "utf8"))
+      .interactions as Row[];
+    expect(rows[0].response).toBe("router-nav");
+    expect(rows[0].exempt).toContain("別ページへの遷移のみ");
+    expect(run(dir, ["--check"]).code).toBe(0);
+  });
+
+  it("href にクエリを足すと落ちる (旧 exempt を引き継がない)", () => {
+    const dir = linkTree("/products");
+    run(dir, ["--seed-baseline"]);
+    expect(run(dir, ["--check"]).code).toBe(0);
+
+    /* href だけを書き換える。id は変わらないので、素直に実装すると素通りする。 */
+    const host = join(dir, "components/host.tsx");
+    writeFileSync(host, readFileSync(host, "utf8").replace('"/products"', '"/products?sort=new"'));
+
+    const result = run(dir, ["--check"]);
+    expect(result.code).toBe(1);
+    expect(result.out).toContain("自動 exempt が残っている");
+  });
+
+  it("href を変数に逃がしても落ちる (安全側 = 分類必須)", () => {
+    const dir = linkTree("/products");
+    run(dir, ["--seed-baseline"]);
+
+    const host = join(dir, "components/host.tsx");
+    writeFileSync(
+      host,
+      readFileSync(host, "utf8").replace('href="/products"', "href={target}"),
+    );
+
+    const result = run(dir, ["--check"]);
+    expect(result.code).toBe(1);
+    expect(result.out).toContain("自動 exempt が残っている");
+  });
+
+  it("再生成すると失効した自動 exempt が外れて未分類になる", () => {
+    const dir = linkTree("/products");
+    run(dir, ["--seed-baseline"]);
+    const host = join(dir, "components/host.tsx");
+    writeFileSync(host, readFileSync(host, "utf8").replace('"/products"', '"/products?sort=new"'));
+
+    run(dir, []);
+    const rows = JSON.parse(readFileSync(join(dir, "interaction-inventory.json"), "utf8"))
+      .interactions as Row[];
+    expect(rows[0].exempt).toBeUndefined();
+    expect(rows[0].response).toBeUndefined();
+    /* 宣言を求める状態になっている = 黙って通らない。 */
+    expect(run(dir, ["--check"]).code).toBe(1);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* 1c. 抽出のすり抜け 5 パターン (QA 指摘 MID-a)                                 */
+/* -------------------------------------------------------------------------- */
+
+describe("書き方を変えても台帳から消せない", () => {
+  const rowsOf = (dir: string) =>
+    (
+      JSON.parse(readFileSync(join(dir, "interaction-inventory.json"), "utf8"))
+        .interactions as Row[]
+    ).map((r) => r.id);
+
+  it("素の要素への spread は 1 行立つ (中身が読めないので安全側)", () => {
+    const dir = tree({
+      "components/host.tsx": [
+        '"use client";',
+        "export function Host(props) {",
+        "  return <button {...props} />;",
+        "}",
+      ].join("\n"),
+    });
+    run(dir, ["--seed-baseline"]);
+    expect(rowsOf(dir)).toContain("components/host.tsx#handler:spread#1");
+  });
+
+  it("React.createElement のハンドラも拾う", () => {
+    const dir = tree({
+      "components/host.tsx": [
+        '"use client";',
+        "import React from \"react\";",
+        "export const Host = () => React.createElement(\"button\", { onClick: () => 0 });",
+      ].join("\n"),
+    });
+    run(dir, ["--seed-baseline"]);
+    expect(rowsOf(dir)).toContain("components/host.tsx#handler:onClick#1");
+  });
+
+  it("init を外に出した fetch も拾う (eslint も同時に抜ける形)", () => {
+    const dir = tree({
+      "components/host.tsx": '"use client";\nimport "./writer";\nexport const H = 1;',
+      "components/writer.ts": [
+        'const init = { method: "POST" };',
+        'export const save = () => fetch("/api/x", init);',
+      ].join("\n"),
+    });
+    run(dir, ["--seed-baseline"]);
+    expect(rowsOf(dir)).toContain("components/writer.ts#write:fetch:HOISTED#1");
+  });
+
+  it("globalThis.fetch でも拾う", () => {
+    const dir = tree({
+      "components/host.tsx": '"use client";\nimport "./writer";\nexport const H = 1;',
+      "components/writer.ts":
+        'export const save = () => globalThis.fetch("/api/x", { method: "POST" });',
+    });
+    run(dir, ["--seed-baseline"]);
+    expect(rowsOf(dir)).toContain("components/writer.ts#write:fetch:POST#1");
+  });
+
+  it("角括弧の addEventListener でも拾う", () => {
+    const dir = tree({
+      "components/host.tsx": [
+        '"use client";',
+        'export const H = () => window["addEventListener"]("scroll", () => 0);',
+      ].join("\n"),
+    });
+    run(dir, ["--seed-baseline"]);
+    expect(rowsOf(dir)).toContain("components/host.tsx#listener:scroll#1");
+  });
+
+  it("サーバ専用モジュールの書き込みは台帳に載せない", () => {
+    /* 「押せるもの」の表にサーバ内部の往復が混ざると、本当に押せる行が埋もれる。 */
+    const dir = tree({
+      "app/api/x/route.ts": 'export const POST = () => fetch("/up", { method: "POST" });',
+    });
+    run(dir, ["--seed-baseline"]);
+    expect(rowsOf(dir)).toEqual([]);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
 /* 2. 未分類が通らないか                                                         */
 /* -------------------------------------------------------------------------- */
 
