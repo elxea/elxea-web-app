@@ -36,15 +36,46 @@ import { assertEnvValid, env, isProduction } from "./lib/config";
  *
  * エラー文に値は出ない (上の実測でも変数名と制約だけ)。設定エラーはしばしば
  * 資格情報についてのエラーなので、received を出すと設定ミスがそのまま漏洩になる。
+ *
+ * ## `NEXT_RUNTIME` だけは生読みする (レジストリに入れてはいけない)
+ *
+ * 下の 2 つの分岐だけ `process.env.NEXT_RUNTIME` を直接読んでいる。これは
+ * 例外の抜け道ではなく、**この値が設定ではないから**。`NEXT_RUNTIME` は人が
+ * ダッシュボードに入れる値ではなく、バンドラが「いま edge 向けにビルドして
+ * いるのか nodejs 向けなのか」をビルド時に文字列リテラルとして埋め込む
+ * コンパイル対象の識別子で、埋め込まれた結果 `if ("edge" === "nodejs")` に
+ * なった分岐は丸ごと消える (dead code elimination)。消えることに意味がある:
+ * nodejs 側の分岐は `sentry.server.config` と `fake-firestore` →
+ * `firebase-admin` を引き込んでおり、これらは node:http / node:fs / node:net
+ * などに依存する。
+ *
+ * `env("NEXT_RUNTIME")` は関数呼び出しなのでビルド時に畳めない。畳めないと
+ * 分岐が消えず、Node 専用モジュールが **Edge Function の bundle に入る**。
+ * 実害 (2026-08-27): Wave 1 (#164) を main にマージしたところ、CI の全 required
+ * check は緑のまま Vercel のデプロイだけが落ちた:
+ *
+ *     Error: The Edge Function "_middleware" is referencing unsupported modules:
+ *       - __vc__ns__/0/index.js: node:http, node:https, node:zlib, node:stream,
+ *         node:net, node:fs, node:path
+ *
+ * `next build` は成功するので required check では捕まらない (Vercel が出力を
+ * 配る段で初めて落ちる)。本番は fail-closed で直前のデプロイを配り続けたが、
+ * main は「マージできるがデプロイできない」状態になった。
+ *
+ * したがって `NEXT_RUNTIME` は `lib/config/spec.ts` から**外してある**。
+ * レジストリに残しておくと `env("NEXT_RUNTIME")` がまた書けてしまい、同じ
+ * 壊れ方が静かに戻る。宣言を消すことが再流入止め (憲章 R8)。
  */
 export async function register() {
   assertEnvValid();
 
-  if (env("NEXT_RUNTIME") === "nodejs") {
+  // eslint-disable-next-line no-restricted-syntax -- ビルド時に畳まれる必要がある。理由は上の doc comment を参照
+  if (process.env.NEXT_RUNTIME === "nodejs") {
     await import("./sentry.server.config");
     await installE2eFirestoreIfRequested();
   }
-  if (env("NEXT_RUNTIME") === "edge") {
+  // eslint-disable-next-line no-restricted-syntax -- 同上
+  if (process.env.NEXT_RUNTIME === "edge") {
     await import("./sentry.edge.config");
   }
 }
