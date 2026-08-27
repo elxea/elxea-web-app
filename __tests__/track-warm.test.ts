@@ -136,4 +136,23 @@ describe("取りかけの抱え方", () => {
     expect(created[0].src, "押し出された 1 本目の取得が止まっていない").toBe("");
     expect(created[3].src).toBe("https://cdn.test/d.mp3");
   });
+
+  /**
+   * 途中で捨てた曲を「温めた」に数えたままにすると、その曲は**二度と取りに
+   * いかれない** — 手元に何も無いのに先読み済み扱いになるので、押した人から
+   * 見れば直す前より悪い (先読みもされず、しかも待たされる)。
+   */
+  it("取得を止めた曲は、次に押されたらもう一度取りにいく", () => {
+    installBrowser();
+    for (const name of ["a", "b", "c", "d"]) warmTrack(`https://cdn.test/${name}.mp3`);
+    expect(created).toHaveLength(4);
+
+    /* a は押し出されている = 温まっていない。もう一度要求されたら取りにいく。 */
+    expect(warmTrack("https://cdn.test/a.mp3"), "捨てた曲が温め済み扱いのまま").toBe(true);
+    expect(created).toHaveLength(5);
+    expect(created[4].src).toBe("https://cdn.test/a.mp3");
+
+    /* まだ抱えている曲は二度取りにいかない (この直しで重複が増えていない)。 */
+    expect(warmTrack("https://cdn.test/d.mp3")).toBe(false);
+  });
 });

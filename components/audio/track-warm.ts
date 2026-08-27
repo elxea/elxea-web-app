@@ -33,7 +33,7 @@ const warmed = new Set<string>();
  * 回収されて**取得ごと捨てられる**ことがある。直近の数本だけ参照を残す。
  * 上限があるのは、これ自体が漏れ (leak) にならないようにするため。
  */
-const inFlight: HTMLAudioElement[] = [];
+const inFlight: { el: HTMLAudioElement; src: string }[] = [];
 const IN_FLIGHT_MAX = 3;
 
 /**
@@ -53,12 +53,17 @@ export function warmTrack(src: string): boolean {
   probe.src = src;
   probe.load();
 
-  inFlight.push(probe);
+  inFlight.push({ el: probe, src });
   while (inFlight.length > IN_FLIGHT_MAX) {
     const oldest = inFlight.shift();
+    if (!oldest) continue;
+    /* 取得を止めたぶんは「温めた」に数え直さない。数えたままにすると、
+       途中で捨てた曲は**二度と取りにいかなくなる** (次に押されたときも
+       手元に何も無いのに先読み済み扱いになる)。 */
+    warmed.delete(oldest.src);
     /* 参照を手放す前に取得も止める。押されなかった曲のために回線を
        握り続けない。 */
-    if (oldest) oldest.src = "";
+    oldest.el.src = "";
   }
 
   return true;
