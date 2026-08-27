@@ -779,7 +779,7 @@ export function seedCart(): Cart | null {
           product: product("sencha-akane", "煎茶 茜 -akane-"),
           price: jpy("1800"),
         },
-        cost: { totalAmount: jpy("3600") },
+        cost: { totalAmount: jpy("3600"), amountPerQuantity: jpy("1800") },
         sellingPlanAllocation: {
           sellingPlan: {
             id: `${SEED_ID_PREFIX}selling-plan-monthly`,
@@ -797,7 +797,7 @@ export function seedCart(): Cart | null {
           product: product("gyokuro-midori", "玉露 翠 -midori-"),
           price: jpy("2400"),
         },
-        cost: { totalAmount: jpy("2400") },
+        cost: { totalAmount: jpy("2400"), amountPerQuantity: jpy("2400") },
         sellingPlanAllocation: null,
       },
     ],

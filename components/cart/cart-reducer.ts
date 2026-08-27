@@ -1,5 +1,7 @@
 import type { Cart, CartItem } from "@/lib/shopify/types";
 
+import { canDeriveMoney, withDerivedMoney } from "./cart-money";
+
 /**
  * カートの楽観更新の規則。**画面から切り離してここに置く**。
  *
@@ -48,6 +50,19 @@ export function cartReducer(current: Cart | null, action: CartAction): Cart | nu
   if (!current && action.type !== "ADD") return current;
   const state = current ?? PENDING_CART;
 
+  /* 金額を引き直してよいかは、**書き換える前の (= サーバが確定させた) 金額**で
+     判断する。書き換えたあとで確かめても、自分が入れた値を自分で追認するだけで
+     何の確認にもならない。判定の中身は `cart-money.ts`。 */
+  const derivable = canDeriveMoney(state);
+  const next = applyQuantity(state, action);
+
+  /* 何も変わらなかったとき (指す行が無い等) は同じ参照のまま返す。 */
+  if (next === state) return next;
+  return derivable ? withDerivedMoney(next) : next;
+}
+
+/** 数量だけを書き換える。金額には触らない。 */
+function applyQuantity(state: Cart, action: CartAction): Cart {
   switch (action.type) {
     case "ADD": {
       const existingLine = state.lines.find(

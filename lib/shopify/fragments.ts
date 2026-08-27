@@ -199,6 +199,13 @@ export const CART_FRAGMENT = /* GraphQL */ `
               amount
               currencyCode
             }
+            # 1 個あたりの実額。定期便プランの調整後の値なので、数量を押した
+            # 瞬間に金額を引き直すときの基準になる (components/cart/cart-money.ts)。
+            # merchandise.price はプラン調整前の定価なので、この用途には使えない。
+            amountPerQuantity {
+              amount
+              currencyCode
+            }
           }
           sellingPlanAllocation {
             sellingPlan {

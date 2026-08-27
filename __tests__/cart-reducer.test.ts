@@ -30,6 +30,7 @@ function makeCartItem(overrides: Partial<CartItem> = {}): CartItem {
     },
     cost: overrides.cost ?? {
       totalAmount: { amount: "1000", currencyCode: "JPY" },
+      amountPerQuantity: { amount: "1000", currencyCode: "JPY" },
     },
     sellingPlanAllocation: overrides.sellingPlanAllocation ?? null,
   };
