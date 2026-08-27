@@ -119,7 +119,13 @@ export function CartProvider({
             product: { id: "", handle: "", title: "", featuredImage: null, vendor: "" },
             price: { amount: "0", currencyCode: "JPY" },
           },
-          cost: { totalAmount: { amount: "0", currencyCode: "JPY" } },
+          /* 追加した瞬間はまだ値段を知らない (サーバの応答で入れ替わる)。
+             0 のままにしてあるのは、`cart-money` の確かめが「1 個あたり × 数量」
+             と一致するかを見るので、嘘の金額を置くと確かめが通ってしまうため。 */
+          cost: {
+            totalAmount: { amount: "0", currencyCode: "JPY" },
+            amountPerQuantity: { amount: "0", currencyCode: "JPY" },
+          },
           sellingPlanAllocation: null,
         },
       }),
