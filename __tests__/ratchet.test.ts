@@ -119,6 +119,42 @@ describe("正常系", () => {
   });
 });
 
+describe("--update は人が書いたものを落とさない", () => {
+  /* 初版の `render()` は `{ max, source, why }` だけを組み立て直して書いていた。
+     つまり `--update` を 1 回走らせるだけで、各エントリの `note` (なぜその件数に
+     なったのかの経緯) と `$comment` の 4〜5 行目が**黙って消えた**。しかも消える
+     のは「表を減らしたので --update してね」とスクリプト自身が指示した直後で、
+     消えたことはエラーにならない。例外の件数は守りながら、なぜ例外なのかの記録の
+     ほうを機械が捨てる — この仕組みが最も嫌う形の失敗 (憲章 R8)。 */
+  it("note と $comment を持ち越す", () => {
+    const dir = tree();
+    run(dir, ["--update"]);
+
+    const path = join(dir, "ratchets.json");
+    const seeded = JSON.parse(readFileSync(path, "utf8"));
+    seeded.$comment = [...seeded.$comment, "人が足した 4 行目"];
+    seeded.ratchets["interaction-allowlist"].note = "16 → 19 にした理由がここに書いてある";
+    seeded.ratchets["interaction-allowlist"].why = "人が書いた why";
+    writeFileSync(path, JSON.stringify(seeded, null, 2));
+
+    /* 表を 1 件減らして、スクリプトの指示どおり --update を走らせる。 */
+    const rulePath = join(dir, "eslint-rules/mutation-through-shared-primitive.mjs");
+    writeFileSync(
+      rulePath,
+      readFileSync(rulePath, "utf8").replace('  "components/b.tsx",\n', ""),
+    );
+    expect(run(dir, ["--update"]).code).toBe(0);
+
+    const after = JSON.parse(readFileSync(path, "utf8"));
+    expect(after.ratchets["interaction-allowlist"].max).toBe(1);
+    expect(after.ratchets["interaction-allowlist"].note).toBe(
+      "16 → 19 にした理由がここに書いてある",
+    );
+    expect(after.ratchets["interaction-allowlist"].why).toBe("人が書いた why");
+    expect(after.$comment).toContain("人が足した 4 行目");
+  });
+});
+
 describe("変異: 例外を増やしたら落ちる", () => {
   it("ALLOWLIST に 1 行足すと落ちる", () => {
     const dir = tree();

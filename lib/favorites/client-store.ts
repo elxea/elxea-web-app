@@ -1,6 +1,7 @@
 "use client";
 
 import { favoriteKey, type FavoriteKind } from "@/lib/account-favorites";
+import { createWriteQueue } from "@/lib/interaction/write-queue";
 
 /**
  * お気に入りの登録状態を、ブラウザ側で **1 か所にまとめて持つ** ための小さな倉庫。
@@ -417,6 +418,66 @@ export function readFavoriteState(
 
 export type ToggleOutcome = "added" | "removed" | "unauthenticated" | "failed";
 
+/** 1 件ぶんの書き込み。`value` が向き (true = 登録する)。 */
+type FavoriteWrite = {
+  kind: FavoriteKind;
+  targetId: string;
+  title: string;
+  imageUrl: string | null;
+  value: boolean;
+};
+
+/**
+ * お気に入りの書き込みを捌く共通の通り道 (`lib/interaction`)。
+ *
+ * ## なぜ自前の fetch をやめたのか
+ *
+ * ここは長らく「`"use client"` を持つ `.ts`」という、**検査の視界に入らない場所**
+ * だった (`eslint.config.mjs` の `files` が `.tsx` しか見ていなかった)。そのあいだ
+ * この関数は `fetch` を直に呼び、連打の整理も、失敗が誰かに届く経路も持たないまま
+ * だった — `catch` は握り潰しで、書き込みが全滅しても Sentry には 1 件も出ない。
+ *
+ * 通り道に載せることで 3 つが機構側から付いてくる:
+ *
+ *   - **連打の整理** … 同じ相手 (`key`) へは同時に 1 本だけ。押しっぱなしで
+ *     往復が並走し、遅れて着いた古い向きが最後に効く、が起きなくなる。
+ *   - **同じ向きを送り直さない** … `isEqual` を **向きで**渡す。既定の `Object.is`
+ *     は毎回新しいオブジェクトなので常に不一致になり、足切りが一度も効かない
+ *     (カート側で実際にそうなっていた: 網羅表 G11)。
+ *   - **失敗が残る** … `write-queue` の中で `logger.error("ui.write.send-failed")`。
+ *
+ * 向きは**絶対量**(「登録済みにする」/「していない状態にする」) なので `"latest"`。
+ * 加算ではないため、途中を間引いても最終状態は変わらない。
+ */
+const favoriteWrites = createWriteQueue<FavoriteWrite>({
+  operation: "favorites.toggle",
+  isEqual: (a, b) => a.value === b.value,
+});
+
+/** 実際の往復。失敗は投げる (通り道が `failed` に畳んで呼び出し元へ返す)。 */
+async function sendFavoriteWrite(write: FavoriteWrite): Promise<void> {
+  const res = write.value
+    ? await fetch("/api/user/favorites", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({
+          type: write.kind,
+          targetId: write.targetId,
+          title: write.title,
+          imageUrl: write.imageUrl,
+        }),
+      })
+    : await fetch("/api/user/favorites", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ type: write.kind, targetId: write.targetId }),
+      });
+
+  if (!res.ok) throw new Error(`favorites write failed: ${res.status}`);
+}
+
 /**
  * 押されたときの一連の処理。**押した瞬間に倉庫を書き換える** (楽観更新)。
  *
@@ -455,38 +516,50 @@ export async function toggleFavorite(entry: {
   localWrites.set(key, { value: next, seq: writeSeq });
   setKey(key, next);
 
-  try {
-    const res = next
-      ? await fetch("/api/user/favorites", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "same-origin",
-          body: JSON.stringify({
-            type: entry.kind,
-            targetId: entry.targetId,
-            title: entry.title,
-            imageUrl: entry.imageUrl,
-          }),
-        })
-      : await fetch("/api/user/favorites", {
-          method: "DELETE",
-          headers: { "Content-Type": "application/json" },
-          credentials: "same-origin",
-          body: JSON.stringify({ type: entry.kind, targetId: entry.targetId }),
-        });
+  const outcome = await favoriteWrites.enqueue(
+    key,
+    { ...entry, value: next },
+    sendFavoriteWrite,
+    "latest",
+  );
 
-    if (!res.ok) throw new Error(`favorites write failed: ${res.status}`);
-
-    /* 書けた。倉庫は既にこの値なので触らない。 */
-    return next ? "added" : "removed";
-  } catch {
+  if (outcome === "failed") {
     /* 失敗した。押す前に戻し、記録も「押す前の値」に更新する (番号は進めたまま —
-       戻さないと、この巻き戻し自体が古い一覧に上書きされる)。 */
+       戻さないと、この巻き戻し自体が古い一覧に上書きされる)。
+       失敗そのものの記録は通り道 (`write-queue`) が Sentry へ残す。 */
     writeSeq += 1;
     localWrites.set(key, { value: previous, seq: writeSeq });
     setKey(key, previous);
     return "failed";
   }
+
+  /* 書けた。倉庫は既にこの値なので触らない。 */
+  return next ? "added" : "removed";
+}
+
+/**
+ * 1 件を解除する。**お気に入り一覧 (`/account/favorites`) の解除ボタン専用**。
+ *
+ * 一覧側は「並び順を保った復元」が要るので画面の巻き戻しを自分で持つが、
+ * **往復だけはここへ寄せる**。寄せないと、同じ `/api/user/favorites` への
+ * DELETE が 2 か所から別々の交通整理で飛び、一覧で外した直後に商品ページの
+ * トグルを押すと 2 本が並走する (どちらが最後にサーバへ残るかが運になる)。
+ * `toggleFavorite` と同じ `key` を使うので、通り道が同じ列として捌く。
+ *
+ * 倉庫への反映は呼び出し側が `applyLocalFavorite` で行う (一覧は復元のために
+ * 成功・失敗の両方で自前の state も動かすため、ここでは触らない)。
+ */
+export async function removeFavorite(
+  kind: FavoriteKind,
+  targetId: string,
+): Promise<"removed" | "failed"> {
+  const outcome = await favoriteWrites.enqueue(
+    favoriteKey(kind, targetId),
+    { kind, targetId, title: "", imageUrl: null, value: false },
+    sendFavoriteWrite,
+    "latest",
+  );
+  return outcome === "ok" ? "removed" : "failed";
 }
 
 /* -------------------------------------------------------------------------- */

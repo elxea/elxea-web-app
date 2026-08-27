@@ -21,13 +21,31 @@
  *
  * ■ なにが違反か
  *
- * client component (`"use client"`) が、`lib/interaction` の hook を import せずに
+ * **ブラウザで走るモジュール**が、`lib/interaction` の共通の通り道を import せずに
  *   - Server Action とみなせる import (`@/lib/**\/*-actions`) を呼ぶ
  *   - `fetch(...)` を書き込みメソッド (POST / PUT / PATCH / DELETE) で呼ぶ
  * 場合。
  *
  * 呼び出し位置は見ない。`onClick={() => act()}` と `async function handle() { act() }`
  * は同じことなので、**書き方の違いで逃げられないように**ファイル単位で判定する。
+ *
+ * ■ 「ブラウザで走る」をどう決めるか (2026-08-27 / 憲章 R9)
+ *
+ * 当初はファイル冒頭の `"use client"` の 1 行だけを見ていた。これには 2 段の穴が
+ * あり、**どちらも実際に踏まれていた**:
+ *
+ *   1. `eslint.config.mjs` の `files` が `components/**\/*.tsx` と `app/**\/*.tsx`
+ *      だけを対象にしていたので、`lib/**` と `.ts` 全域がそもそもルールの視界に
+ *      入っていなかった。`lib/favorites/client-store.ts` は `"use client"` + POST +
+ *      例外表未登載という三拍子で、それでも `npx eslint` は 0 件だった。
+ *   2. glob を広げても、**指令を持つのは境界のファイルだけ**なので `.ts` に 1 段
+ *      切り出すだけで指令が消え、また見えなくなる。実際 `lib/firebase/behavior-tracker.ts`
+ *      と `components/chat/elxea-chat-transport.ts` がこの形だった。
+ *
+ * よって判定を **import の道筋によるブラウザ到達可能性**に変える
+ * (`eslint-rules/lib/browser-reachable.mjs`)。`"use client"` から値 import を辿り、
+ * `"use server"` (= 呼び出しがネットワーク越しになる境界) で打ち切る。
+ * ファイルを分割しても、拡張子を変えても、到達可能性は変わらない。
  *
  * ■ どう直すのか
  *
@@ -43,6 +61,8 @@
  * レビューで必ず目に入る = 人の記憶に頼らない。
  */
 
+import { isBrowserReachable } from "./lib/browser-reachable.mjs";
+
 /**
  * まだ共通の通り道に載せていない画面。**縮小方向にのみ更新する**。
  *
@@ -50,10 +70,15 @@
  * そのまま持っているので、ここが「残りの移行計画」でもある。
  */
 const ALLOWLIST = new Set([
-  // --- optimistic 相当 — 独自の楽観更新を倉庫側に既に持っている。
-  //     通り道へ寄せるのは非急務 (設計 QA 判定 2026-08-26)。
-  "components/favorites/favorite-toggle-button.tsx",
-  "components/account/favorites-board.tsx",
+  // --- 「押した瞬間の応答」ではない書き込み。
+  //     `elxea-chat-transport.ts` は Vercel AI SDK の ChatTransport 実装で、
+  //     往復の生存期間 (streaming・中断・再送) を SDK 側が持つ。共通 hook は
+  //     応答を返さない (`enqueue` は成否しか返さない) ので、ここを通すと
+  //     SSE の本体が受け取れない = 機構として噛み合わない。同じ流れの画面側
+  //     (chat-bar / chat-panel / chat-message) は既にこの表に載っており、
+  //     この行はその実装本体を同じ扱いに揃えるもの。**新しい例外ではない**
+  //     (2026-08-27 / 憲章 R9 でルールの視界を広げた際に顕在化した)。
+  "components/chat/elxea-chat-transport.ts",
 
   // --- pessimistic-commit — 金銭・契約。悲観のままが正しい。
   //     「関係ない操作まで止めない」の是正 (パネルの開閉・引き返す側) は済み。
@@ -122,7 +147,12 @@ const rule = {
 
     const source = context.sourceCode ?? context.getSourceCode();
     const text = source.getText();
-    if (!/^\s*["']use client["']/m.test(text)) return {};
+
+    /* ブラウザで走らないファイルは対象外。指令を持つファイルは即座に対象
+       (走査が空振りする環境 — RuleTester の仮想ファイル等 — でも従来どおり
+       効かせるため、指令の判定を先に置く)。 */
+    const declaresClient = /^\s*["']use client["']/m.test(text);
+    if (!declaresClient && !isBrowserReachable(process.cwd(), filename)) return {};
 
     /** import された Server Action の名前。 */
     const actionNames = new Set();

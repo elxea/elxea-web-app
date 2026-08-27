@@ -148,8 +148,31 @@ const eslintConfig = [
   //   閉じていて、250ms 間隔の 2 回目が黙って捨てられていた）。
   //   error 級（pnpm lint は --max-warnings 0）。逃げ道はルール内の allowlist のみで、
   //   **縮小方向にのみ更新する**。分類の正本は lib/interaction/mutation-classes.ts。
+  //
+  // 対象範囲の訂正（2026-08-27 / 憲章 R9）:
+  //   ここは長らく `["components/**/*.tsx", "app/**/*.tsx"]` だった。ルール本体は
+  //   「逃げ道は allowlist だけで、差分に必ず現れる」と謳っているのに、**その担保が
+  //   この 1 行で上流から破れていた** — `lib/**` `hooks/**` と `.ts` 全域が視界の外に
+  //   あり、ファイルを `.tsx` から `.ts` に移すだけで allowlist に差分を出さずに
+  //   監査から消せた。
+  //
+  //   実測 (2026-08-27, bcce45e): `lib/favorites/client-store.ts` は
+  //   `"use client"` + `method: "POST"` + allowlist 未登載の三拍子が揃っているのに
+  //   `npx eslint lib/favorites/client-store.ts` が 0 件で返っていた。
+  //   `--print-config` で見ると、そのファイルで有効な elxea-tokens ルールは
+  //   `cookie-name-through-registry` だけで、このルールは居なかった。
+  //
+  //   よって拡張子と配置で絞るのをやめる。「画面から書き込むコードが置かれうる場所」
+  //   = app / components / lib / hooks を、`.ts` も含めて全部見る。
+  //   （glob を広げただけでは `"use client"` を持たない `.ts` が漏れ続けるので、
+  //     ルール側の判定も import 到達可能性へ直してある。両方揃って 1 セット。）
   {
-    files: ["components/**/*.tsx", "app/**/*.tsx"],
+    files: [
+      "app/**/*.{ts,tsx}",
+      "components/**/*.{ts,tsx}",
+      "lib/**/*.{ts,tsx}",
+      "hooks/**/*.{ts,tsx}",
+    ],
     plugins: {
       "elxea-tokens": elxeaTokens,
     },
