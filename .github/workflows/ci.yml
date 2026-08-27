@@ -294,6 +294,17 @@ jobs:
           NEXT_PUBLIC_SANITY_DATASET: production
           # SESSION_SECRET comes from the workflow-level `env` block.
 
+      - name: Edge bundle contains nothing the Edge Runtime cannot run
+        # `next build` が成功しても Vercel のデプロイは落ちうる。Edge Function に
+        # node:http / node:fs のような Node 専用モジュールが入っていると、出力を
+        # 配る段で "The Edge Function ... is referencing unsupported modules" に
+        # なる。この差のせいで 2026-08-27 に「required check は全部緑、マージ済み、
+        # だがデプロイできない main」が実際に発生した (憲章 Wave 1 / #164)。
+        #
+        # ビルド直後の成果物を検査してその場で落とす。deploy でしか分からなかった
+        # 失敗を、required check である build に前倒しする。
+        run: node scripts/ops/check-edge-bundle.mjs
+
   storybook-tests:
     name: storybook-tests
     needs: static-checks

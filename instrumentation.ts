@@ -1,6 +1,6 @@
 import * as Sentry from "@sentry/nextjs";
 
-import { assertEnvValid, env, isProduction } from "./lib/config";
+import { assertEnvValid, env } from "./lib/config";
 
 /**
  * `register()` はリクエストを受け付ける前に 1 回だけ走る、というのが Next の契約。
@@ -87,16 +87,34 @@ export async function register() {
  * 最初の route handler が `getAdminFirestore()` を呼ぶ時点では必ず差し込みが済んでいる。
  *
  * 3 重に閉じている:
- *   1. `E2E_FIRESTORE_STUB === "1"` … 既定では何もしない
- *   2. `NODE_ENV !== "production"` … ここでも見る（`setInjectedFirestoreForE2E` 側でも throw する）
+ *   1. `NODE_ENV !== "production"` … ここでも見る（`setInjectedFirestoreForE2E` 側でも throw する）
+ *   2. `E2E_FIRESTORE_STUB === "1"` … 既定では何もしない
  *   3. 偽物の import は **この分岐の中の動的 import** … 通常起動では読み込まれない
  *
  * 理由と安全性の議論は `lib/firebase/admin.ts` の差し込み口のコメントに置いてある
  * （二重に書かない）。
+ *
+ * ## `NODE_ENV` の判定を先に、しかも生読みで置く理由
+ *
+ * この 2 つの early return は順序と読み方に意味がある。`next build` は必ず
+ * `NODE_ENV=production` で走るので、`process.env.NODE_ENV === "production"` と
+ * **リテラルで**書いてあればバンドラがこれを `if (true) return;` に畳み、
+ * それ以降が到達不能になって下の動的 import ごと落ちる。落ちることが目的:
+ * `fake-firestore` は `firebase-admin` を引き込み、`firebase-admin` は gaxios /
+ * gcp-metadata / node-fetch 経由で node:http・node:net・node:fs などに依存する。
+ * これらが Edge Function の bundle に入ると Vercel のデプロイが
+ * unsupported modules で落ちる（2026-08-27 実害。詳細は `register()` の
+ * doc comment）。
+ *
+ * `isProduction()` は関数呼び出しなので畳めず、到達不能にならない。よってここは
+ * `env()` 経由にできない。逆に `E2E_FIRESTORE_STUB` は畳む必要が無いので
+ * レジストリ経由のままでよく、production ビルドでは上の return より後ろにある
+ * ぶん丸ごと消える。
  */
 async function installE2eFirestoreIfRequested(): Promise<void> {
+  // eslint-disable-next-line no-restricted-syntax -- ビルド時に畳んで下の動的 import を消すためリテラルで読む。理由は上の doc comment
+  if (process.env.NODE_ENV === "production") return;
   if (env("E2E_FIRESTORE_STUB") !== "1") return;
-  if (isProduction()) return;
 
   const [{ createFakeFirestore }, { setInjectedFirestoreForE2E }] = await Promise.all([
     import("./__tests__/helpers/fake-firestore"),
