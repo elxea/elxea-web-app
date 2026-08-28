@@ -105,6 +105,18 @@ export function Footer({ groups: externalGroups }: FooterProps) {
                       {t("common.teaMenu")}
                     </Link>
                   </li>
+                  {/* 茶葉診断 (/diagnosis) — CDP 統合 Stage 4 で開いた Web 入口。
+                      いまはここがサイト内で唯一の導線。トップページの Figma 節
+                      8110:2514 は忠実度ゲート (数値対比表 + 別エージェント監査) の
+                      対象なので別タスクに残してある (app/[locale]/diagnosis/page.tsx)。 */}
+                  <li>
+                    <Link
+                      href="/diagnosis"
+                      className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {t("diagnosis.title")}
+                    </Link>
+                  </li>
                   <li>
                     <Link
                       href="/playlists"
