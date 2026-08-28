@@ -1,5 +1,6 @@
 /**
- * 注文 webhook が **persona を書かない** ことを固定する (T-1 / CDP 統合 Stage 0).
+ * 注文 webhook が **persona も「買った」という出来事も書かない** ことを固定する
+ * (T-1 / CDP 統合 Stage 0 + 注文 webhook 一本化 / CDP 統合 Stage 3).
  *
  * ## なぜここを固定するのか
  *
@@ -25,6 +26,17 @@
  * (cx-agent 側は「書き手がちょうど 1 本ある」ことを ratchet `persona-writers`
  *  で固定している。2 リポにまたがる 1 つの数は作れないので、
  *  「cx-agent = 1 本」と「web-app = 0 本」の 2 つで全体の 1 本を担保する。)
+ *
+ * ## Stage 3 で足したこと — behaviorLog への購入行も書かない
+ *
+ * 同じ 1 回の購入が 2 か所に別々の形で残っていた: cx-agent が L0
+ * (`customer_events` の `purchase.order_paid`) に積む行と、この route が
+ * `users/{id}/behaviorLog` に直書きする `{ action: "purchase" }` の行である。
+ * 後者は events gateway を通らない直書きで、設計が D4 として名指ししていたもの
+ * (「注文 webhook は route を迂回して channel:\"shopify\" を実書込」)。
+ *
+ * ここで固定するのは **「買った」を書く口が web-app 側に復活しないこと**。
+ * 前と同じ理由で字面の件数ではなく、実際の書き込みペイロードを見る。
  *
  * Shopify 検証 / Firestore / LINE 送出はすべて mock。**実送信はしない**。
  */
@@ -169,11 +181,12 @@ beforeEach(() => {
   getAdminFirestoreMock.mockReturnValue(store.db);
 });
 
-describe("注文 webhook は persona を書かない (T-1)", () => {
+describe("注文 webhook は persona も購入の出来事も書かない (T-1 / Stage 3)", () => {
   it("取り込みは成功する (撤去で壊していないことの前提確認)", async () => {
     const res = await POST(request());
     expect(res.status).toBe(200);
-    expect(store.writes.length, "注文ミラー・行動ログ・ユーザーの 3 書き込み").toBe(3);
+    // Stage 3 で行動ログの購入行を落としたので、残るのは注文ミラーとユーザーの 2 つ。
+    expect(store.writes.length, "注文ミラーとユーザーの 2 書き込み").toBe(2);
   });
 
   it("どの書き込みペイロードにも persona 項目が無い", async () => {
@@ -196,16 +209,41 @@ describe("注文 webhook は persona を書かない (T-1)", () => {
     }
   });
 
-  it("behaviorLog の personaSignal は null (項目ごと落とさない)", async () => {
+  it("behaviorLog への購入行を書かない (Stage 3 / 出来事を書く口は L0 の 1 本)", async () => {
     await POST(request());
 
-    const behavior = store.writes.find((w) =>
-      Object.prototype.hasOwnProperty.call(w.payload, "personaSignal"),
+    // 「買った」という事実は cx-agent が L0 に 1 行積む。ここが 2 つ目の形で
+    // 残すと、同じ 1 回の購入がどちらの記録なのかを言う場所が無くなる。
+    const behaviorish = store.writes.filter(
+      (w) =>
+        Object.prototype.hasOwnProperty.call(w.payload, "action") ||
+        Object.prototype.hasOwnProperty.call(w.payload, "personaSignal"),
     );
-    expect(behavior, "behaviorLog の書き込みが見つからない").toBeDefined();
-    // 「項目が無い = 未定義」と「null = 判定していない」を区別できる形に保つ。
-    // 落としてしまうと、cx-agent が書いた過去の行と読み分けられなくなる。
-    expect(behavior?.payload.personaSignal).toBe(null);
+    expect(
+      behaviorish,
+      `行動ログの書き込みが復活している: ${JSON.stringify(behaviorish)}`,
+    ).toHaveLength(0);
+
+    const serialized = JSON.stringify(store.writes);
+    expect(serialized, 'purchase という出来事を書いている').not.toContain('"purchase"');
+  });
+
+  it("注文ミラーとユーザー文書は残っている (一本化であって機能の削除ではない)", async () => {
+    await POST(request());
+
+    // この 2 つは cx-agent 側に同じ書き手が無い。消すと一本化ではなく欠落になる
+    // (注文ミラーは GDPR のデータ提供が読み、email / displayName はここだけが書く)。
+    const mirror = store.writes.find((w) =>
+      Object.prototype.hasOwnProperty.call(w.payload, "orderNumber"),
+    );
+    expect(mirror, "注文ミラーの書き込みが消えている").toBeDefined();
+
+    const user = store.writes.find((w) =>
+      Object.prototype.hasOwnProperty.call(w.payload, "lastActiveAt"),
+    );
+    expect(user, "ユーザー文書の upsert が消えている").toBeDefined();
+    expect(user?.payload.email).toBe("customer@example.test");
+    expect(user?.payload.displayName).toBe("山田 太郎");
   });
 
   it("トランザクション内の読み取りは冪等判定の 1 回だけ", async () => {

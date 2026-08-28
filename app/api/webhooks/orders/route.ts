@@ -17,10 +17,40 @@ import { FieldValue, Timestamp } from "firebase-admin/firestore";
  * Flow:
  *   1. Verify HMAC-SHA256 signature
  *   2. Write order mirror to Firestore users/{customerId}/orders/{orderId}
- *   3. Add purchase behavior event to behaviorLog
- *   4. Return 200 immediately (Shopify retries on non-2xx)
+ *   3. Return 200 immediately (Shopify retries on non-2xx)
  *
- * ## ここは persona を書かない (T-1 / CDP 統合 Stage 0)
+ * ## ここは「買った」という出来事を書かない (CDP 統合 Stage 3 / 注文 webhook 一本化)
+ *
+ * 同じ注文は cx-agent の `src/routes/shopify-webhook.ts` も受け取っており、そちらが
+ * events gateway 経由で L0 (`customer_events`) に `purchase.order_paid` を 1 行積む。
+ * つまり「買った」という**事実**の記録は既に 1 本ある。
+ *
+ * かつてここは、それとは別に `users/{customerId}/behaviorLog` へ
+ * `{ action: "purchase", channel: "shopify" }` の行を直接書いていた。events gateway を
+ * 通らない直書きで、設計が D4 として名指ししていた「注文 webhook は route を迂回して
+ * `channel:"shopify"` を実書込」がこれである。同じ 1 回の購入が 2 か所に別々の形で
+ * 残り、どちらが本物かを言う場所が無い状態だった (E2「顧客の事実を書く口は 1 つ」)。
+ *
+ * その行を落とした。**失われる読み手は無い** — 実測 (2026-08-29) で behaviorLog の
+ * 実行時の読み手は 2 つあり、どちらも `action == "view_content"` で絞っている:
+ *   - `lib/recommendations/content-engine.ts` の `getReadArticleSlugs`
+ *   - `lib/journal/popular-articles.ts` の `fetchPopularArticlesUncached`
+ * `action === "purchase"` で絞る読み手はリポジトリ全体に 1 つも無い。購入の事実を
+ * 使う側は L0 と、cx-agent が `users/{customerId}` に書く `lastPurchaseAt` を見る。
+ *
+ * ## 残しているもの (と、その理由)
+ *
+ * 注文ミラー `users/{customerId}/orders/{orderId}` と、ユーザー文書の upsert
+ * (`email` / `displayName` / `lastActiveAt`) は残す。これらは cx-agent 側に同じ書き手が
+ * **無い**ので、消すと一本化ではなく機能の削除になる:
+ *   - 注文ミラーは GDPR のデータ提供 (`customers-data-request`) と連携時の移送が読む。
+ *   - `email` / `displayName` はこのリポジトリで**ここだけが書いている**
+ *     (`displayName` は cx-agent の応答生成が `users/{id}` から読む)。
+ * 移すには cx-agent 側に Firestore サブコレクションへの書き手を新設する必要があり、
+ * それは 2 リポの Firebase プロジェクト ID が同一であることに依存する — その確認は
+ * 別タスク進行中 (統合設計 C-2)。よって移送は Stage 5 送りにする。
+ *
+ * ## ここは persona も書かない (T-1 / CDP 統合 Stage 0)
  *
  * persona の書き手は cx-agent `src/lib/preference-pipeline.ts` の
  * `PURCHASE_SIGNAL_WEIGHT` 加算 1 本に一本化する。web-app 側と cx-agent 側の
@@ -34,10 +64,12 @@ import { FieldValue, Timestamp } from "firebase-admin/firestore";
  * か、後勝ちで一方の計算結果が消えるかのどちらかになる。どちらが起きたかは
  * 到着順で決まり、後から見分ける手段が無い。
  *
- * よって **web-app は「何が起きたか」(注文ミラー・behaviorLog) だけを書き、
- * 「それをどう解釈するか」(persona) は書かない**。behaviorLog の
- * `personaSignal` も web-app では推論しないので `null` (= 判定しない) を置く。
- * 解釈は購入シグナルを商品タグから導く cx-agent 側が単独で持つ。
+ * よって **web-app は「それをどう解釈するか」(persona) を書かない**。解釈は購入
+ * シグナルを商品タグから導く cx-agent 側が単独で持つ。
+ *
+ * ⚠ Stage 0 の時点では「何が起きたか (注文ミラー・behaviorLog) は書く」と書いて
+ *   いたが、Stage 3 で behaviorLog の購入行も落とした (上記)。いまここが書くのは
+ *   **注文ミラーとユーザー文書だけ** — どちらも他に書き手がいないものである。
  */
 
 // ---------------------------------------------------------------------------
@@ -166,7 +198,6 @@ export async function POST(request: NextRequest) {
     const orderId = String(order.id);
     const userRef = db.collection("users").doc(customerId);
     const orderRef = userRef.collection("orders").doc(orderId);
-    const behaviorRef = userRef.collection("behaviorLog").doc();
 
     const orderMirror = {
       orderNumber: String(order.order_number),
@@ -182,16 +213,20 @@ export async function POST(request: NextRequest) {
       createdAt: Timestamp.fromDate(new Date(order.created_at)),
     };
 
-    // Wrap all writes (order mirror, behavior log, user upsert) in a single
-    // Firestore transaction. The idempotency read (existing order check) happens
-    // inside the transaction, so concurrent deliveries of the same order cannot
-    // both pass the check.
+    // Wrap all writes (order mirror, user upsert) in a single Firestore
+    // transaction. The idempotency read (existing order check) happens inside
+    // the transaction, so concurrent deliveries of the same order cannot both
+    // pass the check.
     //
     // かつてここには「注文件数の集計読み取り」と「ユーザー文書の読み取り」も
     // あった。どちらも persona 加算のためだけの読み取りで、persona を書かなく
     // なった今は結果を誰も使わない。トランザクションの読み取りは競合検出の
     // 対象になる (読んだものが他所で書き換わると再試行が起きる) ため、使わない
     // 読み取りを残すと注文の取り込みが理由なく再試行で詰まる。よって外す。
+    //
+    // Stage 3 で behaviorLog への購入行の書き込みも外した (ファイル冒頭の注記)。
+    // 「買った」という事実は cx-agent が L0 に 1 行積むので、ここが 2 つ目の形で
+    // 残す必要が無い。
     const txResult = await db.runTransaction(async (tx) => {
       // Idempotency: if order already mirrored, skip all writes.
       const existingOrderSnap = await tx.get(orderRef);
@@ -202,24 +237,7 @@ export async function POST(request: NextRequest) {
       // (1) Order mirror
       tx.set(orderRef, orderMirror);
 
-      // (2) Behavior log
-      // `personaSignal` は **web-app では推論しない** (ファイル冒頭の T-1 注記)。
-      // BehaviorEvent の型上この項目は必須なので、「判定していない」を意味する
-      // null を明示的に置く。項目ごと落とすと、cx-agent が書いた過去の行と
-      // 「項目が無い = 未定義」「null = 判定しない」の区別が付かなくなる。
-      tx.set(behaviorRef, {
-        action: "purchase",
-        channel: "shopify",
-        metadata: {
-          productId: String(order.line_items[0]?.product_id ?? ""),
-          orderId,
-          orderNumber: String(order.order_number),
-        },
-        personaSignal: null,
-        createdAt: FieldValue.serverTimestamp(),
-      });
-
-      // (3) User upsert
+      // (2) User upsert
       const userUpdate: Record<string, unknown> = {
         lastActiveAt: FieldValue.serverTimestamp(),
       };
