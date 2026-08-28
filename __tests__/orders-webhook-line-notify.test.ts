@@ -84,8 +84,11 @@ function orderPayload() {
 
 /** Firestore の参照チェーンを最小限だけ満たすスタブ。 */
 function firestoreStub() {
+  /* `count()` は persona 推論用の注文件数集計のためだけに要っていた。
+     T-1 で persona の書き手を cx-agent 側に一本化し、その読み取りごと
+     route から外したので、スタブ側も落とす (実装に無いものを満たさない)。 */
   const docRef = {
-    collection: () => ({ doc: () => docRef, count: () => ({}) }),
+    collection: () => ({ doc: () => docRef }),
   };
   return {
     collection: () => ({ doc: () => docRef }),
@@ -119,7 +122,9 @@ beforeEach(() => {
     markProcessed: vi.fn(async () => {}),
   });
   getAdminFirestoreMock.mockImplementation(() => firestoreStub());
-  runTransactionMock.mockResolvedValue({ skipped: false, personaSignal: "explorer" });
+  /* トランザクションの戻り値から `personaSignal` は無くなった (T-1)。
+     route は skipped だけを見てログを分岐する。 */
+  runTransactionMock.mockResolvedValue({ skipped: false });
   notifyWebhookExceptionMock.mockResolvedValue(undefined);
 });
 
