@@ -18,8 +18,26 @@ import { FieldValue, Timestamp } from "firebase-admin/firestore";
  *   1. Verify HMAC-SHA256 signature
  *   2. Write order mirror to Firestore users/{customerId}/orders/{orderId}
  *   3. Add purchase behavior event to behaviorLog
- *   4. Update persona scores based on purchase history
- *   5. Return 200 immediately (Shopify retries on non-2xx)
+ *   4. Return 200 immediately (Shopify retries on non-2xx)
+ *
+ * ## ここは persona を書かない (T-1 / CDP 統合 Stage 0)
+ *
+ * persona の書き手は cx-agent `src/lib/preference-pipeline.ts` の
+ * `PURCHASE_SIGNAL_WEIGHT` 加算 1 本に一本化する。web-app 側と cx-agent 側の
+ * 2 つの書き手が同一注文で各々加算していたため、二重加算またはカルテ分裂が
+ * 起きていた。
+ *
+ * かつてここには `inferPersonaSignalFromOrder` (初回購入 → explorer / 高額 →
+ * serenity / それ以外 → sensory) と `computePersonaUpdate` (スコア +10 の
+ * マージ) があり、`users/{customerId}` の `persona` を直接書いていた。同じ
+ * 注文を cx-agent 側も商品タグから採点するので、1 回の購入で 2 回加算される
+ * か、後勝ちで一方の計算結果が消えるかのどちらかになる。どちらが起きたかは
+ * 到着順で決まり、後から見分ける手段が無い。
+ *
+ * よって **web-app は「何が起きたか」(注文ミラー・behaviorLog) だけを書き、
+ * 「それをどう解釈するか」(persona) は書かない**。behaviorLog の
+ * `personaSignal` も web-app では推論しないので `null` (= 判定しない) を置く。
+ * 解釈は購入シグナルを商品タグから導く cx-agent 側が単独で持つ。
  */
 
 // ---------------------------------------------------------------------------
@@ -90,117 +108,6 @@ const ShopifyOrderSchema = z
     fulfillment_status: z.string().nullable(),
   })
   .passthrough();
-
-type PersonaType = "serenity" | "explorer" | "sensory";
-
-// ---------------------------------------------------------------------------
-// Persona scoring logic (ported from Cloud Functions)
-// ---------------------------------------------------------------------------
-
-/**
- * Parse Shopify order total price into an integer minor-unit amount.
- *
- * Shopify returns `total_price` as a decimal string (e.g. "5000.00" or
- * "12.34"). Floating point arithmetic on money is unsafe, so we convert to
- * the smallest indivisible unit of the currency:
- *   - JPY has no sub-unit (1 yen = 1 minor unit); divisor = 1
- *   - USD / EUR / GBP etc. have 2 decimal places; divisor = 100
- *
- * Returns integer minor units (bigint-safe within Number.MAX_SAFE_INTEGER
- * for all practical order totals).
- */
-const ZERO_DECIMAL_CURRENCIES = new Set([
-  "JPY",
-  "KRW",
-  "VND",
-  "CLP",
-  "ISK",
-  "BIF",
-  "DJF",
-  "GNF",
-  "KMF",
-  "MGA",
-  "RWF",
-  "UGX",
-  "VUV",
-  "XAF",
-  "XOF",
-  "XPF",
-]);
-
-function parseMoneyToMinorUnits(
-  priceString: string,
-  currency: string,
-): number {
-  const currencyUpper = currency.toUpperCase();
-  const isZeroDecimal = ZERO_DECIMAL_CURRENCIES.has(currencyUpper);
-  const multiplier = isZeroDecimal ? 1 : 100;
-  // Use string parsing to avoid floating-point drift, then round as a final
-  // safety net for unexpected precision (e.g. "12.345").
-  const parsed = Number.parseFloat(priceString);
-  if (!Number.isFinite(parsed)) return 0;
-  return Math.round(parsed * multiplier);
-}
-
-/**
- * Persona signal threshold: 5000 JPY (zero-decimal currency).
- * Expressed in minor units; for JPY this is literally 5000.
- */
-const HIGH_VALUE_THRESHOLD_JPY_MINOR = 5000;
-
-/**
- * Infer persona signal from purchase behavior.
- *
- * Heuristics:
- *   - First purchase (no previous orders) -> explorer (curiosity)
- *   - Repeat purchase -> sensory (sensory attachment)
- *   - High-value order (>= 5000 JPY equivalent) -> serenity (mindful consumption)
- *
- * Only applies the high-value heuristic when the order currency is JPY, to
- * avoid false positives across currency conversions.
- */
-function inferPersonaSignalFromOrder(
-  order: ShopifyOrder,
-  previousOrderCount: number,
-): PersonaType | null {
-  if (previousOrderCount === 0) {
-    return "explorer";
-  }
-  if (order.currency.toUpperCase() === "JPY") {
-    const totalMinor = parseMoneyToMinorUnits(order.total_price, order.currency);
-    if (totalMinor >= HIGH_VALUE_THRESHOLD_JPY_MINOR) {
-      return "serenity";
-    }
-  }
-  return "sensory";
-}
-
-/**
- * Compute updated persona scores given the current document data and a signal.
- * Pure function — safe to call inside a Firestore transaction.
- */
-function computePersonaUpdate(
-  existingData: FirebaseFirestore.DocumentData | undefined,
-  signal: PersonaType,
-): { primary: PersonaType; scores: Record<string, number> } {
-  const currentScores = (existingData?.persona?.scores as
-    | Record<string, number>
-    | undefined) ?? {
-    serenity: 0,
-    explorer: 0,
-    sensory: 0,
-  };
-
-  const SCORE_INCREMENT = 10;
-  const newScores: Record<string, number> = { ...currentScores };
-  newScores[signal] = Math.min(100, (newScores[signal] ?? 0) + SCORE_INCREMENT);
-
-  const primary = (Object.entries(newScores).sort(
-    ([, a], [, b]) => b - a,
-  )[0][0]) as PersonaType;
-
-  return { primary, scores: newScores };
-}
 
 // ---------------------------------------------------------------------------
 // Route handler
@@ -275,10 +182,16 @@ export async function POST(request: NextRequest) {
       createdAt: Timestamp.fromDate(new Date(order.created_at)),
     };
 
-    // Wrap all writes (order mirror, behavior log, persona scores, user upsert)
-    // in a single Firestore transaction. Reads (existing order check, order
-    // count, user doc) happen inside the transaction, so the previousOrderCount
-    // is free from race conditions with concurrent webhook deliveries.
+    // Wrap all writes (order mirror, behavior log, user upsert) in a single
+    // Firestore transaction. The idempotency read (existing order check) happens
+    // inside the transaction, so concurrent deliveries of the same order cannot
+    // both pass the check.
+    //
+    // かつてここには「注文件数の集計読み取り」と「ユーザー文書の読み取り」も
+    // あった。どちらも persona 加算のためだけの読み取りで、persona を書かなく
+    // なった今は結果を誰も使わない。トランザクションの読み取りは競合検出の
+    // 対象になる (読んだものが他所で書き換わると再試行が起きる) ため、使わない
+    // 読み取りを残すと注文の取り込みが理由なく再試行で詰まる。よって外す。
     const txResult = await db.runTransaction(async (tx) => {
       // Idempotency: if order already mirrored, skip all writes.
       const existingOrderSnap = await tx.get(orderRef);
@@ -286,31 +199,14 @@ export async function POST(request: NextRequest) {
         return { skipped: true as const };
       }
 
-      // Read existing user doc (for persona score merge)
-      const userSnap = await tx.get(userRef);
-
-      // Read current order count (pre-insert) for persona inference.
-      // Firebase Admin SDK's count() aggregation returns an object with a
-      // numeric `count` property. We defensively coerce and fall back to 0
-      // so a future API shape change cannot cause NaN propagation.
-      const ordersCountSnap = await tx.get(
-        userRef.collection("orders").count(),
-      );
-      const rawCount = ordersCountSnap.data() as unknown;
-      const previousOrderCount =
-        typeof rawCount === "object" &&
-        rawCount !== null &&
-        "count" in rawCount &&
-        typeof (rawCount as { count: unknown }).count === "number"
-          ? (rawCount as { count: number }).count
-          : 0;
-
-      const personaSignal = inferPersonaSignalFromOrder(order, previousOrderCount);
-
       // (1) Order mirror
       tx.set(orderRef, orderMirror);
 
       // (2) Behavior log
+      // `personaSignal` は **web-app では推論しない** (ファイル冒頭の T-1 注記)。
+      // BehaviorEvent の型上この項目は必須なので、「判定していない」を意味する
+      // null を明示的に置く。項目ごと落とすと、cx-agent が書いた過去の行と
+      // 「項目が無い = 未定義」「null = 判定しない」の区別が付かなくなる。
       tx.set(behaviorRef, {
         action: "purchase",
         channel: "shopify",
@@ -319,11 +215,11 @@ export async function POST(request: NextRequest) {
           orderId,
           orderNumber: String(order.order_number),
         },
-        personaSignal,
+        personaSignal: null,
         createdAt: FieldValue.serverTimestamp(),
       });
 
-      // (3) Persona scores + (4) user upsert — merged into a single user write
+      // (3) User upsert
       const userUpdate: Record<string, unknown> = {
         lastActiveAt: FieldValue.serverTimestamp(),
       };
@@ -338,17 +234,9 @@ export async function POST(request: NextRequest) {
           .filter(Boolean)
           .join(" ");
       }
-      if (personaSignal) {
-        const { primary, scores } = computePersonaUpdate(userSnap.data(), personaSignal);
-        userUpdate.persona = {
-          primary,
-          scores,
-          lastUpdated: FieldValue.serverTimestamp(),
-        };
-      }
       tx.set(userRef, userUpdate, { merge: true });
 
-      return { skipped: false as const, personaSignal };
+      return { skipped: false as const };
     });
 
     if (txResult.skipped) {
@@ -357,7 +245,7 @@ export async function POST(request: NextRequest) {
       );
     } else {
       console.log(
-        `[Webhook:orders] Transaction committed for customer=${customerId}, order=${orderId}, signal=${txResult.personaSignal}`,
+        `[Webhook:orders] Transaction committed for customer=${customerId}, order=${orderId}`,
       );
     }
 

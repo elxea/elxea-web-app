@@ -138,6 +138,23 @@ jobs:
         # 既存の static-checks に相乗りさせている (新規ジョブは作らない)。
         run: node scripts/ops/check-ratchet.mjs --check
 
+      - name: No dead functions/lib
+        # T-2 (CDP 統合 Stage 0): `functions/lib/` の再流入を止める。
+        #
+        # 出所の TypeScript が無く (functions/src には index.ts と
+        # persona-keywords.json しか無い)、firebase.json にも functions
+        # セクションが無いのでデプロイ経路も無い、コンパイル済み JavaScript が
+        # コミットされていた。動かないのに、注文のペルソナ計算を追った人が
+        # 現役の実装だと誤読する置き場所になっていた。
+        #
+        # 消すだけだと、手元で tsc を回した拍子に生成物が戻り .gitignore にも
+        # 無いのでそのままコミットされる。憲章 R8 の「全件移行 + 再流入止めで
+        # 1 セット」。
+        #
+        # ミリ秒で終わる存在チェックなので、既存の static-checks に相乗り
+        # させている (新規ジョブは作らない)。
+        run: node scripts/ops/check-no-dead-functions-lib.mjs
+
       - name: Validate interaction inventory
         # 憲章 R9「押せるものは、全部台帳に載る」の機械強制。
         # app/ components/ lib/ hooks/ を AST で走査し、ユーザーが押せるもの
@@ -177,6 +194,46 @@ jobs:
         # hand-written and silently drifted; this is what makes drift a build
         # failure instead of a discovery months later.
         run: pnpm validate:design-kit
+
+      # ⚠ このステップは **ジョブの最後に置く**。
+      #
+      # 他の検査と違い、これだけは **このリポジトリの外の状態** (cx-agent が
+      # デプロイ済みか) に結果が左右される。ジョブの途中に置くと、cx-agent 側が
+      # まだ出ていないというだけで後続のステップが 1 つも走らなくなり、
+      # 「このリポジトリの中の退行」が外部依存の失敗に隠れる。実際、最初に
+      # ratchet の直後へ置いたときは interaction inventory / design token /
+      # design-map / design-kit の 4 検査が丸ごと skip された。
+      #
+      # 外部に依存する検査は最後に置き、自分のリポジトリの検査を先に全部通す。
+      - name: Firebase project parity (E6')
+        # E6' (CDP 統合 Stage 0): web-app と cx-agent が **同じ Firebase
+        # プロジェクト** を見ていることを機械で確かめる。
+        #
+        # 2 リポは別ランタイムでありながら同じ Firestore を顧客カルテの置き場と
+        # して共有している。にもかかわらず接続先が一致しているかを確かめる手段が
+        # 無く、実際 2026-08 の設計審査では 3 案すべてが接続先を取り違えて推測した。
+        # 一致していれば同じ注文で persona が二重加算され、していなければ同じ人の
+        # カルテが 2 つに分裂する — どちらが起きているのかを、人が実機に入って
+        # secret を数えるまで誰も言えなかった。
+        #
+        # **不一致でも未設定でも到達不能でも落とす** (fail-closed)。とくに
+        # 「未設定」を緑にしないのが要点で、cx-agent 側には未設定でも黙って
+        # 動き続けられる縮退が各所にある。未設定を通すとこの検査は
+        # 「壊れているときだけ何も言わない」検査になる。
+        #
+        # ⚠ この検査は cx-agent 側に /health/firebase が **デプロイ済み** で
+        #   あることを前提にする。契約の片側なので、cx-agent を先にマージ・
+        #   デプロイしてからでないと緑にならない (404 で落ちる)。これは検査の
+        #   不具合ではなく「契約がまだ片側しか無い」ことの正しい報告である。
+        #
+        # 判定ロジックは scripts/ops/lib/firebase-project-parity.mjs に純関数で
+        # 切り出してあり、全分岐を __tests__/ops/firebase-project-parity.test.ts が
+        # ネットワーク無しで固定している。
+        #
+        # 既存の static-checks に相乗りさせている (新規ジョブは作らない)。
+        env:
+          CX_AGENT_HEALTH_URL: https://elxea-agent.setaka-on.workers.dev/health/firebase
+        run: node scripts/ops/check-firebase-project-parity.mjs
 
   unit-tests:
     name: unit-tests

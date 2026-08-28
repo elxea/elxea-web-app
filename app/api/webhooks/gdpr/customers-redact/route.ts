@@ -7,18 +7,58 @@ import { getAdminFirestore } from "@/lib/firebase/admin";
 import { logger } from "@/lib/log";
 import {
   userDoc,
-  ordersCol,
-  behaviorLogCol,
-  favoritesCol,
-  followsCol,
-  eventRegistrationsCol,
-  conversationsCol,
+  userSubcollection,
+  USER_SUBCOLLECTIONS,
 } from "@/lib/firebase/collections";
 
 /**
+ * Firestore の WriteBatch が 1 コミットで受け付ける書き込みの上限。
+ *
+ * これは実装都合の定数ではなく **Firestore 側の固定上限**で、501 件目を積んだ
+ * batch は `commit()` が `INVALID_ARGUMENT` で落ちる。
+ */
+const FIRESTORE_BATCH_LIMIT = 500;
+
+/**
+ * 配列を最大 `size` 件ずつに切り分ける。
+ *
+ * ## なぜ切るのか — 「一番消さなければいけない人」だけが消せなかった
+ *
+ * 以前の実装はサブコレクションの全ドキュメントを **1 つの `db.batch()` に
+ * 積んで 1 回だけ commit** していた。関数の説明には「in batches (複数回に
+ * 分けて)」と書いてあったのに、実装は 1 バッチしか作っていない。説明と実装が
+ * 食い違ったまま、テストは空コレクション (0 件) しか通していなかったので
+ * 誰も気づかなかった。
+ *
+ * この壊れ方の悪質なところは、**当たる人が偏る**ことにある。落ちるのは
+ * `behaviorLog` が 500 件を超えるお客さま — つまり LINE と EC を長く使い、
+ * 最も多くの個人データが溜まっている人である。ライトユーザーの削除要求は
+ * 通り、ヘビーユーザーの削除要求だけが 500 で弾かれる。GDPR 上いちばん
+ * 実害が大きい側だけが消えないという、静かで偏った失敗になっていた。
+ *
+ * さらに commit の失敗は例外として上がるので 5xx にはなるが、Shopify が
+ * 何度再送しても件数は減らない (毎回同じ 500 超えで落ちる)。再送では
+ * 永久に直らない。
+ *
+ * よって上限件数ごとに切って **順番に** commit する。並列にしないのは、
+ * 同一コレクションへの大量書き込みを一度に投げると Firestore 側の競合で
+ * 中途半端に失敗しうるため。順次なら「どこまで消えたか」が単調に進み、
+ * 途中で落ちても再送でその続きから消える (削除は冪等)。
+ */
+function chunk<T>(items: readonly T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size));
+  }
+  return chunks;
+}
+
+/**
  * Delete all documents in a Firestore subcollection.
- * Firestore does not support deleting subcollections atomically, so we
- * fetch all docs and delete them in batches.
+ *
+ * Firestore does not support deleting subcollections atomically, so we fetch
+ * all docs and delete them in batches of at most `FIRESTORE_BATCH_LIMIT`
+ * writes, committed one after another. Returns the number of deleted docs.
  */
 async function deleteSubcollection(
   db: FirebaseFirestore.Firestore,
@@ -27,11 +67,13 @@ async function deleteSubcollection(
   const snapshot = await db.collection(collectionPath).get();
   if (snapshot.empty) return 0;
 
-  const batch = db.batch();
-  for (const doc of snapshot.docs) {
-    batch.delete(doc.ref);
+  for (const docs of chunk(snapshot.docs, FIRESTORE_BATCH_LIMIT)) {
+    const batch = db.batch();
+    for (const doc of docs) {
+      batch.delete(doc.ref);
+    }
+    await batch.commit();
   }
-  await batch.commit();
   return snapshot.size;
 }
 
@@ -39,9 +81,11 @@ async function deleteSubcollection(
  * Shopify GDPR: customers/redact webhook handler.
  *
  * Shopify sends this when a customer requests deletion of their data.
- * elxea stores customer data in Firestore under users/{customerId},
- * including subcollections for orders, behaviorLog, favorites, follows,
- * eventRegistrations, and conversations. All must be deleted.
+ * elxea stores customer data in Firestore under users/{customerId}, including
+ * every subcollection listed in `USER_SUBCOLLECTIONS`
+ * (`lib/firebase/collections.ts`). All must be deleted. 対象一覧をここに
+ * 書き写さないのは、書き写した瞬間に台帳と二重管理になり、片方だけ増えて
+ * 消し残しが出るため。
  *
  * ## 消える範囲は Firestore だけではない（M-5 / Issue A・2026-08-25）
  *
@@ -148,15 +192,19 @@ export async function POST(request: NextRequest) {
       `[Webhook:GDPR] cx-agent erase completed (attempts=${cxErase.attempts})`,
     );
 
-    // Delete all subcollections in parallel
-    const subcollections = [
-      ordersCol(customerId),
-      behaviorLogCol(customerId),
-      favoritesCol(customerId),
-      followsCol(customerId),
-      eventRegistrationsCol(customerId),
-      conversationsCol(customerId),
-    ];
+    /* 消す対象は **台帳 (`USER_SUBCOLLECTIONS`) から導出する**。ここに 6 個の
+       コレクション名を手で並べていたときは、`COLLECTIONS` に新しいサブ
+       コレクションを足しても削除側は誰も直さず、その分だけ「消したはずの人の
+       データ」が黙って残り続ける形になっていた (識別子の合体で同じ取り残しが
+       実際に起きている。`lib/firebase/collections.ts` の注記を参照)。
+
+       台帳から引けば、足した時点で自動的に削除対象に入る。逆に「対象外」に
+       したいものは `NON_USER_COLLECTIONS` 側に申告する必要があり、
+       `__tests__/firestore-collection-coverage.test.ts` がどちらにも入って
+       いないコレクションで落ちる。 */
+    const subcollections = USER_SUBCOLLECTIONS.map((sub) =>
+      userSubcollection(customerId, sub),
+    );
 
     const results = await Promise.allSettled(
       subcollections.map((col) => deleteSubcollection(db, col)),
