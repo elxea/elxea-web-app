@@ -15,6 +15,7 @@
 
 import type { FavoriteKind } from "@/lib/account-favorites";
 import { logger } from "@/lib/log";
+import { getOrIssueAnonymousId } from "@/lib/cdp/anonymous-id";
 
 export type TrackPageViewParams = {
   contentId: string;
@@ -105,12 +106,19 @@ function sendEvent(
   // サーバ側 (`/api/user/behavior`) も `resolveIdentity()` で LINE を
   // 受けるようにしてあるので、ここを開けると実際に書き込まれる。
   if (typeof document === "undefined") return;
-  if (
-    !document.cookie.includes("shop_auth=1") &&
-    !document.cookie.includes("line_auth=1")
-  ) {
-    return;
-  }
+  const loggedIn =
+    document.cookie.includes("shop_auth=1") || document.cookie.includes("line_auth=1");
+
+  /* CDP 統合 Stage 1 / 欠陥 D2: 初めて来た人の一歩目が構造的に欠けていた。
+     ログインしていない来訪者はここで早期 return され、受け口も未認証を弾くので、
+     クライアントとサーバの二重のゲートで 1 件も残っていなかった。
+
+     ⚠ 開けるのは **解析の同意がある人だけ**。`getOrIssueAnonymousId()` が
+       consent="all" 以外では null を返すので、同意が無ければ従来どおり
+       何も送らない（端末に痕跡も残さない）。サーバ側でも同意 cookie を
+       もう一度見る（二重ゲート・fail-closed）。 */
+  const anonymousId = loggedIn ? null : getOrIssueAnonymousId();
+  if (!loggedIn && !anonymousId) return;
 
   const beacon = globalThis.navigator?.sendBeacon?.bind(globalThis.navigator);
   if (!beacon) return;
@@ -118,9 +126,17 @@ function sendEvent(
   /* Blob の type がそのまま Content-Type になる。サーバ (`parseJsonBody`) は
      JSON を期待するので、ここを省くと `text/plain` で届いて弾かれる。
      cookie は sendBeacon が同一オリジンへ自動で付ける (credentials 指定は不要)。 */
-  const body = new Blob([JSON.stringify({ action, channel: "web", metadata })], {
-    type: "application/json",
-  });
+  const body = new Blob(
+    [
+      JSON.stringify({
+        action,
+        channel: "web",
+        metadata,
+        ...(anonymousId ? { anonymousId } : {}),
+      }),
+    ],
+    { type: "application/json" },
+  );
 
   let queued = false;
   try {
