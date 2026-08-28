@@ -423,6 +423,91 @@
       "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
     },
     {
+      "id": "app/[locale]/diagnosis/diagnosis-form.tsx#handler:onChoose#1",
+      "file": "app/[locale]/diagnosis/diagnosis-form.tsx",
+      "kind": "handler",
+      "name": "onChoose",
+      "response": "sync-dom",
+      "observe": [
+        "[data-slot=\"diagnosis-step\"]"
+      ],
+      "why": "選択肢を押すと段が進む。React state → 即再描画で、ネットワークを待たない (答えの送信は最後の 1 手だけ)。段の入れ替わりが見えないと「押したのに何も起きない」になる。"
+    },
+    {
+      "id": "app/[locale]/diagnosis/diagnosis-form.tsx#handler:onClick#1",
+      "file": "app/[locale]/diagnosis/diagnosis-form.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "response": "sync-dom",
+      "observe": [
+        "[data-slot=\"diagnosis-step\"]"
+      ],
+      "why": "「はじめる」。welcome から Q1 へ state だけで進む。"
+    },
+    {
+      "id": "app/[locale]/diagnosis/diagnosis-form.tsx#handler:onClick#2",
+      "file": "app/[locale]/diagnosis/diagnosis-form.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "response": "sync-dom",
+      "observe": [
+        "[data-slot=\"diagnosis-step\"]"
+      ],
+      "why": "「もう一度診断する」。答えを捨てて welcome に戻すだけで、サーバへは何も送らない。"
+    },
+    {
+      "id": "app/[locale]/diagnosis/diagnosis-form.tsx#handler:onClick#3",
+      "file": "app/[locale]/diagnosis/diagnosis-form.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "response": "sync-dom",
+      "observe": [
+        "[data-slot=\"diagnosis-step\"]"
+      ],
+      "why": "「戻る」。1 段戻すだけ。押した答えは保持したまま再描画する。"
+    },
+    {
+      "id": "app/[locale]/diagnosis/diagnosis-form.tsx#handler:onClick#4",
+      "file": "app/[locale]/diagnosis/diagnosis-form.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "response": "pessimistic-form",
+      "why": "「結果を見る」。出す結果をサーバが決めるので楽観更新はしない (当たっていない結果を先に見せることになる) 代わりに、進行の印を押した瞬間に出す。通り道は usePessimisticMutation (mutation-classes.ts の pessimistic-form)。",
+      "observe": [
+        "[data-slot=\"diagnosis-submit\"][data-pending=\"true\"]"
+      ]
+    },
+    {
+      "id": "app/[locale]/diagnosis/diagnosis-form.tsx#handler:onClick#5",
+      "file": "app/[locale]/diagnosis/diagnosis-form.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "response": "sync-dom",
+      "observe": [
+        "[data-slot=\"diagnosis-choice\"][aria-pressed=\"true\"]"
+      ],
+      "why": "選択肢そのもの。押した肢に aria-pressed が立つ。Q1/Q2 は続けて段が進み、Q3 だけは選んだ状態で止まる (送信は onClick#4)。"
+    },
+    {
+      "id": "app/[locale]/diagnosis/diagnosis-form.tsx#link:Link#1",
+      "file": "app/[locale]/diagnosis/diagnosis-form.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "app/[locale]/diagnosis/diagnosis-form.tsx#write:fetch:POST#1",
+      "file": "app/[locale]/diagnosis/diagnosis-form.tsx",
+      "kind": "write",
+      "name": "fetch:POST",
+      "response": "pessimistic-form",
+      "why": "答え 3 つを /api/diagnosis へ送る本体 (onClick#4 と同じ 1 操作)。二重送信は hook 側が弾く。",
+      "observe": [
+        "[data-slot=\"diagnosis-submit\"][data-pending=\"true\"]"
+      ]
+    },
+    {
       "id": "app/[locale]/error.tsx#handler:onClick#1",
       "file": "app/[locale]/error.tsx",
       "kind": "handler",
@@ -2107,7 +2192,7 @@
       "file": "components/layout/footer.tsx",
       "kind": "link",
       "name": "Link",
-      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。"
     },
     {
       "id": "components/layout/footer.tsx#link:Link#10",
@@ -2146,15 +2231,15 @@
       "file": "components/layout/footer.tsx",
       "kind": "link",
       "name": "Link",
-      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
     },
     {
       "id": "components/layout/footer.tsx#link:Link#15",
       "file": "components/layout/footer.tsx",
       "kind": "link",
       "name": "Link",
-      "response": "router-nav",
-      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。"
     },
     {
       "id": "components/layout/footer.tsx#link:Link#16",
@@ -2174,6 +2259,14 @@
     },
     {
       "id": "components/layout/footer.tsx#link:Link#18",
+      "file": "components/layout/footer.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "components/layout/footer.tsx#link:Link#19",
       "file": "components/layout/footer.tsx",
       "kind": "link",
       "name": "Link",

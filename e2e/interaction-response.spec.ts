@@ -166,7 +166,120 @@ export const SCENARIOS: Record<
       await page.getByRole("button", { name: "削除" }).first().click();
     },
   },
+
+  /* --- 茶葉診断 (CDP 統合 Stage 4 / /ja/diagnosis) -------------------------
+     Shopify も会員も要らない画面なので `requiresCart` は付かない = CI で実際に
+     走る。段の進行は state だけで完結し (sync-dom)、ネットワークを待つのは
+     最後の送信 1 手だけ (pessimistic-form)。その 2 つが混ざっていないことを
+     ここで固定する。 */
+
+  "app/[locale]/diagnosis/diagnosis-form.tsx#handler:onClick#1": {
+    /* 「はじめる」。welcome → Q1。 */
+    arrive: async (page) => {
+      await page.goto("/ja/diagnosis");
+      await expect(page.getByRole("button", { name: "はじめる" })).toBeVisible();
+    },
+    act: async (page) => {
+      await page.getByRole("button", { name: "はじめる" }).click();
+    },
+  },
+
+  "app/[locale]/diagnosis/diagnosis-form.tsx#handler:onChoose#1": {
+    /* 選択肢を押すと段が進む (Q1 → Q2)。 */
+    arrive: async (page) => {
+      await startDiagnosis(page);
+    },
+    act: async (page) => {
+      await chooseFirst(page);
+    },
+  },
+
+  "app/[locale]/diagnosis/diagnosis-form.tsx#handler:onClick#5": {
+    /* 選択肢そのもの。**Q3 で押す** — Q1/Q2 で押すと段が進んでしまい、
+       押した肢 (aria-pressed) がその場に残らないので観測できない。 */
+    arrive: async (page) => {
+      await goToLastQuestion(page);
+    },
+    act: async (page) => {
+      await chooseFirst(page);
+    },
+  },
+
+  "app/[locale]/diagnosis/diagnosis-form.tsx#handler:onClick#3": {
+    /* 「戻る」。Q2 → Q1。サーバには触らない。 */
+    arrive: async (page) => {
+      await startDiagnosis(page);
+      await chooseFirst(page);
+      await expect(page.locator('[data-slot="diagnosis-step"][data-step="2"]')).toBeVisible();
+    },
+    act: async (page) => {
+      await page.getByRole("button", { name: "戻る" }).click();
+    },
+  },
+
+  "app/[locale]/diagnosis/diagnosis-form.tsx#handler:onClick#4": {
+    /* 「結果を見る」。送信の往復を保留したまま、進行の印が出るかを見る。 */
+    blocks: "**/api/diagnosis",
+    arrive: async (page) => {
+      await goToLastQuestion(page);
+      await chooseFirst(page);
+    },
+    act: async (page) => {
+      await page.locator('[data-slot="diagnosis-submit"]').click();
+    },
+  },
+
+  "app/[locale]/diagnosis/diagnosis-form.tsx#write:fetch:POST#1": {
+    /* onClick#4 と同じ 1 操作 (押す側と書き込み側の両方が台帳に載るため)。 */
+    blocks: "**/api/diagnosis",
+    arrive: async (page) => {
+      await goToLastQuestion(page);
+      await chooseFirst(page);
+    },
+    act: async (page) => {
+      await page.locator('[data-slot="diagnosis-submit"]').click();
+    },
+  },
+
+  "app/[locale]/diagnosis/diagnosis-form.tsx#handler:onClick#2": {
+    /* 「もう一度診断する」。結果まで進めてから押す。ここだけ `arrive` が
+       実際の送信を通す (結果の段に居ないと押せるものが無い)。 */
+    arrive: async (page) => {
+      await goToLastQuestion(page);
+      await chooseFirst(page);
+      await page.locator('[data-slot="diagnosis-submit"]').click();
+      await expect(page.locator('[data-slot="diagnosis-persona"]')).toBeVisible({
+        timeout: 15_000,
+      });
+    },
+    act: async (page) => {
+      await page.getByRole("button", { name: "もう一度診断する" }).click();
+    },
+  },
 };
+
+/* --- 茶葉診断の共通手順 ------------------------------------------------------ */
+
+/** /ja/diagnosis を開き、Q1 まで進める。 */
+async function startDiagnosis(page: Page) {
+  await page.goto("/ja/diagnosis");
+  await page.getByRole("button", { name: "はじめる" }).click();
+  await expect(page.locator('[data-slot="diagnosis-step"][data-step="1"]')).toBeVisible();
+}
+
+/** いま出ている設問の最初の選択肢を押す。 */
+async function chooseFirst(page: Page) {
+  await page.locator('[data-slot="diagnosis-choice"]').first().click();
+}
+
+/** 最後の設問 (Q3) まで進める。**Q3 は選んでも段が進まない**のが要点。 */
+async function goToLastQuestion(page: Page) {
+  await startDiagnosis(page);
+  await chooseFirst(page); // Q1 → Q2
+  await expect(page.locator('[data-slot="diagnosis-step"][data-step="2"]')).toBeVisible();
+  await chooseFirst(page); // Q2 → Q3
+  await expect(page.locator('[data-slot="diagnosis-step"][data-step="3"]')).toBeVisible();
+}
 
 /* -------------------------------------------------------------------------- */
 
@@ -345,6 +458,44 @@ async function assertRouterNavFeedback(
   }
 }
 
+/**
+ * 取り消しの利かない操作の性質検査 — **着地を待たずに「受け付けた」が見えるか**。
+ *
+ * `pessimistic-*` は結果を先に描かない。描けないからではなく、外れたときに
+ * 「成立したように見えたものが無かったことになる」ほうが遅さより重い裏切りだから
+ * (`lib/interaction/mutation-classes.ts`)。そのぶん **進行の印だけは往復を待たずに
+ * 出す**のが約束なので、往復を保留したまま押して印が出るかを見る。
+ *
+ * 見ている性質は `router-nav` と同じ (着地前に画面が変わるか) だが、落ちたときに
+ * 直す場所が違う (あちらは遷移の印、こちらは送信の印) ので関数を分けてある。
+ */
+async function assertPendingFeedback(
+  page: Page,
+  row: Interaction,
+  scenario: (typeof SCENARIOS)[string],
+) {
+  await scenario.arrive(page);
+
+  const observe = row.observe ?? [];
+  expect(observe.length, `${row.id} は observe が空`).toBeGreaterThan(0);
+
+  /* 送信の往復を**永久に保留**する (中断ではない — 返事が来ないあいだを見たい)。 */
+  await page.route(scenario.blocks ?? "**/*", async (route, request) => {
+    if (request.method() === "GET") return route.continue();
+    await new Promise(() => {});
+  });
+
+  await scenario.act(page);
+
+  for (const selector of observe) {
+    await expect(
+      page.locator(selector).first(),
+      `${row.id}: ${selector} が出ない。送信の返事を待つあいだ画面が変わらないので、` +
+        "押しても何も起きていないように見える (二度押し・離脱の原因)。",
+    ).toBeVisible({ timeout: 10_000 });
+  }
+}
+
 /* -------------------------------------------------------------------------- */
 
 test.describe("憲章 R9 — 台帳が宣言した応答が、実際にその性質を持つ", () => {
@@ -391,6 +542,10 @@ test.describe("憲章 R9 — 台帳が宣言した応答が、実際にその性
           break;
         case "router-nav":
           await assertRouterNavFeedback(page, row, scenario);
+          break;
+        case "pessimistic-commit":
+        case "pessimistic-form":
+          await assertPendingFeedback(page, row, scenario);
           break;
         default:
           throw new Error(
