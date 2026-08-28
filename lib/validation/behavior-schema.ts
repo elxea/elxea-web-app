@@ -52,8 +52,18 @@ export const BehaviorMetadataSchema = z
   })
   .strict();
 
+/**
+ * 匿名来訪者の端末を指す不透明 ID（CDP 統合 Stage 1 / 欠陥 D2）。
+ *
+ * 32 桁の 16 進数固定。発行側は `lib/cdp/anonymous-id.ts`。
+ * ここで形を縛るのは、任意文字列を受けると **L0 に幽霊の主体をいくらでも生やせる**
+ * ため（ブラウザから来る値なので信用しない）。
+ */
+export const AnonymousIdSchema = z.string().regex(/^[0-9a-f]{32}$/);
+
 export const BehaviorBodySchema = z.object({
   action: BehaviorActionSchema,
   channel: z.enum(["web", "line", "shopify"]).optional(),
   metadata: BehaviorMetadataSchema.optional(),
+  anonymousId: AnonymousIdSchema.optional(),
 });
