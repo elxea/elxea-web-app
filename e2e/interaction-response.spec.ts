@@ -195,10 +195,14 @@ export const SCENARIOS: Record<
   },
 
   "app/[locale]/diagnosis/diagnosis-form.tsx#handler:onClick#5": {
-    /* 選択肢そのもの。**Q3 で押す** — Q1/Q2 で押すと段が進んでしまい、
-       押した肢 (aria-pressed) がその場に残らないので観測できない。 */
+    /* 選択肢そのもの (onChoose#1 と同じ 1 操作を、押す側から見たもの)。
+       **Q1 で押して段の入れ替わりを見る。**
+       初版は「Q3 で押して aria-pressed を見る」にしていたが、`aria-pressed="true"`
+       は**押す前に 1 件も存在しない**ので、旧値を読む段階で待ち続けて 30 秒の
+       時間切れになった (run 33211864201)。観測先は押す前も後も在って中身が変わる
+       ものにする。 */
     arrive: async (page) => {
-      await goToLastQuestion(page);
+      await startDiagnosis(page);
     },
     act: async (page) => {
       await chooseFirst(page);

@@ -484,9 +484,9 @@
       "name": "onClick",
       "response": "sync-dom",
       "observe": [
-        "[data-slot=\"diagnosis-choice\"][aria-pressed=\"true\"]"
+        "[data-slot=\"diagnosis-step\"]"
       ],
-      "why": "選択肢そのもの。押した肢に aria-pressed が立つ。Q1/Q2 は続けて段が進み、Q3 だけは選んだ状態で止まる (送信は onClick#4)。"
+      "why": "選択肢そのもの。押すと段が入れ替わる (Q1 → Q2)。観測先を「押した肢の aria-pressed」ではなく段そのものにしてあるのは、**押す前に存在しない要素は観測に使えない**ため — 初版は aria-pressed=\"true\" を観測先にして Q3 で押す手順にしたが、押す前の値を読む段階で存在しない要素を待ち続け、e2e が 30 秒で時間切れになった (run 33211864201)。段は押す前も後も在り、中身が変わる。"
     },
     {
       "id": "app/[locale]/diagnosis/diagnosis-form.tsx#link:Link#1",
