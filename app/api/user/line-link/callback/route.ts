@@ -22,6 +22,10 @@ import {
   classifyTokenExchangeError,
   reportMisconfiguredChannel,
 } from "@/lib/line/token-error";
+import {
+  isLedgerAuthRejection,
+  reportLedgerAuthFailure,
+} from "@/lib/line/ledger-auth";
 
 /**
  * GET /api/user/line-link/callback — Web 発 LINE 連携の帰り道（P2）。
@@ -178,7 +182,13 @@ export async function GET(request: NextRequest) {
 
   const syncSecret = env("SYNC_API_SECRET");
   if (!syncSecret) {
-    /* fail-closed。秘密が無ければ cx-agent は 401 を返すので、無駄打ちもしない。 */
+    /* fail-closed。秘密が無ければ cx-agent は 401 を返すので、無駄打ちもしない。
+       ただし黙って 1 行 warn を出すだけにはしない — 鍵が無い状態は「この人が
+       連携できない」ではなく「誰も連携できない」であり、監視に上げる対象。 */
+    reportLedgerAuthFailure({
+      source: "line-link-callback",
+      failure: "secret-missing",
+    });
     return fail(returnTo, "SYNC_API_SECRET not set; cannot link");
   }
 
@@ -274,6 +284,16 @@ export async function GET(request: NextRequest) {
         return NextResponse.redirect(
           new URL(returnUrlWithResult(returnTo, "conflict"), requestOrigin),
         );
+      }
+      /* 401 = 共有鍵がずれている。**やり直しても直らない**のに、下の `fail` は
+         画面に「もう一度お試しください」を出す。2026-08-30 はこれで、鍵が
+         上書きされた 17 分後からお客さまが同じ失敗を繰り返せる状態になり、
+         こちらに残ったのは 1 行の console.warn だけだった。設定破壊として上げる。 */
+      if (isLedgerAuthRejection(upstream.status)) {
+        reportLedgerAuthFailure({
+          source: "line-link-callback",
+          failure: "key-rejected",
+        });
       }
       return fail(returnTo, `cx-agent returned ${upstream.status}: ${detail}`);
     }

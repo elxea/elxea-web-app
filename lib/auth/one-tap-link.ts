@@ -30,6 +30,10 @@ import { env } from "@/lib/config";
 import { CX_AGENT_BASE_URL } from "@/lib/chat/proxy";
 import type { LinkageCompletion } from "@/lib/auth/identity-link";
 import type { LinkResult } from "@/lib/line/link-flow";
+import {
+  isLedgerAuthRejection,
+  reportLedgerAuthFailure,
+} from "@/lib/line/ledger-auth";
 
 /** 何が起きたか。**決して throw しない**（ログインを失敗させない）。 */
 export type OneTapLinkResult =
@@ -67,8 +71,10 @@ export async function establishLinkageFromIntent({
   const secret = env("SYNC_API_SECRET");
   if (!secret) {
     /* fail-closed。鍵が無ければ cx-agent は 401 を返すので、無駄打ちもしない。
-       ワンタップが成立しないだけで、ログインも既存の連携も壊れない。 */
+       ワンタップが成立しないだけで、ログインも既存の連携も壊れない。
+       ただし「誰もワンタップできない」状態なので、監視には上げる。 */
     console.error("[one-tap-link] SYNC_API_SECRET not set; cannot write linkage");
+    reportLedgerAuthFailure({ source: "one-tap-link", failure: "secret-missing" });
     return { ok: false, reason: "not-configured", detail: "SYNC_API_SECRET missing" };
   }
 
@@ -107,10 +113,17 @@ export async function establishLinkageFromIntent({
 
   if (!res.ok) {
     console.error(`[one-tap-link] cx-agent rejected the linkage (status=${res.status})`);
-    Sentry.captureMessage("One-tap link rejected by cx-agent", {
-      level: "error",
-      tags: { subsystem: "one-tap-link", status: String(res.status) },
-    });
+    /* 401 は「拒まれた 1 件」ではなく「共有鍵がずれていて全員が連携できない」。
+       同じ `rejected` に畳んだままだと、通知を見た人が個別の失敗として流してしまう
+       （2026-08-30 に実際そうなった）。設定破壊の通知を別に出す。 */
+    if (isLedgerAuthRejection(res.status)) {
+      reportLedgerAuthFailure({ source: "one-tap-link", failure: "key-rejected" });
+    } else {
+      Sentry.captureMessage("One-tap link rejected by cx-agent", {
+        level: "error",
+        tags: { subsystem: "one-tap-link", status: String(res.status) },
+      });
+    }
     return { ok: false, reason: "rejected", detail: `status=${res.status}` };
   }
 

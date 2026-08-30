@@ -7,10 +7,16 @@ import {
   encryptToken,
   decryptToken,
   getCustomer,
+  getCustomerCreationDate,
 } from "@/lib/shopify/customer";
 import { verifyShopifyIdToken } from "@/lib/shopify/id-token";
 import { buildSessionCookieWrites } from "@/lib/shopify/session-cookies";
 import { sendWelcomeEmail } from "@/lib/email/welcome";
+import {
+  claimWelcomeEmail,
+  isFreshRegistration,
+  releaseWelcomeClaim,
+} from "@/lib/email/welcome-gate";
 import { sanitizeReturnTo } from "@/lib/auth/return-to";
 import { clearAuthCookies } from "@/lib/auth/cookies";
 import { getRequestOrigin } from "@/lib/base-url";
@@ -549,26 +555,57 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Send welcome email for new members (no order history = first registration)
-    // Run async without blocking the redirect
+    /* 歓迎メールは **初回登録のときだけ・1 人につき 1 通だけ**（2026-08-30 の再送事故）。
+     *
+     * ここは以前「注文履歴が 0 件なら初回登録」とみなして送っていた。この 2 つは
+     * 別のことなので、**一度登録して一度も買っていない会員はログインするたびに
+     * 「ご登録ありがとうございます」を受け取っていた**。登録は 1 回きりの出来事で、
+     * 2 通目以降は事実として誤っている。
+     *
+     * 判定は `lib/email/welcome-gate.ts` に寄せてある。順序（新しさ → 権利取得 →
+     * 送信）と、印を送信の**前**に付ける理由、台帳が読めないときに送らない理由は
+     * すべてそちらの doc に書いた。リダイレクトはこの処理を待たない（従来どおり）。 */
     void (async () => {
       try {
         const customer = await getCustomer(tokens.access_token);
-        if (customer) {
-          const isNewMember = customer.orders.edges.length === 0;
-          if (isNewMember) {
-            const customerName =
-              [customer.firstName, customer.lastName].filter(Boolean).join(" ") ||
-              "Guest";
-            const customerEmail = customer.emailAddress?.emailAddress;
-            if (customerEmail) {
-              await sendWelcomeEmail({
-                customerEmail,
-                customerName,
-                locale: locale as "ja" | "en",
-              });
-            }
-          }
+        if (!customer) return;
+
+        const customerEmail = customer.emailAddress?.emailAddress;
+        if (!customerEmail) return;
+
+        /* 既に買ったことがある人は「ご登録ありがとうございます」の宛先ではない。
+           従来からある条件で、単独では初回判定に足りないが、足せば安全側に効く。 */
+        if (customer.orders.edges.length > 0) return;
+
+        /* 「注文が無い」という**不在の証拠**ではなく、「たった今できた顧客だ」という
+           **在ることの証拠**で初回を判定する。読めなければ送らない。 */
+        const creationDate = await getCustomerCreationDate(tokens.access_token);
+        if (!isFreshRegistration(creationDate, Date.now())) {
+          console.info("[welcome-email] skipped: not a fresh registration");
+          return;
+        }
+
+        /* 窓の中で何度ログインしても 2 通目を出さない最後の歯。送信の前に印を付ける。 */
+        const claim = await claimWelcomeEmail(customerId);
+        if (!claim.ok) {
+          console.info(`[welcome-email] skipped: reason=${claim.reason}`);
+          return;
+        }
+
+        const customerName =
+          [customer.firstName, customer.lastName].filter(Boolean).join(" ") || "Guest";
+
+        try {
+          await sendWelcomeEmail({
+            customerEmail,
+            customerName,
+            locale: locale as "ja" | "en",
+          });
+        } catch (err) {
+          /* 送れなかったのに印だけ残ると、その人は永久に受け取れない。戻して
+             次のログインでもう一度だけ試させる（窓の中にいる間だけ効く）。 */
+          await releaseWelcomeClaim(customerId);
+          throw err;
         }
       } catch (err) {
         /* ログインは止めない。ただし黙らせない — 初回登録の歓迎メールが

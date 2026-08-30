@@ -23,6 +23,9 @@ const LOGIN_SECRET = "login-secret-0123456789abcdef01";
 const LINK_ID = "2011239425";
 const LINK_SECRET = "link-secret-0123456789abcdef0123";
 
+/** cx-agent 台帳の共有鍵（3 本目の probe・2026-08-30 追加）。 */
+const SYNC_SECRET = "sync-secret-0123456789abcdef0123";
+
 const SAVED = {
   AUTH_LINE_ID: process.env.AUTH_LINE_ID,
   AUTH_LINE_SECRET: process.env.AUTH_LINE_SECRET,
@@ -30,6 +33,7 @@ const SAVED = {
   LINE_LIFF_CHANNEL_SECRET: process.env.LINE_LIFF_CHANNEL_SECRET,
   LINE_LOGIN_CHANNEL_SECRET: process.env.LINE_LOGIN_CHANNEL_SECRET,
   NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL,
+  SYNC_API_SECRET: process.env.SYNC_API_SECRET,
 };
 
 beforeEach(() => {
@@ -39,6 +43,11 @@ beforeEach(() => {
   process.env.LINE_LIFF_CHANNEL_ID = LINK_ID;
   process.env.LINE_LIFF_CHANNEL_SECRET = LINK_SECRET;
   process.env.NEXT_PUBLIC_SITE_URL = "https://elxea.com";
+  /* 既定は「鍵はある」。**CI には SYNC_API_SECRET が無い**ので、ここで
+     明示しないと 3 本目の probe が not-configured になり、LINE 側の判定を
+     見ている検査まで巻き添えで 503 になる（実際に一度そうなった）。
+     鍵が無い場合／拒否される場合は専用の検査で個別に作る。 */
+  process.env.SYNC_API_SECRET = SYNC_SECRET;
   delete process.env.LINE_LOGIN_CHANNEL_SECRET;
 });
 
@@ -54,8 +63,17 @@ afterEach(() => {
  * token endpoint の応答を `client_secret` ごとに切り替える。実物と同じく
  * 「どの資格情報で来たか」で答えが変わる LINE を模す。
  */
-function stubLineBySecret(bySecret: Record<string, { status: number; body: unknown }>) {
-  const impl = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+function stubLineBySecret(
+  bySecret: Record<string, { status: number; body: unknown }>,
+  /** cx-agent 台帳の応答（3 本目の probe）。既定は「鍵は通った」。 */
+  ledgerStatus = 200,
+) {
+  const impl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    /* 台帳の probe は LINE の token endpoint ではなく cx-agent を GET で叩く。
+       LINE の応答表で答えると「鍵が拒否された」と区別できないので分ける。 */
+    if (String(input).includes("/api/identity/linkage-status")) {
+      return new Response("{}", { status: ledgerStatus });
+    }
     const secret = new URLSearchParams(String(init?.body)).get("client_secret") ?? "";
     const answer = bySecret[secret] ?? { status: 400, body: { error: "invalid_grant" } };
     return new Response(JSON.stringify(answer.body), {
@@ -66,6 +84,12 @@ function stubLineBySecret(bySecret: Record<string, { status: number; body: unkno
   vi.stubGlobal("fetch", impl);
   return impl;
 }
+
+/** LINE 側は健全、という定型（台帳の検査で使う）。 */
+const HEALTHY_LINE = {
+  [LOGIN_SECRET]: { status: 400, body: { error: "invalid_grant" } },
+  [LINK_SECRET]: { status: 400, body: { error: "invalid_grant" } },
+};
 
 async function callHealth() {
   const { GET } = await import("@/app/api/health/line/route");
@@ -173,6 +197,52 @@ describe("GET /api/health/line", () => {
     expect(body.status).toBe("ok");
   });
 
+  /* ── cx-agent 台帳の共有鍵（3 本目・2026-08-30）─────────────────────────
+   *
+   * この日、LINE のチャネル資格情報は 2 つとも健全なまま連携だけが全滅した。
+   * health は緑を出し続けた——**壊れたものが観測範囲の外にあった**からで、
+   * 気付いたのはオーナーが自分で連携を試したときだった。以下はその穴を塞いだ
+   * ことを固定する検査で、いずれも「LINE 側は健全」を前提に台帳だけを動かす。 */
+  it("LINE が健全でも、台帳が鍵を拒めば 503 / misconfigured", async () => {
+    stubLineBySecret(HEALTHY_LINE, 401);
+
+    const { res, body } = await callHealth();
+    expect(res.status).toBe(503);
+    expect(body.status).toBe("misconfigured");
+    const channels = body.channels as Record<string, { verdict: string }>;
+    // LINE 側は緑のまま = 「連携だけが落ちている」が読み取れる
+    expect(channels.login.verdict).toBe("ok");
+    expect(channels.link.verdict).toBe("ok");
+    expect(channels.ledger.verdict).toBe("misconfigured");
+  });
+
+  it("共有鍵が未設定なら not-configured（誰も連携できない状態を緑にしない）", async () => {
+    delete process.env.SYNC_API_SECRET;
+    stubLineBySecret(HEALTHY_LINE);
+
+    const { res, body } = await callHealth();
+    expect(res.status).toBe(503);
+    expect((body.channels as Record<string, { verdict: string }>).ledger.verdict).toBe(
+      "not-configured",
+    );
+  });
+
+  it("台帳が 401 以外を返すのは鍵の問題ではない（業務上の拒否で監視を鳴らさない）", async () => {
+    // 409 = 既に別の LINE と連携済み。恒久的な拒否だが設定破壊ではない。
+    stubLineBySecret(HEALTHY_LINE, 409);
+
+    const { res, body } = await callHealth();
+    expect(res.status).toBe(200);
+    expect(body.status).toBe("ok");
+  });
+
+  it("台帳の判定にも秘密を載せない", async () => {
+    stubLineBySecret(HEALTHY_LINE, 401);
+
+    const { body } = await callHealth();
+    expect(JSON.stringify(body)).not.toContain(SYNC_SECRET);
+  });
+
   it("応答に秘密を載せない", async () => {
     stubLineBySecret({
       [LOGIN_SECRET]: {
@@ -202,12 +272,13 @@ describe("GET /api/health/line", () => {
     const { GET } = await import("@/app/api/health/line/route");
     const first = await GET();
     expect((await first.json()).cached).toBe(false);
-    // 2 チャネル分 = 2 往復。
-    expect(impl).toHaveBeenCalledTimes(2);
+    /* 2 チャネル + cx-agent の共有鍵 = 3 往復。3 本目は 2026-08-30 の障害
+       （SYNC_API_SECRET のずれで連携が全滅したのに health は緑だった）で足した。 */
+    expect(impl).toHaveBeenCalledTimes(3);
 
     const second = await GET();
     expect((await second.json()).cached).toBe(true);
-    expect(impl).toHaveBeenCalledTimes(2);
+    expect(impl).toHaveBeenCalledTimes(3);
   });
 
   it("CDN に持たせない", async () => {

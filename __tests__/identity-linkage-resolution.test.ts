@@ -397,12 +397,34 @@ describe("読めなかったことを Sentry に残す", () => {
       ?.reason;
   };
 
+  /* 代表に 500 を使う。401 は「読めなかった 1 件」に加えて**共有鍵の設定破壊**
+     としても上がるようになった（2026-08-30）ので、汎用の非 2xx の見本には
+     使えない。401 固有の振る舞いは次の検査で別に固定する。 */
   it("非 2xx → reason=upstream-status で残る", async () => {
-    stubUpstream({}, false, 401);
+    stubUpstream({}, false, 500);
     await fetchShopifyCustomerIdForLineUser(LINE_USER_ID);
 
     expect(captured()).toHaveLength(1);
     expect(lastReason()).toBe("upstream-status");
+  });
+
+  /* 2026-08-30: 共有鍵がずれた日、この経路は 401 を返し続けたのに残ったのは
+     `console.warn` 1 行だけだった。401 は「この 1 件が読めなかった」ではなく
+     「全員の連携状態が読めない」なので、設定破壊としても必ず上げる。 */
+  it("401 は読み取り失敗に加えて共有鍵の設定破壊としても上がる", async () => {
+    stubUpstream({}, false, 401);
+    await fetchShopifyCustomerIdForLineUser(LINE_USER_ID);
+
+    const messages = captured().map((c) => String(c[0]));
+    expect(messages.some((m) => m.includes("SYNC_API_SECRET"))).toBe(true);
+    // 従来の読み取り失敗の記録も消えていない
+    expect(
+      captured().some(
+        (c) =>
+          (c[1] as { tags?: { reason?: string } } | undefined)?.tags?.reason ===
+          "upstream-status",
+      ),
+    ).toBe(true);
   });
 
   it("不達 / timeout → reason=unreachable で残る", async () => {

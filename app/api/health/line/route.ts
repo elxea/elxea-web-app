@@ -53,6 +53,9 @@ import {
   resolveLinkChannelId,
   resolveLinkChannelSecret,
 } from "@/lib/line/link-flow";
+import { probeLedgerSharedSecret } from "@/lib/line/ledger-auth";
+import { CX_AGENT_BASE_URL } from "@/lib/chat/proxy";
+import { env } from "@/lib/config";
 
 export const dynamic = "force-dynamic";
 
@@ -84,7 +87,7 @@ export async function GET() {
   const origin = getBaseUrl();
 
   /* 2 チャネルを並列で見る。直列にすると片方の timeout がもう片方を押し出す。 */
-  const [login, link] = await Promise.all([
+  const [login, link, ledger] = await Promise.all([
     probeChannelCredentials({
       channelId: resolveLoginChannelId(),
       channelSecret: resolveLoginChannelSecret(),
@@ -95,14 +98,24 @@ export async function GET() {
       channelSecret: resolveLinkChannelSecret(),
       redirectUri: `${origin}/api/user/line-link/callback`,
     }),
+    /* 3 本目: web-app と cx-agent の共有鍵（2026-08-30 の障害の当事者）。
+     *
+     * LINE のチャネル資格情報が 2 つとも通っていても、この鍵がずれていれば
+     * 連携は全経路で落ちる。実際 08-30 はチャネル側が無傷のまま連携だけが
+     * 全滅し、この health は緑のままだった。**壊れたものが観測範囲の外に
+     * あったので、監視は何も言えなかった。** 同じ画面で一緒に見る。 */
+    probeLedgerSharedSecret({
+      baseUrl: CX_AGENT_BASE_URL,
+      secret: env("SYNC_API_SECRET"),
+    }),
   ]);
 
-  const status = worstVerdict([login.verdict, link.verdict]);
+  const status = worstVerdict([login.verdict, link.verdict, ledger.verdict]);
   const httpStatus = verdictHttpStatus(status);
   const body: CachedBody = {
     status,
     checkedAt: new Date(now).toISOString(),
-    channels: { login, link },
+    channels: { login, link, ledger },
   };
 
   cache = { at: now, httpStatus, body };
