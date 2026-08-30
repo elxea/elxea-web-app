@@ -29,6 +29,7 @@ import {
   hasLineAuthFromCookie,
   historyCacheKey,
   isSignedInFromCookie,
+  isSignedInForChat,
   readCachedHistory,
   writeCachedHistory,
   type HistoryIdentity,
@@ -51,7 +52,7 @@ interface ChatContextValue {
   setIsOpen: (open: boolean) => void;
   /** Current page pathname (for context) */
   pathname: string;
-  /** Stable session ID (persisted in localStorage) */
+  /** サーバが発行した会話 ID (`/api/chat/session`)。解決するまでは空文字。 */
   sessionId: string;
   /** Send a text message */
   sendMessage: (text: string) => void;
@@ -77,32 +78,44 @@ const ChatContext = createContext<ChatContextValue | null>(null);
 // Session ID helpers
 // ---------------------------------------------------------------------------
 
-const SESSION_KEY = "elxea-chat-session-id";
-
-function getOrCreateSessionId(): string {
-  if (typeof window === "undefined") return "";
-  const existing = localStorage.getItem(SESSION_KEY);
-  // UUID v4 形式のみ有効（旧 sess_ プレフィックス付きは再生成）
-  if (existing && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(existing)) {
-    return existing;
-  }
-  const id = randomId();
-  localStorage.setItem(SESSION_KEY, id);
-  return id;
-}
-
 /**
- * 会話 ID を捨てて新しく作る。
+ * 会話 ID をサーバから受け取る。
  *
- * ログイン状態が変わったとき (= 端末の前に居る人が入れ替わりうるとき) に呼ぶ。
- * 会話 ID は cx-agent 側の会話の単位でもあるので、振り直すとサーバ側の会話も
- * 引き継がれなくなる — 共用端末で前の人の会話が続いてしまう問題も同時に切れる。
+ * ## なぜ自分で作らないのか (localStorage の自作 UUID をやめた理由)
+ *
+ * 以前はここが `localStorage` に v4 UUID を作って持ち、それを body に載せて
+ * 送っていた。サーバは形も出所も見ないので、**他人の会話 ID を送るだけで**
+ * その会話を読む・書く・自分の LINE に恒久的に結び付けることができた。
+ * UUID は秘密ではない (URL・ログ・共用端末・総当たり) ので、「知っていること」を
+ * 所有権の根拠にできない。経緯は `lib/chat/session-token.ts` の冒頭。
+ *
+ * いまは `/api/chat/session` が httpOnly の署名付き cookie を発行し、画面はその
+ * ID を**表示と作り置きの鍵のためだけ**に受け取る。署名はブラウザに渡らない。
+ *
+ * @param rotate ログイン状態が変わったとき (端末の前の人が入れ替わりうるとき) に
+ *   必ず振り直す。共用端末で前の人の会話が続くのを断ち切る。
  */
-function rotateSessionId(): string {
-  if (typeof window === "undefined") return "";
-  const id = randomId();
-  localStorage.setItem(SESSION_KEY, id);
-  return id;
+async function fetchServerSessionId(rotate = false): Promise<string> {
+  try {
+    const res = await fetch(
+      rotate ? "/api/chat/session?rotate=1" : "/api/chat/session",
+      { credentials: "same-origin" },
+    );
+    if (res.ok) {
+      const data = (await res.json()) as { session_id?: unknown };
+      if (typeof data.session_id === "string" && data.session_id) {
+        return data.session_id;
+      }
+    }
+  } catch {
+    /* 取れなかったときの落とし方は下のフォールバックに一本化してある
+       (ここで握り潰しているのではなく、失敗も成功も同じ出口を通す)。 */
+  }
+
+  /* 取れなくてもチャットは死なせない。サーバは cookie 側の会話 ID を使うので、
+     この場しのぎの ID で会話が壊れることはない — 画面に履歴が出ないだけで、
+     発言そのものは正しい会話に入る。 */
+  return randomId();
 }
 
 // ---------------------------------------------------------------------------
@@ -192,16 +205,13 @@ interface HistoryApiResponse {
  * Fetch conversation history from the cx-agent API.
  * Returns null on error so the chat can degrade gracefully.
  */
-async function fetchChatHistory(
-  sessionId: string,
-): Promise<HistoryApiResponse | null> {
+async function fetchChatHistory(): Promise<HistoryApiResponse | null> {
   try {
-    // [SEC-B] 自サーバ proxy 経由。customer_id はブラウザから送らず、proxy が
-    // サーバの認証済みセッションから verify 済み customer_id を導出して cx-agent に渡す。
-    const params = new URLSearchParams({ session_id: sessionId });
-    const res = await fetch(
-      `/api/chat/history?${params.toString()}`,
-    );
+    /* [SEC-B] 自サーバ proxy 経由。customer_id はブラウザから送らず、proxy が
+       サーバの認証済みセッションから verify 済み customer_id を導出して cx-agent に渡す。
+       [SEC-C] `session_id` も送らない。proxy は署名付き cookie から会話 ID を決める
+       ので、ここで積んでも無視される (積むと「指定できる」と読めてしまい危ない)。 */
+    const res = await fetch("/api/chat/history");
     if (!res.ok) return null;
     return (await res.json()) as HistoryApiResponse;
   } catch {
@@ -298,12 +308,19 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
      (前の人の ID が作り置きの鍵に残らないように)。 */
   const lineUserIdFetchedRef = useRef(false);
 
-  // Hydrate session ID on mount (client only)
+  /* 会話 ID をサーバから取る (client only)。往復 1 回なので、届くまで `sessionId`
+     は空のまま — その間は送信も履歴取得も止まる (`!sessionId` で弾いている)。 */
   useEffect(() => {
-    if (!initialisedRef.current) {
-      setSessionId(getOrCreateSessionId());
-      initialisedRef.current = true;
-    }
+    if (initialisedRef.current) return;
+    initialisedRef.current = true;
+
+    let cancelled = false;
+    fetchServerSessionId().then((id) => {
+      if (!cancelled) setSessionId(id);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   /* ログイン状態。cookie 名を完全一致で見る (部分一致だと `xshop_auth=1` のような
@@ -351,7 +368,12 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       typeof window !== "undefined" &&
       applyAuthTransition(previous, signature, {
         clearCache: () => clearAllHistoryCache(window.sessionStorage),
-        rotateSession: () => setSessionId(rotateSessionId()),
+        /* 振り直しはサーバに頼む (cookie ごと差し替える)。往復 1 回かかるので、
+           先に空へ落として**古い ID が生きたまま使われる隙間**を作らない。 */
+        rotateSession: () => {
+          setSessionId("");
+          void fetchServerSessionId(true).then(setSessionId);
+        },
         forgetIdentity: () => {
           setShopifyCustomerId(null);
           setLineUserId(null);
@@ -468,7 +490,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    fetchChatHistory(identity.sessionId).then((data) => {
+    fetchChatHistory().then((data) => {
       if (!data) {
         // 失敗は作り置きしない。次の機会に引き直せるよう鍵も戻す。
         historyLoadedRef.current = false;
@@ -538,7 +560,10 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     [],
   );
 
-  const isAuthenticated = shopifyCustomerId !== null || lineUserId !== null;
+  /* ログイン済みか (画面の見せ方だけに使う旗)。判断の中身と理由は
+     `lib/chat/history-cache.ts` の `isSignedInForChat` が正本 (テストで縛ってある)。
+     ここは配線だけを持つ。 */
+  const isAuthenticated = isSignedInForChat({ shopifyCustomerId, lineAuthed });
 
   const value = useMemo<ChatContextValue>(
     () => ({

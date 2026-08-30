@@ -6,7 +6,7 @@
  * ## なぜ `lib/auth/cookies.ts` から切り出してあるのか
  *
  * 名前を使いたい場所には**ブラウザで動く画面**が含まれる
- * (`components/ui/sidebar.tsx` / `lib/consent.ts` / `lib/chat/session-cookie.ts`)。
+ * (`components/ui/sidebar.tsx` / `lib/consent.ts` など)。
  * ところが `lib/auth/cookies.ts` は読み込まれた瞬間に
  * `validateApex(env("AUTH_COOKIE_APEX"))` を実行する。`AUTH_COOKIE_APEX` は
  * `NEXT_PUBLIC_` が付かないサーバ専用の設定なので、クライアント束では値が
@@ -41,6 +41,7 @@ export type CookieSecureRule = "prod-only" | "always";
 export type CookieGroup =
   | "shopify-session"
   | "line-session"
+  | "chat-session"
   | "transient"
   | "not-auth";
 
@@ -119,7 +120,30 @@ export const COOKIE_REGISTRY: readonly CookieSpec[] = [
   /* Name verified against lib/line/account-link.ts:22 — it is `acct_link_tk`,
    * not the longer form the design assumed. */
   { name: "acct_link_tk", group: "transient", scope: "host-only", secure: "prod-only" },
-  { name: "chat_session_id", group: "transient", scope: "host-only", secure: "always" },
+
+  /* チャットの会話 ID。**サーバ (route handler) だけが発行する** httpOnly cookie で、
+   * 中身は `<uuid>.<HMAC 署名>` (`lib/chat/session-token.ts`)。
+   *
+   * ## なぜ独立したグループなのか
+   *
+   * - `transient` ではない。寿命は 30 日で、往復 1 回で使い捨てる値ではない
+   *   (前身の `chat_session_id` は 300 秒の受け渡し用で、性質が違う)。
+   * - かといって `shopify-session` / `line-session` にも入れられない。この 2 群は
+   *   `AUTH_COOKIE_GROUPS` = 「認証状態を運ぶ cookie」であり、`middleware.ts` の
+   *   `/account` 判定と logout の一括削除がここを見る。会話 ID を混ぜると
+   *   **会話を持っているだけでログイン済みとみなされる**という新しい欠陥になる。
+   * - `not-auth` (カート ID / サイドバー状態) でもない。この cookie を持っていると
+   *   その会話の履歴が読めるので、認証ではないが**資格情報ではある**。
+   *
+   * よって自分のグループを持つ。ログアウト時の扱いは一括削除ではなく、ログイン状態が
+   * 変わった時点で画面側が `/api/chat/session?rotate=1` を叩いて振り直す
+   * (`components/chat/chat-provider.tsx`)。
+   *
+   * `secure` は prod-only。他の cookie と同じ理由 — `always` にすると平文 http の
+   * 環境 (Ring 2 / LAN 実機) でブラウザが黙って捨て、チャットが無言で壊れる。
+   * `host-only`: 発行するのは自サーバの route handler だけで、往復で別ホストに
+   * 着地する LINE の state 系とは事情が違う。 */
+  { name: "chat_sid", group: "chat-session", scope: "host-only", secure: "prod-only" },
 
   // Not auth state; listed so the registry is a complete map of what we set.
   { name: "site_auth", group: "not-auth", scope: "host-only", secure: "prod-only" },
@@ -161,7 +185,7 @@ export const EXTERNAL_LIBRARY_COOKIES: readonly string[] = [
  *
  * Wave 4 以前、この表は 13 名しか持っていなかった。残り 13 本
  * (`shop_cv` `shop_state` `shop_nonce` `shop_locale` `shop_return_to`
- * `shop_oauth` `line_oauth_nonce` `line_link_intent` `chat_session_id`
+ * `shop_oauth` `line_oauth_nonce` `line_link_intent` `chat_session_id` (廃止済み)
  * `site_auth` `shopify_cart_id` `sidebar_state` `cookie_consent`) は
  * 呼び出し側に生文字列のまま散っていて、`__tests__/auth-cookie-registry.test.ts`
  * は「知らない名前が無いか」しか見ていないのでそれを通していた。
@@ -193,7 +217,7 @@ export const COOKIE_NAME = {
   shopLocale: "shop_locale",
   shopReturnTo: "shop_return_to",
   shopPendingOauth: "shop_oauth",
-  chatSessionId: "chat_session_id",
+  chatSession: "chat_sid",
   siteAuth: "site_auth",
   shopifyCartId: "shopify_cart_id",
   sidebarState: "sidebar_state",

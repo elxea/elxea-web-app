@@ -335,6 +335,21 @@ export const ENV_SPEC = {
     read: () => process.env.SYNC_API_SECRET,
     schema: optionalTrimmed(),
   },
+  /**
+   * チャットの会話 ID に付ける HMAC-SHA256 の鍵 (`lib/chat/session-token.ts`)。
+   *
+   * `trimmed` にしてある。この鍵は新設で、**これに由来する発行済みの値がまだ
+   * どのブラウザにも無い**ため、貼り付け由来の末尾改行を落としても何も無効化
+   * しない。`SESSION_SECRET` を `raw` にしてあるのは逆に「発行済みの cookie が
+   * 全部その改行込みで導出されている」からで、前提が違う (冒頭の正規化方針)。
+   *
+   * 未設定でも起動は止めない。止めると鍵を配る前にチャットごと落ちるので、
+   * `resolveChatSession()` が未署名へ落として `logger.error` を 1 行残す。
+   */
+  CHAT_SESSION_SECRET: {
+    read: () => process.env.CHAT_SESSION_SECRET,
+    schema: optionalTrimmed(),
+  },
   ERASE_API_SECRET: {
     read: () => process.env.ERASE_API_SECRET,
     schema: optionalTrimmed(),

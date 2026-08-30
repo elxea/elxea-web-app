@@ -2,7 +2,8 @@
  * elxea CX Agent 用カスタム ChatTransport
  *
  * Vercel AI SDK の useChat が期待する ChatTransport インターフェースを実装し、
- * Workers API の { message, session_id } → SSE レスポンス形式と橋渡しする。
+ * 自サーバ proxy (`/api/chat`) の { message } → SSE レスポンス形式と橋渡しする。
+ * 会話 ID は body ではなく署名付き cookie で運ぶ (`lib/chat/session-server.ts`)。
  */
 import type { ChatTransport, UIMessage, UIMessageChunk } from "ai";
 import { randomId } from "@/lib/random-id";
@@ -94,13 +95,15 @@ export class ElxeaChatTransport implements ChatTransport<UIMessage> {
       });
     }
 
-    // 自サーバ proxy (/api/chat) にリクエスト。
-    // [SEC-B] customer_id はブラウザから送らない。proxy がサーバの認証済みセッションから
-    // verify 済み customer_id を導出し X-API-Key 付きで cx-agent に転送する。
-    // ブラウザ自己申告の customer_id は cx-agent 側で無視される (なりすまし防止)。
+    /* 自サーバ proxy (/api/chat) にリクエスト。
+       [SEC-B] customer_id はブラウザから送らない。proxy がサーバの認証済みセッションから
+       verify 済み customer_id を導出し X-API-Key 付きで cx-agent に転送する。
+       [SEC-C] `session_id` も送らない。proxy は署名付き cookie (`chat_sid`) から
+       会話 ID を決めるので、body に積んでも読まれない。積んだままにすると
+       「ブラウザが会話を指定できる」と読めてしまうので、形からも外してある
+       (上の `sessionId` は「サーバの会話 ID がまだ届いていない」を見る門番として残す)。 */
     const requestBody: Record<string, string> = {
       message: messageText,
-      session_id: sessionId,
     };
 
     // Abort previous request if still in-flight

@@ -27,6 +27,7 @@ import {
   hasLineAuthFromCookie,
   historyCacheKey,
   isSignedInFromCookie,
+  isSignedInForChat,
 } from "@/lib/chat/history-cache";
 
 function effects() {
@@ -143,5 +144,32 @@ describe("作り置きの鍵で、LINE の人と匿名の人が同じ棚を共�
       customerId: "gid://shopify/Customer/AAA",
     });
     expect(withLine).toBe(withoutLine);
+  });
+});
+
+/**
+ * 「ログインすると、LINE でもこの会話を続けられます」を **誰に見せるか**。
+ *
+ * 2026-08-30 の本番で、LINE ログインで入っている本人にこの誘い文句が出ていた。
+ * 判定が `shopifyCustomerId !== null || lineUserId !== null` で、`lineUserId` は
+ * この app に存在しない Auth.js セッション口を叩く関数の戻り（= 常に null）
+ * だったため、実質 Shopify 一本の判定になっていた。
+ */
+describe("チャットのログイン済み判定 (バナーの出し分け)", () => {
+  it("LINE ログインで入っている人はログイン済み扱い (誘い文句を出さない)", () => {
+    expect(
+      isSignedInForChat({ shopifyCustomerId: null, lineAuthed: true }),
+      "LINE で入っている本人に未ログイン向けの誘い文句が出る",
+    ).toBe(true);
+  });
+
+  it("Shopify で入っている人はログイン済み扱い (従来どおり)", () => {
+    expect(
+      isSignedInForChat({ shopifyCustomerId: "gid://shopify/Customer/1", lineAuthed: false }),
+    ).toBe(true);
+  });
+
+  it("どちらの旗も無い人だけが未ログイン", () => {
+    expect(isSignedInForChat({ shopifyCustomerId: null, lineAuthed: false })).toBe(false);
   });
 });
