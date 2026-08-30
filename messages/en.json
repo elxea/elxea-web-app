@@ -568,6 +568,8 @@
     "description": "Sign in with LINE to continue your conversation across Web and LINE.",
     "lineButton": "Sign in with LINE",
     "lineButtonUnavailable": "Unavailable right now",
+    "autoLoginBrowserNotice": "This browser cannot open the LINE app automatically. To continue without typing your LINE password, open this page in Safari and then tap “Sign in with LINE”.",
+    "autoLoginWebviewNotice": "You are in an in-app browser, so the LINE app cannot open automatically. To continue without typing your LINE password, choose “Open in browser” from the menu, then tap “Sign in with LINE”.",
     "lineEmailConsent": "When you sign in with LINE, we receive the email address registered with your LINE account and use it for order confirmations, support enquiries, and account linking.",
     "or": "or",
     "shopifyButton": "Sign in with Email",

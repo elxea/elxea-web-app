@@ -12,7 +12,7 @@
  * 4. メールアドレスでログインは /api/auth/login → Shopify OAuth (PKCE)
  */
 import { Suspense } from "react";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { getTranslations, getLocale } from "next-intl/server";
 import {
   AuthCard,
@@ -29,6 +29,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { Link } from "@/i18n/navigation";
 import { hasLineSessionCookies } from "@/lib/auth/cookies";
+import {
+  classifyAutoLoginEnvironment,
+  shouldWarnAboutAutoLogin,
+} from "@/lib/line/auto-login-environment";
 import { LineLoginButton, LineLoginButtonFallback } from "./line-login-button";
 import { LinkSuccessBanner } from "./link-success-banner";
 import { AuthErrorBanner } from "./auth-error-banner";
@@ -54,6 +58,28 @@ export default async function LoginPage() {
   const signedInWithLineOnly = hasLineSessionCookies((name) =>
     loginCookies.has(name),
   );
+
+  /* 「押しても LINE アプリが開かない」と**押す前に**分かる環境には、そう伝える。
+   *
+   * LINE の自動ログインは iOS では Safari と LINE 内ブラウザでしか動かず、
+   * アプリ内ブラウザ (Instagram 等) でも発火しないことが公式に明記されている。
+   * その環境の人は必ず access.line.me のメール/パスワード/QR 画面に行き着くが、
+   * 一般の利用者は LINE のパスワードを覚えておらず、スマホ 1 台では QR も読めない。
+   * ここが実際の離脱点である (オーナー指摘 2026-08-30)。
+   *
+   * 判定は UA なので確実ではない。よって**ボタンは塞がず、案内だけ足す**。
+   * 判定の根拠と分類は `lib/line/auto-login-environment.ts`。
+   *
+   * サーバ側で判定するのは、クライアントで出すと一度ボタンだけが描かれてから
+   * 案内が遅れて現れ、その間に押されてしまうため。 */
+  const autoLoginEnv = classifyAutoLoginEnvironment(
+    (await headers()).get("user-agent"),
+  );
+  const autoLoginNoticeKey = shouldWarnAboutAutoLogin(autoLoginEnv)
+    ? autoLoginEnv === "ios-other-browser"
+      ? "autoLoginBrowserNotice"
+      : "autoLoginWebviewNotice"
+    : null;
 
   return (
     <AuthSection>
@@ -88,6 +114,18 @@ export default async function LoginPage() {
           <Suspense fallback={<LineLoginButtonFallback>{t("lineButton")}</LineLoginButtonFallback>}>
             <LineLoginButton>{t("lineButton")}</LineLoginButton>
           </Suspense>
+
+          {/* この環境では LINE アプリが開かないと事前に分かるときだけ出す一言。
+            * 出す条件と根拠は `lib/line/auto-login-environment.ts`。 */}
+          {autoLoginNoticeKey ? (
+            <p
+              className="w-full text-center text-xs leading-4 text-muted-foreground"
+              data-testid="line-auto-login-notice"
+              role="status"
+            >
+              {t(autoLoginNoticeKey)}
+            </p>
+          ) : null}
 
           {/* LINE のメールアドレス取得についての説明 (M-0 の前提整備)。
             *

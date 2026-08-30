@@ -132,7 +132,15 @@ export async function GET(request: NextRequest) {
     console.error("[line-callback] State mismatch");
     const retryUrl = new URL(`/${locale}/login?error=StateMismatch`, requestOrigin);
     retryUrl.searchParams.set(AUTO_LOGIN_FAILED_PARAM, AUTO_LOGIN_FAILED_VALUE);
-    return NextResponse.redirect(retryUrl);
+    /* 使い捨ての state / nonce をここでも落とす。
+     *
+     * ここだけ `clearState` を通っていなかった。他の失敗分岐（`error` / 未設定 /
+     * token 交換失敗）は全部落としているのに、この分岐だけが**照合に失敗した
+     * state cookie を最大 10 分生かしたまま**返していた。次の試行は
+     * `/api/line-login/init` が上書きするので実害は出にくいが、「照合に落ちた
+     * 値を消さない」は CSRF 対策の一部を無効化しうるうえ、分岐ごとに後始末が
+     * 違うこと自体が次の読み手を誤らせる。 */
+    return clearState(NextResponse.redirect(retryUrl));
   }
 
   const baseUrl = getBaseUrl(request);
