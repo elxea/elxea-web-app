@@ -6,7 +6,7 @@
  * ## なぜ `lib/auth/cookies.ts` から切り出してあるのか
  *
  * 名前を使いたい場所には**ブラウザで動く画面**が含まれる
- * (`components/ui/sidebar.tsx` / `lib/consent.ts` / `lib/chat/session-cookie.ts`)。
+ * (`components/ui/sidebar.tsx` / `lib/consent.ts` など)。
  * ところが `lib/auth/cookies.ts` は読み込まれた瞬間に
  * `validateApex(env("AUTH_COOKIE_APEX"))` を実行する。`AUTH_COOKIE_APEX` は
  * `NEXT_PUBLIC_` が付かないサーバ専用の設定なので、クライアント束では値が
