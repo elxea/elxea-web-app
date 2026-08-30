@@ -137,7 +137,11 @@ process.env.E2E_WARMUP_COOKIE = "line_session=warmup-not-a-session";
 
 export default defineConfig({
   testDir: ".",
-  testMatch: ["**/line-linkage-flow.spec.ts"],
+  /* `line-login-mobile.spec.ts` も同居させる。理由は偽アペックスが要ること —
+   * `isTrustedAuthHost()` は自ホスト apex の配下しか通さないので、`localhost` の
+   * 素の config では `/api/line-login/init` が 503 になり、LINE ボタンは常に
+   * 「現在ご利用いただけません」になる。そこで回しても何も守れない。 */
+  testMatch: ["**/line-linkage-flow.spec.ts", "**/line-login-mobile.spec.ts"],
   /* 初回コンパイルをテストの制限時間の外へ出す。詳細は同ファイルのコメント。 */
   globalSetup: require.resolve("./support/warm-dev-server"),
   /* 受入シナリオは①→⑤が 1 本の物語で、しかも偽サーバーと偽 Firestore は

@@ -4,7 +4,7 @@ import crypto from "crypto";
 import { getBaseUrl, getRequestHostname, isTrustedAuthHost } from "@/lib/base-url";
 import { getCookieSpec, isSecure, resolveCookieDomain } from "@/lib/auth/cookies";
 import { wantsAutoLoginDisabled } from "@/lib/line/auto-login";
-import { lineAuthBaseUrl } from "@/lib/line/endpoints";
+import { buildLineAuthorizeUrl, lineUiLocales } from "@/lib/line/authorize-url";
 import {
   loginBotPrompt,
   loginScopeParam,
@@ -143,26 +143,22 @@ export async function POST(request: NextRequest) {
   /* 名前空間ガード（M-0）。詳細は lib/line/login-channel-report.ts。 */
   reportChannelNamespace("line-login-init");
 
-  const params = new URLSearchParams({
-    response_type: "code",
-    client_id: channelId,
-    redirect_uri: redirectUri,
+  /* 組み立ては `buildLineAuthorizeUrl` に一本化した（3 経路が別々に
+   * `URLSearchParams` を書いていたのを寄せた）。`prompt` /
+   * `disable_ios_auto_login` はそこで構造的に載らない。
+   *
+   * ⚠ `bot_prompt` は `prompt` とは別のパラメータである。上の長い注記が禁じて
+   * いるのは `prompt` の方で、`bot_prompt` は auto login を無効化しない。 */
+  const authUrl = buildLineAuthorizeUrl({
+    channelId,
+    redirectUri,
     state,
     nonce,
     scope: loginScopeParam(),
+    botPrompt: loginBotPrompt(),
+    uiLocales: lineUiLocales(request),
+    disableAutoLogin: wantsAutoLoginDisabled(request),
   });
-  /* `bot_prompt` は 2026-08-25 に復活（新チャネル 2011239425 が本番 OA `@307tzhkw` を
-   * 紐付け済みになったため）。判断の中身は `lib/line/login-channel.ts`。
-   * ⚠ `prompt` とは別のパラメータである。上の長い注記が禁じているのは `prompt` の方で、
-   * `bot_prompt` は auto login を無効化しない。 */
-  const botPrompt = loginBotPrompt();
-  if (botPrompt) params.set("bot_prompt", botPrompt);
-
-  if (wantsAutoLoginDisabled(request)) {
-    params.set("disable_auto_login", "true");
-  }
-
-  const authUrl = `${lineAuthBaseUrl()}/oauth2/v2.1/authorize?${params.toString()}`;
 
   return NextResponse.json({ authUrl });
 }

@@ -107,6 +107,12 @@ export default defineConfig({
     "**/staging-smoke.spec.ts",
     "**/auth-session-flow.spec.ts",
     "**/line-linkage-flow.spec.ts",
+    /* `line-login-mobile.spec.ts` も同じ理由で除外する。LINE ボタンは
+     * `isTrustedAuthHost()` を通ったホストでしか出ない（`localhost` では
+     * `/api/line-login/init` が 503 を返し、ボタンは「現在ご利用いただけません」で
+     * 固定される）。偽アペックスを持つ `e2e/playwright-line-linkage.config.ts` が
+     * 正しい入口。 */
+    "**/line-login-mobile.spec.ts",
   ],
   use: {
     baseURL,

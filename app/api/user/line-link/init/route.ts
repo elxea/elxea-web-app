@@ -6,7 +6,7 @@ import { enforceRateLimit, limiters } from "@/lib/ratelimit";
 import { getBaseUrl, getRequestHostname, isTrustedAuthHost } from "@/lib/base-url";
 import { getCookieSpec, isSecure, resolveCookieDomain } from "@/lib/auth/cookies";
 import { fetchLineLinkageStatus } from "@/lib/line/linkage-status";
-import { lineAuthBaseUrl } from "@/lib/line/endpoints";
+import { buildLineAuthorizeUrl, lineUiLocales } from "@/lib/line/authorize-url";
 import {
   LINE_LINK_STATE_COOKIE,
   STATE_TTL_MS,
@@ -133,18 +133,21 @@ export async function POST(request: NextRequest) {
    * nonce は戻ってきた id_token をこの認可要求に束縛する。同じ値を使い回すと、URL に出た
    * state を見た者が nonce も知ることになり、id_token 側の束縛が名ばかりになる。
    * 検証は callback の `verifyLiffIdToken({ expectedNonce })`。 */
-  const params = new URLSearchParams({
-    response_type: "code",
-    client_id: channelId,
-    redirect_uri: `${baseUrl}/api/user/line-link/callback`,
+  /* `prompt` も `disable_auto_login` も送らない。どちらも LINE の自動ログインを殺し、
+   * 自動ログインは電話で LINE アプリが開く唯一の経路である（`lib/line/auto-login.ts`）。
+   * それを「送らない」ではなく**送りようが無い**形にするため、組み立ては
+   * `buildLineAuthorizeUrl` に一本化した。
+   *
+   * ここは連携（link）なので `bot_prompt` は送らない — 友だち追加を促すのは
+   * ログイン導線の役割で、連携の途中に別の同意画面を挟むと戻り先が増える。 */
+  const authUrl = buildLineAuthorizeUrl({
+    channelId,
+    redirectUri: `${baseUrl}/api/user/line-link/callback`,
     state,
     nonce,
     scope: "profile openid",
+    uiLocales: lineUiLocales(request),
   });
-
-  /* `prompt` も `disable_auto_login` も送らない。どちらも LINE の自動ログインを殺し、
-   * 自動ログインは電話で LINE アプリが開く唯一の経路である（`lib/line/auto-login.ts`）。 */
-  const authUrl = `${lineAuthBaseUrl()}/oauth2/v2.1/authorize?${params.toString()}`;
 
   return NextResponse.json({ authUrl });
 }

@@ -4,7 +4,7 @@ import crypto from "crypto";
 import { getBaseUrl, getRequestHostname, isTrustedAuthHost } from "@/lib/base-url";
 import { getCookieSpec, isSecure, resolveCookieDomain } from "@/lib/auth/cookies";
 import { wantsAutoLoginDisabled } from "@/lib/line/auto-login";
-import { lineAuthBaseUrl } from "@/lib/line/endpoints";
+import { buildLineAuthorizeUrl, lineUiLocales } from "@/lib/line/authorize-url";
 import {
   loginBotPrompt,
   loginScopeParam,
@@ -122,23 +122,26 @@ export async function GET(request: NextRequest) {
    * 紐付けられる OA がテスト用 `@426vlcyb` しか無かった」。新チャネル 2011239425 は
    * 本番 OA を紐付け済みなので、前提ごと解消している。判断の中身は
    * `lib/line/login-channel.ts` の `loginBotPrompt` に置いた。 */
-  const params = new URLSearchParams({
-    response_type: "code",
-    client_id: channelId,
-    redirect_uri: redirectUri,
-    state: state,
+  /* 組み立ては `buildLineAuthorizeUrl` に一本化した。この route が
+   * `/api/line-login/init` と別々に `URLSearchParams` を書いていたことが、
+   * 2026-03-25 に `prompt=consent` が片方だけに入って 146 日間残った経緯
+   * （`ab25915` で除去）の下地である。以後は方針を 1 か所でしか持たない。
+   *
+   * ⚠ この route は **302 でしか遷移しない**ので、iOS の Universal Link は
+   *   発火しないことがある（LINE 公式: JavaScript リダイレクト / URL 直打ちは
+   *   発火しない）。画面から使う導線は `/api/line-login/init` + 実 `<a>` タップ
+   *   の方（`line-login-button.tsx`）であり、ここは後方互換のために残している。 */
+  const authUrl = buildLineAuthorizeUrl({
+    channelId,
+    redirectUri,
+    state,
     nonce,
     scope: loginScopeParam(),
+    botPrompt: loginBotPrompt(),
+    uiLocales: lineUiLocales(request),
+    // Same auto-login-failure escape hatch as the init route; see lib/line/auto-login.ts.
+    disableAutoLogin: wantsAutoLoginDisabled(request),
   });
-  const botPrompt = loginBotPrompt();
-  if (botPrompt) params.set("bot_prompt", botPrompt);
-
-  // Same auto-login-failure escape hatch as the init route; see lib/line/auto-login.ts.
-  if (wantsAutoLoginDisabled(request)) {
-    params.set("disable_auto_login", "true");
-  }
-
-  const authUrl = `${lineAuthBaseUrl()}/oauth2/v2.1/authorize?${params.toString()}`;
 
   return NextResponse.redirect(authUrl);
 }
