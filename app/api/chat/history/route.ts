@@ -19,7 +19,7 @@ const PASSTHROUGH_PARAMS = ["session_id", "channel", "keyword", "from", "to", "l
 export async function GET(request: NextRequest) {
   const src = request.nextUrl.searchParams;
 
-  const { headers, verifiedCustomerId, trusted } = await buildProxyAuth();
+  const { headers, verifiedCustomerId, verifiedLineUserId, trusted } = await buildProxyAuth();
 
   const qs = new URLSearchParams();
   for (const key of PASSTHROUGH_PARAMS) {
@@ -29,6 +29,10 @@ export async function GET(request: NextRequest) {
   // verify 済みのときだけ customer_id を付与 (ブラウザ自己申告は使わない)
   if (trusted && verifiedCustomerId) {
     qs.set("shopify_customer_id", verifiedCustomerId);
+  }
+  // LINE ログインで入っている人の identity (理由は /api/chat の同じ箇所を参照)
+  if (trusted && verifiedLineUserId) {
+    qs.set("line_user_id", verifiedLineUserId);
   }
 
   let upstream: Response;

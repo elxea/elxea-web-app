@@ -28,8 +28,27 @@ export interface ProxyAuth {
   headers: Record<string, string>;
   /** サーバセッションで verify 済みの customer_id (GID)。未ログインなら null。 */
   verifiedCustomerId: string | null;
+  /**
+   * サーバセッションで verify 済みの LINE userId。LINE ログインで入っている人だけ付く。
+   *
+   * 出どころは暗号化 cookie の復号結果 (= LINE 署名済み id_token の sub) で、
+   * ブラウザ自己申告ではない。cx-agent 側は X-API-Key 検証済みのときだけこれを信じる。
+   */
+  verifiedLineUserId: string | null;
   /** SYNC_API_SECRET が設定されており cx-agent に信頼させられるか。 */
   trusted: boolean;
+}
+
+/**
+ * 顧客 ID を cx-agent が受け取る形 (GID) に揃える。
+ *
+ * cx-agent の `validateShopifyCustomerId` は `gid://shopify/Customer/<digits>` しか
+ * 受け付けない。Shopify セッション経路 (`getCustomerFromSession`) は元から GID だが、
+ * `resolveIdentity()` は数値へ寄せた ID を返すので、ここで戻す。形が違うだけで
+ * 400 になり、ログイン済みの人が黙って匿名扱いに落ちる — それを起こさないための正規化。
+ */
+function toCustomerGid(id: string): string {
+  return /^\d+$/.test(id) ? `gid://shopify/Customer/${id}` : id;
 }
 
 /**
@@ -46,7 +65,40 @@ export async function buildProxyAuth(): Promise<ProxyAuth> {
      「なぜこの会話が匿名だったのか」を事後に追える。以前の catch は
      握り潰していたので、障害中に会話が顧客へ紐付かなくなっても痕跡が無かった。 */
   const result = await getCustomerFromSession();
-  const verifiedCustomerId = result.ok ? (result.data?.id ?? null) : null;
+  let verifiedCustomerId = result.ok ? (result.data?.id ?? null) : null;
+  let verifiedLineUserId: string | null = null;
+
+  /* ## LINE ログインで入っている人を「ログイン済み」として扱う (2026-08-30 の本番障害)
+   *
+   * ここは長く `getCustomerFromSession()` **だけ** を見ていた。これは Shopify の
+   * セッション cookie しか読まないので、**LINE ログインで入っている人は必ず
+   * `verifiedCustomerId = null`** になる。すると cx-agent へ identity が 1 つも
+   * 渡らず、ログイン済みの本人の発言が匿名 web セッションとして保存される。
+   * 結果、LINE 公式で「私の好みは？」と聞いても、サイトで話した内容を一切参照できない。
+   *
+   * `resolveIdentity()` は既にこの解決を持っている (Shopify セッション →
+   * 顧客 ID / LINE セッション → 連携台帳の逆引きで顧客 ID)。マイページ・お気に入り・
+   * 行動ログは全部これを使っており、**チャットだけが別の (狭い) 判定を持っていた**。
+   *
+   * 呼ぶ順は変えない: Shopify セッションで確定した人は従来どおりそのまま通し
+   * (「判定できなかった」= 503 を「未ログイン」に畳まない R1 の作りを保つ)、
+   * 顧客 ID が取れなかったときだけ `resolveIdentity()` に降りる。どちらも
+   * `React.cache` 済みなので往復は増えない。 */
+  if (!verifiedCustomerId) {
+    /* 動的 import なのは **読み込みの輪を作らないため**。
+       `lib/firebase/auth-guard` → `lib/line/linkage-status` → `lib/chat/proxy`
+       (CX_AGENT_BASE_URL) と戻ってくるので、ここで静的に import すると
+       proxy → auth-guard → linkage-status → proxy の循環になる。
+       呼ばれるのはサーバの route handler の中だけなので、遅延で困らない。 */
+    const { resolveIdentity } = await import("@/lib/firebase/auth-guard");
+    const identity = await resolveIdentity();
+    if (identity.authenticated) {
+      verifiedLineUserId = identity.lineUserId ?? null;
+      if (identity.shopifyCustomerId) {
+        verifiedCustomerId = toCustomerGid(identity.shopifyCustomerId);
+      }
+    }
+  }
 
   const secret = env("SYNC_API_SECRET");
   const headers: Record<string, string> = {};
@@ -60,7 +112,7 @@ export async function buildProxyAuth(): Promise<ProxyAuth> {
     );
   }
 
-  return { headers, verifiedCustomerId, trusted };
+  return { headers, verifiedCustomerId, verifiedLineUserId, trusted };
 }
 
 /**

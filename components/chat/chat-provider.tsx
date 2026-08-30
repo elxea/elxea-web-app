@@ -29,6 +29,7 @@ import {
   hasLineAuthFromCookie,
   historyCacheKey,
   isSignedInFromCookie,
+  isSignedInForChat,
   readCachedHistory,
   writeCachedHistory,
   type HistoryIdentity,
@@ -538,7 +539,10 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     [],
   );
 
-  const isAuthenticated = shopifyCustomerId !== null || lineUserId !== null;
+  /* ログイン済みか (画面の見せ方だけに使う旗)。判断の中身と理由は
+     `lib/chat/history-cache.ts` の `isSignedInForChat` が正本 (テストで縛ってある)。
+     ここは配線だけを持つ。 */
+  const isAuthenticated = isSignedInForChat({ shopifyCustomerId, lineAuthed });
 
   const value = useMemo<ChatContextValue>(
     () => ({

@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
 
   const { message, session_id } = body ?? {};
 
-  const { headers, verifiedCustomerId, trusted } = await buildProxyAuth();
+  const { headers, verifiedCustomerId, verifiedLineUserId, trusted } = await buildProxyAuth();
   const ipHeaders = clientIpForwardHeaders(
     request.headers.get("x-forwarded-for"),
     request.headers.get("x-real-ip"),
@@ -40,6 +40,12 @@ export async function POST(request: NextRequest) {
   const forwardBody: Record<string, unknown> = { message, session_id };
   if (trusted && verifiedCustomerId) {
     forwardBody.shopify_customer_id = verifiedCustomerId;
+  }
+  /* LINE ログインで入っている人の identity。顧客 ID を持たない人 (未連携の LINE
+     ログイン) でも「誰か」は確定しているので、これを渡さないと cx-agent 側は
+     匿名扱いにするしかない。customer_id と同じく **サーバ確定値のみ** 転送する。 */
+  if (trusted && verifiedLineUserId) {
+    forwardBody.line_user_id = verifiedLineUserId;
   }
 
   let upstream: Response;

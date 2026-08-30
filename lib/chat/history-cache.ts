@@ -77,6 +77,30 @@ export function hasLineAuthFromCookie(cookieString: string | undefined | null): 
 }
 
 /**
+ * チャットの画面が「この人はログイン済み」と見なすか。
+ *
+ * ## なぜ関数にしてあるか（2026-08-30 の本番）
+ *
+ * この判断はチャットの中に `shopifyCustomerId !== null || lineUserId !== null` と
+ * 直書きされていた。`lineUserId` は **常に null を返す**関数の戻り
+ * （Auth.js のセッション口はこの app に無い）なので、実質 Shopify 一本の判定だった。
+ * その結果、LINE ログインで入っている本人に「ログインすると、LINE でもこの会話を
+ * 続けられます」という**未ログインの人向けの誘い文句**が出ていた。
+ *
+ * 入口は 2 つある（Shopify / LINE）ので、旗も 2 つ見る。どちらの旗も
+ * ブラウザから読める cookie で、**画面の見せ方にしか使わない**。本当の認可は
+ * サーバが持つ（`lib/chat/proxy.ts` の `buildProxyAuth`）。
+ */
+export function isSignedInForChat(input: {
+  /** サーバから引いた verify 済み顧客 ID。未ログイン / 未解決なら null。 */
+  shopifyCustomerId: string | null;
+  /** `line_auth` cookie が立っているか。 */
+  lineAuthed: boolean;
+}): boolean {
+  return input.shopifyCustomerId !== null || input.lineAuthed;
+}
+
+/**
  * いま**どの入口で**入っているかの署名。`s` = Shopify / `l` = LINE。
  *
  * 入れ替わりの検知はこの署名の変化で行う。真偽値 1 つではなく署名にするのは、
