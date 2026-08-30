@@ -32,12 +32,24 @@ export function LineLoginButtonFallback({ children }: { children: React.ReactNod
  *
  * CRITICAL DESIGN DECISIONS (do not change without reading):
  *
- * 1. The <a href> must point DIRECTLY at access.line.me, not at an
+ * 1. The <a href> must point DIRECTLY at a LINE-owned host, not at an
  *    elxea-owned endpoint that server-redirects. Chrome iOS will not fire
  *    LINE's Universal Link through a 302 from a first-party URL; Safari iOS
  *    is more lenient but we standardize on the strict path.
- *    We fetch the fully-formed authorize URL from POST /api/line-login/init
- *    on mount (which also sets the HttpOnly state cookie).
+ *    We fetch the fully-formed URL from POST /api/line-login/init on mount
+ *    (which also sets the HttpOnly state cookie).
+ *
+ *    WHICH LINE host it is depends on the caller's environment and is decided
+ *    server-side, in ONE place (lib/line/authorize-url.ts):
+ *      - auto login works here (iOS Safari / Android / LINE in-app / unknown)
+ *        -> https://access.line.me/oauth2/v2.1/authorize?...
+ *      - auto login is documented NOT to work (iOS non-Safari, in-app webviews)
+ *        -> https://access-auto.line.me/oauth2/v2.1/login?returnUri=...
+ *           which is the host+path LINE registers in its
+ *           apple-app-site-association / assetlinks.json, i.e. the only URL a
+ *           tap can actually hand to the LINE app. access.line.me is NOT in any
+ *           association file, so a tap there can never open the app by itself.
+ *    Do not reintroduce a hard-coded host here; read whatever init returns.
  *
  * 2. DO NOT use LIFF SDK (liff.login())
  *    - LIFF SDK does NOT open the LINE app from external browsers.

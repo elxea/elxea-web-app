@@ -30,8 +30,39 @@ import { NextRequest } from "next/server";
 import {
   AUTO_LOGIN_KILLING_PARAMS,
   buildLineAuthorizeUrl,
+  lineAppHandoffFromRequest,
   lineUiLocales,
 } from "@/lib/line/authorize-url";
+import {
+  LINE_APP_HANDOFF_BASE_URL_DEFAULT,
+  LINE_APP_HANDOFF_PATH,
+} from "@/lib/line/endpoints";
+
+/**
+ * User-Agent の見本。
+ *
+ * `ios-safari` / `android-browser` は自動ログインが公式に成立する側なので、
+ * **今日どおり認可エンドポイントへ行くこと**を退行検査として固定する。
+ */
+const UA = {
+  iosChrome:
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/126.0.6478.35 Mobile/15E148 Safari/604.1",
+  iosSafari:
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1",
+  instagram:
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Instagram 330.0.0.0.0",
+  androidChrome:
+    "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36",
+  lineInApp:
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Line/14.9.0",
+} as const;
+
+/** 受け渡し URL の `returnUri` に入っている認可要求を取り出す。 */
+function authorizeRequestInside(handoffUrl: URL): URL {
+  const returnUri = handoffUrl.searchParams.get("returnUri");
+  expect(returnUri, "returnUri が無い。認可要求が失われている。").toBeTruthy();
+  return new URL(returnUri!, "https://access.line.me");
+}
 
 const cookieStore = {
   get: vi.fn(() => undefined),
@@ -99,33 +130,43 @@ function request(url: string, headers: Record<string, string> = {}) {
  */
 const AUTHORIZE_URL_ROUTES: Array<{
   name: string;
-  run: () => Promise<string>;
+  /** `userAgent` 省略時は UA ヘッダ無し（= 環境判定は `unknown` = 今日の挙動）。 */
+  run: (userAgent?: string) => Promise<string>;
 }> = [
   {
     name: "POST /api/line-login/init （/login のボタンが読む本命経路）",
-    run: async () => {
+    run: async (userAgent) => {
       const { POST } = await import("@/app/api/line-login/init/route");
-      const res = await POST(request("https://elxea.com/api/line-login/init"));
+      const res = await POST(
+        request("https://elxea.com/api/line-login/init", ua(userAgent)),
+      );
       return ((await res.json()) as { authUrl: string }).authUrl;
     },
   },
   {
     name: "GET /api/line-login （旧経路・302・後方互換）",
-    run: async () => {
+    run: async (userAgent) => {
       const { GET } = await import("@/app/api/line-login/route");
-      const res = await GET(request("https://elxea.com/api/line-login"));
+      const res = await GET(request("https://elxea.com/api/line-login", ua(userAgent)));
       return res.headers.get("location")!;
     },
   },
   {
     name: "POST /api/user/line-link/init （マイページの連携）",
-    run: async () => {
+    run: async (userAgent) => {
       const { POST } = await import("@/app/api/user/line-link/init/route");
-      const res = await POST(request("https://elxea.com/api/user/line-link/init"));
+      const res = await POST(
+        request("https://elxea.com/api/user/line-link/init", ua(userAgent)),
+      );
       return ((await res.json()) as { authUrl: string }).authUrl;
     },
   },
 ];
+
+/** UA ヘッダを足す（未指定なら足さない）。 */
+function ua(userAgent?: string): Record<string, string> {
+  return userAgent ? { "user-agent": userAgent } : {};
+}
 
 describe("認可 URL は全経路で自動ログインを殺さない", () => {
   for (const route of AUTHORIZE_URL_ROUTES) {
@@ -218,6 +259,148 @@ describe("buildLineAuthorizeUrl（方針の本体）", () => {
     const url = new URL(buildLineAuthorizeUrl({ ...base, uiLocales: "ja" }));
     expect(url.searchParams.get("ui_locales")).toBe("ja");
   });
+});
+
+/**
+ * 着地点の切り替え（PR #180 で残っていた穴）。
+ *
+ * `access.line.me` は OS の association ファイルに載っていないので、そこへの
+ * タップは原理的に LINE アプリを開けない（実測 2026-08-30: 同ホストの
+ * `apple-app-site-association` は本文 0 バイト）。アプリに結び付いているのは
+ * `access-auto.line.me` の `/oauth2/v2.1/login` だけである。
+ */
+describe("buildLineAuthorizeUrl（LINE アプリへの着地点）", () => {
+  const base = {
+    channelId: "2011239425",
+    redirectUri: "https://elxea.com/api/line-callback",
+    state: "s",
+    nonce: "n",
+    scope: "profile openid",
+  };
+
+  it("既定では今日どおり認可エンドポイントを指す（動いている環境を触らない）", () => {
+    const url = new URL(buildLineAuthorizeUrl(base));
+    expect(url.host).toBe("access.line.me");
+    expect(url.pathname).toBe("/oauth2/v2.1/authorize");
+  });
+
+  it("appHandoff で association ファイルに載っている host + path へ着地する", () => {
+    const url = new URL(buildLineAuthorizeUrl({ ...base, appHandoff: true }));
+    expect(url.origin).toBe(LINE_APP_HANDOFF_BASE_URL_DEFAULT);
+    expect(url.host).toBe("access-auto.line.me");
+    /* パスは association ファイルの `paths` に載っている値そのもの。ここを外れると
+       同じホストでも Universal Link にならず、アプリは開かない。 */
+    expect(url.pathname).toBe(LINE_APP_HANDOFF_PATH);
+    expect(url.pathname).toBe("/oauth2/v2.1/login");
+  });
+
+  it("受け渡し URL でも認可要求は 1 バイトも失われない", () => {
+    const handoff = new URL(
+      buildLineAuthorizeUrl({
+        ...base,
+        botPrompt: "aggressive",
+        uiLocales: "ja",
+        appHandoff: true,
+      }),
+    );
+    /* `loginChannelId` が無いと LINE は 400 を返す（2026-08-30 実測）。 */
+    expect(handoff.searchParams.get("loginChannelId")).toBe("2011239425");
+
+    const inner = authorizeRequestInside(handoff);
+    expect(inner.pathname).toBe("/oauth2/v2.1/authorize");
+    expect(inner.searchParams.get("response_type")).toBe("code");
+    expect(inner.searchParams.get("client_id")).toBe("2011239425");
+    expect(inner.searchParams.get("redirect_uri")).toBe(base.redirectUri);
+    expect(inner.searchParams.get("state")).toBe("s");
+    expect(inner.searchParams.get("nonce")).toBe("n");
+    expect(inner.searchParams.get("scope")).toBe("profile openid");
+    expect(inner.searchParams.get("bot_prompt")).toBe("aggressive");
+    expect(inner.searchParams.get("ui_locales")).toBe("ja");
+  });
+
+  it("受け渡し URL でも自動ログインを殺すパラメータは載らない（外側・内側とも）", () => {
+    const handoff = new URL(buildLineAuthorizeUrl({ ...base, appHandoff: true }));
+    const inner = authorizeRequestInside(handoff);
+    for (const p of AUTO_LOGIN_KILLING_PARAMS) {
+      expect(
+        handoff.searchParams.has(p),
+        `${p} が受け渡し URL の外側に付いている。`,
+      ).toBe(false);
+      expect(
+        inner.searchParams.has(p),
+        `${p} が returnUri の中に付いている。検査の外で復活している。`,
+      ).toBe(false);
+    }
+  });
+
+  it("自動ログイン失敗からの再試行では受け渡しへ行かない", () => {
+    /* `disableAutoLogin` は「アプリ受け渡しが失敗したので今回は避ける」ための入力。
+       そこでアプリ側へ着地させると同じ失敗を踏ませ、無限ループに戻る。 */
+    const url = new URL(
+      buildLineAuthorizeUrl({ ...base, appHandoff: true, disableAutoLogin: true }),
+    );
+    expect(url.host).toBe("access.line.me");
+    expect(url.pathname).toBe("/oauth2/v2.1/authorize");
+    expect(url.searchParams.get("disable_auto_login")).toBe("true");
+  });
+});
+
+describe("lineAppHandoffFromRequest（どの環境で着地点を変えるか）", () => {
+  const cases: Array<[string, string, boolean]> = [
+    ["iPhone の Chrome（公式に自動ログイン非対応）", UA.iosChrome, true],
+    ["アプリ内ブラウザ（Instagram）", UA.instagram, true],
+    ["iOS Safari（公式に対応・今日動いている）", UA.iosSafari, false],
+    ["Android の Chrome（公式に対応・今日動いている）", UA.androidChrome, false],
+    ["LINE のアプリ内ブラウザ（そもそも LINE の中）", UA.lineInApp, false],
+  ];
+
+  for (const [label, userAgent, expected] of cases) {
+    it(`${label} → ${expected ? "受け渡しへ" : "今日どおり認可へ"}`, () => {
+      expect(
+        lineAppHandoffFromRequest(
+          request("https://elxea.com/api/line-login/init", {
+            "user-agent": userAgent,
+          }),
+        ),
+      ).toBe(expected);
+    });
+  }
+
+  it("User-Agent が無いときは切り替えない（分からないものを内部仕様側へ倒さない）", () => {
+    expect(
+      lineAppHandoffFromRequest(request("https://elxea.com/api/line-login/init")),
+    ).toBe(false);
+  });
+});
+
+describe("全経路が UA で同じ判断をする（経路ごとに分かれないこと）", () => {
+  for (const route of AUTHORIZE_URL_ROUTES) {
+    it(`${route.name} — iPhone の Chrome では受け渡し URL を返す`, async () => {
+      const url = new URL(await route.run(UA.iosChrome));
+      expect(url.host).toBe("access-auto.line.me");
+      expect(url.pathname).toBe(LINE_APP_HANDOFF_PATH);
+
+      const inner = authorizeRequestInside(url);
+      expect(inner.searchParams.get("response_type")).toBe("code");
+      expect(inner.searchParams.get("state")).toBeTruthy();
+      expect(inner.searchParams.get("nonce")).toBeTruthy();
+      for (const p of AUTO_LOGIN_KILLING_PARAMS) {
+        expect(inner.searchParams.has(p)).toBe(false);
+      }
+    });
+
+    it(`${route.name} — iOS Safari では今日どおり access.line.me を返す（退行検査）`, async () => {
+      const url = new URL(await route.run(UA.iosSafari));
+      expect(url.host).toBe("access.line.me");
+      expect(url.pathname).toBe("/oauth2/v2.1/authorize");
+    });
+
+    it(`${route.name} — Android では今日どおり access.line.me を返す（退行検査）`, async () => {
+      const url = new URL(await route.run(UA.androidChrome));
+      expect(url.host).toBe("access.line.me");
+      expect(url.pathname).toBe("/oauth2/v2.1/authorize");
+    });
+  }
 });
 
 describe("lineUiLocales", () => {

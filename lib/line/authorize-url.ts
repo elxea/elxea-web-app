@@ -31,23 +31,56 @@
  *   - `disable_auto_login=true`  … 「If set to `true`, auto login will be disabled」
  *   - `disable_ios_auto_login=true` … 「auto login will be disabled in iOS」
  *
- * したがってコード側でできることは 2 つだけである:
+ * したがってコード側でできることは 3 つである:
  *
  *   1. 上記 3 つを**送らない**（`disable_auto_login` は自動ログイン失敗からの復帰時のみ）
  *   2. 認可 URL を**ユーザーの実 `<a>` タップ**で開く（JavaScript リダイレクト /
  *      URL 直打ちは Universal Links を発火させないと公式に明記）
+ *   3. **そのタップの着地点を、LINE アプリに結び付いた URL にする**（下記）
  *
  * 2 は各ボタン側の責務（`line-login-button.tsx` / `line-linkage-cta.tsx`）。
- * **1 はこの関数の責務**であり、`__tests__/line-authorize-url.test.ts` が固定する。
+ * **1 と 3 はこの関数の責務**であり、`__tests__/line-authorize-url.test.ts` が固定する。
+ *
+ * ## 3 が要る理由（PR #180 で残っていた穴）
+ *
+ * PR #180 は 1 と 2 を満たしたが、それでも iPhone の Chrome では行き止まったままだった。
+ * 理由は **タップの着地点 `access.line.me` がそもそもアプリに結び付いていない**こと
+ * である。OS が読む association ファイルの実測（2026-08-30）:
+ *
+ *   - `https://access.line.me/.well-known/apple-app-site-association` … 本文 0 バイト
+ *   - `https://access-auto.line.me/.well-known/apple-app-site-association` …
+ *     `appID: ZW4U99SQQ3.jp.naver.line` / `paths: ["/dialog/oauth/weblogin",
+ *     "/oauth2/v2.1/login"]`
+ *
+ * つまりアプリが開く URL は `access-auto.line.me/oauth2/v2.1/login` **だけ**であり、
+ * 自動ログインとは「LINE の画面がそこへ内部で遷移する」ことに他ならない。内部遷移は
+ * 公式が「Universal Links may not work」と名指しする形（JS リダイレクト / URL 直打ち）
+ * であり、iOS の Safari 以外ではそこで切れる。だから **利用者のタップを直接その URL に
+ * 着地させる**。LINE 自身が access.line.me のログイン画面下部に出す
+ * 「LINEアプリでログイン」リンクと同じ URL 形である。
+ *
+ * ⚠ この受け渡し URL の組み立て（`returnUri` + `loginChannelId`）は **公式の
+ * パラメータ表には無い**。よって適用先は「今日すでに壊れている環境」だけに絞る
+ * （`shouldUseLineAppHandoff`）。外れても行き先は LINE の通常ログイン画面 = 今日と
+ * 同じ画面なので、失うものは無い。
  *
  * 一次情報:
  *   https://developers.line.biz/en/docs/line-login/integrate-line-login/#making-an-authorization-request
  *   https://developers.line.biz/en/docs/line-login/integrate-line-login/#line-auto-login
  *   https://developers.line.biz/en/docs/line-login/how-to-handle-auto-login-failure/
+ *   https://developer.apple.com/documentation/xcode/supporting-associated-domains
  */
 import type { NextRequest } from "next/server";
 
-import { lineAuthBaseUrl } from "./endpoints";
+import {
+  classifyAutoLoginEnvironment,
+  shouldUseLineAppHandoff,
+} from "./auto-login-environment";
+import {
+  LINE_APP_HANDOFF_PATH,
+  lineAppHandoffBaseUrl,
+  lineAuthBaseUrl,
+} from "./endpoints";
 
 /**
  * 送った瞬間に自動ログインが死ぬパラメータ。
@@ -98,15 +131,28 @@ export type LineAuthorizeUrlInput = {
    * ものを毎回潰す。判定は `lib/line/auto-login.ts`。
    */
   disableAutoLogin?: boolean;
+  /**
+   * **タップの着地点を LINE アプリ側にする**（既定 false）。
+   *
+   * true にすると、返る URL は認可エンドポイントではなく
+   * `access-auto.line.me/oauth2/v2.1/login?returnUri=…&loginChannelId=…` になる。
+   * 認可要求そのものは `returnUri` の中にそのまま入るので、載るパラメータは
+   * どちらでも同一である（`AUTO_LOGIN_KILLING_PARAMS` の検査も両方に効く）。
+   *
+   * 判定は呼び出し側で `lineAppHandoffFromRequest(request)` を使うこと。
+   * 自前で UA を見ないのは、方針を 1 か所に閉じ込めるという本モジュールの趣旨と
+   * 同じ理由である。
+   */
+  appHandoff?: boolean;
 };
 
 /**
- * 認可 URL を組み立てる。
+ * 認可要求のクエリ。`buildLineAuthorizeUrl` の 2 つの出力に共通の本体。
  *
  * ここに無いパラメータは載らない。載せたくなったら、まず上の
  * `AUTO_LOGIN_KILLING_PARAMS` と一次情報を読むこと。
  */
-export function buildLineAuthorizeUrl(input: LineAuthorizeUrlInput): string {
+function lineAuthorizeParams(input: LineAuthorizeUrlInput): URLSearchParams {
   const params = new URLSearchParams({
     response_type: "code",
     client_id: input.channelId,
@@ -122,7 +168,48 @@ export function buildLineAuthorizeUrl(input: LineAuthorizeUrlInput): string {
   /* 既定では**送らない**。送るのは呼び出し側が明示したときだけ。 */
   if (input.disableAutoLogin) params.set("disable_auto_login", "true");
 
-  return `${lineAuthBaseUrl()}/oauth2/v2.1/authorize?${params.toString()}`;
+  return params;
+}
+
+/**
+ * ユーザーのタップ先 URL を組み立てる。
+ *
+ * 既定は公式の認可エンドポイント。`appHandoff` を立てたときだけ、LINE アプリに
+ * 結び付いた受け渡し URL を返す（中身の認可要求は同一）。
+ */
+export function buildLineAuthorizeUrl(input: LineAuthorizeUrlInput): string {
+  const authorizePath = `/oauth2/v2.1/authorize?${lineAuthorizeParams(input)}`;
+
+  /* `disableAutoLogin` が立っている回は、**自動ログインを避けるための再試行**である
+   * （直前の往復がアプリ受け渡しに失敗している）。そこでアプリ側へ着地させると、
+   * 同じ失敗をもう一度踏ませることになる。受け渡しより再試行の意図が優先する。 */
+  if (!input.appHandoff || input.disableAutoLogin) {
+    return `${lineAuthBaseUrl()}${authorizePath}`;
+  }
+
+  /* LINE 自身の「LINEアプリでログイン」リンクと同じ形。`loginChannelId` が無いと
+   * LINE は 400 を返す（2026-08-30 実測）。`loginState` は LINE の画面が自分の
+   * セッション用に載せる値で、**必須ではない**（同実測: 未指定・不正値とも 200 で
+   * 通常のログイン画面が返る）ため、こちらからは組み立てない。 */
+  const handoff = new URLSearchParams({
+    returnUri: authorizePath,
+    loginChannelId: input.channelId,
+  });
+
+  return `${lineAppHandoffBaseUrl()}${LINE_APP_HANDOFF_PATH}?${handoff}`;
+}
+
+/**
+ * この要求の相手に対して、アプリ受け渡し URL を出すべきか。
+ *
+ * 認可 URL を作る経路（ログイン / 旧 302 / 連携）が**同じ判定**を使うための入口。
+ * 経路ごとに UA を見ると、片方だけ直って片方が残る — それが PR #180 の直前まで
+ * 3 経路で起きていたことそのものである。
+ */
+export function lineAppHandoffFromRequest(request: NextRequest): boolean {
+  return shouldUseLineAppHandoff(
+    classifyAutoLoginEnvironment(request.headers.get("user-agent")),
+  );
 }
 
 /**

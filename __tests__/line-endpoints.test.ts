@@ -14,14 +14,21 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 
 import {
   LINE_API_BASE_URL_DEFAULT,
+  LINE_APP_HANDOFF_BASE_URL_DEFAULT,
+  LINE_APP_HANDOFF_PATH,
   LINE_AUTH_BASE_URL_DEFAULT,
   lineApiBaseUrl,
+  lineAppHandoffBaseUrl,
   lineAuthBaseUrl,
   lineAuthRedirectPrefix,
 } from "@/lib/line/endpoints";
 import { verifyLineIdToken } from "@/lib/line/verify-liff-token";
 
-const ENV_KEYS = ["LINE_AUTH_BASE_URL", "LINE_API_BASE_URL"] as const;
+const ENV_KEYS = [
+  "LINE_AUTH_BASE_URL",
+  "LINE_API_BASE_URL",
+  "LINE_APP_HANDOFF_BASE_URL",
+] as const;
 const saved = new Map<string, string | undefined>(
   ENV_KEYS.map((k) => [k, process.env[k]]),
 );
@@ -168,5 +175,44 @@ describe("verifyLineIdToken が差し替え先へ向く", () => {
     });
 
     expect(res.ok).toBe(false);
+  });
+});
+
+/**
+ * LINE アプリ受け渡しホストの契約。
+ *
+ * 値の正本は **LINE が配っている association ファイル**であって、このリポジトリの
+ * 定数ではない。実測（2026-08-30）:
+ *
+ *   https://access-auto.line.me/.well-known/apple-app-site-association
+ *   → {"applinks":{"apps":[],"details":[{"appID":"ZW4U99SQQ3.jp.naver.line",
+ *      "paths":["/dialog/oauth/weblogin","/oauth2/v2.1/login"]}]}}
+ *
+ *   https://access.line.me/.well-known/apple-app-site-association
+ *   → HTTP 200 / 本文 0 バイト（= アプリに結び付いていない）
+ *
+ * ここを書き換えるときは、必ず上の 2 本を実際に引き直すこと。定数だけ動かすと
+ * 「アプリが開かない」に静かに戻る。
+ */
+describe("LINE アプリ受け渡しホスト", () => {
+  it("既定は access-auto.line.me（認可ホストとは別ホスト）", () => {
+    delete process.env.LINE_APP_HANDOFF_BASE_URL;
+    expect(lineAppHandoffBaseUrl()).toBe("https://access-auto.line.me");
+    expect(lineAppHandoffBaseUrl()).toBe(LINE_APP_HANDOFF_BASE_URL_DEFAULT);
+    expect(lineAppHandoffBaseUrl()).not.toBe(lineAuthBaseUrl());
+  });
+
+  it("パスは association ファイルに載っている値そのもの", () => {
+    expect(LINE_APP_HANDOFF_PATH).toBe("/oauth2/v2.1/login");
+  });
+
+  it("env で偽サーバーへ差し替えられる（末尾スラッシュは落ちる）", () => {
+    process.env.LINE_APP_HANDOFF_BASE_URL = "http://127.0.0.1:4010/";
+    expect(lineAppHandoffBaseUrl()).toBe("http://127.0.0.1:4010");
+  });
+
+  it("空文字は未設定と同じ扱い（env を空で上書きしても本番が壊れない）", () => {
+    process.env.LINE_APP_HANDOFF_BASE_URL = "";
+    expect(lineAppHandoffBaseUrl()).toBe(LINE_APP_HANDOFF_BASE_URL_DEFAULT);
   });
 });

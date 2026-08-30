@@ -15,6 +15,7 @@ import { describe, it, expect } from "vitest";
 import {
   canHandOffToLineApp,
   classifyAutoLoginEnvironment,
+  shouldUseLineAppHandoff,
   shouldWarnAboutAutoLogin,
 } from "@/lib/line/auto-login-environment";
 
@@ -110,5 +111,55 @@ describe("shouldWarnAboutAutoLogin", () => {
     expect(shouldWarnAboutAutoLogin("line-in-app")).toBe(false);
     expect(shouldWarnAboutAutoLogin("android-browser")).toBe(false);
     expect(shouldWarnAboutAutoLogin("unknown")).toBe(false);
+  });
+});
+
+/**
+ * 着地点の切り替え先を固定する。
+ *
+ * ここで守るのは「壊れている環境にだけ当てる」こと。受け渡し URL は LINE の
+ * 内部仕様（`returnUri` + `loginChannelId`）に寄りかかっており、公式のパラメータ表
+ * には無い。今日アプリが開いている環境（iOS Safari / Android / LINE 内ブラウザ）まで
+ * そちらへ倒すと、LINE 側の都合で全環境が同時に壊れうる。
+ */
+describe("shouldUseLineAppHandoff", () => {
+  it("iPhone の Chrome は切り替える（今日そこで行き止まっている）", () => {
+    expect(
+      shouldUseLineAppHandoff(classifyAutoLoginEnvironment(UA.iosChrome)),
+    ).toBe(true);
+  });
+
+  it("アプリ内ブラウザも切り替える", () => {
+    expect(
+      shouldUseLineAppHandoff(classifyAutoLoginEnvironment(UA.instagramIos)),
+    ).toBe(true);
+  });
+
+  it("公式に対応している環境は触らない（動いているものを内部仕様へ倒さない）", () => {
+    expect(shouldUseLineAppHandoff("ios-safari")).toBe(false);
+    expect(shouldUseLineAppHandoff("android-browser")).toBe(false);
+    expect(shouldUseLineAppHandoff("line-in-app")).toBe(false);
+  });
+
+  it("desktop と unknown も触らない", () => {
+    expect(shouldUseLineAppHandoff("desktop")).toBe(false);
+    expect(shouldUseLineAppHandoff("unknown")).toBe(false);
+  });
+
+  it("案内を出す環境と切り替える環境は一致している", () => {
+    /* 片方だけ動かすと「アプリが開く前提の画面なのに案内が出ない」等の
+       ちぐはぐが起きる。ずらすときは両方の呼び出し側を読むこと。 */
+    const all = [
+      "line-in-app",
+      "ios-safari",
+      "ios-other-browser",
+      "android-browser",
+      "other-in-app-webview",
+      "desktop",
+      "unknown",
+    ] as const;
+    for (const env of all) {
+      expect(shouldUseLineAppHandoff(env), env).toBe(shouldWarnAboutAutoLogin(env));
+    }
   });
 });

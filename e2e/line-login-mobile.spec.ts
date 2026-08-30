@@ -38,6 +38,21 @@
  */
 import { test, expect } from "@playwright/test";
 
+/**
+ * ## 着地点（2026-08-30 追記）
+ *
+ * 「実 `<a>` タップである」だけでは足りない。タップの**着地先ホスト**が LINE アプリに
+ * 結び付いていなければ、OS はアプリを開く候補としてすら扱わない。実測（同日）:
+ *
+ *   - `access.line.me/.well-known/apple-app-site-association` … 本文 0 バイト
+ *   - `access-auto.line.me/.well-known/apple-app-site-association` …
+ *     `jp.naver.line` / `paths: ["/dialog/oauth/weblogin", "/oauth2/v2.1/login"]`
+ *
+ * よって自動ログインが成立しない環境（iPhone の Safari 以外 / アプリ内ブラウザ）だけ、
+ * 着地点を受け渡しホストへ切り替える。**対応環境は今日どおり**であることを、同じ
+ * ファイルの中で退行検査として並べて固定する。
+ */
+
 /** 自動ログインを殺すパラメータ。1 本でも載ったらアプリは開かない。 */
 const AUTO_LOGIN_KILLING_PARAMS = [
   "prompt",
@@ -48,6 +63,11 @@ const AUTO_LOGIN_KILLING_PARAMS = [
 /** 認可先の origin。偽 LINE に差し替わっているならそちら。 */
 const AUTH_ORIGIN = process.env.E2E_LINE_ORIGIN ?? "https://access.line.me";
 const AUTH_LINK = `a[href^="${AUTH_ORIGIN}/oauth2/v2.1/authorize"]`;
+
+/** 受け渡し先の origin。偽サーバーでは別 host 名に差し替わる（config の注記）。 */
+const HANDOFF_ORIGIN =
+  process.env.E2E_LINE_HANDOFF_ORIGIN ?? "https://access-auto.line.me";
+const HANDOFF_LINK = `a[href^="${HANDOFF_ORIGIN}/oauth2/v2.1/login"]`;
 
 test.describe("LINE ログイン（モバイル）", () => {
   test.use({ viewport: { width: 390, height: 844 }, isMobile: true });
@@ -105,14 +125,45 @@ test.describe("LINE ログイン（モバイル）", () => {
         "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/126.0.6478.35 Mobile/15E148 Safari/604.1",
     });
 
-    test("押す前に「アプリが開かない」と伝える", async ({ page }) => {
-      /* iOS Chrome は LINE 公式に非対応。ここで案内が出ないと、利用者は押してから
-         LINE のパスワード画面で行き止まる（オーナー指摘 2026-08-30 の症状）。 */
+    test("タップ先が LINE アプリに結び付いた URL になっている", async ({ page }) => {
+      /* iOS Chrome では LINE の自動ログイン（= LINE の画面が受け渡しホストへ内部で
+         遷移する形）が成立しない。だから利用者のタップを、その受け渡しホストへ
+         **直接**着地させる。ここが `access.line.me` に戻ると、押した人は必ず
+         メール/パスワード/QR 画面で行き止まる（オーナー指摘 2026-08-30 の症状）。 */
+      await page.goto("/ja/login");
+
+      const handoff = page.locator(HANDOFF_LINK);
+      await expect(handoff).toHaveCount(1, { timeout: 15_000 });
+      expect(await handoff.evaluate((el) => el.tagName)).toBe("A");
+      expect(await handoff.getAttribute("target")).toBeNull();
+
+      /* 認可エンドポイントへの素の `<a>` は出ていない（両方出すと押し分けになる）。 */
+      await expect(page.locator(AUTH_LINK)).toHaveCount(0);
+
+      const url = new URL((await handoff.getAttribute("href"))!);
+      expect(url.pathname).toBe("/oauth2/v2.1/login");
+      expect(url.searchParams.get("loginChannelId")).toBeTruthy();
+
+      /* 認可要求は returnUri の中にそのまま入っている（1 バイトも失われない）。 */
+      const inner = new URL(url.searchParams.get("returnUri")!, AUTH_ORIGIN);
+      expect(inner.pathname).toBe("/oauth2/v2.1/authorize");
+      expect(inner.searchParams.get("response_type")).toBe("code");
+      expect(inner.searchParams.get("state")).toBeTruthy();
+      expect(inner.searchParams.get("nonce")).toBeTruthy();
+      for (const param of AUTO_LOGIN_KILLING_PARAMS) {
+        expect(
+          inner.searchParams.has(param),
+          `${param} が returnUri の中に付いている。`,
+        ).toBe(false);
+      }
+    });
+
+    test("それでも開かなかったときの逃げ道を押す前に置く", async ({ page }) => {
+      /* 受け渡しはアプリ未インストール等で外れうる。外れた先は今日と同じ
+         メール/パスワード画面なので、そこからの戻り方を先に見せておく。 */
       await page.goto("/ja/login");
 
       await expect(page.getByTestId("line-auto-login-notice")).toBeVisible();
-      /* 案内は出すが、導線は塞がない（UA 判定は確実ではないため）。 */
-      await expect(page.locator(AUTH_LINK)).toHaveCount(1, { timeout: 15_000 });
     });
   });
 
@@ -122,10 +173,31 @@ test.describe("LINE ログイン（モバイル）", () => {
         "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1",
     });
 
-    test("対応環境なので余計な案内を出さない", async ({ page }) => {
+    test("対応環境なので今日どおり認可 URL へ行き、案内も出さない（退行検査）", async ({
+      page,
+    }) => {
+      /* iOS Safari は自動ログインが公式に成立する唯一の外部ブラウザで、今日すでに
+         アプリが開いている。受け渡し URL は LINE の内部仕様に寄りかかっているので、
+         **動いている環境をそちらへ倒さない**ことを機械で固定する。 */
       await page.goto("/ja/login");
 
       await expect(page.locator(AUTH_LINK)).toHaveCount(1, { timeout: 15_000 });
+      await expect(page.locator(HANDOFF_LINK)).toHaveCount(0);
+      await expect(page.getByTestId("line-auto-login-notice")).toHaveCount(0);
+    });
+  });
+
+  test.describe("Android の Chrome", () => {
+    test.use({
+      userAgent:
+        "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36",
+    });
+
+    test("公式に対応しているので今日どおり（退行検査）", async ({ page }) => {
+      await page.goto("/ja/login");
+
+      await expect(page.locator(AUTH_LINK)).toHaveCount(1, { timeout: 15_000 });
+      await expect(page.locator(HANDOFF_LINK)).toHaveCount(0);
       await expect(page.getByTestId("line-auto-login-notice")).toHaveCount(0);
     });
   });

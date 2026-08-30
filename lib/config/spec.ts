@@ -553,6 +553,13 @@ export const ENV_SPEC = {
     read: () => process.env.LINE_API_BASE_URL,
     schema: trimmedNoTrailingSlash(),
   },
+  /* LINE アプリ受け渡しホスト (既定 `https://access-auto.line.me`)。認可ホストとは
+   * 別ホストであることに意味がある — 理由は lib/line/endpoints.ts の
+   * `LINE_APP_HANDOFF_BASE_URL_DEFAULT` の注記。 */
+  LINE_APP_HANDOFF_BASE_URL: {
+    read: () => process.env.LINE_APP_HANDOFF_BASE_URL,
+    schema: trimmedNoTrailingSlash(),
+  },
 
   /* ---------------- Firebase ---------------- */
 
