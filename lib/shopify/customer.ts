@@ -376,6 +376,81 @@ export async function getCustomer(accessToken: string): Promise<Customer | null>
 }
 
 /**
+ * 顧客がいつ作られたかだけを聞く、独立した 1 本のクエリ。
+ *
+ * ## なぜ `CUSTOMER_QUERY` に `creationDate` を足さないのか
+ *
+ * `CUSTOMER_QUERY` はマイページ・注文一覧・ヘッダー表示が全部ぶら下がっている
+ * 基幹の問い合わせで、GraphQL は**未知のフィールドが 1 つでもあればクエリ全体を
+ * 拒否する**。歓迎メールという 1 つの用途のためにそこへフィールドを足すと、
+ * 将来 Shopify がこの項目を動かした日に、メールではなく**ログイン後の画面全部**が
+ * 落ちる。用途の狭い読み取りは、影響範囲も狭いところに置く。
+ *
+ * Ref: https://shopify.dev/docs/api/customer/2026-07/objects/Customer
+ *   （`creationDate: DateTime!` — 2026-07 で実在を確認済み・`api-version.ts` の固定版）
+ */
+const CUSTOMER_CREATION_DATE_QUERY = /* GraphQL */ `
+  query CustomerCreationDate {
+    customer {
+      creationDate
+    }
+  }
+`;
+
+/**
+ * 顧客レコードが作られた時刻を返す。**判定できなければ `null`**（例外は投げない）。
+ *
+ * 呼び出し側（歓迎メール）は `null` を「新しさを証明できなかった」として
+ * **送らない側**に倒す。ここが `null` と「古い顧客」を区別しないのは意図的で、
+ * どちらも「初回登録の証拠が無い」という同じ結論になるため。
+ */
+export async function getCustomerCreationDate(
+  accessToken: string,
+): Promise<Date | null> {
+  if (!accessToken) return null;
+
+  try {
+    const res = await fetch(CUSTOMER_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: accessToken,
+      },
+      body: JSON.stringify({ query: CUSTOMER_CREATION_DATE_QUERY }),
+      cache: "no-store",
+    });
+
+    if (!res.ok) {
+      console.warn(`[customer] creationDate query responded ${res.status}`);
+      return null;
+    }
+
+    const json = (await res.json()) as {
+      data?: { customer?: { creationDate?: unknown } | null } | null;
+      errors?: unknown[];
+    };
+    if (json.errors && json.errors.length > 0) {
+      console.warn("[customer] creationDate query returned GraphQL errors");
+      return null;
+    }
+
+    const raw = json.data?.customer?.creationDate;
+    if (typeof raw !== "string") return null;
+    const parsed = new Date(raw);
+    return Number.isFinite(parsed.getTime()) ? parsed : null;
+  } catch (err) {
+    /* 戻り値は null（＝新しさを証明できなかった）だが、**黙らせない**。
+       呼び出し側はこれを受けて歓迎メールを送らない側に倒すので、ここが静かに
+       落ち続けると「初回登録の人に歓迎メールが届かない」が誰にも気付かれずに
+       固定化する。元の実装がまさにその形で壊れていた。 */
+    reportLoadFailure("getCustomerCreationDate:transport", err, {
+      impact: "初回登録の判定ができず歓迎メールを送らなかった",
+    });
+    return null;
+  }
+}
+
+/**
  * Query used to prove that a subscription contract belongs to the customer who
  * owns `accessToken`.
  *

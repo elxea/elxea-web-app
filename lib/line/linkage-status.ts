@@ -1,6 +1,10 @@
 import * as Sentry from "@sentry/nextjs";
 
 import { CX_AGENT_BASE_URL } from "@/lib/chat/proxy";
+import {
+  isLedgerAuthRejection,
+  reportLedgerAuthFailure,
+} from "@/lib/line/ledger-auth";
 import { env } from "@/lib/config";
 import { extractCustomerId } from "@/lib/firebase/types";
 
@@ -123,6 +127,15 @@ async function loadLineLinkageStatus(
       console.warn(
         `[line-linkage-status] forward lookup returned ${upstream.status}`,
       );
+      /* 401 は「この 1 件が読めなかった」ではなく「全員分が読めない」。共有鍵が
+         ずれている間はマイページの連携状態が誰にも出せないので、1 件の読み取り
+         失敗と同じ棚に積まず、設定破壊として上げる（2026-08-30）。 */
+      if (isLedgerAuthRejection(upstream.status)) {
+        reportLedgerAuthFailure({
+          source: "linkage-status-forward",
+          failure: "key-rejected",
+        });
+      }
       reportLinkageReadFailure("forward", "upstream-status", now);
       return UNKNOWN_LINE_LINKAGE;
     }
@@ -597,6 +610,14 @@ async function loadReverseLinkage(
       console.warn(
         `[line-linkage-status] reverse lookup returned ${upstream.status}`,
       );
+      /* 順引きと同じ理由（2026-08-30）。逆引きが落ちると LINE ログインの人の
+         本人解決が空の棚に落ちるので、こちらも設定破壊として上げる。 */
+      if (isLedgerAuthRejection(upstream.status)) {
+        reportLedgerAuthFailure({
+          source: "linkage-status-reverse",
+          failure: "key-rejected",
+        });
+      }
       reportLinkageReadFailure("reverse", "upstream-status", now);
       return unknown;
     }

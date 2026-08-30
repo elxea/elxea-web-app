@@ -202,12 +202,13 @@ describe("GET /api/health/line", () => {
     const { GET } = await import("@/app/api/health/line/route");
     const first = await GET();
     expect((await first.json()).cached).toBe(false);
-    // 2 チャネル分 = 2 往復。
-    expect(impl).toHaveBeenCalledTimes(2);
+    /* 2 チャネル + cx-agent の共有鍵 = 3 往復。3 本目は 2026-08-30 の障害
+       （SYNC_API_SECRET のずれで連携が全滅したのに health は緑だった）で足した。 */
+    expect(impl).toHaveBeenCalledTimes(3);
 
     const second = await GET();
     expect((await second.json()).cached).toBe(true);
-    expect(impl).toHaveBeenCalledTimes(2);
+    expect(impl).toHaveBeenCalledTimes(3);
   });
 
   it("CDN に持たせない", async () => {
