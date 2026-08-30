@@ -1,37 +1,38 @@
 /**
  * 「この環境で LINE の自動ログインは成立しうるか」を User-Agent から見分ける。
  *
- * ## なぜこれが要るのか（今回の指摘の本体）
+ * ## なぜこれが要るのか
  *
- * 認可 URL の側は、もう正しい。`prompt` は 2026-08-18 の `ab25915` で外れ、
- * 本番の実測（2026-08-30）でも認可 URL は
- *
- *   `response_type / client_id / redirect_uri / state / nonce / scope / bot_prompt`
- *
- * だけを載せている。自動ログインを殺す 3 パラメータはどれも付いていない。
- * ボタンも実 `<a>` タップである。**コード側でできることは全部やっている。**
- *
- * それでも「LINE アプリが立ち上がらない」が続くのは、自動ログインが**環境の機能**
- * だからである。LINE の公式 FAQ はこう書いている:
+ * LINE の公式 FAQ はこう書いている:
  *
  *   > Auto login isn't supported for devices other than iOS and Android devices,
  *   > devices where LINE isn't installed, and **in browsers other than the Safari
  *   > browser for iOS**.
  *
- * つまり **iPhone の Chrome / Firefox / Edge、および Instagram・X・Facebook などの
- * アプリ内ブラウザでは、何をしても LINE アプリは起動しない。** LINE はそういう
- * 環境の人を黙って access.line.me のメール/パスワード/QR 画面へ送る。それが
- * 「パスワードを覚えていない」「スマホなので QR を読めない」で詰まる画面である。
+ * つまり iPhone の Chrome / Firefox / Edge、および Instagram・X・Facebook などの
+ * アプリ内ブラウザでは、LINE の**自動ログイン**は成立しない。LINE はそういう環境の
+ * 人を黙って access.line.me のメール/パスワード/QR 画面へ送る。それが「パスワードを
+ * 覚えていない」「スマホなので QR を読めない」で詰まる画面である。
  *
- * ここまでが分かっていれば、サイト側にはまだやれることがある — **押す前に伝える**
- * ことである。押した後に LINE の画面で行き止まるのと、押す前に「この browser では
- * LINE アプリが開きません。Safari で開いてください」と分かるのとでは、離脱が違う。
+ * ## この分類の使い道は 2 つある
+ *
+ * 1. **導線そのものを変える**（`shouldUseLineAppHandoff`）。自動ログインが成立しない
+ *    環境では、ボタンのタップ先を `access.line.me` の認可 URL ではなく、LINE アプリに
+ *    結び付いた `access-auto.line.me/oauth2/v2.1/login` にする。自動ログインは
+ *    「LINE の画面が内部でその URL へ遷移する」形なので Safari 以外では切れるが、
+ *    **利用者自身のタップ**なら OS はアプリを開く候補として扱う。根拠と association
+ *    ファイルの実測は `lib/line/endpoints.ts`。
+ *
+ * 2. **押す前に伝える**（`shouldWarnAboutAutoLogin`）。1 が効かなかったとき
+ *    （アプリ未インストール / アプリ内 WebView が外部アプリを開かない設定 など）の
+ *    行き止まりを、押した後ではなく押す前に説明する。
  *
  * ## この判定は「押させない」ためのものではない
  *
  * 判定は UA 文字列に頼るので確実ではない（UA は詐称でき、将来変わる）。よって
- * **ボタンは常に押せるままにし、案内を足すだけ**にする。誤判定しても人の行き先を
- * 塞がない設計にしておくこと。`unknown` を「非対応」に丸めないのも同じ理由。
+ * **ボタンは常に押せるままにする**。1 の分岐も、外したときの行き先は LINE の
+ * 通常のログイン画面（＝今日と同じ画面）であって、袋小路が増えることはない。
+ * `unknown` を「非対応」に丸めないのも同じ理由。
  *
  * 一次情報:
  *   https://developers.line.biz/en/faq/  （"How does auto login work?"）
@@ -157,7 +158,31 @@ export function canHandOffToLineApp(env: AutoLoginEnvironment): boolean {
  *
  * 案内を出す条件はこれ。PC はそもそもアプリを開く話をしていないので含めない
  * （PC で QR / メールが出るのは正常であり、案内は雑音になる）。
+ *
+ * `shouldUseLineAppHandoff` と**同じ集合**を返す。同じ環境に対して
+ * 「導線を変える」と「変えても外れうると伝える」を同時に行うためで、片方だけを
+ * 動かすと『アプリが開く前提の画面なのに案内が出ない』等のちぐはぐが起きる。
+ * 意図的に一方だけ変えるときは、両方の呼び出し側を読んでからにすること。
  */
 export function shouldWarnAboutAutoLogin(env: AutoLoginEnvironment): boolean {
+  return env === "ios-other-browser" || env === "other-in-app-webview";
+}
+
+/**
+ * ボタンのタップ先を **LINE アプリに結び付いた URL** に切り替えるべき環境か。
+ *
+ * ## 切り替える側だけを選ぶ理由
+ *
+ * `line-in-app` / `ios-safari` / `android-browser` は自動ログインが公式に成立する
+ * 環境で、今日すでにアプリが開いている。**動いているものは触らない** —
+ * 受け渡し URL は LINE の内部仕様に寄りかかっており（`returnUri` + `loginChannelId`
+ * という組み合わせは公式のパラメータ表には無い）、公式に文書化された
+ * `access.line.me/oauth2/v2.1/authorize` の方が寿命が長い。壊れている環境にだけ
+ * 当てれば、外れたときに失うものは今日と同じ画面だけで済む。
+ *
+ * `unknown` を含めないのも同じ判断である（分からないものを内部仕様側へ倒さない）。
+ * `desktop` は QR / メールで入るのが正しい姿なので当然含めない。
+ */
+export function shouldUseLineAppHandoff(env: AutoLoginEnvironment): boolean {
   return env === "ios-other-browser" || env === "other-in-app-webview";
 }

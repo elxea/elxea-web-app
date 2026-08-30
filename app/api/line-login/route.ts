@@ -4,7 +4,11 @@ import crypto from "crypto";
 import { getBaseUrl, getRequestHostname, isTrustedAuthHost } from "@/lib/base-url";
 import { getCookieSpec, isSecure, resolveCookieDomain } from "@/lib/auth/cookies";
 import { wantsAutoLoginDisabled } from "@/lib/line/auto-login";
-import { buildLineAuthorizeUrl, lineUiLocales } from "@/lib/line/authorize-url";
+import {
+  buildLineAuthorizeUrl,
+  lineAppHandoffFromRequest,
+  lineUiLocales,
+} from "@/lib/line/authorize-url";
 import {
   loginBotPrompt,
   loginScopeParam,
@@ -141,6 +145,14 @@ export async function GET(request: NextRequest) {
     uiLocales: lineUiLocales(request),
     // Same auto-login-failure escape hatch as the init route; see lib/line/auto-login.ts.
     disableAutoLogin: wantsAutoLoginDisabled(request),
+    /* 着地点の切り替えも 3 経路で同じ判定を使う（`/api/line-login/init` の同じ箇所）。
+     *
+     * ⚠ この route は 302 なので、切り替えても Universal Link が発火する保証は無い
+     *   （公式が発火しないと名指しするのは JS リダイレクト / URL 直打ちで、302 の
+     *   扱いは書かれていない）。それでも同じ判定を通すのは、**経路ごとに方針が
+     *   分かれること自体**が 2026-03-25 の再発の下地だったからである。外れたときの
+     *   行き先は LINE の通常ログイン画面で、今日と同じである。 */
+    appHandoff: lineAppHandoffFromRequest(request),
   });
 
   return NextResponse.redirect(authUrl);

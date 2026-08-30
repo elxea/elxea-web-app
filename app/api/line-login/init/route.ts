@@ -4,7 +4,11 @@ import crypto from "crypto";
 import { getBaseUrl, getRequestHostname, isTrustedAuthHost } from "@/lib/base-url";
 import { getCookieSpec, isSecure, resolveCookieDomain } from "@/lib/auth/cookies";
 import { wantsAutoLoginDisabled } from "@/lib/line/auto-login";
-import { buildLineAuthorizeUrl, lineUiLocales } from "@/lib/line/authorize-url";
+import {
+  buildLineAuthorizeUrl,
+  lineAppHandoffFromRequest,
+  lineUiLocales,
+} from "@/lib/line/authorize-url";
 import {
   loginBotPrompt,
   loginScopeParam,
@@ -158,6 +162,11 @@ export async function POST(request: NextRequest) {
     botPrompt: loginBotPrompt(),
     uiLocales: lineUiLocales(request),
     disableAutoLogin: wantsAutoLoginDisabled(request),
+    /* 自動ログインが公式に成立しない環境（iPhone の Safari 以外 / アプリ内 WebView）
+     * にだけ、タップの着地点を LINE アプリ側の URL に切り替える。判定と根拠は
+     * `lib/line/auto-login-environment.ts` と `lib/line/endpoints.ts`。
+     * Safari / Android / LINE 内ブラウザは今日どおり認可エンドポイントへ行く。 */
+    appHandoff: lineAppHandoffFromRequest(request),
   });
 
   return NextResponse.json({ authUrl });

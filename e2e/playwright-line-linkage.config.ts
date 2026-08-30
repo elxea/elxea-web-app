@@ -42,6 +42,15 @@ const CX_PORT = 3322;
 const SHOPIFY_PORT = 3323;
 
 const LINE_ORIGIN = `http://127.0.0.1:${LINE_PORT}`;
+/**
+ * 受け渡しホスト（本物の `access-auto.line.me` にあたる）。
+ *
+ * **わざと別の host 名にしてある。** 本物では認可ホストと受け渡しホストが別ホストで、
+ * アプリに結び付いているのは後者だけである（`lib/line/endpoints.ts`）。同じ origin に
+ * すると「タップの着地点が別ホストへ移ったこと」自体を検査できなくなり、着地点が
+ * `access.line.me` に戻る退行が緑のまま通る。中身は同じ偽サーバーでよい。
+ */
+const LINE_HANDOFF_ORIGIN = `http://localhost:${LINE_PORT}`;
 const CX_ORIGIN = `http://127.0.0.1:${CX_PORT}`;
 const SHOPIFY_ORIGIN = `http://127.0.0.1:${SHOPIFY_PORT}`;
 
@@ -77,6 +86,7 @@ const CX_HIT_LOG = path.join(repoRoot, "test-results", "fake-cx-agent-hits.jsonl
 /* spec 側からも同じ値を読む。ここで 1 回だけ評価して両側へ渡すのは、独立に組み立てると
  * 静かにずれて「たまたま緑」になりうるため（auth-flow config と同じ理由）。 */
 process.env.E2E_LINE_ORIGIN = LINE_ORIGIN;
+process.env.E2E_LINE_HANDOFF_ORIGIN = LINE_HANDOFF_ORIGIN;
 process.env.E2E_CX_ORIGIN = CX_ORIGIN;
 process.env.E2E_SHOPIFY_ORIGIN = SHOPIFY_ORIGIN;
 process.env.E2E_LINE_HIT_LOG = LINE_HIT_LOG;
@@ -223,6 +233,8 @@ export default defineConfig({
         /* --- 偽 LINE --- */
         LINE_AUTH_BASE_URL: LINE_ORIGIN,
         LINE_API_BASE_URL: LINE_ORIGIN,
+        /* 受け渡しホストは別 host 名で渡す（上の LINE_HANDOFF_ORIGIN の注記）。 */
+        LINE_APP_HANDOFF_BASE_URL: LINE_HANDOFF_ORIGIN,
         AUTH_LINE_ID: LINE_LOGIN_CHANNEL_ID,
         AUTH_LINE_SECRET: "fake-line-login-secret",
         /* 連携（/{locale}/account からの導線）は LINE ログインとは別チャネル。

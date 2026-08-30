@@ -135,6 +135,33 @@ const server = http.createServer(async (req, res) => {
     return json(res, 200, { ok: true });
   }
 
+  /* ---- LINE アプリへの受け渡し ---------------------------------------------- */
+
+  /* 本物では `access-auto.line.me` にあり、iOS の apple-app-site-association /
+   * Android の assetlinks.json に載っている**唯一のパス**（実測 2026-08-30）。
+   * 電話ではここで LINE アプリが開く。ブラウザから素通りしたときは、本物と同じく
+   * `returnUri` へ送り返す（本物は自前のログイン画面を出すが、ここで検査したいのは
+   * 「認可要求が失われずに戻ること」なので素直に転送する）。
+   *
+   * `loginChannelId` が無ければ 400。本物も同じ（未指定で 400 を返すことを実測）。 */
+  if (pathname === "/oauth2/v2.1/login") {
+    const returnUri = url.searchParams.get("returnUri");
+    const loginChannelId = url.searchParams.get("loginChannelId");
+
+    recordHit({ path: pathname, loginChannelId, hasReturnUri: Boolean(returnUri) });
+
+    if (!loginChannelId || !returnUri) {
+      return json(res, 400, { error: "invalid_request" });
+    }
+    /* 相対パスしか受けない（`returnUri` に絶対 URL を入れて外へ飛ばす経路を作らない）。 */
+    if (!returnUri.startsWith("/")) {
+      return json(res, 400, { error: "invalid_return_uri" });
+    }
+
+    res.writeHead(302, { location: `${PUBLIC_ORIGIN}${returnUri}` }).end();
+    return;
+  }
+
   /* ---- 認可 ---------------------------------------------------------------- */
 
   if (pathname === "/oauth2/v2.1/authorize") {

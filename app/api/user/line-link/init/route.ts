@@ -6,7 +6,11 @@ import { enforceRateLimit, limiters } from "@/lib/ratelimit";
 import { getBaseUrl, getRequestHostname, isTrustedAuthHost } from "@/lib/base-url";
 import { getCookieSpec, isSecure, resolveCookieDomain } from "@/lib/auth/cookies";
 import { fetchLineLinkageStatus } from "@/lib/line/linkage-status";
-import { buildLineAuthorizeUrl, lineUiLocales } from "@/lib/line/authorize-url";
+import {
+  buildLineAuthorizeUrl,
+  lineAppHandoffFromRequest,
+  lineUiLocales,
+} from "@/lib/line/authorize-url";
 import {
   LINE_LINK_STATE_COOKIE,
   STATE_TTL_MS,
@@ -147,6 +151,10 @@ export async function POST(request: NextRequest) {
     nonce,
     scope: "profile openid",
     uiLocales: lineUiLocales(request),
+    /* 連携も「LINE アプリが開かない環境」は同じ。マイページから連携する人も
+     * iPhone の Chrome なら同じメール/パスワード画面で行き止まる。判定は
+     * ログイン経路と同じ 1 か所（`lib/line/authorize-url.ts`）。 */
+    appHandoff: lineAppHandoffFromRequest(request),
   });
 
   return NextResponse.json({ authUrl });
