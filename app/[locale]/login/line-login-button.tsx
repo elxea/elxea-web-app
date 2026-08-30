@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
-import { buildChatSessionCookie } from "@/lib/chat/session-cookie";
 import { autoLoginFailedInSearch } from "@/lib/line/auto-login";
 
 import { channelMisconfiguredInSearch } from "./auth-error-keys";
@@ -103,17 +102,12 @@ export function LineLoginButton({ children }: { children: React.ReactNode }) {
     // 押せないと決まっている回は、init を呼ぶ意味が無い。
     if (channelMisconfigured) return;
 
-    // Save chat session_id cookie for identity linking in the Auth.js callback.
-    try {
-      const sessionId = localStorage.getItem("elxea-chat-session-id");
-      if (sessionId) {
-        // `Secure` は secure context のときだけ付ける。非 secure origin では
-        // ブラウザが `Secure` 付きクッキーを黙って捨てるため (lib/chat/session-cookie.ts)。
-        document.cookie = buildChatSessionCookie(sessionId, window.isSecureContext);
-      }
-    } catch {
-      // localStorage not available
-    }
+    /* ここには以前「localStorage の会話 ID を `chat_session_id` cookie に書き写す」
+     * 処理があった。LINE の callback がそれを読んで cx-agent に連携させるためだが、
+     * **ブラウザが自分で書いた値を identity の根拠にしていた**ので、他人の会話 ID を
+     * 入れて押すだけでその会話を奪えた。会話 ID の発行はサーバ (`/api/chat/session`)
+     * に一本化し、callback は署名済み `chat_sid` を読むようにしたので、ここで
+     * 渡すものは何も無い。 */
 
     /* If we arrived here because auto login just failed, ask for an authorize
      * URL that skips auto login. Otherwise auto login is left on — it is the
@@ -147,20 +141,6 @@ export function LineLoginButton({ children }: { children: React.ReactNode }) {
     };
   }, [channelMisconfigured]);
 
-  const handleClick = () => {
-    // Refresh session_id cookie immediately before navigation.
-    try {
-      const sessionId = localStorage.getItem("elxea-chat-session-id");
-      if (sessionId) {
-        // `Secure` は secure context のときだけ付ける。非 secure origin では
-        // ブラウザが `Secure` 付きクッキーを黙って捨てるため (lib/chat/session-cookie.ts)。
-        document.cookie = buildChatSessionCookie(sessionId, window.isSecureContext);
-      }
-    } catch {
-      // noop
-    }
-  };
-
   /* 押しても直らないと分かっている状態は、押せない見た目にする。`unavailable`
      (init が 503) と `channelMisconfigured` (token 交換が invalid_client) は
      起点が違うが、利用者にとっては同じ「今は使えない」なので同じ姿にする。 */
@@ -183,7 +163,7 @@ export function LineLoginButton({ children }: { children: React.ReactNode }) {
   return (
     <Button asChild className="w-full shadow-xs">
       {/* Intentional: <a> with external href (authUrl) required for Universal Links to open the LINE app. Must NOT be <Link>. no-html-link-for-pages does not fire here (external href), so no disable directive is needed. */}
-      <a href={authUrl} onClick={handleClick}>
+      <a href={authUrl}>
         {children}
       </a>
     </Button>

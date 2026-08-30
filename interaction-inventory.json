@@ -472,10 +472,10 @@
       "kind": "handler",
       "name": "onClick",
       "response": "pessimistic-form",
-      "why": "「結果を見る」。出す結果をサーバが決めるので楽観更新はしない (当たっていない結果を先に見せることになる) 代わりに、進行の印を押した瞬間に出す。通り道は usePessimisticMutation (mutation-classes.ts の pessimistic-form)。",
       "observe": [
         "[data-slot=\"diagnosis-submit\"][data-pending=\"true\"]"
-      ]
+      ],
+      "why": "「結果を見る」。出す結果をサーバが決めるので楽観更新はしない (当たっていない結果を先に見せることになる) 代わりに、進行の印を押した瞬間に出す。通り道は usePessimisticMutation (mutation-classes.ts の pessimistic-form)。"
     },
     {
       "id": "app/[locale]/diagnosis/diagnosis-form.tsx#handler:onClick#5",
@@ -502,10 +502,10 @@
       "kind": "write",
       "name": "fetch:POST",
       "response": "pessimistic-form",
-      "why": "答え 3 つを /api/diagnosis へ送る本体 (onClick#4 と同じ 1 操作)。二重送信は hook 側が弾く。",
       "observe": [
         "[data-slot=\"diagnosis-submit\"][data-pending=\"true\"]"
-      ]
+      ],
+      "why": "答え 3 つを /api/diagnosis へ送る本体 (onClick#4 と同じ 1 操作)。二重送信は hook 側が弾く。"
     },
     {
       "id": "app/[locale]/error.tsx#handler:onClick#1",
@@ -638,13 +638,6 @@
       "name": "Link",
       "response": "router-nav",
       "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
-    },
-    {
-      "id": "app/[locale]/login/line-login-button.tsx#handler:onClick#1",
-      "file": "app/[locale]/login/line-login-button.tsx",
-      "kind": "handler",
-      "name": "onClick",
-      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
     },
     {
       "id": "app/[locale]/login/line-login-button.tsx#link:a#1",

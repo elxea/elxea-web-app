@@ -25,6 +25,7 @@ import {
   reportMisconfiguredChannel,
 } from "@/lib/line/token-error";
 import { COOKIE_NAME } from "@/lib/auth/cookie-names";
+import { resolveChatSession, writeChatSessionCookie } from "@/lib/chat/session-server";
 
 /**
  * LINE Login OAuth 2.0 callback endpoint.
@@ -275,7 +276,16 @@ export async function GET(request: NextRequest) {
       env("NEXT_PUBLIC_CHAT_API_URL") ?? "http://localhost:8787/api/chat"
     ).replace(/\/api\/chat\/?$/, "");
 
-    const chatSessionId = cookieStore.get(COOKIE_NAME.chatSessionId)?.value;
+    /* ## ここが恒久的な乗っ取りの入口だった (P1)
+     *
+     * 以前は `chat_session_id` — **ブラウザの JS が自分で書いた cookie** — を
+     * そのまま `link-line` に渡していた。つまり他人の会話 ID を自分の cookie に
+     * 入れて LINE ログインするだけで、他人の匿名会話を自分の LINE アカウントに
+     * **恒久的に**結び付けられた。本人は自分の会話から締め出される。
+     *
+     * `resolveChatSession()` はサーバが署名した `chat_sid` しか受け付けないので、
+     * 「他人の会話 ID を知っている」ことは何の根拠にもならなくなる。 */
+    const chatSession = await resolveChatSession();
 
     // C1: Include X-API-Key for identity linking. In production, never call the worker without it
     // (avoids silently sending unauthenticated requests).
@@ -302,7 +312,10 @@ export async function GET(request: NextRequest) {
             line_user_id: lineUserId,
             email,
             display_name: displayName,
-            session_id: chatSessionId ?? null,
+            session_id: chatSession.sessionId,
+            /* 署名は別フィールド。cx-agent は未署名の会話 ID を identity として
+               扱わないので、鍵が無い環境では黙って匿名側に落ちる (fail-closed)。 */
+            session_proof: chatSession.proof,
           }),
         });
       } catch (e) {
@@ -322,6 +335,11 @@ export async function GET(request: NextRequest) {
     });
 
     const response = NextResponse.redirect(new URL(`/${locale}/login/complete?linked=true`, requestOrigin));
+
+    /* この往復で会話 ID を発行したなら、その ID をブラウザにも渡しておく。
+       渡さないと「`link-line` には登録したのに、戻ってきたブラウザは別の会話を
+       始める」というズレが残り、連携直後の履歴が空になる。 */
+    if (chatSession.minted) writeChatSessionCookie(response, chatSession);
 
     /* Scope session cookies to the apex so the user stays logged in whether they
      * browse `elxea.com` or `www.elxea.com`. See the init route for context.
