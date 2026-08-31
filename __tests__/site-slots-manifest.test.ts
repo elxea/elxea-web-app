@@ -21,9 +21,25 @@ import {
   validateSiteSlotsManifest,
   type SiteSlot,
 } from '@/lib/site-slots';
+import { scanSource } from '@/scripts/check-site-slots';
 
 const ROOT = path.resolve(__dirname, '..');
 const MANIFEST_PATH = path.join(ROOT, 'public', 'site-slots.manifest.json');
+const PAGE_PATH = path.join(ROOT, 'app', '[locale]', 'page.tsx');
+
+/**
+ * 実使用 (JSX 属性 slotId) だけを外し、id の文字列自体はソースに残す。
+ * 「文字列が残っているだけでは使用と数えない」ことを測るための細工。
+ */
+function removeSlotUsage(source: string): string {
+  const replaced = source.replace(/slotId="(site:[a-z0-9:-]+)"/, 'data-legacy-slot="$1"');
+  if (replaced === source) throw new Error('slotId 属性が見つからず、細工できませんでした');
+  return replaced;
+}
+
+function regenerate(): void {
+  execFileSync('npx', ['tsx', 'scripts/gen-site-slots.ts'], { cwd: ROOT, stdio: 'ignore' });
+}
 
 /** 検査を通る最小の枠。各テストがここから 1 か所だけ壊す。 */
 function validSlot(overrides: Partial<SiteSlot> = {}): SiteSlot {
@@ -186,6 +202,65 @@ describe('isSiteSlotActive', () => {
   });
 });
 
+/**
+ * 「使用」の判定は AST で行う (JSX 属性 slotId の文字列リテラルのみ)。
+ * 以前は任意の引用文字列を正規表現で拾っていたため、コメントが実使用の代わりに
+ * なる偽陰性 (QA NC9) と、コメントを足しただけで落ちる偽陽性 (NC8) が起きていた。
+ */
+describe('scanSource — 何を「使用」と数えるか', () => {
+  const ids = (source: string) =>
+    scanSource('fixture.tsx', source).usages.map((u) => u.id);
+
+  it('JSX 属性の文字列リテラルは使用と数える', () => {
+    expect(ids('const a = <SiteImage slotId="site:top:hero-01" />;')).toEqual([
+      'site:top:hero-01',
+    ]);
+  });
+
+  it('波括弧つきの文字列リテラルも数える', () => {
+    expect(ids('const a = <SiteImage slotId={"site:top:hero-01"} />;')).toEqual([
+      'site:top:hero-01',
+    ]);
+    expect(ids('const a = <SiteImage slotId={`site:top:hero-01`} />;')).toEqual([
+      'site:top:hero-01',
+    ]);
+  });
+
+  it('行コメント内の id は数えない (NC8 の偽陽性)', () => {
+    expect(ids('// legacy: "site:ghost:hero-01"\nconst a = 1;')).toEqual([]);
+  });
+
+  it('ブロックコメント内の id は数えない', () => {
+    expect(ids('/* was slotId="site:ghost:hero-01" */\nconst a = 1;')).toEqual([]);
+  });
+
+  it('別の属性に置かれた id は数えない (NC9 の偽陰性)', () => {
+    expect(ids('const a = <img data-legacy-slot="site:top:hero-01" />;')).toEqual([]);
+  });
+
+  it('slotId 以外の場所の文字列は数えない', () => {
+    expect(ids('const s = "site:top:hero-01";')).toEqual([]);
+  });
+
+  it('静的に読めない slotId は dynamic として拾う', () => {
+    const { usages, dynamic } = scanSource(
+      'fixture.tsx',
+      'const a = <SiteImage slotId={id} />;',
+    );
+    expect(usages).toEqual([]);
+    expect(dynamic).toHaveLength(1);
+  });
+
+  it('埋め込みのあるテンプレート文字列も dynamic 扱い', () => {
+    const { usages, dynamic } = scanSource(
+      'fixture.tsx',
+      'const a = <SiteImage slotId={`site:top:${n}`} />;',
+    );
+    expect(usages).toEqual([]);
+    expect(dynamic).toHaveLength(1);
+  });
+});
+
 describe('check:site-slots ゲート (子プロセス実行)', () => {
   it('宣言とコードが一致していれば exit 0', () => {
     const { code, output } = runGate();
@@ -225,6 +300,47 @@ describe('check:site-slots ゲート (子プロセス実行)', () => {
       expect(output).toContain(removed);
     } finally {
       writeFileSync(MANIFEST_PATH, original, 'utf8');
+    }
+  });
+
+  /**
+   * QA NC5: manifest は「畳むなら validTo を入れる」と案内しているのに、検査が
+   * validTo を見ておらず、案内どおりにやると build が落ちていた。落ちないのが正。
+   */
+  it('validTo を入れた枠はコードから外しても exit 0 (廃止手順が通る)', () => {
+    const originalManifest = readFileSync(MANIFEST_PATH, 'utf8');
+    const originalPage = readFileSync(PAGE_PATH, 'utf8');
+    const parsed = JSON.parse(originalManifest) as { version: number; slots: SiteSlot[] };
+    parsed.version += 1;
+    parsed.slots[0].validTo = '2026-01-31';
+    try {
+      writeFileSync(MANIFEST_PATH, `${JSON.stringify(parsed, null, 2)}\n`, 'utf8');
+      writeFileSync(PAGE_PATH, removeSlotUsage(originalPage), 'utf8');
+      regenerate();
+      const { code, output } = runGate();
+      expect(output).toContain('[SKIP]');
+      expect(output).toContain('validTo=2026-01-31');
+      expect(code).toBe(0);
+    } finally {
+      writeFileSync(MANIFEST_PATH, originalManifest, 'utf8');
+      writeFileSync(PAGE_PATH, originalPage, 'utf8');
+      regenerate();
+    }
+  });
+
+  /**
+   * QA NC9: SiteImage を消してコメント等に id 文字列だけ残すと、以前は
+   * 「使用されている」と誤判定してゲートを黙って通り抜けていた。落ちるのが正。
+   */
+  it('validTo なしで枠をコードから外すと exit 1 (文字列の残骸は使用と数えない)', () => {
+    const originalPage = readFileSync(PAGE_PATH, 'utf8');
+    try {
+      writeFileSync(PAGE_PATH, removeSlotUsage(originalPage), 'utf8');
+      const { code, output } = runGate();
+      expect(code).toBe(1);
+      expect(output).toContain('コードのどこでも');
+    } finally {
+      writeFileSync(PAGE_PATH, originalPage, 'utf8');
     }
   });
 

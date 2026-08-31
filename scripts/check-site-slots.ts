@@ -29,7 +29,10 @@
 import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 
-import { validateSiteSlotsManifest } from '../lib/site-slots-schema';
+import ts from 'typescript';
+
+import { isSiteSlotActive, validateSiteSlotsManifest } from '../lib/site-slots-schema';
+import type { SiteSlot } from '../lib/site-slots-schema';
 
 import { GENERATED_PATH, MANIFEST_PATH, readSlotIds, renderGenerated } from './gen-site-slots';
 
@@ -38,22 +41,81 @@ const ROOT = path.resolve(__dirname, '..');
 /** コードを走査する対象。ここに無いディレクトリで枠を使っても検出できない。 */
 const SCAN_DIRS = ['app', 'components', 'lib', 'sanity'];
 const SCAN_EXTENSIONS = new Set(['.ts', '.tsx']);
-/** 枠 id を「宣言として」持つファイル。使用箇所としては数えない。 */
-const NOT_A_USAGE = new Set(
-  ['lib/site-slots.ts', 'lib/site-slots-schema.ts', 'lib/site-slots.generated.ts'].map((p) =>
-    path.join(ROOT, p),
-  ),
-);
 
-/** ソース中に現れる枠 id 文字列リテラル。 */
-const SLOT_ID_LITERAL = /["'`](site:[a-z0-9-]+:[a-z0-9-]+)["'`]/g;
-/** 静的に読めない `slotId={...}`。第 1 引数が文字列リテラルでないものだけ拾う。 */
-const DYNAMIC_SLOT_ID = /slotId=\{(?!\s*["'`])/g;
+/**
+ * 「使用」と数える唯一の形は **JSX 属性 `slotId` の文字列リテラル**。
+ *
+ * 以前は任意の引用文字列を正規表現で拾っていたが、それだと
+ * `// legacy: "site:top:hero-01"` のようなコメントが実使用の代わりになり、
+ * SiteImage を消してコメントだけ残したときにゲートが黙って通っていた
+ * (QA NC9 の偽陰性)。逆にコメントを足しただけで落ちる偽陽性も起きた (NC8)。
+ * どちらも「文字列が出現したか」を見ていたのが原因なので、AST で
+ * 「その文字列が JSX 属性 slotId の値か」を見るようにした。
+ */
+const SLOT_ID_ATTRIBUTE = 'slotId';
 
 interface Usage {
   id: string;
   file: string;
   line: number;
+}
+
+/**
+ * 1 ファイル分のソースから、JSX 属性 `slotId` の使用箇所を集める。
+ *
+ * 文字列リテラルで書かれていれば使用として数え、そうでなければ (変数・関数呼び出し・
+ * 埋め込みのあるテンプレート文字列等) `dynamic` に入れる。dynamic は manifest との
+ * 突き合わせができないので、呼び出し側がエラーにする。
+ */
+export function scanSource(
+  file: string,
+  source: string,
+): { usages: Usage[]; dynamic: { file: string; line: number }[] } {
+  const usages: Usage[] = [];
+  const dynamic: { file: string; line: number }[] = [];
+
+  const sourceFile = ts.createSourceFile(
+    file,
+    source,
+    ts.ScriptTarget.Latest,
+    /* setParentNodes */ true,
+    file.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+  );
+
+  const lineOf = (node: ts.Node): number =>
+    sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1;
+
+  const visit = (node: ts.Node): void => {
+    if (
+      ts.isJsxAttribute(node) &&
+      ts.isIdentifier(node.name) &&
+      node.name.text === SLOT_ID_ATTRIBUTE
+    ) {
+      const init = node.initializer;
+      let literal: string | undefined;
+
+      if (init && ts.isStringLiteral(init)) {
+        // slotId="site:top:hero-01"
+        literal = init.text;
+      } else if (init && ts.isJsxExpression(init) && init.expression) {
+        const expr = init.expression;
+        // slotId={"site:top:hero-01"} / slotId={`site:top:hero-01`}
+        if (ts.isStringLiteral(expr) || ts.isNoSubstitutionTemplateLiteral(expr)) {
+          literal = expr.text;
+        }
+      }
+
+      if (literal !== undefined) {
+        usages.push({ id: literal, file, line: lineOf(node) });
+      } else {
+        dynamic.push({ file, line: lineOf(node) });
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+
+  visit(sourceFile);
+  return { usages, dynamic };
 }
 
 function listSourceFiles(dir: string): string[] {
@@ -84,16 +146,12 @@ export function scanUsages(root: string = ROOT): {
 
   for (const dir of SCAN_DIRS) {
     for (const file of listSourceFiles(path.join(root, dir))) {
-      if (NOT_A_USAGE.has(file)) continue;
-      const lines = readFileSync(file, 'utf8').split('\n');
-      lines.forEach((text, i) => {
-        for (const m of text.matchAll(SLOT_ID_LITERAL)) {
-          usages.push({ id: m[1], file, line: i + 1 });
-        }
-        for (const _ of text.matchAll(DYNAMIC_SLOT_ID)) {
-          dynamic.push({ file, line: i + 1 });
-        }
-      });
+      const source = readFileSync(file, 'utf8');
+      // AST を組む前の足切り。slotId という語が 1 度も出ないファイルは対象外。
+      if (!source.includes(SLOT_ID_ATTRIBUTE)) continue;
+      const found = scanSource(file, source);
+      usages.push(...found.usages);
+      dynamic.push(...found.dynamic);
     }
   }
   return { usages, dynamic };
@@ -125,6 +183,9 @@ function main(): void {
   const declaredIds = readSlotIds(MANIFEST_PATH);
   const declared = new Set(declaredIds);
   const version = (raw as { version: number }).version;
+  const slotsById = new Map(
+    (raw as { slots: SiteSlot[] }).slots.map((s) => [s.id, s] as const),
+  );
 
   // 3) SoT (JSON) と生成物の一致
   if (!existsSync(GENERATED_PATH)) {
@@ -148,14 +209,26 @@ function main(): void {
   }
 
   // (a) manifest にあるのにコードで使われていない
+  //
+  // ただし validTo が入っている枠は免除する。validTo は「この枠は畳む」という
+  // 宣言なので、コードから SiteImage を外すのが正しい手順であり、そこで build が
+  // 落ちてはいけない。免除しないと、廃止したい人は slots から削るしかなくなり、
+  // それは manifest 自身が「割当が孤児になる」と禁じている道だった (QA NC5)。
+  const retiring: string[] = [];
   for (const id of declaredIds) {
-    if (!used.has(id)) {
-      problems.push(
-        `枠 "${id}" は ${rel(MANIFEST_PATH)} が宣言していますが、コードのどこでも ` +
-          '使われていません。SiteImage を置くか、manifest から外してください ' +
-          '(一時的に外すだけなら validTo を入れる)',
+    if (used.has(id)) continue;
+    const slot = slotsById.get(id);
+    if (slot?.validTo) {
+      retiring.push(
+        `${id} (validTo=${slot.validTo}${isSiteSlotActive(slot) ? '・期限前' : '・期限切れ'})`,
       );
+      continue;
     }
+    problems.push(
+      `枠 "${id}" は ${rel(MANIFEST_PATH)} が宣言していますが、コードのどこでも ` +
+        '使われていません。SiteImage を置くか、畳むなら validTo を入れてください ' +
+        '(slots から削ると asset-hub 側で割当が孤児になります)',
+    );
   }
 
   // (b) コードで使っているのに manifest に無い
@@ -181,6 +254,9 @@ function main(): void {
     `site-slots: manifest version=${version} / 宣言 ${declaredIds.length} 枠 / ` +
       `コード使用 ${used.size} 枠`,
   );
+  for (const r of retiring) {
+    console.log(`site-slots: [SKIP] 畳む予定の枠なので未使用を許容 — ${r}`);
+  }
 
   if (problems.length > 0) {
     console.error('');

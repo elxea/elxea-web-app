@@ -57,6 +57,21 @@ export interface SiteSlotsManifest {
   slots: SiteSlot[];
 }
 
+/** `validFrom` / `validTo` を見て、その時点で有効な枠か判定する。 */
+export function isSiteSlotActive(slot: SiteSlot, now: Date = new Date()): boolean {
+  const t = now.getTime();
+  if (slot.validFrom && t < Date.parse(slot.validFrom)) return false;
+  // validTo は「その日まで有効」なので、日付だけの指定でもその日いっぱいを含める。
+  if (slot.validTo) {
+    const end = Date.parse(slot.validTo);
+    const endOfDay = /^\d{4}-\d{2}-\d{2}$/.test(slot.validTo)
+      ? end + 24 * 60 * 60 * 1000 - 1
+      : end;
+    if (t > endOfDay) return false;
+  }
+  return true;
+}
+
 /** 枠 id の形式。`site:<page>:<slot>` のみ受け付ける。 */
 export const SITE_SLOT_ID_PATTERN = /^site:[a-z0-9-]+:[a-z0-9-]+$/;
 
