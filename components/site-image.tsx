@@ -2,6 +2,7 @@ import type { ImgHTMLAttributes } from 'react';
 import { type ImageProps } from 'next/image';
 import { ImageWithFallback } from '@/components/media/image-with-fallback';
 import { getSiteImage } from '@/lib/site-assets';
+import type { ResolvedSiteImage } from '@/lib/site-assets';
 import type { SiteSlotId } from '@/lib/site-slots';
 
 /**
@@ -85,7 +86,22 @@ export async function SiteImage({
   ...props
 }: SiteImageProps) {
   const resolved = await getSiteImage(slotId, src);
+  return <SiteImageFigure resolved={resolved} fallbackSrc={fallbackSrc} {...props} />;
+}
 
+/**
+ * 解決済みの 1 枠を描くだけの部分 (同期・取得しない)。
+ *
+ * `SiteImage` から切り出してあるのは、**枠の描き方は 1 通りしか無い**が枠の置かれ方が
+ * 2 通りあるため: ページに直接置く `SiteImage` と、既存の写真枠 (`ImageCard`) の中に
+ * 収める `SiteImageCard`。両方が同じ `<picture>` 分岐を通るようにしておかないと、
+ * art direction の扱いが枠の置かれ方で食い違う。
+ */
+export function SiteImageFigure({
+  resolved,
+  fallbackSrc,
+  ...props
+}: Omit<SiteImageProps, 'slotId' | 'src'> & { resolved: ResolvedSiteImage }) {
   if (!resolved.artDirected) {
     return (
       <ImageWithFallback src={resolved.src} fallbackSrc={fallbackSrc} {...props} />

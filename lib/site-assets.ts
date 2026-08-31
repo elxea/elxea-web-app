@@ -172,6 +172,17 @@ export interface ResolvedSiteImage {
    * 寸分違わず描かれる**のはこの分岐が担保している。
    */
   artDirected: boolean;
+  /**
+   * この枠にマニフェスト由来の写真が 1 枚でも当たっているか。
+   *
+   * `src` / `sources[].url` だけでは「割り当てられた写真」と「後退先の
+   * `fallbackSrc`」を見分けられない。呼び出し側が **写真が無いときは写真を出さない**
+   * (灰色の面のまま描く・枠ごと畳む) を選べるように、由来そのものを持つ。
+   *
+   * `artDirected` とは別物であることに注意 — 1 枚だけ割り当たっている枠は
+   * `assigned: true` / `artDirected: false` になる。
+   */
+  assigned: boolean;
 }
 
 /**
@@ -216,8 +227,11 @@ export function resolveSiteSurfaces(
 
   const sources = resolved.filter((s) => s !== base && s.media !== undefined);
   const artDirected = new Set([base.url, ...sources.map((s) => s.url)]).size > 1;
+  // 代表 url しか無い旧形式のマニフェストでも「当たっている」と数える。面別に
+  // 焼かれているかどうかは割当の有無とは別の話で、ここが見たいのは前者ではない。
+  const assigned = representative !== undefined || resolved.some((s) => s.assigned);
 
-  return { src: base.url, base, sources, artDirected };
+  return { src: base.url, base, sources, artDirected, assigned };
 }
 
 /**

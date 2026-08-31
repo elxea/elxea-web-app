@@ -3,6 +3,7 @@ import { getTranslations } from "next-intl/server";
 import { getProducts } from "@/lib/shopify";
 import { Link } from "@/i18n/navigation";
 import { ImageCard } from "@/components/media/image-card";
+import { SiteImageCard } from "@/components/site-image-card";
 import { VariantSelector } from "@/components/product/variant-selector";
 import { VariantPurchase } from "@/components/product/variant-purchase";
 import { VariantSelectionProvider } from "@/components/product/variant-selection-context";
@@ -180,14 +181,25 @@ export default async function SubscriptionLPPage() {
         >
           {firstDeliveryRibbon}
         </p>
+        {/* 3 枚は別々の写真枠。`slotId` は JSX 属性に文字列リテラルで書く必要が
+            あるため (`pnpm check:site-slots` の突き合わせ条件)、map で回さず
+            3 つ書き下す。比率は 3 枚とも Figma 実測の 3:2。 */}
         <SectionBody className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:gap-8">
-          {[0, 1, 2].map((i) => (
-            <ImageCard
-              key={i}
-              alt={firstDeliveryRibbon}
-              aspectRatio="3/2"
-            />
-          ))}
+          <SiteImageCard
+            slotId="site:subscription:first-delivery-01"
+            alt={firstDeliveryRibbon}
+            aspectRatio="3/2"
+          />
+          <SiteImageCard
+            slotId="site:subscription:first-delivery-02"
+            alt={firstDeliveryRibbon}
+            aspectRatio="3/2"
+          />
+          <SiteImageCard
+            slotId="site:subscription:first-delivery-03"
+            alt={firstDeliveryRibbon}
+            aspectRatio="3/2"
+          />
         </SectionBody>
       </PageSection>
 
@@ -213,7 +225,11 @@ export default async function SubscriptionLPPage() {
       <PageSection>
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-12 lg:gap-8">
           <div className="lg:col-span-5">
-            <ImageCard alt={t("storyOverline")} aspectRatio="1/1" />
+            <SiteImageCard
+              slotId="site:subscription:story-01"
+              alt={t("storyOverline")}
+              aspectRatio="1/1"
+            />
           </div>
           <div className="lg:col-span-6 lg:col-start-7 lg:self-center">
             <span aria-hidden="true" className="block h-px w-32 bg-border" />
@@ -238,7 +254,11 @@ export default async function SubscriptionLPPage() {
         <h2>{t("nextMonthTitle")}</h2>
         <SectionBody className="grid grid-cols-1 gap-8 lg:grid-cols-12 lg:gap-8">
           <div className="lg:col-span-5">
-            <ImageCard alt={t("nextMonthTitle")} aspectRatio="13/9" />
+            <SiteImageCard
+              slotId="site:subscription:next-month-01"
+              alt={t("nextMonthTitle")}
+              aspectRatio="13/9"
+            />
           </div>
           <div className="lg:col-span-5 lg:col-start-7">
             <span

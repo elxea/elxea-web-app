@@ -19,7 +19,7 @@ import {
 } from "@/components/editorial/section-blocks";
 import { Section } from "@/components/layout/container";
 import { Breadcrumb } from "@/components/seo/breadcrumb";
-import { ImageCard } from "@/components/media/image-card";
+import { SiteImageCard } from "@/components/site-image-card";
 import { Link } from "@/i18n/navigation";
 import { filterOutFictional } from "@/lib/fictional-content";
 import { placeholderValue } from "@/lib/placeholders";
@@ -109,7 +109,36 @@ export default async function AboutPage() {
     { no: t("company.no"), label: t("company.short"), href: `#${ANCHOR.company}` },
   ];
 
-  const origins = [t("origins.a1"), t("origins.a2"), t("origins.a3"), t("origins.a4")];
+  /* 産地タイル 4 枚。写真は 1 枚ずつ別の枠なので、枠 id をここで書き下す。
+   *
+   * `slotId` は **JSX 属性に文字列リテラルで**書く必要がある (`pnpm check:site-slots`
+   * が宣言とコードを突き合わせられるのがリテラルのときだけで、変数で渡すと
+   * 「静的に読めない」としてビルドが落ちる)。よって共通部品に id を転送させず、
+   * タイル 4 枚ぶんの写真枠をここで作って `figure` として配る。
+   * PC 304x224 / SP 163.5x120 = どちらも 19:14。 */
+  const originFigureProps = {
+    alt: "",
+    aspectRatio: "19/14",
+    sizes: "(max-width: 1024px) 50vw, 304px",
+  } as const;
+  const origins = [
+    {
+      area: t("origins.a1"),
+      figure: <SiteImageCard slotId="site:about:origin-01" {...originFigureProps} />,
+    },
+    {
+      area: t("origins.a2"),
+      figure: <SiteImageCard slotId="site:about:origin-02" {...originFigureProps} />,
+    },
+    {
+      area: t("origins.a3"),
+      figure: <SiteImageCard slotId="site:about:origin-03" {...originFigureProps} />,
+    },
+    {
+      area: t("origins.a4"),
+      figure: <SiteImageCard slotId="site:about:origin-04" {...originFigureProps} />,
+    },
+  ];
 
   /* 「決めていること」「決めていないこと」を左右で対にする (Figma 8121:1287 系の並び)。 */
   const criteria = [
@@ -189,12 +218,13 @@ export default async function AboutPage() {
             </SectionBody>
           </div>
           <div data-slot="about-us-figure" className="mt-10 lg:col-span-6 lg:col-start-7 lg:mt-0">
-            <ImageCard
-              image={undefined}
+            <SiteImageCard
+              slotId="site:about:us-01"
               alt={t("us.imageAlt")}
               /* SP 16:9 (343x192) / PC 10:7 (640x448)。ImageCard は aspectRatio を
                  インラインで当てるので、BP ごとに変えるには style 側を打ち消して
-                 utility に任せる (生 px は書かない)。 */
+                 utility に任せる (生 px は書かない)。宣言 (site-slots.manifest.json)
+                 の surfaces もこの 2 面をそのまま持つ。 */
               style={{ aspectRatio: undefined }}
               className="aspect-[16/9] lg:aspect-[10/7]"
               sizes="(max-width: 1024px) 100vw, 640px"
@@ -207,10 +237,9 @@ export default async function AboutPage() {
       <PageSection className="pt-12 lg:pt-16">
         <Overline>{t("origins.overline")}</Overline>
         <ul data-slot="about-origins" className="mt-8 grid grid-cols-2 gap-x-4 gap-y-6 lg:mt-12 lg:grid-cols-4 lg:gap-x-8">
-          {origins.map((area) => (
+          {origins.map(({ area, figure }) => (
             <li data-slot="about-origin" key={area}>
-              {/* PC 304x224 / SP 163.5x120 = どちらも 19:14 */}
-              <ImageCard image={undefined} alt="" aspectRatio="19/14" sizes="(max-width: 1024px) 50vw, 304px" />
+              {figure}
               <p className={cn(captionClass, "mt-2 text-muted-foreground lg:mt-4")}>{area}</p>
             </li>
           ))}
