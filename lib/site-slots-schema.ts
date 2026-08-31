@@ -30,6 +30,21 @@ export interface SiteSlotSurface {
   label: string;
   ratio: SiteSlotRatio;
   fit: SiteSlotFit;
+  /**
+   * その面が選ばれる CSS メディア条件 (`<picture>` の `<source media>` にそのまま出る)。
+   * 例: `"(min-width: 1024px)"`。
+   *
+   * **省略した面が「既定の面」** — どの条件にも当たらないときに出る面で、`<img>` 側に
+   * 載る。枠ごとにちょうど 1 件必要 (`validateSiteSlotsManifest` が強制する)。
+   * 既定の面を必ず 1 つ置くのは、`<picture>` が常に `<img>` を 1 つ要求するため。
+   *
+   * ここに持たせる理由: 「どの幅でどの面が出るか」を知っているのはサイトだけで、
+   * これまでは同じ数字がページの className (`lg:`) と surface の label 文
+   * (「幅 1024px 以上」) に散らばっていた。宣言 1 か所に寄せて、描画側は読むだけにする。
+   * asset-hub 側は surface の id / ratio / fit しか見ない (未知キーは無視する) ので、
+   * この項目を足しても切り抜きにも指紋にも影響しない。
+   */
+  media?: string;
 }
 
 /** 枠 1 件。 */
@@ -160,6 +175,8 @@ export function validateSiteSlotsManifest(raw: unknown): string[] {
       return;
     }
     const seenSurfaceIds = new Set<string>();
+    // media を持たない面 = 既定の面 (<picture> の <img> に出る面)。ちょうど 1 件必要。
+    let baseSurfaces = 0;
     s.surfaces.forEach((rawSurface, j) => {
       const sw = `${where}.surfaces[${j}]`;
       if (!rawSurface || typeof rawSurface !== 'object' || Array.isArray(rawSurface)) {
@@ -179,6 +196,11 @@ export function validateSiteSlotsManifest(raw: unknown): string[] {
       if (su.fit !== 'cover' && su.fit !== 'contain') {
         push(`${sw}: fit は "cover" か "contain" である必要があります`);
       }
+      if (su.media === undefined) {
+        baseSurfaces += 1;
+      } else if (typeof su.media !== 'string' || su.media.trim().length === 0) {
+        push(`${sw}: media は空でない CSS メディア条件の文字列である必要があります`);
+      }
       const r = su.ratio;
       if (!r || typeof r !== 'object' || Array.isArray(r)) {
         push(`${sw}: ratio はオブジェクトである必要があります`);
@@ -192,6 +214,16 @@ export function validateSiteSlotsManifest(raw: unknown): string[] {
         }
       }
     });
+
+    // 既定の面が無いと `<picture>` の `<img>` に何を出すか決まらず、2 件以上あると
+    // 「どの条件にも当たらないとき」の答えが 2 つになる。どちらも宣言の書き間違いなので
+    // build で落とす (描画側は落ちない — 先頭の面を既定に繰り上げて描き続ける)。
+    if (baseSurfaces !== 1) {
+      push(
+        `${where}: media を持たない surface (既定の面) はちょうど 1 件必要です ` +
+          `(見つかった件数: ${baseSurfaces})`,
+      );
+    }
   });
 
   return errors;

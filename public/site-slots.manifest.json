@@ -28,6 +28,13 @@
     "fit は収め方 (cover = はみ出しを切る / contain = 切らずに収める・余白が付く)。",
     "『チャネルに 1 つの比率』ではない — 同じ写真が場所ごとに違う切られ方をするため。",
     "",
+    "【media (面の出し分け条件)】",
+    "media はその面が選ばれる CSS メディア条件で、<picture> の <source media> に",
+    "そのまま出る。省略した面が『既定の面』= どの条件にも当たらないときに出る面で、",
+    "枠ごとにちょうど 1 件必要 (check:site-slots が強制)。既定は狭い方 (SP) に置く。",
+    "asset-hub は surface の id / ratio / fit しか見ず未知キーを無視するので、",
+    "media を足しても切り抜き・指紋は変わらない = version 規約の対象外。",
+    "",
     "【validFrom / validTo (任意)】",
     "期間限定 LP・季節ページ用。省略時は常時有効。枠を消すときは slots から削るのでは",
     "なく validTo を入れて履歴を残すのが既定 (削ると asset-hub 側で割当が孤児になる)。"
@@ -52,7 +59,8 @@
           "id": "pc",
           "label": "PC 表示 (幅 1024px 以上)",
           "ratio": { "width": 864, "height": 560 },
-          "fit": "cover"
+          "fit": "cover",
+          "media": "(min-width: 1024px)"
         }
       ]
     }
