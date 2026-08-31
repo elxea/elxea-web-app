@@ -11,7 +11,11 @@
  * "don't break the current look" guarantee: an empty/failed manifest must leave
  * every frame rendering exactly what it renders today.
  *
- * Contract SoT lives in elxea-asset-hub (lib/site-slots.json / lib/site-assign.ts).
+ * 枠がどれだけ存在するか (枠の宣言) の SoT はこのリポジトリ側、
+ * `public/site-slots.manifest.json` にある (`lib/site-slots.ts` 参照)。asset-hub は
+ * それを URL で読むだけで、枠を宣言しない。ここが扱うのは「枠に何が割り当たって
+ * いるか」= R2 manifest (割当の記録) の読み取りだけで、両者は別物。
+ *
  * This file intentionally does NOT import across repos; it mirrors only the two
  * facts the read side needs (manifest key + R2 public domain), both env-overridable.
  */

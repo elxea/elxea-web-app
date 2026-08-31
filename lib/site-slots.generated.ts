@@ -1,0 +1,19 @@
+/**
+ * 自動生成ファイル — 直接編集しないこと。
+ *
+ * 生成元: public/site-slots.manifest.json (SoT)
+ * 生成コマンド: pnpm generate:site-slots
+ * 一致検査: pnpm check:site-slots (build の前段で走る)
+ *
+ * 枠を足す・消すときに編集するのは public/site-slots.manifest.json だけ。
+ * このファイルはそこから作り直す。
+ */
+
+/** manifest が宣言している枠 id の union。これ以外の id は型で弾かれる。 */
+export type SiteSlotId =
+  | "site:top:hero-01";
+
+/** 同じ集合を実行時にも使えるようにしたもの (order 昇順)。 */
+export const SITE_SLOT_IDS: readonly SiteSlotId[] = [
+  "site:top:hero-01",
+] as const;

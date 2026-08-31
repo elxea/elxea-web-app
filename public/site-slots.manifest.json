@@ -1,0 +1,60 @@
+{
+  "$comment": [
+    "site-slots.manifest.json — このサイトが持つ画像枠の宣言 (SoT / 単一正本)。",
+    "",
+    "【この 1 ファイルだけを書き換える】",
+    "ページを足す・レイアウトを変えて写真枠が増減したら、編集するのはここだけ。",
+    "asset-hub はこのファイルを URL で読み、載っている枠を『空き枠』として出す。",
+    "asset-hub 側に枠定義を書かない (向きは サイトが宣言 → asset-hub が読む)。",
+    "",
+    "【編集したら必ず】",
+    "  pnpm generate:site-slots   ... lib/site-slots.generated.ts (id の union 型) を作り直す",
+    "  pnpm check:site-slots      ... manifest とコードの突き合わせ (build の前段でも走る)",
+    "生成物を作り直さないと build が落ちる。落ちること自体がガード。",
+    "",
+    "【version を上げる規約 (必須)】",
+    "slots に 1 件でも変更 (追加 / 削除 / id・比率・required・order の変更) を入れたら、",
+    "同じコミットで version を +1 する。飛び番・据え置き禁止。理由は 2 つ:",
+    "  (1) asset-hub は version 不一致を『スキーマが変わったかもしれない』と見なし、",
+    "      消えた枠の未使用化を実行せず人に判断させる (空ファイルガード)。",
+    "      version を据え置くと、このガードが効かないまま枠が消えたと判定される。",
+    "  (2) 同じ version で中身が違う JSON が CDN に出回ると、どちらが新しいか判定できない。",
+    "version を上げ忘れた場合は check:site-slots が『slots が変わったのに version が同じ』",
+    "とは言えない (前版を知らないため)。人が守る規約であることを承知でここに書く。",
+    "",
+    "【比率 (surfaces) の決め方】",
+    "surfaces は『その枠が実際に画面に出る場所』を実測で書く。1 枠が複数の見え方を",
+    "持つ (SP と PC で比率が違う等) 場合は全部並べる。ratio は表示上の縦横比、",
+    "fit は収め方 (cover = はみ出しを切る / contain = 切らずに収める・余白が付く)。",
+    "『チャネルに 1 つの比率』ではない — 同じ写真が場所ごとに違う切られ方をするため。",
+    "",
+    "【validFrom / validTo (任意)】",
+    "期間限定 LP・季節ページ用。省略時は常時有効。枠を消すときは slots から削るのでは",
+    "なく validTo を入れて履歴を残すのが既定 (削ると asset-hub 側で割当が孤児になる)。"
+  ],
+  "version": 1,
+  "org": "ELX",
+  "slots": [
+    {
+      "id": "site:top:hero-01",
+      "label": "トップ Hero (KV)",
+      "page": "top",
+      "required": true,
+      "order": 10,
+      "surfaces": [
+        {
+          "id": "sp",
+          "label": "スマホ表示 (幅 1024px 未満)",
+          "ratio": { "width": 5, "height": 4 },
+          "fit": "cover"
+        },
+        {
+          "id": "pc",
+          "label": "PC 表示 (幅 1024px 以上)",
+          "ratio": { "width": 864, "height": 560 },
+          "fit": "cover"
+        }
+      ]
+    }
+  ]
+}

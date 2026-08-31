@@ -1,6 +1,7 @@
 import { type ImageProps } from 'next/image';
 import { ImageWithFallback } from '@/components/media/image-with-fallback';
 import { getSiteAsset } from '@/lib/site-assets';
+import type { SiteSlotId } from '@/lib/site-slots';
 
 /**
  * SiteImage — async Server Component that fills a site-body static image frame
@@ -19,8 +20,14 @@ import { getSiteAsset } from '@/lib/site-assets';
  * fallback = the frame's own layout.
  */
 interface SiteImageProps extends Omit<ImageProps, 'onError' | 'src'> {
-  /** Site slot id, `site:<page>:<section>-<nn>` (Asset Hub SoT). */
-  slotId: string;
+  /**
+   * 枠 id。`public/site-slots.manifest.json` が宣言している id だけを受け付ける
+   * (`SiteSlotId` は manifest から生成した union 型)。宣言に無い枠に写真を置こうと
+   * すると型エラーになるので、「コードにはあるが manifest に無い枠」は
+   * コンパイル時点で存在できない。逆向き (manifest にあるがコードで使っていない)
+   * は型では見えないので `pnpm check:site-slots` が build の前段で検出する。
+   */
+  slotId: SiteSlotId;
   /** Current static asset for this frame; used when the slot is unassigned. */
   src: string;
   /** Runtime onError placeholder (unchanged ImageWithFallback behaviour). */
