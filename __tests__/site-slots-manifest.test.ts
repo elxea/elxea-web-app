@@ -166,6 +166,50 @@ describe('validateSiteSlotsManifest — 異常系', () => {
         }),
       ]),
     ],
+    [
+      'media が空文字',
+      validManifest([
+        validSlot({
+          surfaces: [
+            { id: 'pc', label: 'PC', ratio: { width: 1, height: 1 }, fit: 'cover', media: '  ' },
+          ],
+        }),
+      ]),
+    ],
+    [
+      '既定の面 (media なし) が 0 件',
+      validManifest([
+        validSlot({
+          surfaces: [
+            {
+              id: 'sp',
+              label: 'SP',
+              ratio: { width: 5, height: 4 },
+              fit: 'cover',
+              media: '(max-width: 1023px)',
+            },
+            {
+              id: 'pc',
+              label: 'PC',
+              ratio: { width: 864, height: 560 },
+              fit: 'cover',
+              media: '(min-width: 1024px)',
+            },
+          ],
+        }),
+      ]),
+    ],
+    [
+      '既定の面 (media なし) が 2 件',
+      validManifest([
+        validSlot({
+          surfaces: [
+            { id: 'sp', label: 'SP', ratio: { width: 5, height: 4 }, fit: 'cover' },
+            { id: 'pc', label: 'PC', ratio: { width: 864, height: 560 }, fit: 'cover' },
+          ],
+        }),
+      ]),
+    ],
     ['validTo が日付でない', validManifest([validSlot({ validTo: 'いつか' })])],
     [
       'validFrom が validTo より後',
@@ -179,6 +223,46 @@ describe('validateSiteSlotsManifest — 異常系', () => {
 
   it('正常な manifest はエラーを返さない', () => {
     expect(validateSiteSlotsManifest(validManifest())).toEqual([]);
+  });
+
+  it('既定の面 1 + 条件付きの面 1 は正常', () => {
+    const manifest = validManifest([
+      validSlot({
+        surfaces: [
+          { id: 'sp', label: 'SP', ratio: { width: 5, height: 4 }, fit: 'cover' },
+          {
+            id: 'pc',
+            label: 'PC',
+            ratio: { width: 864, height: 560 },
+            fit: 'cover',
+            media: '(min-width: 1024px)',
+          },
+        ],
+      }),
+    ]);
+    expect(validateSiteSlotsManifest(manifest)).toEqual([]);
+  });
+});
+
+/**
+ * 面の出し分け条件は宣言だけが持つ (以前はページの className の `lg:` と surface の
+ * label 文に同じ 1024px が散らばっていた)。描画側はこれを読むだけなので、
+ * 実物が「既定 1 件 + 条件付き」の形になっていること自体を測る。
+ */
+describe('surface の media (面の出し分け条件)', () => {
+  it('全枠が既定の面 (media なし) をちょうど 1 件持つ', () => {
+    for (const slot of SITE_SLOTS) {
+      const base = slot.surfaces.filter((s) => s.media === undefined);
+      expect(base).toHaveLength(1);
+    }
+  });
+
+  it('既定でない面は空でない media を持つ', () => {
+    for (const slot of SITE_SLOTS) {
+      for (const surface of slot.surfaces.filter((s) => s.media !== undefined)) {
+        expect(surface.media?.trim()).toBeTruthy();
+      }
+    }
   });
 });
 
