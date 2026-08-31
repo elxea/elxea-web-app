@@ -12,15 +12,23 @@
     "  pnpm check:site-slots      ... manifest とコードの突き合わせ (build の前段でも走る)",
     "生成物を作り直さないと build が落ちる。落ちること自体がガード。",
     "",
-    "【version を上げる規約 (必須)】",
-    "slots に 1 件でも変更 (追加 / 削除 / id・比率・required・order の変更) を入れたら、",
-    "同じコミットで version を +1 する。飛び番・据え置き禁止。理由は 2 つ:",
-    "  (1) asset-hub は version 不一致を『スキーマが変わったかもしれない』と見なし、",
-    "      消えた枠の未使用化を実行せず人に判断させる (空ファイルガード)。",
-    "      version を据え置くと、このガードが効かないまま枠が消えたと判定される。",
-    "  (2) 同じ version で中身が違う JSON が CDN に出回ると、どちらが新しいか判定できない。",
-    "version を上げ忘れた場合は check:site-slots が『slots が変わったのに version が同じ』",
-    "とは言えない (前版を知らないため)。人が守る規約であることを承知でここに書く。",
+    "【version は「スキーマの版」であって「中身の版」ではない (2026-09-01 訂正)】",
+    "枠を足す・消す・比率を変えるだけでは version を上げない。据え置きが正しい。",
+    "上げてよいのは『この JSON の書き方そのもの』を変えたとき (項目の追加・意味の変更) だけ。",
+    "",
+    "ここには以前『slots に 1 件でも変更を入れたら version を +1 する』と書いてあったが、",
+    "それに従うと本番が壊れる。読み手である asset-hub は version を **スキーマ版** として",
+    "扱い、自分が理解できる上限 (SUPPORTED_MANIFEST_VERSION) を超えた version の宣言を",
+    "『読めないファイル』として丸ごと捨てる (lib/site-slot-registry.ts)。つまり中身を変えた",
+    "だけで version を上げると、枠が増えるどころか **全枠が消える**。",
+    "",
+    "中身が変わったことは version ではなく **指紋** (manifestFingerprint) で検出される。",
+    "指紋は全枠の id・比率・fit・required・order から作られるので、version を据え置いても",
+    "『枠が増えた/減った/比率が変わった』は asset-hub 側で正しく差分に出る。空ファイル",
+    "ガード (枠 0 件 / 前回の 50% 未満 / version の逆行) もそのまま働く。",
+    "",
+    "version を上げるときは、**先に asset-hub の SUPPORTED_MANIFEST_VERSION を上げて",
+    "デプロイしてから** こちらを上げる。順番を逆にすると、その間ずっと枠が 0 件になる。",
     "",
     "【比率 (surfaces) の決め方】",
     "surfaces は『その枠が実際に画面に出る場所』を実測で書く。1 枠が複数の見え方を",
@@ -61,6 +69,163 @@
           "ratio": { "width": 864, "height": 560 },
           "fit": "cover",
           "media": "(min-width: 1024px)"
+        }
+      ]
+    },
+    {
+      "id": "site:about:us-01",
+      "label": "About「01 わたしたちのこと」本文の隣の写真",
+      "page": "about",
+      "required": false,
+      "order": 110,
+      "surfaces": [
+        {
+          "id": "sp",
+          "label": "スマホ表示 (幅 1024px 未満)",
+          "ratio": { "width": 16, "height": 9 },
+          "fit": "cover"
+        },
+        {
+          "id": "pc",
+          "label": "PC 表示 (幅 1024px 以上)",
+          "ratio": { "width": 10, "height": 7 },
+          "fit": "cover",
+          "media": "(min-width: 1024px)"
+        }
+      ]
+    },
+    {
+      "id": "site:about:origin-01",
+      "label": "About 産地タイル 1 枚目 (左上)",
+      "page": "about",
+      "required": false,
+      "order": 120,
+      "surfaces": [
+        {
+          "id": "base",
+          "label": "スマホ・PC 共通",
+          "ratio": { "width": 19, "height": 14 },
+          "fit": "cover"
+        }
+      ]
+    },
+    {
+      "id": "site:about:origin-02",
+      "label": "About 産地タイル 2 枚目",
+      "page": "about",
+      "required": false,
+      "order": 130,
+      "surfaces": [
+        {
+          "id": "base",
+          "label": "スマホ・PC 共通",
+          "ratio": { "width": 19, "height": 14 },
+          "fit": "cover"
+        }
+      ]
+    },
+    {
+      "id": "site:about:origin-03",
+      "label": "About 産地タイル 3 枚目",
+      "page": "about",
+      "required": false,
+      "order": 140,
+      "surfaces": [
+        {
+          "id": "base",
+          "label": "スマホ・PC 共通",
+          "ratio": { "width": 19, "height": 14 },
+          "fit": "cover"
+        }
+      ]
+    },
+    {
+      "id": "site:about:origin-04",
+      "label": "About 産地タイル 4 枚目",
+      "page": "about",
+      "required": false,
+      "order": 150,
+      "surfaces": [
+        {
+          "id": "base",
+          "label": "スマホ・PC 共通",
+          "ratio": { "width": 19, "height": 14 },
+          "fit": "cover"
+        }
+      ]
+    },
+    {
+      "id": "site:subscription:first-delivery-01",
+      "label": "定期便LP「初回お届け」3 枚組 1 枚目",
+      "page": "subscription",
+      "required": false,
+      "order": 210,
+      "surfaces": [
+        {
+          "id": "base",
+          "label": "スマホ・PC 共通",
+          "ratio": { "width": 3, "height": 2 },
+          "fit": "cover"
+        }
+      ]
+    },
+    {
+      "id": "site:subscription:first-delivery-02",
+      "label": "定期便LP「初回お届け」3 枚組 2 枚目",
+      "page": "subscription",
+      "required": false,
+      "order": 220,
+      "surfaces": [
+        {
+          "id": "base",
+          "label": "スマホ・PC 共通",
+          "ratio": { "width": 3, "height": 2 },
+          "fit": "cover"
+        }
+      ]
+    },
+    {
+      "id": "site:subscription:first-delivery-03",
+      "label": "定期便LP「初回お届け」3 枚組 3 枚目",
+      "page": "subscription",
+      "required": false,
+      "order": 230,
+      "surfaces": [
+        {
+          "id": "base",
+          "label": "スマホ・PC 共通",
+          "ratio": { "width": 3, "height": 2 },
+          "fit": "cover"
+        }
+      ]
+    },
+    {
+      "id": "site:subscription:story-01",
+      "label": "定期便LP「語り」の正方形写真",
+      "page": "subscription",
+      "required": false,
+      "order": 240,
+      "surfaces": [
+        {
+          "id": "base",
+          "label": "スマホ・PC 共通 (正方形)",
+          "ratio": { "width": 1, "height": 1 },
+          "fit": "cover"
+        }
+      ]
+    },
+    {
+      "id": "site:subscription:next-month-01",
+      "label": "定期便LP「次月のお届け」の写真",
+      "page": "subscription",
+      "required": false,
+      "order": 250,
+      "surfaces": [
+        {
+          "id": "base",
+          "label": "スマホ・PC 共通",
+          "ratio": { "width": 13, "height": 9 },
+          "fit": "cover"
         }
       ]
     }

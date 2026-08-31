@@ -271,6 +271,38 @@ describe("resolveSiteSurfaces — 面ごとの出し分け", () => {
   });
 });
 
+/**
+ * `assigned` — 写真が「当たっている」か「後退先で埋まっている」かの区別。
+ *
+ * これを間違えると、今日は灰色の面 (`ImagePlaceholder`) で置かれている写真枠が
+ * 未割当のまま `fallbackSrc` を描き始める (= 静かな見た目の退行)。`src` を見ても
+ * 区別できないので、由来そのものを測る。
+ */
+describe("resolveSiteSurfaces — assigned (割当の有無)", () => {
+  it("未割当 (マニフェストに枠が無い) は false", () => {
+    expect(resolveSiteSurfaces({}, DECL, FALLBACK).assigned).toBe(false);
+    expect(resolveSiteSurfaces(null, DECL, FALLBACK).assigned).toBe(false);
+  });
+
+  it("面別 url が 1 つでもあれば true", () => {
+    const manifest = surfaceManifest({ sp: { url: SP_URL } });
+    expect(resolveSiteSurfaces(manifest, DECL, FALLBACK).assigned).toBe(true);
+  });
+
+  it("旧形式 (代表 url だけ) でも true — 面別に焼かれているかは別の話", () => {
+    const r = resolveSiteSurfaces(manifestWith(ASSIGNED), DECL, FALLBACK);
+    expect(r.assigned).toBe(true);
+    // 1 枚しか無いので art direction は不要。両者が別物であることを固定する。
+    expect(r.artDirected).toBe(false);
+  });
+
+  it("空文字・空白だけの url は「当たっていない」と数える", () => {
+    expect(resolveSiteSurfaces(manifestWith("   "), DECL, FALLBACK).assigned).toBe(false);
+    const manifest = surfaceManifest({ sp: { url: "" }, pc: { url: null } });
+    expect(resolveSiteSurfaces(manifest, DECL, FALLBACK).assigned).toBe(false);
+  });
+});
+
 describe("getSiteManifest (best-effort)", () => {
   afterEach(() => {
     vi.restoreAllMocks();
