@@ -197,6 +197,22 @@ export function Footer({ groups: externalGroups }: FooterProps) {
                       {t("common.shipping")}
                     </Link>
                   </li>
+                  {/* 今月のお茶 (/account/this-month) — 顧客プロファイル 第1段 ①。
+                      主たる入口は同梱の QR カードだが、設計 §2 の到達 3 経路には
+                      「次に開いたとき」も含まれるので、サイト内にも 1 本置く。
+                      置き場をここにしたのは /diagnosis と同じ理由で、マイページ本体
+                      (/account) とトップページの節は Figma 忠実度ゲートの対象であり、
+                      そちらへの導線追加は別タスクに残してあるため。
+                      この行が消えると /account/this-month はサイト内から到達不能に
+                      なり、`__tests__/route-reachability.test.ts` が赤で止める。 */}
+                  <li>
+                    <Link
+                      href="/account/this-month"
+                      className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {t("thisMonth.title")}
+                    </Link>
+                  </li>
                 </ul>
               </div>
 

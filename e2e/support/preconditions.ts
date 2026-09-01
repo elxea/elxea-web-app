@@ -129,3 +129,27 @@ export async function gotoNonEmptyCart(page: Page): Promise<void> {
     "cart is empty after adding a product — the Shopify cart write failed",
   ).toHaveCount(0);
 }
+
+/**
+ * 会員としてログインした状態を要求するテストの前提。
+ *
+ * 顧客プロファイル 第1段 の画面 (`/account/this-month` / `/account/safety`) は
+ * 択一 #11 の確定「本人はログインで解決する。URL に個人の番号を出さない」により
+ * **ログイン必須**である。ログインは Shopify Customer Account API の OAuth
+ * (または LINE Login) を実際に往復するので、資格情報の無い CI では成立しない。
+ *
+ * `STOREFRONT_CONFIGURED` と同じ扱いにしてあるのは、どちらも「実ストアの資格情報が
+ * 無いと作れない状態」だから。見本データでログイン済みを偽装すると、
+ * **「本人にしか問いを出さない」という検査そのものが消える**（誰でも通る画面を
+ * 検査して緑にするのは、S5 が批判した「見ていない緑」と同じ）。
+ *
+ * skip は `pnpm report:e2e-skips` が CI サマリに理由付きで出すので不可視にならない。
+ */
+export const MEMBER_SESSION_CONFIGURED = Boolean(
+  process.env.E2E_MEMBER_SESSION === "1" && STOREFRONT_CONFIGURED,
+);
+
+export const MEMBER_SESSION_SKIP_REASON =
+  "会員セッションが未設定 — 顧客プロファイル 第1段 の画面は択一 #11 によりログイン必須で、" +
+  "ログインは Shopify Customer Account API の OAuth 往復を要する。CI に資格情報が無いので " +
+  "成立しない (E2E_MEMBER_SESSION=1 + Storefront 資格情報のある環境でのみ走る)";

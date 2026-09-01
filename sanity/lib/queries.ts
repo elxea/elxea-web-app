@@ -630,3 +630,23 @@ export const PAGE_CONTENT_QUERY = groq`
     }
   }
 `;
+
+/**
+ * 号（elxea Journal）と、その号に入っているお茶だけを引く
+ * （顧客プロファイル 第1段 ①「届いた後の評価」の器）。
+ *
+ * `JOURNAL_BY_SLUG_QUERY` を使い回さないのは、あちらが本文・著者・プレイリスト
+ * まで引く重い問い合わせで、ここが要るのは **slug と銘柄番号だけ**だから。
+ * 号は 2 件（今号 + 前号）しか見ないので `[0...4]` で十分に足りる
+ * （`featured` の立て忘れに備えて少し多めに取り、選別は
+ * `lib/roji/issue-cups.ts` の `pickIssues` が純粋関数として行う）。
+ */
+export const ISSUE_CUPS_QUERY = groq`
+  *[_type == "journal" && language == $language] | order(_createdAt desc)[0...4] {
+    _createdAt,
+    title,
+    slug,
+    featured,
+    teaMenus[]->{ title, displayName, productNumber, slug }
+  }
+`;
