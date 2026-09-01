@@ -39,7 +39,13 @@ import { join } from "node:path";
 
 import { test, expect, type Page } from "@playwright/test";
 
-import { STOREFRONT_CONFIGURED, addToCart, openPurchasableProduct } from "./support/preconditions";
+import {
+  MEMBER_SESSION_CONFIGURED,
+  MEMBER_SESSION_SKIP_REASON,
+  STOREFRONT_CONFIGURED,
+  addToCart,
+  openPurchasableProduct,
+} from "./support/preconditions";
 
 type Interaction = {
   id: string;
@@ -93,6 +99,11 @@ export const SCENARIOS: Record<
   string,
   {
     requiresCart?: boolean;
+    /**
+     * 会員としてログインした状態を要する操作の印（顧客プロファイル 第1段）。
+     * `requiresCart` と同じ理由で同じ扱い — 資格情報が無い環境では理由付きで skip する。
+     */
+    requiresMemberSession?: boolean;
     /** 操作対象のページへ移動し、押せる状態にする。 */
     arrive: (page: Page) => Promise<void>;
     /** 実際に押す。 */
@@ -242,6 +253,153 @@ export const SCENARIOS: Record<
     },
     act: async (page) => {
       await page.locator('[data-slot="diagnosis-submit"]').click();
+    },
+  },
+
+  /* --- 顧客プロファイル 第1段 (/ja/account/this-month・/ja/account/safety) -----
+     択一 #11 でログイン必須と確定した面なので、CI では `requiresMemberSession`
+     により理由付きで skip される (資格情報のある環境でのみ走る)。手順を書いて
+     あるのは、宣言だけして検査手順が無い状態を作らないため — 環境が整った
+     瞬間に、書き換えなしでそのまま走る。 */
+
+  "components/profile/cup-feedback-card.tsx#handler:onClick#1": {
+    requiresMemberSession: true,
+    /* 答えを選ぶのは state だけ。送信の往復を止めても選べる。 */
+    blocks: "**/api/user/cup-feedback",
+    arrive: async (page) => {
+      await page.goto("/ja/account/this-month");
+      await expect(page.locator("[data-slot='cup-verdict']").first()).toBeVisible();
+    },
+    act: async (page) => {
+      await page.locator("[data-slot='cup-verdict']").first().click();
+    },
+  },
+
+  "components/profile/cup-feedback-card.tsx#handler:onClick#2": {
+    requiresMemberSession: true,
+    blocks: "**/api/user/cup-feedback",
+    arrive: async (page) => {
+      await page.goto("/ja/account/this-month");
+      /* 「どこが」は合わなかった側を選んだときだけ出る (asksAspect)。 */
+      await page.locator("[data-slot='cup-verdict']").last().click();
+      await expect(page.locator("[data-slot='cup-aspect-choice']").first()).toBeVisible();
+    },
+    act: async (page) => {
+      await page.locator("[data-slot='cup-aspect-choice']").first().click();
+    },
+  },
+
+  "components/profile/cup-feedback-card.tsx#handler:onClick#3": {
+    requiresMemberSession: true,
+    blocks: "**/api/user/cup-feedback",
+    arrive: async (page) => {
+      await page.goto("/ja/account/this-month");
+      await page.locator("[data-slot='cup-verdict']").first().click();
+      await expect(page.locator("[data-slot='cup-submit']").first()).toBeEnabled();
+    },
+    act: async (page) => {
+      await page.locator("[data-slot='cup-submit']").first().click();
+    },
+  },
+
+  "components/profile/cup-feedback-card.tsx#handler:onClick#4": {
+    requiresMemberSession: true,
+    blocks: "**/api/user/cup-feedback",
+    arrive: async (page) => {
+      await page.goto("/ja/account/this-month");
+      await expect(page.locator("[data-slot='cup-decline']").first()).toBeVisible();
+    },
+    act: async (page) => {
+      await page.locator("[data-slot='cup-decline']").first().click();
+    },
+  },
+
+  "components/profile/cup-feedback-card.tsx#write:fetch:POST#1": {
+    requiresMemberSession: true,
+    blocks: "**/api/user/cup-feedback",
+    arrive: async (page) => {
+      await page.goto("/ja/account/this-month");
+      await page.locator("[data-slot='cup-verdict']").first().click();
+      await expect(page.locator("[data-slot='cup-submit']").first()).toBeEnabled();
+    },
+    act: async (page) => {
+      await page.locator("[data-slot='cup-submit']").first().click();
+    },
+  },
+
+  "components/profile/recipient-card.tsx#handler:onClick#1": {
+    requiresMemberSession: true,
+    blocks: "**/api/user/purchase-recipient",
+    arrive: async (page) => {
+      await page.goto("/ja/account/this-month");
+      await expect(page.locator("[data-slot='recipient-choice']").first()).toBeVisible();
+    },
+    act: async (page) => {
+      await page.locator("[data-slot='recipient-choice']").first().click();
+    },
+  },
+
+  "components/profile/recipient-card.tsx#write:fetch:POST#1": {
+    requiresMemberSession: true,
+    blocks: "**/api/user/purchase-recipient",
+    arrive: async (page) => {
+      await page.goto("/ja/account/this-month");
+      await expect(page.locator("[data-slot='recipient-choice']").first()).toBeVisible();
+    },
+    act: async (page) => {
+      await page.locator("[data-slot='recipient-choice']").first().click();
+    },
+  },
+
+  "components/profile/safety-form.tsx#handler:onClick#1": {
+    requiresMemberSession: true,
+    blocks: "**/api/user/safety",
+    arrive: async (page) => {
+      await page.goto("/ja/account/safety");
+      await expect(page.locator("[data-slot='safety-tag']").first()).toBeEnabled();
+    },
+    act: async (page) => {
+      await page.locator("[data-slot='safety-tag']").first().click();
+    },
+  },
+
+  "components/profile/safety-form.tsx#handler:onClick#2": {
+    requiresMemberSession: true,
+    blocks: "**/api/user/safety",
+    arrive: async (page) => {
+      await page.goto("/ja/account/safety");
+      await expect(page.locator("[data-slot='safety-consent']")).toBeVisible();
+    },
+    act: async (page) => {
+      await page.locator("[data-slot='safety-consent']").click();
+    },
+  },
+
+  "components/profile/safety-form.tsx#handler:onClick#3": {
+    requiresMemberSession: true,
+    blocks: "**/api/user/safety",
+    arrive: async (page) => {
+      await page.goto("/ja/account/safety");
+      await page.locator("[data-slot='safety-tag']").first().click();
+      await page.locator("[data-slot='safety-consent']").click();
+      await expect(page.locator("[data-slot='safety-submit']")).toBeEnabled();
+    },
+    act: async (page) => {
+      await page.locator("[data-slot='safety-submit']").click();
+    },
+  },
+
+  "components/profile/safety-form.tsx#write:fetch:POST#1": {
+    requiresMemberSession: true,
+    blocks: "**/api/user/safety",
+    arrive: async (page) => {
+      await page.goto("/ja/account/safety");
+      await page.locator("[data-slot='safety-tag']").first().click();
+      await page.locator("[data-slot='safety-consent']").click();
+      await expect(page.locator("[data-slot='safety-submit']")).toBeEnabled();
+    },
+    act: async (page) => {
+      await page.locator("[data-slot='safety-submit']").click();
     },
   },
 
@@ -528,6 +686,11 @@ test.describe("憲章 R9 — 台帳が宣言した応答が、実際にその性
          隠していない: skip は `pnpm report:e2e-skips` が CI サマリに理由付きで
          出す (ci.yml の「Report skipped tests (no-op green visibility)」)。
          恒久解 (CI への資格情報投入 or 見本カートでの代替) は別件。 */
+      test.skip(
+        Boolean(scenario.requiresMemberSession) && !MEMBER_SESSION_CONFIGURED,
+        MEMBER_SESSION_SKIP_REASON,
+      );
+
       test.skip(
         Boolean(scenario.requiresCart) && !STOREFRONT_CONFIGURED,
         "Shopify Storefront の資格情報 (SHOPIFY_STORE_DOMAIN / " +

@@ -333,6 +333,14 @@
       "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
     },
     {
+      "id": "app/[locale]/account/safety/page.tsx#link:Link#1",
+      "file": "app/[locale]/account/safety/page.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
       "id": "app/[locale]/account/subscriptions/page.tsx#link:Link#1",
       "file": "app/[locale]/account/subscriptions/page.tsx",
       "kind": "link",
@@ -391,6 +399,30 @@
       "kind": "link",
       "name": "a",
       "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "app/[locale]/account/this-month/page.tsx#link:Link#1",
+      "file": "app/[locale]/account/this-month/page.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "app/[locale]/account/this-month/page.tsx#link:Link#2",
+      "file": "app/[locale]/account/this-month/page.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "app/[locale]/account/this-month/page.tsx#link:Link#3",
+      "file": "app/[locale]/account/this-month/page.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
     },
     {
       "id": "app/[locale]/collections/page.tsx#link:Link#1",
@@ -2239,8 +2271,7 @@
       "file": "components/layout/footer.tsx",
       "kind": "link",
       "name": "Link",
-      "response": "router-nav",
-      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+      "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。"
     },
     {
       "id": "components/layout/footer.tsx#link:Link#17",
@@ -2268,6 +2299,14 @@
     },
     {
       "id": "components/layout/footer.tsx#link:Link#2",
+      "file": "components/layout/footer.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "components/layout/footer.tsx#link:Link#20",
       "file": "components/layout/footer.tsx",
       "kind": "link",
       "name": "Link",
@@ -2729,6 +2768,128 @@
       "kind": "handler",
       "name": "onClick",
       "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/profile/cup-feedback-card.tsx#handler:onClick#1",
+      "file": "components/profile/cup-feedback-card.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "response": "sync-dom",
+      "observe": [
+        "[data-slot='cup-submit']"
+      ],
+      "why": "答えを選ぶのは state だけで完結する。選んだ瞬間に送信ボタンが押せるようになる (ネットワークは待たない)"
+    },
+    {
+      "id": "components/profile/cup-feedback-card.tsx#handler:onClick#2",
+      "file": "components/profile/cup-feedback-card.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "response": "sync-dom",
+      "observe": [
+        "[data-slot='cup-aspect-choice']"
+      ],
+      "why": "「どこが」の選択も state だけ。押した札の見た目がその場で入れ替わる"
+    },
+    {
+      "id": "components/profile/cup-feedback-card.tsx#handler:onClick#3",
+      "file": "components/profile/cup-feedback-card.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "response": "pessimistic-form",
+      "why": "送信の 1 手だけがネットワークを待つ。押した瞬間に進行を出し、二重送信を閉じる"
+    },
+    {
+      "id": "components/profile/cup-feedback-card.tsx#handler:onClick#4",
+      "file": "components/profile/cup-feedback-card.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "response": "pessimistic-form",
+      "why": "「いまは答えない」も L0 に 1 行積む送信なので、送信と同じ約束で扱う"
+    },
+    {
+      "id": "components/profile/cup-feedback-card.tsx#write:fetch:POST#1",
+      "file": "components/profile/cup-feedback-card.tsx",
+      "kind": "write",
+      "name": "fetch:POST",
+      "response": "pessimistic-form",
+      "why": "/api/user/cup-feedback への書き込み。共通 hook (usePessimisticMutation) 経由"
+    },
+    {
+      "id": "components/profile/recipient-card.tsx#handler:onClick#1",
+      "file": "components/profile/recipient-card.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "response": "pessimistic-form",
+      "why": "2 択は押した瞬間に送る。押した側だけが進行を出し、もう一方も往復のあいだ閉じる"
+    },
+    {
+      "id": "components/profile/recipient-card.tsx#write:fetch:POST#1",
+      "file": "components/profile/recipient-card.tsx",
+      "kind": "write",
+      "name": "fetch:POST",
+      "response": "pessimistic-form",
+      "why": "/api/user/purchase-recipient への書き込み。共通 hook 経由"
+    },
+    {
+      "id": "components/profile/safety-form.tsx#handler:onClick#1",
+      "file": "components/profile/safety-form.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "response": "sync-dom",
+      "observe": [
+        "[data-slot='safety-tag']"
+      ],
+      "why": "区分の選択は state だけ。押した区分の印がその場で変わる"
+    },
+    {
+      "id": "components/profile/safety-form.tsx#handler:onClick#2",
+      "file": "components/profile/safety-form.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "response": "sync-dom",
+      "observe": [
+        "[data-slot='safety-consent']"
+      ],
+      "why": "同意の印も state だけ。ここが立たない限り送信は押せない"
+    },
+    {
+      "id": "components/profile/safety-form.tsx#handler:onClick#3",
+      "file": "components/profile/safety-form.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "response": "pessimistic-form",
+      "why": "申告の送信。安全に関わるので、積めたかどうかを確かめてから完了を見せる"
+    },
+    {
+      "id": "components/profile/safety-form.tsx#link:Link#1",
+      "file": "components/profile/safety-form.tsx",
+      "kind": "link",
+      "name": "Link",
+      "response": "router-nav",
+      "exempt": "別ページへの遷移のみ (ページ内の見た目は変わらない)"
+    },
+    {
+      "id": "components/profile/safety-form.tsx#write:fetch:POST#1",
+      "file": "components/profile/safety-form.tsx",
+      "kind": "write",
+      "name": "fetch:POST",
+      "response": "pessimistic-form",
+      "why": "/api/user/safety への書き込み。共通 hook 経由"
+    },
+    {
+      "id": "components/profile/this-month-board.tsx#handler:onSettled#1",
+      "file": "components/profile/this-month-board.tsx",
+      "kind": "handler",
+      "name": "onSettled",
+      "exempt": "子コンポーネントへ渡すコールバック props であり、押せるもの (DOM の操作) ではない。実際に押されるのは子側のボタンで、そちらが cup-feedback-card / recipient-card の行として台帳に載っている。ここを二重に数えると、同じ 1 操作が 2 行になる"
+    },
+    {
+      "id": "components/profile/this-month-board.tsx#handler:onSettled#2",
+      "file": "components/profile/this-month-board.tsx",
+      "kind": "handler",
+      "name": "onSettled",
+      "exempt": "子コンポーネントへ渡すコールバック props であり、押せるもの (DOM の操作) ではない。実際に押されるのは子側のボタンで、そちらが cup-feedback-card / recipient-card の行として台帳に載っている。ここを二重に数えると、同じ 1 操作が 2 行になる"
     },
     {
       "id": "components/sanity/portable-text.tsx#link:a#1",
