@@ -279,9 +279,19 @@ describe("対象範囲 (files glob)", () => {
     ["components/chat/elxea-chat-transport.ts", "components/** の .ts"],
     ["components/cart/cart-content.tsx", "components/** の .tsx (従来から対象)"],
     ["app/[locale]/contact/contact-form.tsx", "app/** の .tsx (従来から対象)"],
-  ])("%s で有効 — %s", (file) => {
-    expect(activeRulesFor(file)).toHaveProperty(RULE_ID);
-  });
+  ])(
+    "%s で有効 — %s",
+    (file) => {
+      expect(activeRulesFor(file)).toHaveProperty(RULE_ID);
+    },
+    /* 1 ケースごとに `eslint --print-config` を **別プロセスで** 起こす。単独なら
+       数秒だが、全スイート (storybook プロジェクト併走) の下では 30 秒の既定を
+       超える (この事象はすぐ下の「本物のリポジトリ」節の注記が実測 38.5 秒として
+       記録済み)。上限に当たると **変更内容と無関係に落ちるテスト**になり、
+       `--no-verify` (禁止) への圧力になるだけで検査の質は上がらないので、
+       外部プロセスを起こすこの節だけ上限を上げる。assert は 1 つも緩めない。 */
+    120_000,
+  );
 });
 
 describe("本物のリポジトリ", () => {
@@ -297,6 +307,7 @@ describe("本物のリポジトリ", () => {
    * ここが受け持つのは「網羅表 A23-A26 の 4 件が、例外表へ逃げずに実体として
    * 直ったままか」の 1 点。戻せばここが名指しで落ちる。
    */
+  /* 上と同じ理由 (外部 eslint プロセス + 併走) で、この 1 件だけ上限を上げる。 */
   it("かつて見えていなかった 4 件が、このルールの違反として残っていない", () => {
     const PREVIOUSLY_INVISIBLE = [
       "lib/favorites/client-store.ts", // A23 / A24
@@ -333,5 +344,5 @@ describe("本物のリポジトリ", () => {
       .map((r) => r.filePath.slice(REPO.length + 1));
 
     expect(offenders).toEqual([]);
-  });
+  }, 120_000);
 });
