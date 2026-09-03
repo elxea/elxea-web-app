@@ -73,6 +73,148 @@
       ]
     },
     {
+      "id": "site:top:philosophy-01",
+      "label": "トップ「OUR PHILOSOPHY」帯の背景写真",
+      "page": "top",
+      "required": false,
+      "order": 20,
+      "surfaces": [
+        {
+          "id": "sp",
+          "label": "スマホ表示 (幅 1024px 未満)",
+          "ratio": { "width": 4, "height": 5 },
+          "fit": "cover"
+        },
+        {
+          "id": "pc",
+          "label": "PC 表示 (幅 1024px 以上)",
+          "ratio": { "width": 3, "height": 1 },
+          "fit": "cover",
+          "media": "(min-width: 1024px)"
+        }
+      ]
+    },
+    {
+      "id": "site:top:overview-01",
+      "label": "トップ「elxea でできること」1 枚目 (TEA)",
+      "page": "top",
+      "required": false,
+      "order": 30,
+      "surfaces": [
+        {
+          "id": "base",
+          "label": "スマホ・PC 共通",
+          "ratio": { "width": 3, "height": 2 },
+          "fit": "cover"
+        }
+      ]
+    },
+    {
+      "id": "site:top:overview-02",
+      "label": "トップ「elxea でできること」2 枚目 (JOURNAL)",
+      "page": "top",
+      "required": false,
+      "order": 40,
+      "surfaces": [
+        {
+          "id": "base",
+          "label": "スマホ・PC 共通",
+          "ratio": { "width": 3, "height": 2 },
+          "fit": "cover"
+        }
+      ]
+    },
+    {
+      "id": "site:top:overview-03",
+      "label": "トップ「elxea でできること」3 枚目 (EVENT)",
+      "page": "top",
+      "required": false,
+      "order": 50,
+      "surfaces": [
+        {
+          "id": "base",
+          "label": "スマホ・PC 共通",
+          "ratio": { "width": 3, "height": 2 },
+          "fit": "cover"
+        }
+      ]
+    },
+    {
+      "id": "site:top:overview-04",
+      "label": "トップ「elxea でできること」4 枚目 (ROJI)",
+      "page": "top",
+      "required": false,
+      "order": 60,
+      "surfaces": [
+        {
+          "id": "base",
+          "label": "スマホ・PC 共通",
+          "ratio": { "width": 3, "height": 2 },
+          "fit": "cover"
+        }
+      ]
+    },
+    {
+      "id": "site:top:subscription-item-01",
+      "label": "トップ 定期便 4 項目 1 枚目 (茶葉 3 種)",
+      "page": "top",
+      "required": false,
+      "order": 70,
+      "surfaces": [
+        {
+          "id": "base",
+          "label": "スマホ・PC 共通",
+          "ratio": { "width": 3, "height": 2 },
+          "fit": "cover"
+        }
+      ]
+    },
+    {
+      "id": "site:top:subscription-item-02",
+      "label": "トップ 定期便 4 項目 2 枚目 (淹れ方の栞)",
+      "page": "top",
+      "required": false,
+      "order": 80,
+      "surfaces": [
+        {
+          "id": "base",
+          "label": "スマホ・PC 共通",
+          "ratio": { "width": 3, "height": 2 },
+          "fit": "cover"
+        }
+      ]
+    },
+    {
+      "id": "site:top:subscription-item-03",
+      "label": "トップ 定期便 4 項目 3 枚目 (生産者の便り)",
+      "page": "top",
+      "required": false,
+      "order": 90,
+      "surfaces": [
+        {
+          "id": "base",
+          "label": "スマホ・PC 共通",
+          "ratio": { "width": 3, "height": 2 },
+          "fit": "cover"
+        }
+      ]
+    },
+    {
+      "id": "site:top:subscription-item-04",
+      "label": "トップ 定期便 4 項目 4 枚目 (お届け)",
+      "page": "top",
+      "required": false,
+      "order": 100,
+      "surfaces": [
+        {
+          "id": "base",
+          "label": "スマホ・PC 共通",
+          "ratio": { "width": 3, "height": 2 },
+          "fit": "cover"
+        }
+      ]
+    },
+    {
       "id": "site:about:us-01",
       "label": "About「01 わたしたちのこと」本文の隣の写真",
       "page": "about",
@@ -151,6 +293,28 @@
           "label": "スマホ・PC 共通",
           "ratio": { "width": 19, "height": 14 },
           "fit": "cover"
+        }
+      ]
+    },
+    {
+      "id": "site:about:philosophy-01",
+      "label": "About「NO RIGHT ANSWER」帯の背景写真",
+      "page": "about",
+      "required": false,
+      "order": 160,
+      "surfaces": [
+        {
+          "id": "sp",
+          "label": "スマホ表示 (幅 1024px 未満)",
+          "ratio": { "width": 4, "height": 5 },
+          "fit": "cover"
+        },
+        {
+          "id": "pc",
+          "label": "PC 表示 (幅 1024px 以上)",
+          "ratio": { "width": 3, "height": 1 },
+          "fit": "cover",
+          "media": "(min-width: 1024px)"
         }
       ]
     },

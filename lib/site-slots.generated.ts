@@ -12,11 +12,21 @@
 /** manifest が宣言している枠 id の union。これ以外の id は型で弾かれる。 */
 export type SiteSlotId =
   | "site:top:hero-01"
+  | "site:top:philosophy-01"
+  | "site:top:overview-01"
+  | "site:top:overview-02"
+  | "site:top:overview-03"
+  | "site:top:overview-04"
+  | "site:top:subscription-item-01"
+  | "site:top:subscription-item-02"
+  | "site:top:subscription-item-03"
+  | "site:top:subscription-item-04"
   | "site:about:us-01"
   | "site:about:origin-01"
   | "site:about:origin-02"
   | "site:about:origin-03"
   | "site:about:origin-04"
+  | "site:about:philosophy-01"
   | "site:subscription:first-delivery-01"
   | "site:subscription:first-delivery-02"
   | "site:subscription:first-delivery-03"
@@ -26,11 +36,21 @@ export type SiteSlotId =
 /** 同じ集合を実行時にも使えるようにしたもの (order 昇順)。 */
 export const SITE_SLOT_IDS: readonly SiteSlotId[] = [
   "site:top:hero-01",
+  "site:top:philosophy-01",
+  "site:top:overview-01",
+  "site:top:overview-02",
+  "site:top:overview-03",
+  "site:top:overview-04",
+  "site:top:subscription-item-01",
+  "site:top:subscription-item-02",
+  "site:top:subscription-item-03",
+  "site:top:subscription-item-04",
   "site:about:us-01",
   "site:about:origin-01",
   "site:about:origin-02",
   "site:about:origin-03",
   "site:about:origin-04",
+  "site:about:philosophy-01",
   "site:subscription:first-delivery-01",
   "site:subscription:first-delivery-02",
   "site:subscription:first-delivery-03",

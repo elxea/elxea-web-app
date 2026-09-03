@@ -338,6 +338,12 @@ export type ChapterBreakProps = {
    * About R2 の章切りは Figma で中身が x=400 w=640 = **中央**に置かれている。
    */
   align?: "left" | "center";
+  /**
+   * 帯の背面に敷く層 (`SiteImageBackdrop`)。省略時は今日どおり地色のベタ塗り。
+   * opt-in にしてあるのは、この章切りが About / FAQ / 配送情報 / 商品詳細で共用され、
+   * 写真を敷くのは About だけだから (共用部品に一律で写真を持ち込まない)。
+   */
+  backdrop?: React.ReactNode;
   className?: string;
 };
 
@@ -347,6 +353,7 @@ export function ChapterBreak({
   children,
   size = "default",
   align = "left",
+  backdrop,
   className,
 }: ChapterBreakProps) {
   const tall = size === "tall";
@@ -356,8 +363,13 @@ export function ChapterBreak({
       data-slot="chapter-break"
       data-size={size}
       data-align={align}
-      className={cn("bg-primary text-primary-foreground", className)}
+      className={cn(
+        "bg-primary text-primary-foreground",
+        backdrop && "relative isolate overflow-hidden",
+        className
+      )}
     >
+      {backdrop}
       {/* キッカーがある版 (FAQ 7848:532) は上余白 56、無い版 (配送情報 7848:39508) は 96。
           どちらも帯の高さ 192 に収まる Figma 実測どおりの配分。
           tall は About R2 実測 (PC 上 96 / 下 103・SP 上 80 / 下 95) を spacing scale に

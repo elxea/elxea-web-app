@@ -49,6 +49,15 @@ type SiteImageCardProps = {
   /** group-hover のズーム (`ImageCard` と同じ)。 */
   hover?: boolean;
   style?: CSSProperties;
+  /**
+   * 未割当のとき **枠ごと出さない** (`null` を返す)。
+   *
+   * 既定 (false) は「今日この枠に灰色の面が置かれている」場所向けで、未割当なら
+   * その灰色の面をそのまま描く。true は逆に「今日この場所に写真枠そのものが無い」
+   * 場所 — 新設した枠 — 向け。写真が当たるまでは今日と同じ見た目 (枠なし) を保ち、
+   * 割当が入った瞬間に枠ごと現れる。灰色の空枠が本番に出る時間を作らない。
+   */
+  hideWhenUnassigned?: boolean;
 };
 
 export async function SiteImageCard({
@@ -63,10 +72,13 @@ export async function SiteImageCard({
   priority,
   hover,
   style,
+  hideWhenUnassigned = false,
 }: SiteImageCardProps) {
   const resolved = await getSiteImage(slotId, image ?? '');
 
   if (!resolved.assigned) {
+    // 新設枠 — 写真が当たるまでは枠ごと出さない (灰色の空枠を本番に出さない)。
+    if (hideWhenUnassigned) return null;
     // 未割当 — 今日とまったく同じ `ImageCard` を描く。
     return (
       <ImageCard

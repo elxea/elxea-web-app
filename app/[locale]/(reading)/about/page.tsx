@@ -20,6 +20,7 @@ import {
 import { Section } from "@/components/layout/container";
 import { Breadcrumb } from "@/components/seo/breadcrumb";
 import { SiteImageCard } from "@/components/site-image-card";
+import { SiteImageBackdrop } from "@/components/site-image-backdrop";
 import { Link } from "@/i18n/navigation";
 import { filterOutFictional } from "@/lib/fictional-content";
 import { placeholderValue } from "@/lib/placeholders";
@@ -259,6 +260,8 @@ export default async function AboutPage() {
         align="center"
         overline={t("chapter.overline")}
         title={t("chapter.title")}
+        /* トップの OUR PHILOSOPHY と同設計 — 帯の背面に写真、可読性は覆いで担保。 */
+        backdrop={<SiteImageBackdrop slotId="site:about:philosophy-01" />}
       >
         {t("chapter.body")}
       </ChapterBreak>

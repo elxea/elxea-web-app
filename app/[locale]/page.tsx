@@ -3,6 +3,8 @@ import { Suspense } from "react";
 import { getLocale, getTranslations } from "next-intl/server";
 
 import { SiteImage } from "@/components/site-image";
+import { SiteImageBackdrop } from "@/components/site-image-backdrop";
+import { SiteImageCard } from "@/components/site-image-card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CatalogGrid } from "@/components/catalog/catalog-list";
 import {
@@ -94,6 +96,29 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
+/**
+ * 導線ブロック 4 タイルの写真枠の共通指定。枠 id だけがタイルごとに違う。
+ * PC は 4 列 304px / SP は全幅なので `sizes` はその 2 段で足りる。
+ * `hideWhenUnassigned` — 新設枠なので、写真が当たるまでタイルは今日どおり
+ * テキストだけで積む (灰色の空枠を本番に出さない)。
+ */
+const guideFigureProps = {
+  aspectRatio: "3/2",
+  width: 608,
+  height: 405,
+  sizes: "(max-width: 1024px) 100vw, 304px",
+  hideWhenUnassigned: true,
+} as const;
+
+/** 定期便 4 項目の写真枠の共通指定 (PC は 4 列・SP は 2 列)。 */
+const subscriptionFigureProps = {
+  aspectRatio: "3/2",
+  width: 608,
+  height: 405,
+  sizes: "(max-width: 1024px) 50vw, 304px",
+  hideWhenUnassigned: true,
+} as const;
+
 export default async function HomePage() {
   const t = await getTranslations("homeR2");
 
@@ -161,6 +186,8 @@ export default async function HomePage() {
         overline="OUR PHILOSOPHY"
         title={t("chapterTitle")}
         body={t("chapterBody")}
+        /* 帯の背面に写真。文字は白抜きのままなので、可読性は覆い側で担保する。 */
+        backdrop={<SiteImageBackdrop slotId="site:top:philosophy-01" />}
       />
 
       <ServiceGuideBlock
@@ -174,6 +201,9 @@ export default async function HomePage() {
             body: t("guideTeaBody"),
             href: "/products",
             linkLabel: t("guideTeaLink"),
+            figure: (
+              <SiteImageCard slotId="site:top:overview-01" {...guideFigureProps} />
+            ),
           },
           {
             overline: "JOURNAL",
@@ -181,6 +211,9 @@ export default async function HomePage() {
             body: t("guideJournalBody"),
             href: "/journal",
             linkLabel: t("guideJournalLink"),
+            figure: (
+              <SiteImageCard slotId="site:top:overview-02" {...guideFigureProps} />
+            ),
           },
           {
             overline: "EVENT",
@@ -188,6 +221,9 @@ export default async function HomePage() {
             body: t("guideEventBody"),
             href: "/events",
             linkLabel: t("guideEventLink"),
+            figure: (
+              <SiteImageCard slotId="site:top:overview-03" {...guideFigureProps} />
+            ),
           },
           {
             /* Figma は「roji について」。専用の /roji ルートは無く、roji の実体は
@@ -197,6 +233,9 @@ export default async function HomePage() {
             body: t("guideRojiBody"),
             href: "/subscription",
             linkLabel: t("guideRojiLink"),
+            figure: (
+              <SiteImageCard slotId="site:top:overview-04" {...guideFigureProps} />
+            ),
           },
         ]}
         about={{
@@ -536,10 +575,46 @@ async function SubscriptionSection() {
     <TopSection className="py-8 lg:py-16">
       <SpecBand
         items={[
-          { term: ts("included1Term"), value: ts("included1Value") },
-          { term: ts("included2Term"), value: ts("included2Value") },
-          { term: ts("included3Term"), value: ts("included3Value") },
-          { term: ts("included4Term"), value: ts("included4Value") },
+          {
+            term: ts("included1Term"),
+            value: ts("included1Value"),
+            figure: (
+              <SiteImageCard
+                slotId="site:top:subscription-item-01"
+                {...subscriptionFigureProps}
+              />
+            ),
+          },
+          {
+            term: ts("included2Term"),
+            value: ts("included2Value"),
+            figure: (
+              <SiteImageCard
+                slotId="site:top:subscription-item-02"
+                {...subscriptionFigureProps}
+              />
+            ),
+          },
+          {
+            term: ts("included3Term"),
+            value: ts("included3Value"),
+            figure: (
+              <SiteImageCard
+                slotId="site:top:subscription-item-03"
+                {...subscriptionFigureProps}
+              />
+            ),
+          },
+          {
+            term: ts("included4Term"),
+            value: ts("included4Value"),
+            figure: (
+              <SiteImageCard
+                slotId="site:top:subscription-item-04"
+                {...subscriptionFigureProps}
+              />
+            ),
+          },
         ]}
       />
     </TopSection>
