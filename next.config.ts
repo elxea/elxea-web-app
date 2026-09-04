@@ -61,6 +61,15 @@ const nextConfig: NextConfig = {
    */
   allowedDevOrigins: ["www.elxea.test"],
   images: {
+    /* 2026-09-05 本番障害の恒久対処: Vercel Image Optimization (`/_next/image`) が
+     * プラン上限超過で HTTP 402 を返し、全商品写真・site slot 画像が真っ白になった。
+     * 画像は CDN 自身のリサイズ (Shopify `?width=` / Sanity `?w=`) と R2 の焼き済み
+     * 面別ファイルで足りるので、全 next/image をカスタム loader に通し Vercel の
+     * 変換段を一切経由しない。分岐仕様は `lib/image-loader.ts` の JSDoc。
+     * `remotePatterns` は custom loader では参照されないが、`lib/image-utils.ts`
+     * の許可ホスト一覧との同期点 (どのホストの画像を出すか) として残す。 */
+    loader: "custom",
+    loaderFile: "./lib/image-loader.ts",
     minimumCacheTTL: 31536000,
     remotePatterns: [
       {
