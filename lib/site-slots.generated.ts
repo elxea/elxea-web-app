@@ -12,6 +12,9 @@
 /** manifest が宣言している枠 id の union。これ以外の id は型で弾かれる。 */
 export type SiteSlotId =
   | "site:top:hero-01"
+  | "site:top:leaf-liquor-01"
+  | "site:top:leaf-liquor-02"
+  | "site:top:leaf-liquor-03"
   | "site:top:philosophy-01"
   | "site:top:overview-01"
   | "site:top:overview-02"
@@ -36,6 +39,9 @@ export type SiteSlotId =
 /** 同じ集合を実行時にも使えるようにしたもの (order 昇順)。 */
 export const SITE_SLOT_IDS: readonly SiteSlotId[] = [
   "site:top:hero-01",
+  "site:top:leaf-liquor-01",
+  "site:top:leaf-liquor-02",
+  "site:top:leaf-liquor-03",
   "site:top:philosophy-01",
   "site:top:overview-01",
   "site:top:overview-02",

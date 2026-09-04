@@ -13,6 +13,8 @@ import {
   SpecBand,
   TripleColumn,
 } from "@/components/editorial/section-blocks";
+import { bodySmClass, h4Class } from "@/components/editorial/rule-list";
+import { cn } from "@/lib/utils";
 import { ProductCard } from "@/components/product/product-card";
 import { Link } from "@/i18n/navigation";
 import {
@@ -181,6 +183,8 @@ export default async function HomePage() {
       <Suspense fallback={null}>
         <VoicesSection />
       </Suspense>
+
+      <LeafLiquorSection />
 
       <ChapterStatement
         overline="OUR PHILOSOPHY"
@@ -692,6 +696,95 @@ async function VoicesSection() {
           })}
         />
       </SectionBody>
+    </TopSection>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* 9. 葉と、水色 (LEAF & LIQUOR) — 3 製法の葉のかたちと水色                      */
+/*    (Figma PC 8728:2 / SP 8730:2。VOICES 直後・OUR PHILOSOPHY 直前)           */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * 写真枠 3 枠 (4:3 / PC 実寸 416x312・SP 343x257) の共通指定。
+ * `hideWhenUnassigned` — 新設枠なので、写真が当たるまでは枠ごと出さない
+ * (灰色の空枠を本番に出さない)。テキスト部 (キッカー / 見出し / リード /
+ * 産地名 / キャプション) は先に出す — SP はキャプションが「丸みのある葉 —
+ * 澄んだ黄金色」の対比圧縮形で、写真なしでも言語だけで 3 種の差が立つ設計
+ * のため、セクション全体は隠さない。
+ */
+const leafLiquorFigureProps = {
+  aspectRatio: "4/3",
+  width: 832,
+  height: 624,
+  sizes: "(max-width: 1024px) 100vw, 416px",
+  hideWhenUnassigned: true,
+} as const;
+
+async function LeafLiquorSection() {
+  const t = await getTranslations("homeR2");
+
+  /* slotId は check:site-slots の突き合わせのため文字列リテラルで書く
+     (ServiceGuideBlock / SpecBand の figure と同じ作法)。 */
+  const items = [
+    {
+      key: "leaf-liquor-01",
+      figure: (
+        <SiteImageCard slotId="site:top:leaf-liquor-01" {...leafLiquorFigureProps} />
+      ),
+      title: t("leafLiquor1Title"),
+      body: t("leafLiquor1Body"),
+      bodySp: t("leafLiquor1BodySp"),
+    },
+    {
+      key: "leaf-liquor-02",
+      figure: (
+        <SiteImageCard slotId="site:top:leaf-liquor-02" {...leafLiquorFigureProps} />
+      ),
+      title: t("leafLiquor2Title"),
+      body: t("leafLiquor2Body"),
+      bodySp: t("leafLiquor2BodySp"),
+    },
+    {
+      key: "leaf-liquor-03",
+      figure: (
+        <SiteImageCard slotId="site:top:leaf-liquor-03" {...leafLiquorFigureProps} />
+      ),
+      title: t("leafLiquor3Title"),
+      body: t("leafLiquor3Body"),
+      bodySp: t("leafLiquor3BodySp"),
+    },
+  ] as const;
+
+  return (
+    /* Figma 節余白: PC pt96 / pb64 (8728:2)、SP py32 (8730:2) — VOICES と同値。 */
+    <TopSection className="py-8 lg:pt-24 lg:pb-16">
+      {/* 8728:3 — キッカー 12px overline + 見出し 20px jp/h3 (VOICES と同じ
+          SectionHead。キッカー→見出しの間隔は PC 8 / SP 20)。 */}
+      <SectionHead overline="LEAF & LIQUOR" title={t("leafLiquorTitle")} />
+      {/* 8728:88 / 8730:17 — リード body-sm。PC は 3 文 (優劣を否定する一文を
+          含む・幅 640)、SP は 1 文への短縮形。既存 SP ボードの本文短縮運用
+          (Hero / About / VOICES) と同じく表示切替で持つ。 */}
+      <SectionBody>
+        <p className={cn(bodySmClass, "max-w-160 text-muted-foreground")}>
+          <span className="lg:hidden">{t("leafLiquorLeadSp")}</span>
+          <span className="hidden lg:inline">{t("leafLiquorLead")}</span>
+        </p>
+      </SectionBody>
+      {/* 8728:6 — PC 3 カラム gap32 / SP 縦積み gap20。カード内は IMG →
+          産地名 (jp/h4 16) → キャプション (body-sm 14) を PC gap12 / SP gap8。 */}
+      <div className="mt-5 grid grid-cols-1 gap-5 lg:mt-8 lg:grid-cols-3 lg:gap-8">
+        {items.map((item) => (
+          <div key={item.key} className="flex flex-col gap-2 lg:gap-3">
+            {item.figure}
+            <p className={cn(h4Class, "text-foreground")}>{item.title}</p>
+            <p className={cn(bodySmClass, "text-muted-foreground")}>
+              <span className="lg:hidden">{item.bodySp}</span>
+              <span className="hidden lg:inline">{item.body}</span>
+            </p>
+          </div>
+        ))}
+      </div>
     </TopSection>
   );
 }

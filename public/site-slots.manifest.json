@@ -73,6 +73,51 @@
       ]
     },
     {
+      "id": "site:top:leaf-liquor-01",
+      "label": "トップ「葉と、水色」1 枚目 — 嬉野・釜炒り (丸くよれた茶葉マクロ + 澄んだ黄金色の水色。3 枚は画角・光源・背景・湯呑みを統一した同一シリーズで)",
+      "page": "top",
+      "required": false,
+      "order": 15,
+      "surfaces": [
+        {
+          "id": "base",
+          "label": "スマホ・PC 共通",
+          "ratio": { "width": 4, "height": 3 },
+          "fit": "cover"
+        }
+      ]
+    },
+    {
+      "id": "site:top:leaf-liquor-02",
+      "label": "トップ「葉と、水色」2 枚目 — 知覧・浅蒸し (針状に細くよられた茶葉 + 淡い若草色の水色。1 枚目と同一の画角・光・背景で)",
+      "page": "top",
+      "required": false,
+      "order": 16,
+      "surfaces": [
+        {
+          "id": "base",
+          "label": "スマホ・PC 共通",
+          "ratio": { "width": 4, "height": 3 },
+          "fit": "cover"
+        }
+      ]
+    },
+    {
+      "id": "site:top:leaf-liquor-03",
+      "label": "トップ「葉と、水色」3 枚目 — 川根・中蒸し (細かくくだけた茶葉 + とろりと濃い緑の水色。1・2 枚目と同一条件で)",
+      "page": "top",
+      "required": false,
+      "order": 17,
+      "surfaces": [
+        {
+          "id": "base",
+          "label": "スマホ・PC 共通",
+          "ratio": { "width": 4, "height": 3 },
+          "fit": "cover"
+        }
+      ]
+    },
+    {
       "id": "site:top:philosophy-01",
       "label": "トップ「OUR PHILOSOPHY」帯の背景写真",
       "page": "top",
