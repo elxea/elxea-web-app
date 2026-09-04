@@ -3,6 +3,7 @@ import type { NextConfig } from "next";
 import createNextIntlPlugin from "next-intl/plugin";
 
 import { defaultLocale, disabledLocales } from "./i18n/config";
+import { IMAGE_REMOTE_PATTERNS } from "./lib/image-hosts";
 
 const withNextIntl = createNextIntlPlugin("./i18n/request.ts");
 
@@ -66,31 +67,13 @@ const nextConfig: NextConfig = {
      * 画像は CDN 自身のリサイズ (Shopify `?width=` / Sanity `?w=`) と R2 の焼き済み
      * 面別ファイルで足りるので、全 next/image をカスタム loader に通し Vercel の
      * 変換段を一切経由しない。分岐仕様は `lib/image-loader.ts` の JSDoc。
-     * `remotePatterns` は custom loader では参照されないが、`lib/image-utils.ts`
-     * の許可ホスト一覧との同期点 (どのホストの画像を出すか) として残す。 */
+     * 許可ホストの allowlist は `lib/image-hosts.ts` が唯一の定義 (loader /
+     * `sanitizeImageUrl` / ここ `remotePatterns` で共有)。custom loader 下では Next
+     * 自身は `remotePatterns` を参照しないが、宣言点として残す。 */
     loader: "custom",
     loaderFile: "./lib/image-loader.ts",
     minimumCacheTTL: 31536000,
-    remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "cdn.shopify.com",
-      },
-      {
-        protocol: "https",
-        hostname: "*.shopify.com",
-      },
-      {
-        protocol: "https",
-        hostname: "cdn.sanity.io",
-      },
-      {
-        // M33 Phase C: Asset Hub site-slot images (R2 managed public domain).
-        // Mirrors elxea-asset-hub lib/r2.ts R2_PUBLIC_DOMAIN.
-        protocol: "https",
-        hostname: "pub-90a0485599904fee8228ef56bb51c2e6.r2.dev",
-      },
-    ],
+    remotePatterns: [...IMAGE_REMOTE_PATTERNS],
   },
   // MS10.4: Webflow → Next.js redirects (old site URL structure → new)
   async redirects() {

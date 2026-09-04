@@ -1,6 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import loader from "@/lib/image-loader";
+import { IMAGE_REMOTE_PATTERNS } from "@/lib/image-hosts";
+import loader, { REJECTED_IMAGE_FALLBACK } from "@/lib/image-loader";
+import { sanitizeImageUrl } from "@/lib/image-utils";
 
 describe("elxeaImageLoader (Vercel 画像変換バイパス)", () => {
   it("ローカル静的パスはそのまま返す (/_next/image を組み立てない)", () => {
@@ -48,8 +50,48 @@ describe("elxeaImageLoader (Vercel 画像変換バイパス)", () => {
     expect(loader({ src, width: 1920 })).toBe(src);
   });
 
-  it("未知のホストはそのまま返す (Vercel を通さない)", () => {
-    const src = "https://example.com/a.jpg";
-    expect(loader({ src, width: 640 })).toBe(src);
+});
+
+describe("elxeaImageLoader allowlist (lib/image-hosts.ts と共有)", () => {
+  it("allowlist 外のホストは素通しせず placeholder に落とす (console.error 付き)", () => {
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      expect(loader({ src: "https://example.com/a.jpg", width: 640 })).toBe(
+        REJECTED_IMAGE_FALLBACK,
+      );
+      expect(err).toHaveBeenCalledTimes(1);
+      expect(String(err.mock.calls[0]?.[0])).toMatch(/allowlist 外/);
+    } finally {
+      err.mockRestore();
+    }
+  });
+
+  it("http: (非 https) は allowlist 内ホストでも拒否する", () => {
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      expect(loader({ src: "http://cdn.shopify.com/s/files/1/a.jpg", width: 640 })).toBe(
+        REJECTED_IMAGE_FALLBACK,
+      );
+    } finally {
+      err.mockRestore();
+    }
+  });
+
+  it("*.shopify.com の 1 段ワイルドカードは通る", () => {
+    const out = loader({ src: "https://images.shopify.com/cdn/a.jpg", width: 320 });
+    expect(new URL(out).searchParams.get("width")).toBe("320");
+  });
+
+  it("next.config remotePatterns と sanitizeImageUrl が同じ allowlist を見る", () => {
+    expect(IMAGE_REMOTE_PATTERNS.map((p) => p.hostname)).toEqual([
+      "cdn.shopify.com",
+      "*.shopify.com",
+      "cdn.sanity.io",
+      "pub-90a0485599904fee8228ef56bb51c2e6.r2.dev",
+    ]);
+    expect(sanitizeImageUrl("https://example.com/a.jpg")).toBeNull();
+    expect(
+      sanitizeImageUrl("https://pub-90a0485599904fee8228ef56bb51c2e6.r2.dev/cdn/site/x.jpg"),
+    ).not.toBeNull();
   });
 });

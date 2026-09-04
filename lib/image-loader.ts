@@ -1,5 +1,7 @@
 import type { ImageLoaderProps } from "next/image";
 
+import { isAllowedImageUrl } from "./image-hosts";
+
 /**
  * next/image の全画像に効くカスタム loader (`next.config.ts images.loaderFile`)。
  *
@@ -25,8 +27,15 @@ import type { ImageLoaderProps } from "next/image";
  * | cdn.shopify.com / *.shopify.com       | `?width=<w>` を付与 (Shopify CDN がリサイズ) |
  * | cdn.sanity.io                         | `?w=<w>` (既存 `h` は比率を保って再計算)      |
  *                                         | + `auto=format` + `q=<quality>`             |
- * | R2 (`*.r2.dev`)                       | そのまま (面別に焼き済み)                    |
- * | それ以外                              | そのまま                                    |
+ * | R2 (`lib/image-hosts.ts` の公開ドメイン) | そのまま (面別に焼き済み)                  |
+ * | allowlist 外のホスト / http:          | **拒否** (下記)                             |
+ *
+ * allowlist は `lib/image-hosts.ts` が唯一の定義 (next.config remotePatterns /
+ * `sanitizeImageUrl` と共有)。allowlist 外は **変換せず拒否**: `console.error` を
+ * 出してローカルの placeholder を返す (元の URL を素通しすると allowlist を迂回して
+ * 任意ホストの画像を出せてしまう。throw で画面ごと落とすのは復旧目的に反する)。
+ * 外部データ由来の URL は描画前に `sanitizeImageUrl` で落とすのが一次防御で、
+ * ここは最終防御。
  *
  * Shopify CDN は元画像より大きい幅を指定しても拡大しない (元サイズで返す) ので、
  * next/image が候補に出す w=3840 まで含めて安全。`format` は付けない
@@ -36,10 +45,12 @@ import type { ImageLoaderProps } from "next/image";
 
 const SHOPIFY_HOST = /(^|\.)shopify\.com$/;
 const SANITY_HOST = "cdn.sanity.io";
-const R2_HOST = /\.r2\.dev$/;
 
-function isAbsoluteHttp(src: string): boolean {
-  return src.startsWith("https://") || src.startsWith("http://");
+/** allowlist 外を本番で受けたときに出す画像 (`ImageWithFallback` の既定と同じ)。 */
+export const REJECTED_IMAGE_FALLBACK = "/placeholder-hero-day.jpg";
+
+function isAbsoluteUrl(src: string): boolean {
+  return /^[a-z][a-z0-9+.-]*:\/\//i.test(src);
 }
 
 function shopifyUrl(url: URL, width: number): string {
@@ -63,19 +74,29 @@ function sanityUrl(url: URL, width: number, quality?: number): string {
   return url.toString();
 }
 
+function reject(src: string, reason: string): string {
+  console.error(`[image-loader] 拒否: ${reason} — src=${src.slice(0, 120)}`);
+  return REJECTED_IMAGE_FALLBACK;
+}
+
 export default function elxeaImageLoader({ src, width, quality }: ImageLoaderProps): string {
-  if (!isAbsoluteHttp(src)) return src;
+  // 相対パス (public/ の静的ファイル) と data:/blob: はローカル扱いでそのまま。
+  if (!isAbsoluteUrl(src)) return src;
 
   let url: URL;
   try {
     url = new URL(src);
   } catch {
-    return src;
+    return reject(src, "URL として解釈できない");
+  }
+
+  if (!isAllowedImageUrl(url)) {
+    return reject(src, `allowlist 外のホスト (${url.protocol}//${url.hostname})`);
   }
 
   const host = url.hostname;
   if (SHOPIFY_HOST.test(host)) return shopifyUrl(url, width);
   if (host === SANITY_HOST) return sanityUrl(url, width, quality);
-  if (R2_HOST.test(host)) return src;
+  // R2 (面別に焼き済み) はそのまま。
   return src;
 }

@@ -29,6 +29,7 @@
  */
 
 import { env } from '@/lib/config';
+import { R2_PUBLIC_DOMAIN_DEFAULT } from '@/lib/image-hosts';
 import { getSiteSlot } from '@/lib/site-slots';
 import type { SiteSlot, SiteSlotId } from '@/lib/site-slots';
 
@@ -37,9 +38,7 @@ import type { SiteSlot, SiteSlotId } from '@/lib/site-slots';
  * Mirrors elxea-asset-hub lib/r2.ts R2_PUBLIC_DOMAIN. Overridable via env for
  * staging/preview buckets (rarely needed).
  */
-export const R2_PUBLIC_DOMAIN =
-  env('R2_PUBLIC_DOMAIN') ??
-  'pub-90a0485599904fee8228ef56bb51c2e6.r2.dev';
+export const R2_PUBLIC_DOMAIN = env('R2_PUBLIC_DOMAIN') ?? R2_PUBLIC_DOMAIN_DEFAULT;
 
 /** The elxea org token used in the manifest / R2 key path. */
 export const SITE_ORG = 'ELX';
