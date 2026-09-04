@@ -52,6 +52,14 @@ const ALLOWED_EXTERNAL_HOSTS = new Set([
    * reachable, so the check is an allow-list rather than a count of zero. */
   "use.typekit.net",
   "p.typekit.net",
+  /* The site's own photo CDN (R2 managed public domain). `lib/site-assets.ts`
+   * (R2_PUBLIC_DOMAIN) and `next.config.ts` images.remotePatterns declare it as
+   * the first-party host every `SiteImage*` slot is served from. It started to
+   * appear on the pages this flow walks once the photo pipeline began assigning
+   * photos to the site slots (2026-09-03); it is not a session-leak vector, so
+   * allow-list it rather than count it as an unexpected host. Value mirrors the
+   * env override the app itself honours. */
+  process.env.R2_PUBLIC_DOMAIN ?? "pub-90a0485599904fee8228ef56bb51c2e6.r2.dev",
 ]);
 
 type StubHit = { hits: number; path: string; hasIdTokenHint: boolean; verdict: number };
