@@ -150,7 +150,7 @@ async function main() {
     added: diff.added,
     removed: diff.removed,
     modified: diff.modified,
-    // 対象外 (silent truncation 禁止): @/<route> でない Proposals 直下 section。
+    // 対象外 (silent truncation 禁止): frozen-sections.json に載らない Layouts 直下 section。
     excluded: {
       reason: live.excluded.reason,
       sections_without_route: live.excluded.sections_without_route,
@@ -188,7 +188,7 @@ async function main() {
       `  changed routes (${changedRoutes.length}): ${changedRoutes.join(", ") || "(none)"}`
     );
     console.log(
-      `  excluded sections (no @/route, reported): ${manifest.counts.excluded_sections}`
+      `  excluded sections (not in frozen-sections.json, reported): ${manifest.counts.excluded_sections}`
     );
     if (completenessWarning) {
       console.log(`  [WARN] completeness: ${completenessWarning}`);

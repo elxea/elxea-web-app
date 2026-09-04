@@ -37,11 +37,39 @@
  */
 
 import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 
 export const FIGMA_API_BASE = "https://api.figma.com";
 export const DEFAULT_FILE_KEY = "AWLnI0XF07e8rScuxPYPc7"; // elxea DS 正本 (Decision Log 36f70c9d)
-export const TARGET_PAGE_NAME = "Proposals"; // 部分一致 (figma-page-naming prefix 許容)
+/**
+ * 照合母集団 (2026-09-04 復旧で更新): 旧 Proposals canvas 6054:15 の "@/<route>" section は
+ * 廃止済。現行は「<領域> / Layouts」ページ直下の凍結 section (【R2: 確定版】 / 【採用: ...】) を
+ * 母集団とし、route は frozen-sections.json (section_id → route) で決定論的に引く。
+ */
+export const LAYOUT_PAGE_SUFFIX = "/ Layouts";
+export const R2_SECTION_PREFIX = "【R2: 確定版】";
+export const ADOPTED_SECTION_PREFIX = "【採用:";
+export const FROZEN_SECTIONS_PATH = resolve(
+  dirname(fileURLToPath(import.meta.url)),
+  "frozen-sections.json"
+);
+
+export interface FrozenSectionEntry {
+  section_id: string;
+  title: string;
+  route: string;
+  kind?: "r2" | "adopted";
+  notes?: string;
+}
+
+export function loadFrozenSections(path: string = FROZEN_SECTIONS_PATH): FrozenSectionEntry[] {
+  const raw = JSON.parse(readFileSync(path, "utf-8")) as { sections?: FrozenSectionEntry[] };
+  if (!Array.isArray(raw.sections) || raw.sections.length === 0) {
+    throw new Error(`frozen-sections.json has no sections (${path})`);
+  }
+  return raw.sections;
+}
 
 // ---------------------------------------------------------------------------
 // Token loader (sync-figma-read.ts と同方式)
@@ -319,19 +347,20 @@ export function walkSection(
 
 export interface Snapshot {
   tool: "figma-snapshot";
-  schema_version: 1;
+  schema_version: 2;
   file_key: string;
   file_name: string;
   /** 情報用メタ。diff 対象ではない (volatile: 取得ごとに変わる)。 */
   meta: {
     captured_at: string;
     file_last_modified: string;
-    page: { id: string; name: string };
+    /** 母集団を取った Layouts ページ群 (schema_version 2 で単一 page → 複数 pages)。 */
+    pages: Array<{ id: string; name: string }>;
   };
-  /** @/<route> でない Proposals 直下 section を明示除外 (silent truncation 禁止)。 */
+  /** 母集団対象外の Layouts 直下 section を明示除外 (silent truncation 禁止)。 */
   excluded: {
     reason: string;
-    sections_without_route: Array<{ id: string; name: string }>;
+    sections_without_route: Array<{ id: string; name: string; reason: string }>;
   };
   /** id → 正規化ノード。決定論 diff の対象はここだけ。 */
   nodes: Record<string, NormalizedNode>;
@@ -345,47 +374,94 @@ export interface Snapshot {
 export interface ProposalFetch {
   fileName: string;
   fileLastModified: string;
-  page: { id: string; name: string };
+  pages: Array<{ id: string; name: string }>;
   routeSections: Array<{ id: string; route: string }>;
-  sectionsWithoutRoute: Array<{ id: string; name: string }>;
+  sectionsWithoutRoute: Array<{ id: string; name: string; reason: string }>;
   /** 各 route section の full subtree document (nodes API より)。 */
   sectionDocs: Record<string, FigmaNode>;
 }
 
 /**
- * Proposals ページを特定し、@/<route> section を列挙、その full subtree を取得する。
- * fail-loud: ページ不在 / 母集団ゼロ / nodes API の document 欠落 は throw。
+ * Layouts ページ直下の children から母集団を選ぶ (純関数・テスト対象)。
+ * - 【R2: 確定版】 section: 対応表に必須。未登録なら throw (silent drop 禁止)。
+ * - 【採用: ...】 section: 対応表に載るものだけ対象。載らないものは理由付きで excluded。
+ * - それ以外 (バナー TEXT / 無印 section): 理由付きで excluded。
+ * - 対応表にあるが Figma に無い section_id: throw (対応表の stale を黙認しない)。
+ */
+export function selectFrozenSections(
+  layoutPages: FigmaNode[],
+  mapping: FrozenSectionEntry[]
+): {
+  routeSections: Array<{ id: string; route: string }>;
+  sectionsWithoutRoute: Array<{ id: string; name: string; reason: string }>;
+} {
+  const byId = new Map(mapping.map((m) => [m.section_id, m]));
+  const routeSections: Array<{ id: string; route: string }> = [];
+  const sectionsWithoutRoute: Array<{ id: string; name: string; reason: string }> = [];
+  const seen = new Set<string>();
+  for (const page of layoutPages) {
+    for (const c of page.children ?? []) {
+      const entry = byId.get(c.id);
+      const isR2 = c.type === "SECTION" && c.name.startsWith(R2_SECTION_PREFIX);
+      const isAdopted = c.type === "SECTION" && c.name.startsWith(ADOPTED_SECTION_PREFIX);
+      if (entry) {
+        seen.add(c.id);
+        routeSections.push({ id: c.id, route: entry.route });
+        continue;
+      }
+      if (isR2) {
+        throw new Error(
+          `R2 section ${c.id} ${JSON.stringify(c.name)} (page ${JSON.stringify(page.name)}) is not registered in frozen-sections.json (fail-loud: add section_id → route)`
+        );
+      }
+      sectionsWithoutRoute.push({
+        id: c.id,
+        name: c.name,
+        reason: isAdopted
+          ? "adopted section not in frozen-sections.json (superseded by R2 or non-route part)"
+          : "not a frozen section (banner / annotation / unlabeled)",
+      });
+    }
+  }
+  const missing = mapping.filter((m) => !seen.has(m.section_id));
+  if (missing.length > 0) {
+    throw new Error(
+      `frozen-sections.json entries not found under Layouts pages (stale mapping, fail-loud): ` +
+        missing.map((m) => `${m.section_id} ${m.title}`).join(", ")
+    );
+  }
+  routeSections.sort((a, b) => (a.route < b.route ? -1 : a.route > b.route ? 1 : a.id < b.id ? -1 : 1));
+  return { routeSections, sectionsWithoutRoute };
+}
+
+/**
+ * 「<領域> / Layouts」ページ群を特定し、凍結 section (【R2: 確定版】/【採用:】) を列挙して
+ * その full subtree を取得する。route は frozen-sections.json で決定論的に引く。
+ * fail-loud: Layouts ページ不在 / 母集団ゼロ / 未登録の R2 section / 対応表にあるが Figma に
+ * 無い section / nodes API の document 欠落 は throw。
  */
 export async function fetchProposalSections(
   fileKey: string,
-  token: string
+  token: string,
+  mapping: FrozenSectionEntry[] = loadFrozenSections()
 ): Promise<ProposalFetch> {
   const shallow = await figmaGet<FigmaFileShallow>(
     `/v1/files/${fileKey}?depth=2`,
     token
   );
   const pages = shallow.document.children.filter((p) => p.type === "CANVAS");
-  const proposalPages = pages.filter((p) =>
-    p.name.toLowerCase().includes(TARGET_PAGE_NAME.toLowerCase())
-  );
-  if (proposalPages.length !== 1) {
+  const layoutPages = pages.filter((p) => p.name.endsWith(LAYOUT_PAGE_SUFFIX));
+  if (layoutPages.length === 0) {
     throw new Error(
-      `expected exactly 1 page matching "${TARGET_PAGE_NAME}", found ${proposalPages.length}: ` +
+      `no page ending with "${LAYOUT_PAGE_SUFFIX}" in file (fail-loud): ` +
         pages.map((p) => JSON.stringify(p.name)).join(", ")
     );
   }
-  const page = proposalPages[0];
-
-  const routeSections: Array<{ id: string; route: string }> = [];
-  const sectionsWithoutRoute: Array<{ id: string; name: string }> = [];
-  for (const c of page.children ?? []) {
-    const route = extractRoute(c.name);
-    if (route) routeSections.push({ id: c.id, route });
-    else sectionsWithoutRoute.push({ id: c.id, name: c.name });
-  }
+  const selected = selectFrozenSections(layoutPages, mapping);
+  const { routeSections, sectionsWithoutRoute } = selected;
   if (routeSections.length === 0) {
     throw new Error(
-      `no "@/<route>" named sections under page "${page.name}" (fail-loud: 母集団ゼロは取得不能)`
+      `no frozen sections matched frozen-sections.json under Layouts pages (fail-loud: 母集団ゼロは取得不能)`
     );
   }
 
@@ -413,7 +489,7 @@ export async function fetchProposalSections(
   return {
     fileName: shallow.name,
     fileLastModified: shallow.lastModified,
-    page: { id: page.id, name: page.name },
+    pages: layoutPages.map((p) => ({ id: p.id, name: p.name })),
     routeSections,
     sectionsWithoutRoute,
     sectionDocs,
@@ -427,17 +503,17 @@ export function buildSnapshot(fetched: ProposalFetch, fileKey: string): Snapshot
   }
   return {
     tool: "figma-snapshot",
-    schema_version: 1,
+    schema_version: 2,
     file_key: fileKey,
     file_name: fetched.fileName,
     meta: {
       captured_at: new Date().toISOString(),
       file_last_modified: fetched.fileLastModified,
-      page: fetched.page,
+      pages: fetched.pages,
     },
     excluded: {
       reason:
-        "Proposals 直下の兄弟 section のうち @/<route> 命名でないもの (route proposal ではない: 表紙/凡例/作業メモ等) は母集団対象外。silent truncation を避けるため件数と id/name を明示。",
+        "Layouts ページ直下のうち frozen-sections.json に載らないもの (R2 に置換された旧採用案 / 非 route 部品 / 決定バナー等) は母集団対象外。silent truncation を避けるため件数と id/name/reason を明示。",
       sections_without_route: fetched.sectionsWithoutRoute,
     },
     nodes,
