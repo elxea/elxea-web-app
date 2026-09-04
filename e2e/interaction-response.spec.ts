@@ -556,9 +556,12 @@ async function assertAssetPrefetched(page: Page, row: Interaction, scenario: (ty
   const beforeClick = await page.evaluate(() =>
     performance
       .getEntriesByType("resource")
-      // 画像は Vercel の変換 (`/_next/image`) を通さず CDN 直 (Shopify `?width=`)
-      // で取る (`lib/image-loader.ts`)。先読み一覧も同じ土俵で拾う。
-      .filter((e) => /\/_next\/image|cdn\.shopify\.com/.test(e.name))
+      // 画像は Vercel の変換 (`/_next/image`) を通さず、CDN 直 (Shopify `?width=`) か
+      // ローカル静的ファイル (見本カタログの `/hero-*` 画像等) をそのまま取る
+      // (`lib/image-loader.ts`)。先読み一覧も同じ土俵で拾う。
+      .filter((e) =>
+        /\/_next\/image|cdn\.shopify\.com|\.(?:jpe?g|png|webp|avif)(?:\?|$)/i.test(e.name),
+      )
       .map((e) => e.name),
   );
 
