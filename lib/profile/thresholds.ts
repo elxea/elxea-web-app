@@ -34,6 +34,16 @@ export const PROFILE_WORDS_PERSONAL_MIN_SUBJECTS = 10;
 export const PROFILE_WORDS_PERSONAL_MAX_ITEMS = 200;
 
 /**
+ * 差分攻撃対策 (QA 2周目致命)。`field` を実際に再集計・再公開するのは、
+ * 前回の公開から新規参加者が **この人数以上** 増減したときだけ。
+ * これ未満の増減では公開物 (grid の中身・version) を一切変えない —
+ * 変えると「前日版との差分」から単一の新規参加者の座標が復元できてしまう。
+ * D6 (最小人数) と同じ 10 を使う (二重の定数を持たない)。
+ * 正本: Spec 追記3 (2周目QA致命)。
+ */
+export const PROFILE_FIELD_KBATCH = PROFILE_MIN_COHORT;
+
+/**
  * `bbox` の最小サイズ (正規化空間 -1..1 における一辺の長さ)。
  *
  * 極小 bbox で1人だけを孤立抽出する攻撃を防ぐため、これを下回る指定はサーバー

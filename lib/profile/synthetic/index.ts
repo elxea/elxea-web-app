@@ -18,7 +18,15 @@ import type {
   ProfileWordsParams,
   ProfileWordsResponse,
 } from "@/lib/profile/contract";
-import { aggTea, buildFieldGrid, tasteOf, type WeightedPoint } from "@/lib/profile/field";
+import {
+  aggTea,
+  buildFieldGrid,
+  fieldPublishKey,
+  tasteOf,
+  InMemoryFieldPublishStore,
+  type FieldPublishStore,
+  type WeightedPoint,
+} from "@/lib/profile/field";
 import { buildPersonalWords, buildWordsLayers } from "@/lib/profile/words";
 import { teaMenuForCategory } from "@/lib/profile/tea-menu";
 import { makeSyntheticFacetSubjects, makeSyntheticTeaPeople } from "@/lib/profile/synthetic/generators";
@@ -35,6 +43,14 @@ function defaultBboxFor(facet: ProfileFacet): [number, number, number, number] {
 
 export class SyntheticSource implements ProfileSource {
   readonly kind = "synthetic" as const;
+
+  /**
+   * 差分攻撃対策 (公開判定・版番号) の基準点を覚える場所。既定はインスタンス
+   * ごとに新しいメモリ実装 — テスト・story がそれぞれ独立した「初回公開」から
+   * 始められるようにするため (`lib/profile/field.ts#InMemoryFieldPublishStore`
+   * の doc comment に既知の限界を記載)。
+   */
+  constructor(private readonly publishStore: FieldPublishStore = new InMemoryFieldPublishStore()) {}
 
   async getSelf(params: ProfileSelfParams): Promise<ProfileSelfResponse> {
     const menu = teaMenuForCategory(params.category);
@@ -76,17 +92,30 @@ export class SyntheticSource implements ProfileSource {
 
   async getField(params: ProfileFieldParams): Promise<ProfileFieldResponse> {
     const bbox = defaultBboxFor(params.facet);
+    const key = fieldPublishKey(params.facet, params.category);
+    const previousPublish = await this.publishStore.get(key);
+
+    let points: WeightedPoint[];
+    let category: ProfileFieldResponse["category"] = undefined;
     if (params.facet === "tea") {
-      const category = params.category ?? "green";
+      category = params.category ?? "green";
       const people = makeSyntheticTeaPeople(category, SYNTHETIC_POPULATION);
-      const points: WeightedPoint[] = people.map((p) => ({ x: p.x, y: p.y, w: 1 }));
-      const result = buildFieldGrid({ points, rawCohort: people.length, prevState: null, z: params.z, bbox });
-      return { source: "synthetic", facet: "tea", category, ...result };
+      points = people.map((p) => ({ x: p.x, y: p.y, w: 1 }));
+    } else {
+      const subjects = makeSyntheticFacetSubjects(params.facet, SYNTHETIC_POPULATION);
+      points = subjects.map((s) => ({ x: s.x, y: s.y, w: 1 }));
     }
-    const subjects = makeSyntheticFacetSubjects(params.facet, SYNTHETIC_POPULATION);
-    const points: WeightedPoint[] = subjects.map((s) => ({ x: s.x, y: s.y, w: 1 }));
-    const result = buildFieldGrid({ points, rawCohort: subjects.length, prevState: null, z: params.z, bbox });
-    return { source: "synthetic", facet: params.facet, ...result };
+
+    const { publish, ...response } = buildFieldGrid({
+      points,
+      rawCohort: points.length,
+      prevState: previousPublish?.state ?? null,
+      z: params.z,
+      bbox,
+      previousPublish,
+    });
+    await this.publishStore.set(key, publish);
+    return { source: "synthetic", facet: params.facet, category, ...response };
   }
 
   async getWords(params: ProfileWordsParams): Promise<ProfileWordsResponse> {

@@ -12,6 +12,7 @@
 
 import type { ProfileFieldState, ProfileGrid } from "@/lib/profile/contract";
 import {
+  PROFILE_FIELD_KBATCH,
   PROFILE_GRID_CELL_BUDGET,
   resolveFieldState,
   roundCohort,
@@ -173,6 +174,22 @@ export function quantizeGridToU8(grid: Float32Array): Uint8Array {
 }
 
 /**
+ * セル値を10単位へ丸める (差分攻撃対策・QA 2周目致命)。
+ *
+ * 版が変わったとき (`decideFieldPublish` が実際に再公開したとき) でも、
+ * 1人ぶんの寄与がセル値にそのまま出ると「前版との差分」が新規参加者の
+ * 座標を教える経路になる。0..255 を10刻みへ量子化し、セル1つあたりの
+ * 実効的な情報量を落とす。丸め後も 0..255 に収まる。
+ */
+export function roundU8ToUnits(u8: Uint8Array, unit = 10): Uint8Array {
+  const out = new Uint8Array(u8.length);
+  for (let i = 0; i < u8.length; i++) {
+    out[i] = Math.min(255, Math.round(u8[i] / unit) * unit);
+  }
+  return out;
+}
+
+/**
  * `Uint8Array` → base64。Node (`Buffer`) とブラウザ (`btoa`) の両対応 —
  * 段1インフラの唯一の呼び出し元は Route Handler (Node) だが、
  * `lib/profile/story-fixtures.ts` (Storybook・ブラウザ実行) もこの関数を
@@ -195,6 +212,110 @@ export function contourLevelsFor(state: ProfileFieldState): number[] {
 }
 
 /* ------------------------------------------------------------------ *
+ * 公開版の管理 (差分攻撃対策・QA 2周目致命)
+ *
+ * 「前回公開から新規k=10名以上増減したときだけ再集計・公開」+「版番号」で、
+ * 旧版との差分から単一の新規参加者の座標を復元できないようにする。
+ * セル値の10単位丸めと組み合わせて三重に守る (Spec 追記3)。
+ * ------------------------------------------------------------------ */
+
+/** ある時点で「公開されていた」内容のスナップショット。次回呼び出しの基準点になる。 */
+export interface FieldPublishSnapshot {
+  /** 実際に再集計・再公開するたびに +1。据え置き (frozen) では変わらない。 */
+  version: number;
+  /** この版が実際に計算された ISO 日時。据え置きでは変わらない。 */
+  publishedAt: string;
+  /** この版を計算したときの実人数 (丸め前)。次回の k 判定の基準点。 */
+  publishedRawCohort: number;
+  state: ThresholdFieldState;
+  cohort: number;
+  grid: ProfileGrid | null;
+  levels: number[];
+}
+
+/**
+ * 前回の公開スナップショットと現在の実データから、公開版を決める純関数。
+ *
+ * - 初回 (`previous` が無い) は必ず公開する。
+ * - `quiet`⇄`sparse`⇄`formed` の状態遷移 (既存のヒステリシスを経て確定した
+ *   もの) が起きたときは、内容を state に追随させる必要があるので必ず公開する。
+ * - それ以外は、前回公開からの実人数の増減が `kBatch` 未満なら**内容を一切
+ *   変えず前回のスナップショットをそのまま返す**。基準点 (`publishedRawCohort`)
+ *   も動かさない — 動かすと少数の増分を気付かれずに積み上げられる
+ *   (サラミ攻撃) ため。
+ */
+export function decideFieldPublish(params: {
+  points: readonly WeightedPoint[];
+  rawCohort: number;
+  z: number;
+  bbox: readonly [number, number, number, number];
+  previous: FieldPublishSnapshot | null;
+  /** `previous` が無い最初の呼び出しでも、直前の state だけは分かっている場合に渡す。 */
+  prevState?: ThresholdFieldState | null;
+  now?: string;
+  kBatch?: number;
+}): FieldPublishSnapshot {
+  const kBatch = params.kBatch ?? PROFILE_FIELD_KBATCH;
+  const previous = params.previous;
+  const now = params.now ?? new Date().toISOString();
+
+  const state = resolveFieldState(params.rawCohort, previous?.state ?? params.prevState ?? null);
+  const cohort = roundCohort(params.rawCohort);
+
+  const isFirstPublish = !previous;
+  const stateChanged = previous ? previous.state !== state : true;
+  const newSinceLastPublish = previous ? Math.abs(params.rawCohort - previous.publishedRawCohort) : Infinity;
+  const shouldRepublish = isFirstPublish || stateChanged || newSinceLastPublish >= kBatch;
+
+  if (!shouldRepublish && previous) {
+    // 据え置き: 版・中身・基準点のすべてを変えない。
+    return previous;
+  }
+
+  const nextVersion = (previous?.version ?? 0) + 1;
+
+  if (state === "quiet") {
+    return {
+      version: nextVersion,
+      publishedAt: now,
+      publishedRawCohort: params.rawCohort,
+      state,
+      cohort,
+      grid: null,
+      levels: [],
+    };
+  }
+
+  const band = zoomBandFromZ(params.z);
+  const rawDims = resolveGridDims(state, band);
+  if (!rawDims) {
+    return {
+      version: nextVersion,
+      publishedAt: now,
+      publishedRawCohort: params.rawCohort,
+      state,
+      cohort,
+      grid: null,
+      levels: [],
+    };
+  }
+  const dims = clampGridToBudget(rawDims, cohort);
+  const density = buildDensityGrid(params.points, params.bbox, dims.w, dims.h);
+  const u8 = roundU8ToUnits(quantizeGridToU8(density));
+  const data = encodeU8ToBase64(u8);
+  const grid: ProfileGrid = { w: dims.w, h: dims.h, enc: "u8", data, z: params.z };
+  return {
+    version: nextVersion,
+    publishedAt: now,
+    publishedRawCohort: params.rawCohort,
+    state,
+    cohort,
+    grid,
+    levels: contourLevelsFor(state),
+  };
+}
+
+/* ------------------------------------------------------------------ *
  * 3本のうち B (field) の中身をまとめて組み立てる。
  * ------------------------------------------------------------------ */
 
@@ -204,6 +325,15 @@ export interface FieldGridResult {
   grid: ProfileGrid | null;
   levels: number[];
   bbox: [number, number, number, number];
+  version: number;
+  publishedAt: string;
+  kBatch: number;
+  /**
+   * 次回呼び出しのために `FieldPublishStore` へ保存するスナップショット。
+   * API 応答 (`ProfileFieldResponse`) には含めない — 呼び出し側はこのフィールド
+   * を除いた残りを spread すること (`const { publish, ...response } = result`)。
+   */
+  publish: FieldPublishSnapshot;
 }
 
 export interface BuildFieldGridParams {
@@ -212,24 +342,79 @@ export interface BuildFieldGridParams {
   prevState: ThresholdFieldState | null;
   z: number;
   bbox: [number, number, number, number];
+  /** 差分攻撃対策の基準点。渡さなければ「初回公開」として必ず再集計する。 */
+  previousPublish?: FieldPublishSnapshot | null;
+  now?: string;
+  kBatch?: number;
 }
 
-/** サーバー日次バッチが1回計算する `field` の中身。 */
+/**
+ * サーバー日次バッチが1回計算する `field` の中身。
+ *
+ * `LiveSource` / `SyntheticSource` の両方がこの関数だけを呼ぶ (同じ経路)。
+ * 差分攻撃対策 (公開判定・版番号・セル値丸め) は `decideFieldPublish` に
+ * 委ね、ここは呼び出しの型を契約 (`ProfileFieldResponse`) に合わせるだけ。
+ */
 export function buildFieldGrid(params: BuildFieldGridParams): FieldGridResult {
-  const state = resolveFieldState(params.rawCohort, params.prevState);
-  const cohort = roundCohort(params.rawCohort);
-  if (state === "quiet") {
-    return { state, cohort, grid: null, levels: [], bbox: params.bbox };
+  const kBatch = params.kBatch ?? PROFILE_FIELD_KBATCH;
+  const snapshot = decideFieldPublish({
+    points: params.points,
+    rawCohort: params.rawCohort,
+    z: params.z,
+    bbox: params.bbox,
+    previous: params.previousPublish ?? null,
+    prevState: params.prevState,
+    now: params.now,
+    kBatch,
+  });
+  return {
+    state: snapshot.state,
+    cohort: snapshot.cohort,
+    grid: snapshot.grid,
+    levels: snapshot.levels,
+    bbox: params.bbox,
+    version: snapshot.version,
+    publishedAt: snapshot.publishedAt,
+    kBatch,
+    publish: snapshot,
+  };
+}
+
+/* ------------------------------------------------------------------ *
+ * 公開スナップショットの置き場 (`FieldPublishStore`)。
+ *
+ * 「前回公開から何人増えたか」を比べるには、前回の公開を覚えておく場所が
+ * 要る。本番の実データ経路 (D11: cx-agent 側の日次バッチ) は Supabase/KV
+ * 等に永続化する想定だが、その実装は本 PR の範囲外 (別タスク)。ここでは
+ * `LiveSource` / `SyntheticSource` の両方が同じインターフェースを通す形
+ * だけを用意し、既定はプロセス内メモリ実装にする。
+ *
+ * **既知の限界**: メモリ実装はプロセス再起動・複数インスタンスをまたいで
+ * 一貫性を保証しない。サーバーレス環境ではリクエストのたびに新しいプロセス
+ * が立つことがあり、その場合は毎回「初回公開」扱いになる (安全側 — 公開判定を
+ * 誤ってスキップして情報を隠しすぎる方向にしか倒れない。誤って公開しすぎる
+ * 方向には倒れない)。永続化は D11 の一部として別途実装する。
+ */
+export interface FieldPublishStore {
+  get(key: string): Promise<FieldPublishSnapshot | null>;
+  set(key: string, snapshot: FieldPublishSnapshot): Promise<void>;
+}
+
+/** `field` の公開状態を束ねる鍵。カメラの倍率段 (z) はキーに含めない —
+ *  公開してよいかどうかの判定は母集団の増減だけで決まり、LOD (z) は
+ *  同じ版の中で解像度が変わるだけの表示上の違いのため。 */
+export function fieldPublishKey(facet: string, category: string | undefined): string {
+  return `${facet}:${category ?? "-"}`;
+}
+
+export class InMemoryFieldPublishStore implements FieldPublishStore {
+  private readonly snapshots = new Map<string, FieldPublishSnapshot>();
+
+  async get(key: string): Promise<FieldPublishSnapshot | null> {
+    return this.snapshots.get(key) ?? null;
   }
-  const band = zoomBandFromZ(params.z);
-  const rawDims = resolveGridDims(state, band);
-  if (!rawDims) {
-    return { state, cohort, grid: null, levels: [], bbox: params.bbox };
+
+  async set(key: string, snapshot: FieldPublishSnapshot): Promise<void> {
+    this.snapshots.set(key, snapshot);
   }
-  const dims = clampGridToBudget(rawDims, cohort);
-  const density = buildDensityGrid(params.points, params.bbox, dims.w, dims.h);
-  const u8 = quantizeGridToU8(density);
-  const data = encodeU8ToBase64(u8);
-  const grid: ProfileGrid = { w: dims.w, h: dims.h, enc: "u8", data, z: params.z };
-  return { state, cohort, grid, levels: contourLevelsFor(state), bbox: params.bbox };
 }

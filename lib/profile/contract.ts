@@ -78,6 +78,21 @@ export const ProfileFieldResponseSchema = z.object({
   grid: ProfileGridSchema.nullable(),
   levels: z.array(z.number()),
   bbox: z.tuple([z.number(), z.number(), z.number(), z.number()]),
+  /**
+   * 差分攻撃対策 (QA 2周目致命)。実際に再集計・再公開するたびに +1 する
+   * 版番号。前回公開から新規参加者が `kBatch` 未満しか増減していないときは
+   * `grid` の中身と一緒にこの値も据え置く — 版番号が変わらない2つの応答は
+   * 中身も完全に同一であることを保証し、旧版との差分に意味を持たせない。
+   */
+  version: z.number().int().nonnegative(),
+  /** `version` が最後に上がった (実際に再集計・再公開した) ISO 日時。 */
+  publishedAt: z.string(),
+  /**
+   * 再公開に必要な新規参加者数のしきい値 (定数・現在 10)。**進捗 (あと何人)
+   * は返さない** — 進捗を返すと実人数の増減が漏れ、丸め・据え置きで隠した
+   * 情報が別経路で漏れる。
+   */
+  kBatch: z.number().int().positive(),
 });
 export type ProfileFieldResponse = z.infer<typeof ProfileFieldResponseSchema>;
 

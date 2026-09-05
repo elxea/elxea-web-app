@@ -96,7 +96,13 @@ export function buildStoryScene(
     facet === "tea"
       ? makeStoryTeaPoints(category ?? "green", STORY_POPULATION)
       : makeStoryFacetPoints(facet, STORY_POPULATION);
-  const fieldResult = buildFieldGrid({ points, rawCohort: points.length, prevState: null, z, bbox });
+  const { publish: _publish, ...fieldResult } = buildFieldGrid({
+    points,
+    rawCohort: points.length,
+    prevState: null,
+    z,
+    bbox,
+  });
   const field: ProfileFieldResponse = {
     source: "synthetic",
     facet,

@@ -28,6 +28,7 @@ import "server-only";
 import { env } from "@/lib/config";
 import { logger } from "@/lib/log";
 import { CX_AGENT_BASE_URL } from "@/lib/chat/proxy";
+import { PROFILE_FIELD_KBATCH } from "@/lib/profile/thresholds";
 import type { ProfileSource } from "@/lib/profile/source";
 import type {
   ProfileFieldParams,
@@ -60,6 +61,10 @@ export class LiveSource implements ProfileSource {
   }
 
   async getField(params: ProfileFieldParams): Promise<ProfileFieldResponse> {
+    // 差分攻撃対策 (版番号・kBatch) の実装本体 (`decideFieldPublish`) は
+    // cx-agent 側の日次バッチが持つ想定 (D11・本 PR の範囲外)。ここで返す
+    // フォールバックは「まだ一度も公開されていない」ことを示す version:0 に
+    // 固定する — cx-agent 実装後は必ずこの分岐を通らなくなる。
     const quiet: ProfileFieldResponse = {
       source: "live",
       facet: params.facet,
@@ -69,6 +74,9 @@ export class LiveSource implements ProfileSource {
       grid: null,
       levels: [],
       bbox: [0, 0, 0, 0],
+      version: 0,
+      publishedAt: new Date(0).toISOString(),
+      kBatch: PROFILE_FIELD_KBATCH,
     };
     const qs = new URLSearchParams({ facet: params.facet, z: String(params.z) });
     if (params.category) qs.set("category", params.category);
