@@ -393,6 +393,15 @@ jobs:
         # 失敗を、required check である build に前倒しする。
         run: node scripts/ops/check-edge-bundle.mjs
 
+      - name: No roji profile synthetic data in the production server bundle
+        # roji プロファイル (ミクロ⇔マクロ) の生成データ混入防止5層防御・層1
+        # (到達不能化) の裏取り。lib/profile/synthetic/** への import 経路を
+        # ESLint no-restricted-imports で lib/profile/source.ts の動的 import
+        # だけに絞っているが、それが実際にビルド成果物へ反映されているかは
+        # 成果物そのものを読まないと分からない (check-edge-bundle.mjs と同じ思想)。
+        # 詳細: lib/profile/source.ts の doc comment。
+        run: node scripts/check-no-synthetic-in-prod-bundle.mjs
+
   storybook-tests:
     name: storybook-tests
     needs: static-checks
