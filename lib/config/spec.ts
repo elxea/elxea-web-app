@@ -719,6 +719,24 @@ export const ENV_SPEC = {
     read: () => process.env.NEXT_PUBLIC_SENTRY_DSN,
     schema: optionalTrimmed(),
   },
+
+  /* ---------------- roji プロファイル (ミクロ⇔マクロ・段1) ----------------
+   * 正本: Spec https://app.notion.com/p/3d270c9d064c8171b70be803150d6d5d
+   * `PROFILE_MICRO_MACRO` は画面 (`/dev/profile` 、段3で `/{locale}/account/profile`)
+   * を出すかどうかのフラグ。`PROFILE_DATA_SOURCE` は3本のGETが読む値の出どころ。
+   * 実行時 fail-closed (本番×synthetic の拒否) は `lib/profile/source.ts` 側で行う
+   * (ここでは値の形だけを検証する)。
+   */
+  PROFILE_MICRO_MACRO: {
+    read: () => process.env.PROFILE_MICRO_MACRO,
+    schema: optionalTrimmed().transform((v) => v === "1" || v === "true"),
+  },
+  PROFILE_DATA_SOURCE: {
+    read: () => process.env.PROFILE_DATA_SOURCE,
+    schema: optionalTrimmed()
+      .transform((v) => v ?? "live")
+      .pipe(z.enum(["live", "synthetic"])),
+  },
 } as const satisfies Record<string, EnvEntry>;
 
 /** Every variable name the application is allowed to read. */

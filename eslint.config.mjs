@@ -371,9 +371,25 @@ const eslintConfig = [
                 "Sanity の client を直接 import しない。sanityFetch (@/sanity/lib/fetch) を通す " +
                 "(憲章 Wave 2)。別名・相対パス・dot-segment のどれでも不可。",
             },
+            {
+              regex: "(^|/)lib/profile/synthetic(/|$)",
+              message:
+                "lib/profile/synthetic/** を直接 import しない。roji プロファイルの生成データは " +
+                "lib/profile/source.ts#getProfileSource() だけが到達できる (生成データ混入防止5層防御・層1)。",
+            },
           ],
         },
       ],
+    },
+  },
+  // lib/profile/source.ts (到達経路) と lib/profile/synthetic/** 自身 (内部の
+  // 相互参照) は、上の synthetic 制限ルールの対象外。制限の目的は「外から
+  // synthetic へ到達できるファイルを1つに絞る」ことであり、synthetic 配下の
+  // ファイルどうしの import まで塞ぐと機能そのものが組めない。
+  {
+    files: ["lib/profile/source.ts", "lib/profile/synthetic/**"],
+    rules: {
+      "no-restricted-imports": "off",
     },
   },
 

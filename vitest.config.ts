@@ -125,6 +125,12 @@ export default defineConfig({
         resolve: {
           alias: {
             '@': dirname,
+            // `server-only` の条件解決 (`react-server`) は Next のバンドラだけが持つ。
+            // Vitest はそれを持たないため本物 (常に throw) を掴んでしまう —
+            // unit プロジェクトだけ無害なシムに差し替える。詳細は
+            // `__tests__/helpers/server-only-empty.ts` のコメント。本番ビルドの
+            // 解決には影響しない (Next 側は素の `server-only` を見続ける)。
+            'server-only': path.join(dirname, '__tests__/helpers/server-only-empty.ts'),
           },
         },
       },

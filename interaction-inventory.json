@@ -940,6 +940,22 @@
       "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
     },
     {
+      "id": "app/dev/profile/preview.tsx#handler:onClick#1",
+      "file": "app/dev/profile/preview.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "why": "面 (お茶/読み物/イベント) タブ。React state だけで切り替わり、ネットワークを待たない。押した面の aria-selected が true になる。",
+      "exempt": "/dev 限定の確認用UI (本番導線ではない)。他の app/dev/** の操作と同じく e2e 網羅の対象外。面 (お茶/読み物/イベント) タブ切替は React state のみで、押した面の aria-selected が true になる。"
+    },
+    {
+      "id": "app/dev/profile/preview.tsx#handler:onClick#2",
+      "file": "app/dev/profile/preview.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "why": "カテゴリー (緑茶/紅茶/青茶) 切替。React state だけで切り替わる。押したカテゴリーの aria-pressed が true になる。",
+      "exempt": "/dev 限定の確認用UI (本番導線ではない)。他の app/dev/** の操作と同じく e2e 網羅の対象外。カテゴリー切替は React state のみで、押したカテゴリーの aria-pressed が true になる。"
+    },
+    {
       "id": "app/global-error.tsx#handler:onClick#1",
       "file": "app/global-error.tsx",
       "kind": "handler",
@@ -3303,6 +3319,69 @@
       "kind": "handler",
       "name": "onPointerLeave",
       "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
+    },
+    {
+      "id": "components/viz/profile/profile-stage.tsx#handler:onChange#1",
+      "file": "components/viz/profile/profile-stage.tsx",
+      "kind": "handler",
+      "name": "onChange",
+      "exempt": "縦置きズームスライダー。値の変化は camera state 経由で Canvas 2D の再描画にのみ反映され、DOM 属性は変えない。community-lens.tsx / footprints-scene.tsx の同種の Canvas 操作と同じ理由 (canvas 内部再描画は DOM 差分で観測できない)。"
+    },
+    {
+      "id": "components/viz/profile/profile-stage.tsx#handler:onClick#1",
+      "file": "components/viz/profile/profile-stage.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "「じぶんへ戻る」。camera state を原点へ戻すだけで Canvas 2D 内部の再描画にのみ反映される。data-away は rAF ループ経由で非同期に変わるため同期的な DOM 観測に向かない (community-lens.tsx 系と同じ理由)。"
+    },
+    {
+      "id": "components/viz/profile/profile-stage.tsx#handler:onKeyDown#1",
+      "file": "components/viz/profile/profile-stage.tsx",
+      "kind": "handler",
+      "name": "onKeyDown",
+      "exempt": "+/-/0/矢印キーでの camera 操作。Canvas 2D 内部の再描画のみで DOM 属性を変えない (community-lens.tsx / footprints-scene.tsx の onKeyDown と同じ理由)。"
+    },
+    {
+      "id": "components/viz/profile/profile-stage.tsx#handler:onPointerDown#1",
+      "file": "components/viz/profile/profile-stage.tsx",
+      "kind": "handler",
+      "name": "onPointerDown",
+      "exempt": "ドラッグ開始 (パン)。Canvas 2D 内部の再描画のみ (footprints-scene.tsx / community-lens.tsx の onPointerDown と同じ理由)。"
+    },
+    {
+      "id": "components/viz/profile/profile-stage.tsx#handler:onPointerLeave#1",
+      "file": "components/viz/profile/profile-stage.tsx",
+      "kind": "handler",
+      "name": "onPointerLeave",
+      "exempt": "ドラッグ終了 (ポインタが板の外へ出た)。onPointerUp と同じくドラッグ状態を解除するだけ (community-lens.tsx の同種操作と同じ理由)。"
+    },
+    {
+      "id": "components/viz/profile/profile-stage.tsx#handler:onPointerMove#1",
+      "file": "components/viz/profile/profile-stage.tsx",
+      "kind": "handler",
+      "name": "onPointerMove",
+      "exempt": "ドラッグ中のパン。Canvas 2D 内部の再描画のみ (footprints-scene.tsx / community-lens.tsx の onPointerMove と同じ理由)。"
+    },
+    {
+      "id": "components/viz/profile/profile-stage.tsx#handler:onPointerUp#1",
+      "file": "components/viz/profile/profile-stage.tsx",
+      "kind": "handler",
+      "name": "onPointerUp",
+      "exempt": "ドラッグ終了。camera への反映は既に onPointerMove 側で完了しており、ここでは内部のドラッグ状態を解除するだけ (footprints-scene.tsx の同種操作と同じ理由)。"
+    },
+    {
+      "id": "components/viz/profile/profile-stage.tsx#handler:onWheel#1",
+      "file": "components/viz/profile/profile-stage.tsx",
+      "kind": "handler",
+      "name": "onWheel",
+      "exempt": "ホイール/ピンチでのズーム。Canvas 2D 内部の再描画のみ (community-lens.tsx / footprints-scene.tsx の同種操作と同じ理由)。"
+    },
+    {
+      "id": "components/viz/profile/profile-stage.tsx#listener:change#1",
+      "file": "components/viz/profile/profile-stage.tsx",
+      "kind": "listener",
+      "name": "change",
+      "exempt": "prefers-reduced-motion の変化を監視する matchMedia リスナー。EMA を切り替えるだけで DOM 属性を変えない。"
     },
     {
       "id": "components/viz/terroir/terroir-lens-map.tsx#handler:onClick#1",

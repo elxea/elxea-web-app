@@ -1,0 +1,90 @@
+/**
+ * roji プロファイル (ミクロ⇔マクロ) の匿名性・母集団状態のしきい値。
+ *
+ * 画面側にも API 側にも複製しない — この 1 ファイルだけを見れば全部の値が揃う
+ * (Spec §「初期母集団とコールドスタート」)。
+ *
+ * 正本: Spec https://app.notion.com/p/3d270c9d064c8171b70be803150d6d5d (判断点 D6)。
+ * 値そのもの (10 名 / 50 名) は Setaka 承認の推奨値 (D6) を既定にしている。
+ */
+
+/** これ未満は「みんな」の面を描かない (quiet)。D6。 */
+export const PROFILE_MIN_COHORT = 10;
+
+/** これ以上で等高線・共通語まで出す (formed)。 */
+export const PROFILE_FORMED_COHORT = 50;
+
+/**
+ * ヒステリシス (QA 致命 2 — 時系列差分攻撃への対処)。
+ *
+ * 一度 sparse になったら実人数がこの人数を下回るまで quiet に戻さない。
+ * 一度 formed になったら実人数がこの人数を下回るまで sparse に戻さない。
+ * 境界をまたぐ 1 名の増減が `grid: null → 非null` に直結しないようにする。
+ */
+export const PROFILE_QUIET_REENTRY = PROFILE_MIN_COHORT - 3; // 7
+export const PROFILE_SPARSE_REENTRY = PROFILE_FORMED_COHORT - 5; // 45
+
+/** `cohort` は常にこの単位に丸めて返す (実数を返さない)。 */
+export const PROFILE_COHORT_ROUND_UNIT = 10;
+
+/** `words.personal` — bbox 内の該当者数がこれ未満なら空配列を返す (QA 致命1・D6と同じ閾値)。 */
+export const PROFILE_WORDS_PERSONAL_MIN_SUBJECTS = 10;
+
+/** `words.personal` の上限件数。 */
+export const PROFILE_WORDS_PERSONAL_MAX_ITEMS = 200;
+
+/**
+ * `bbox` の最小サイズ (正規化空間 -1..1 における一辺の長さ)。
+ *
+ * 極小 bbox で1人だけを孤立抽出する攻撃を防ぐため、これを下回る指定はサーバー
+ * 側でクランプ拡張してから集計する (`lib/profile/words.ts#clampBboxToMinSize`)。
+ */
+export const PROFILE_MIN_BBOX_SIZE = 0.2;
+
+/** 1 フレームに描く要素数の上限 (性能予算)。 */
+export const PROFILE_FRAME_ELEMENT_BUDGET = 1_500;
+
+/** 密度格子のセル数の上限 (LOD 表の上限値)。 */
+export const PROFILE_GRID_CELL_BUDGET = 8_000;
+
+/** 1 画面あたりのペイロード上限 (バイト)。 */
+export const PROFILE_PAYLOAD_BYTE_BUDGET = 30_000;
+
+export type ProfileFieldState = "quiet" | "sparse" | "formed";
+
+/**
+ * 母集団の実数 (丸め前) と直前状態から、ヒステリシス込みの状態を決める。
+ *
+ * `prevState` が無い (初回) ときは単純なしきい値判定になる。
+ */
+export function resolveFieldState(
+  rawCohort: number,
+  prevState: ProfileFieldState | null,
+): ProfileFieldState {
+  if (prevState === "formed") {
+    if (rawCohort < PROFILE_SPARSE_REENTRY) {
+      return rawCohort < PROFILE_QUIET_REENTRY ? "quiet" : "sparse";
+    }
+    return "formed";
+  }
+  if (prevState === "sparse") {
+    if (rawCohort >= PROFILE_FORMED_COHORT) return "formed";
+    if (rawCohort < PROFILE_QUIET_REENTRY) return "quiet";
+    return "sparse";
+  }
+  // prevState === "quiet" または初回 (null)
+  if (rawCohort >= PROFILE_FORMED_COHORT) return "formed";
+  if (rawCohort >= PROFILE_MIN_COHORT) return "sparse";
+  return "quiet";
+}
+
+/**
+ * 母集団の実数を公開用に丸める。
+ *
+ * 閾値未満は常に 0 (実数を返すと「いま7人」が推測でき、次の1人が誰かを絞る
+ * 手がかりになる)。閾値以上は 10 単位丸め。
+ */
+export function roundCohort(rawCohort: number): number {
+  if (rawCohort < PROFILE_MIN_COHORT) return 0;
+  return Math.round(rawCohort / PROFILE_COHORT_ROUND_UNIT) * PROFILE_COHORT_ROUND_UNIT;
+}
