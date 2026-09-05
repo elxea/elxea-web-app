@@ -39,3 +39,35 @@ export function mapTeaAxes(
   }
   return { x: aroma - flavor, y: aroma + flavor };
 }
+
+/** 味わい・香りの実測値がとりうる整数の範囲 (Notion Tea Menu List の 1〜5)。 */
+const AXIS_INPUT_MIN = 1;
+const AXIS_INPUT_MAX = 5;
+
+/**
+ * 写像後の嗜好空間が実際に到達しうる範囲 (bbox)。
+ *
+ * `[-9,-9,9,9]` のような「余裕を持たせた四角」を手で置かない。写像 A/B を
+ * 切り替えた瞬間に嘘になるし、実際に使われない外周のぶんだけ密度格子の解像度を
+ * 捨てることになる (写像Bの ±9 は到達範囲 8×8 の 5 倍の面積を覆っていた)。
+ * ここでは入力の定義域 (1〜5 の整数) の四隅を `mapTeaAxes` に通して実測する
+ * ので、写像を変えても bbox は自動で追随する。
+ *
+ * 写像B での値: `x = 香り − 味わい ∈ [-4, 4]` / `y = 香り + 味わい ∈ [2, 10]`。
+ * **原点 (0,0) はこの範囲の中に無い** — 「自分」は原点ではなく
+ * `self.centroid` が指す場所であり、画面の中心をどこに置くかは
+ * `lib/profile/framing.ts` が決める。
+ */
+export function teaAxisBbox(
+  mapping: TeaAxisMapping = TEA_AXIS_MAPPING,
+): [number, number, number, number] {
+  const corners = [
+    mapTeaAxes(AXIS_INPUT_MIN, AXIS_INPUT_MIN, mapping),
+    mapTeaAxes(AXIS_INPUT_MIN, AXIS_INPUT_MAX, mapping),
+    mapTeaAxes(AXIS_INPUT_MAX, AXIS_INPUT_MIN, mapping),
+    mapTeaAxes(AXIS_INPUT_MAX, AXIS_INPUT_MAX, mapping),
+  ];
+  const xs = corners.map((c) => c.x);
+  const ys = corners.map((c) => c.y);
+  return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
+}

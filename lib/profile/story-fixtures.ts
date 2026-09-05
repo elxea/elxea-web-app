@@ -18,6 +18,7 @@ import { seededRandom } from "@/lib/viz/roji-viz-palette";
 import { teaMenuForCategory } from "@/lib/profile/tea-menu";
 import { aggTea, buildFieldGrid, tasteOf, type WeightedPoint } from "@/lib/profile/field";
 import { buildPersonalWords, buildWordsLayers } from "@/lib/profile/words";
+import { profileFieldBbox } from "@/lib/profile/framing";
 import { vocabularyFor } from "@/lib/profile/vocabulary";
 import type {
   ProfileFacet,
@@ -30,10 +31,6 @@ import type { ProfileScene } from "@/components/viz/profile/renderer";
 
 const STORY_SEED = 90210;
 const STORY_POPULATION = 240;
-
-function bboxFor(facet: ProfileFacet): [number, number, number, number] {
-  return facet === "tea" ? [-9, -9, 9, 9] : [-1, -1, 1, 1];
-}
 
 function makeStoryTeaPoints(category: TeaCategory, count: number): WeightedPoint[] {
   const menu = teaMenuForCategory(category);
@@ -91,7 +88,7 @@ export function buildStoryScene(
   category: TeaCategory | undefined,
   z: number,
 ): ProfileScene {
-  const bbox = bboxFor(facet);
+  const bbox = profileFieldBbox(facet);
   const points =
     facet === "tea"
       ? makeStoryTeaPoints(category ?? "green", STORY_POPULATION)

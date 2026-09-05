@@ -205,6 +205,25 @@ function encodeU8ToBase64(bytes: Uint8Array): string {
   return Buffer.from(bytes).toString("base64");
 }
 
+/**
+ * base64 → `Uint8Array` (`encodeU8ToBase64` の対)。
+ *
+ * 格子を読む側は 2 か所ある — 描き手
+ * (`components/viz/profile/renderers/canvas/index.ts`) と、画面の中心・倍率を
+ * 決める `lib/profile/framing.ts`。同じ復号を 2 本持つと、片方だけ環境判定
+ * (`atob` / `Buffer`) を直したときに静かにずれるので、符号化と同じファイルに
+ * 1 本だけ置く。
+ */
+export function decodeU8FromBase64(data: string): Uint8Array {
+  if (typeof atob === "function") {
+    const bin = atob(data);
+    const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  }
+  return new Uint8Array(Buffer.from(data, "base64"));
+}
+
 /** 等高線の水準 (0..1 の正規化割合)。quiet/sparse は引かない (試作の判断を踏襲)。 */
 export function contourLevelsFor(state: ProfileFieldState): number[] {
   if (state !== "formed") return [];

@@ -10,7 +10,6 @@ import "server-only";
 
 import type { ProfileSource } from "@/lib/profile/source";
 import type {
-  ProfileFacet,
   ProfileFieldParams,
   ProfileFieldResponse,
   ProfileSelfParams,
@@ -27,6 +26,7 @@ import {
   type FieldPublishStore,
   type WeightedPoint,
 } from "@/lib/profile/field";
+import { profileFieldBbox } from "@/lib/profile/framing";
 import { buildPersonalWords, buildWordsLayers } from "@/lib/profile/words";
 import { teaMenuForCategory } from "@/lib/profile/tea-menu";
 import { makeSyntheticFacetSubjects, makeSyntheticTeaPeople } from "@/lib/profile/synthetic/generators";
@@ -35,11 +35,6 @@ import { seededRandom } from "@/lib/viz/roji-viz-palette";
 /** 段1の動作確認用に固定した合成母集団の規模 (formed 帯を試作で見せるため50超)。 */
 const SYNTHETIC_POPULATION = 240;
 const SELF_SEED = 424242;
-
-function defaultBboxFor(facet: ProfileFacet): [number, number, number, number] {
-  if (facet === "tea") return [-9, -9, 9, 9]; // 写像Bの値域 (±9) をそのまま覆う
-  return [-1, -1, 1, 1];
-}
 
 export class SyntheticSource implements ProfileSource {
   readonly kind = "synthetic" as const;
@@ -91,7 +86,7 @@ export class SyntheticSource implements ProfileSource {
   }
 
   async getField(params: ProfileFieldParams): Promise<ProfileFieldResponse> {
-    const bbox = defaultBboxFor(params.facet);
+    const bbox = profileFieldBbox(params.facet);
     const key = fieldPublishKey(params.facet, params.category);
     const previousPublish = await this.publishStore.get(key);
 
