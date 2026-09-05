@@ -104,10 +104,27 @@ function previewMisconfiguredResponse(): NextResponse {
  * 本番 (`VERCEL_ENV=production`) かどうか。`/dev/*` を本番だけ閉じるために使う。
  *
  * Preview と同じく Vercel が自動注入する値だけで判定するので、ダッシュボード
- * 操作も env の追加も要らない。ローカル (`VERCEL_ENV` 未設定) は false なので
- * 開発時の `/dev/*` はこれまでどおり開く。
+ * 操作も env の追加も要らない。
+ *
+ * ## `NODE_ENV` も見る理由 (2026-09-06 — ローカルで `/dev/*` が全部 404 になる)
+ *
+ * 「ローカルは `VERCEL_ENV` 未設定なので false」という前提が**成り立たない**。
+ * `vercel env pull` は本番の env をそのまま `.env.local` へ書き出すので、
+ * 一度でも引くと手元に `VERCEL_ENV="production"` が残る。以後 `pnpm dev` は
+ * 自分を本番だと思い込み、`/dev/profile` も `/dev/me` も 404 を返す。実装を
+ * 確認する面が全部消えるのに、原因が `.env.local` の 1 行なので誰も辿れない
+ * (実際に 2 人がここで時間を溶かした)。
+ *
+ * `NODE_ENV` は**バンドラが決める**値で、`vercel env pull` では上書きされない
+ * (`next dev` は development / `next build` は production)。Vercel の本番は
+ * 必ず production ビルドなので、この AND を足しても**本番が開くことはない** —
+ * 閉じ忘れの方向には倒れない。落ちるのは「手元の dev サーバーだけ」。
+ *
+ * `.env.local` 側にも同じ注意を書いてあるが、コメントは読まれないことがある
+ * ので機械の側でも成り立たせる。
  */
-const IS_VERCEL_PRODUCTION = env("VERCEL_ENV") === "production";
+const IS_VERCEL_PRODUCTION =
+  env("VERCEL_ENV") === "production" && env("NODE_ENV") === "production";
 
 async function checkSitePassword(request: NextRequest): Promise<NextResponse | null> {
   if (!SITE_PASSWORD) {

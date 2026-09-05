@@ -1344,3 +1344,73 @@ dl[data-slot="spec-band"][data-emphasis="true"] > [data-slot="spec-item"] > dd {
 .z-50 {
   z-index: var(--z-modal);
 }
+
+/* ─── roji プロファイル (ミクロ⇔マクロ) の縦置き倍率スライダー ─────────────
+ *
+ * 素の `input[type=range]` はブラウザ既定の青いつまみで描かれ、roji の意匠
+ * (生成り・苔・砂) から完全に浮く。かといって div で作り直すと、キーボード
+ * 操作と支援技術からの見え方を自分で書き直すことになる (`.audio-seek` と
+ * 同じ判断)。**ネイティブの range を土台にしたまま見た目だけ寄せる**。
+ *
+ * 色は roji の語彙の 1 系統 (苔) だけで組む。黒・近黒 (`sumi`) は使わない
+ * (Setaka 却下済み)。実値はここに書かず、`lib/viz/roji-viz-palette.ts` を正本と
+ * して呼び出し側がカスタムプロパティで渡す (色の正本を 2 か所に持たない)。
+ *
+ * 縦置きは `rotate(-90deg)`。`writing-mode: vertical-*` による縦置きは
+ * 対応ブラウザが割れる (Safari が新しく、iOS の実機で横倒しのまま出る)。
+ * 回転なら矢印キーの上下と画面の上下も一致する。 */
+.roji-zoom-slider {
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  transform: translate(-50%, -50%) rotate(-90deg);
+  cursor: pointer;
+}
+/* 溝。厚み 3px の細い帯にして、下 (×1) から現在値までを苔の明部で塗る。 */
+.roji-zoom-slider::-webkit-slider-runnable-track {
+  height: 0.1875rem;
+  border-radius: var(--shape-radius-full);
+  background:
+    linear-gradient(
+      to right,
+      var(--roji-zoom-fill) 0,
+      var(--roji-zoom-fill) var(--roji-zoom-progress, 0%),
+      var(--roji-zoom-track) var(--roji-zoom-progress, 0%),
+      var(--roji-zoom-track) 100%
+    );
+}
+.roji-zoom-slider::-moz-range-track {
+  height: 0.1875rem;
+  border-radius: var(--shape-radius-full);
+  background:
+    linear-gradient(
+      to right,
+      var(--roji-zoom-fill) 0,
+      var(--roji-zoom-fill) var(--roji-zoom-progress, 0%),
+      var(--roji-zoom-track) var(--roji-zoom-progress, 0%),
+      var(--roji-zoom-track) 100%
+    );
+}
+/* つまみ。掴む対象が見えないとドラッグできないので置く (`.audio-seek` と同じ)。 */
+.roji-zoom-slider::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 0.75rem;
+  height: 0.75rem;
+  margin-top: -0.28125rem; /* (thumb 12px - track 3px) / 2 */
+  border-radius: var(--shape-radius-full);
+  background: var(--roji-zoom-thumb);
+}
+.roji-zoom-slider::-moz-range-thumb {
+  width: 0.75rem;
+  height: 0.75rem;
+  border: 0;
+  border-radius: var(--shape-radius-full);
+  background: var(--roji-zoom-thumb);
+}
+/* キーボードのフォーカスは残す (見た目を寄せてアクセシビリティを落とさない)。
+   板の地が生成りなので、リングも苔の暗部で置く。 */
+.roji-zoom-slider:focus-visible {
+  outline: 2px solid var(--roji-zoom-focus);
+  outline-offset: 3px;
+}

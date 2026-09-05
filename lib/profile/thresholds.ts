@@ -54,6 +54,20 @@ export const PROFILE_MIN_BBOX_SIZE = 0.2;
 /** 1 フレームに描く要素数の上限 (性能予算)。 */
 export const PROFILE_FRAME_ELEMENT_BUDGET = 1_500;
 
+/**
+ * 1 フレームに描く「言葉」の上限。地の面 (密度格子) とは**別に**持つ。
+ *
+ * 予算を 1 本にして地と言葉で分け合うと、格子のセル数が多い倍率 (LOD micro は
+ * 最大 96×64 = 6,144 セル) で地が先に予算を使い切り、**寄るほど言葉が消える**。
+ * それは Setaka 確定要件「寄って消えるものはない。すべては分解されるだけ」と
+ * 正面から反する落ち方なので、言葉の予算は地の解像度に左右されない。
+ *
+ * 語彙表の規模 (数十) に対しては実質的に効かない上限で、実データが桁で増えた
+ * ときだけ効く安全弁。重なりの解消は間引きではなく
+ * `lib/profile/labels.ts#placeLabels` が担う。
+ */
+export const PROFILE_WORDS_FRAME_BUDGET = 400;
+
 /** 密度格子のセル数の上限 (LOD 表の上限値)。 */
 export const PROFILE_GRID_CELL_BUDGET = 8_000;
 

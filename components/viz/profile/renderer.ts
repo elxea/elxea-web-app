@@ -15,10 +15,18 @@ export interface ProfileScene {
 }
 
 export interface CameraState {
-  /** world 座標系での中心。 */
+  /**
+   * world 座標系での中心 = **自分**。
+   *
+   * 原点 (0,0) ではない — 嗜好空間の写像によっては原点が空間の外にある
+   * (`lib/profile/framing.ts` の冒頭参照)。未ログインで自分の粒が描かれない
+   * ときはみんなの分布の重心が入る。
+   */
   cx: number;
   cy: number;
-  /** px per world-unit。 */
+  /** z=0 (×1) のときの px per world-unit。板の大きさと中身の広がりで決まる。 */
+  baseScale: number;
+  /** px per world-unit (= `baseScale * 10^z`)。 */
   scale: number;
   /** 倍率段 (10 の冪。0 = ×1)。 */
   z: number;

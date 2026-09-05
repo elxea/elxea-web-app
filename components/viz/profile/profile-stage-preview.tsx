@@ -11,8 +11,10 @@
 import { useEffect, useRef } from "react";
 
 import { CanvasProfileRenderer } from "@/components/viz/profile/renderers/canvas";
-import { initialCamera, scaleForZ } from "@/components/viz/profile/camera";
+import { cameraForFraming } from "@/components/viz/profile/camera";
 import type { ProfileScene } from "@/components/viz/profile/renderer";
+import { sceneFraming } from "@/lib/profile/framing";
+import type { ProfileFacet } from "@/lib/profile/contract";
 import { ROJI_VIZ_COLOR } from "@/lib/viz/roji-viz-palette";
 
 export interface ProfileStagePreviewProps {
@@ -33,7 +35,17 @@ export function ProfileStagePreview({ label, scene, z = 0, className }: ProfileS
     renderer.mount(host, { reducedMotion: true });
     const rect = host.getBoundingClientRect();
     renderer.resize(rect.width, rect.height, Math.min(window.devicePixelRatio || 1, 2));
-    const camera = { ...initialCamera(), z, scale: scaleForZ(z) };
+    /* 本番の板 (`ProfileStage`) と同じ決め方で中心と倍率を出す。story だけ別の
+       写し方をすると、視覚回帰が「本番で見えるもの」を見なくなる。 */
+    const facet: ProfileFacet = scene.field?.facet ?? scene.words?.facet ?? "tea";
+    const framing = sceneFraming(scene, facet);
+    const camera = cameraForFraming({
+      anchor: framing.anchor,
+      radius: framing.radius,
+      viewW: rect.width,
+      viewH: rect.height,
+      z,
+    });
     renderer.draw(scene, camera);
     return () => renderer.destroy();
   }, [scene, z]);
