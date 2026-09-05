@@ -24,18 +24,20 @@ const ProfileStage = dynamic(
 export interface ProfileStageBlockProps {
   /** スクリーンリーダー向けの説明。図の中に説明文を置かないので必須。 */
   label: string;
+  /** 倍率スライダーの説明。省略時は板側の既定 (日本語) を使う。 */
+  zoomLabel?: string;
   facet: ProfileFacet;
   category?: TeaCategory;
   className?: string;
 }
 
-export function ProfileStageBlock({ label, facet, category, className }: ProfileStageBlockProps) {
+export function ProfileStageBlock({ label, zoomLabel, facet, category, className }: ProfileStageBlockProps) {
   const [ref, inView] = useInViewOnce<HTMLDivElement>();
 
   return (
     <div ref={ref} data-slot="profile-stage-block" className={cn(className)}>
       {inView ? (
-        <ProfileStage label={label} facet={facet} category={category} />
+        <ProfileStage label={label} zoomLabel={zoomLabel} facet={facet} category={category} />
       ) : (
         <div
           className="h-120 w-full lg:h-160"

@@ -940,22 +940,6 @@
       "exempt": "第1段の据え置き — 憲章 R9 導入時点で既にあった操作。増加をゼロで止めることを先に確定させ、分類は段階的に外す"
     },
     {
-      "id": "app/dev/profile/preview.tsx#handler:onClick#1",
-      "file": "app/dev/profile/preview.tsx",
-      "kind": "handler",
-      "name": "onClick",
-      "exempt": "/dev 限定の確認用UI (本番導線ではない)。他の app/dev/** の操作と同じく e2e 網羅の対象外。面 (お茶/読み物/イベント) タブ切替は React state のみで、押した面の aria-selected が true になる。",
-      "why": "面 (お茶/読み物/イベント) タブ。React state だけで切り替わり、ネットワークを待たない。押した面の aria-selected が true になる。"
-    },
-    {
-      "id": "app/dev/profile/preview.tsx#handler:onClick#2",
-      "file": "app/dev/profile/preview.tsx",
-      "kind": "handler",
-      "name": "onClick",
-      "exempt": "/dev 限定の確認用UI (本番導線ではない)。他の app/dev/** の操作と同じく e2e 網羅の対象外。カテゴリー切替は React state のみで、押したカテゴリーの aria-pressed が true になる。",
-      "why": "カテゴリー (緑茶/紅茶/青茶) 切替。React state だけで切り替わる。押したカテゴリーの aria-pressed が true になる。"
-    },
-    {
       "id": "app/global-error.tsx#handler:onClick#1",
       "file": "app/global-error.tsx",
       "kind": "handler",
@@ -3347,6 +3331,22 @@
       "kind": "listener",
       "name": "change",
       "exempt": "prefers-reduced-motion の変化を監視する matchMedia リスナー。EMA を切り替えるだけで DOM 属性を変えない。"
+    },
+    {
+      "id": "components/viz/profile/profile-surface.tsx#handler:onClick#1",
+      "file": "components/viz/profile/profile-surface.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "PROFILE_MICRO_MACRO が立っている環境にしか存在しない面のため、フラグ未設定の CI の e2e からは到達できない (宣言だけして検査できない行を作らない)。切替は React state のみでネットワークを待たず、押した面の aria-selected が true になる。段2 (表現確定) で常設化するときに response と e2e 手順へ移す。",
+      "why": "面 (お茶/読み物/イベント) タブ。React state だけで切り替わり、ネットワークを待たない。押した面の aria-selected が true になる。"
+    },
+    {
+      "id": "components/viz/profile/profile-surface.tsx#handler:onClick#2",
+      "file": "components/viz/profile/profile-surface.tsx",
+      "kind": "handler",
+      "name": "onClick",
+      "exempt": "同上 (PROFILE_MICRO_MACRO 未設定の CI からは到達できない)。カテゴリー切替も React state のみで、押したカテゴリーの aria-pressed が true になる。",
+      "why": "カテゴリー (緑茶/紅茶/青茶) 切替。React state だけで切り替わる。押したカテゴリーの aria-pressed が true になる。"
     },
     {
       "id": "components/viz/terroir/terroir-lens-map.tsx#handler:onClick#1",

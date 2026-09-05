@@ -1648,5 +1648,19 @@
     "otherThingsLead": "To remove something, or to tell us anything not listed above,",
     "otherThingsLink": "get in touch",
     "sendFailed": "We couldn't send that. Please try again in a little while."
+  },
+  "profile": {
+    "facetGroup": "Switch view",
+    "categoryGroup": "Switch category",
+    "facetTea": "Tea",
+    "facetReading": "Reading",
+    "facetEvent": "Events",
+    "categoryGreen": "Green tea",
+    "categoryRed": "Black tea",
+    "categoryOolong": "Oolong tea",
+    "stageTea": "The ground of taste. You are at the centre; pull back and the presence of others appears",
+    "stageReading": "The field of words. You are at the centre; pull back and the words of others overlap",
+    "stageEvent": "The field of words. You are at the centre; pull back and the words of others overlap",
+    "zoom": "Zoom, from one to one thousand"
   }
 }
