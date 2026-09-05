@@ -31,16 +31,27 @@ import { ROJI_VIZ_COLOR } from "@/lib/viz/roji-viz-palette";
 export interface ProfileStageProps {
   /** スクリーンリーダー向けの説明。図の中に説明文を置かないので必須。 */
   label: string;
+  /**
+   * 倍率スライダーの `aria-label`。
+   *
+   * 既定は日本語のべた書きだった。板は `/{locale}/profile` (ja / en) からも
+   * 使うので、locale を持つ呼び出し側が渡せる口を開けてある。渡さないとき
+   * (`/dev/profile`・Storybook) は従来どおりの文言になる。
+   */
+  zoomLabel?: string;
   facet: ProfileFacet;
   category?: TeaCategory;
   className?: string;
 }
 
+/** `zoomLabel` 省略時の文言。数は漢数字で言う (図に算用数字を出さない作法)。 */
+const DEFAULT_ZOOM_LABEL = "倍率 一倍からせん倍";
+
 function fieldBboxFor(facet: ProfileFacet): [number, number, number, number] {
   return facet === "tea" ? [-9, -9, 9, 9] : [-1, -1, 1, 1];
 }
 
-export function ProfileStage({ label, facet, category, className }: ProfileStageProps) {
+export function ProfileStage({ label, zoomLabel, facet, category, className }: ProfileStageProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const cameraRef = useRef<CameraState>(initialCamera());
   const targetCameraRef = useRef<CameraState>(initialCamera());
@@ -174,7 +185,7 @@ export function ProfileStage({ label, facet, category, className }: ProfileStage
         max={200}
         step={1}
         defaultValue={0}
-        aria-label="倍率 一倍からせん倍"
+        aria-label={zoomLabel ?? DEFAULT_ZOOM_LABEL}
         onChange={onZoomSlider}
         data-slot="profile-stage-zoom-slider"
         style={{

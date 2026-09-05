@@ -2,88 +2,36 @@
 
 /**
  * `/dev/profile` の面切替 (お茶 / 読み物 / イベント) とカテゴリー切替
- * (緑茶 / 紅茶 / 青茶) だけを持つ薄いクライアント層。中身の描画・データ取得は
- * すべて `ProfileStageBlock` に委ねる。
+ * (緑茶 / 紅茶 / 青茶)。
+ *
+ * 中身は正式ページ (`/{locale}/profile`) と同じ `ProfileSurface` に寄せてある。
+ * 切替の実装をこちらにも持つと、正式ページと確認面で挙動がずれても誰も気づけない
+ * (どちらが正しいかを決める根拠が無くなる)。**振る舞いは 1 か所・文言だけここ**、
+ * という切り方にしてある。
+ *
+ * `app/dev/` は `[locale]` の外にあり `NextIntlClientProvider` の内側ではない
+ * ので、ここでは `useTranslations()` を呼べない。確認面なので日本語で固定する
+ * (英語の確認は `/en/profile` で行う)。
  */
 
-import { useState } from "react";
+import {
+  ProfileSurface,
+  type ProfileSurfaceLabels,
+} from "@/components/viz/profile/profile-surface";
 
-import { ProfileStageBlock } from "@/components/viz/profile/profile-stage-block";
-import { ROJI_VIZ_COLOR, ROJI_VIZ_SERIF } from "@/lib/viz/roji-viz-palette";
-import type { ProfileFacet, TeaCategory } from "@/lib/profile/contract";
-
-const FACETS: Array<{ value: ProfileFacet; label: string }> = [
-  { value: "tea", label: "お茶" },
-  { value: "reading", label: "読み物" },
-  { value: "event", label: "イベント" },
-];
-
-const CATEGORIES: Array<{ value: TeaCategory; label: string }> = [
-  { value: "green", label: "緑茶" },
-  { value: "red", label: "紅茶" },
-  { value: "oolong", label: "青茶" },
-];
+const LABELS: ProfileSurfaceLabels = {
+  facetGroup: "面の切替",
+  categoryGroup: "カテゴリーの切替",
+  facets: { tea: "お茶", reading: "読み物", event: "イベント" },
+  categories: { green: "緑茶", red: "紅茶", oolong: "青茶" },
+  stage: {
+    tea: "roji プロファイル — 味わいの地",
+    reading: "roji プロファイル — 言葉の野",
+    event: "roji プロファイル — 言葉の野",
+  },
+  zoom: "倍率 一倍からせん倍",
+};
 
 export function ProfileDevPreview() {
-  const [facet, setFacet] = useState<ProfileFacet>("tea");
-  const [category, setCategory] = useState<TeaCategory>("green");
-
-  return (
-    <div style={{ fontFamily: ROJI_VIZ_SERIF, color: ROJI_VIZ_COLOR.sumi }}>
-      <div role="tablist" aria-label="面の切替" style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-        {FACETS.map((f) => (
-          <button
-            key={f.value}
-            type="button"
-            role="tab"
-            aria-selected={facet === f.value}
-            onClick={() => setFacet(f.value)}
-            style={{
-              minHeight: 44,
-              padding: "0 16px",
-              border: `1px solid ${ROJI_VIZ_COLOR.suna}`,
-              background: facet === f.value ? ROJI_VIZ_COLOR.kinari : "transparent",
-              color: ROJI_VIZ_COLOR.sumi,
-              cursor: "pointer",
-            }}
-          >
-            {f.label}
-          </button>
-        ))}
-      </div>
-
-      {facet === "tea" && (
-        <div role="group" aria-label="カテゴリーの切替" style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-          {CATEGORIES.map((c) => (
-            <button
-              key={c.value}
-              type="button"
-              aria-pressed={category === c.value}
-              onClick={() => setCategory(c.value)}
-              style={{
-                minHeight: 44,
-                padding: "0 14px",
-                borderRadius: 999,
-                border: `1px solid ${ROJI_VIZ_COLOR.suna}`,
-                background: category === c.value ? ROJI_VIZ_COLOR.koke : "transparent",
-                color: category === c.value ? ROJI_VIZ_COLOR.kinari : ROJI_VIZ_COLOR.sumi,
-                cursor: "pointer",
-              }}
-            >
-              {c.label}
-            </button>
-          ))}
-        </div>
-      )}
-
-      <div style={{ height: 560, border: `1px solid ${ROJI_VIZ_COLOR.suna}` }}>
-        <ProfileStageBlock
-          key={`${facet}-${category}`}
-          label={`roji プロファイル — ${facet === "tea" ? "味わいの地" : "言葉の野"}`}
-          facet={facet}
-          category={facet === "tea" ? category : undefined}
-        />
-      </div>
-    </div>
-  );
+  return <ProfileSurface labels={LABELS} />;
 }

@@ -1648,5 +1648,19 @@
     "otherThingsLead": "取り消したいとき、上のどれにも当てはまらないことをお知らせいただくときは、",
     "otherThingsLink": "お問い合わせから",
     "sendFailed": "うまく送れませんでした。少し時間をおいて、もう一度お試しください。"
+  },
+  "profile": {
+    "facetGroup": "面の切替",
+    "categoryGroup": "カテゴリーの切替",
+    "facetTea": "お茶",
+    "facetReading": "読み物",
+    "facetEvent": "イベント",
+    "categoryGreen": "緑茶",
+    "categoryRed": "紅茶",
+    "categoryOolong": "青茶",
+    "stageTea": "味わいの地。自分は中心にいて、引くとみんなの気配が現れる",
+    "stageReading": "言葉の野。自分は中心にいて、引くとみんなの言葉が重なる",
+    "stageEvent": "言葉の野。自分は中心にいて、引くとみんなの言葉が重なる",
+    "zoom": "倍率 一倍からせん倍"
   }
 }
