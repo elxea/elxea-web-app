@@ -393,6 +393,18 @@ jobs:
         # 失敗を、required check である build に前倒しする。
         run: node scripts/ops/check-edge-bundle.mjs
 
+      - name: roji profile synthetic data reaches only through source.ts
+        # roji プロファイル (ミクロ⇔マクロ) の生成データ混入防止5層防御・層1
+        # (到達不能化) の裏取り。lib/profile/synthetic/** への import 経路を
+        # ESLint no-restricted-imports で lib/profile/source.ts の動的 import
+        # だけに絞っているが、CI 側でも独立に検査する (2本目の検査で1本目の穴を
+        # 塞ぐ・check-edge-bundle.mjs と同じ思想)。PROFILE_DEMO_MODE 導入
+        # (2026-09-05 Setaka決定) により本番でも synthetic がビルド成果物に
+        # 現れうるようになったため、検査対象は「ビルド成果物に含まれないこと」
+        # ではなく「import 経路が source.ts だけであること」(ソースレベル)。
+        # 詳細: scripts/check-synthetic-import-boundary.mjs の doc comment。
+        run: node scripts/check-synthetic-import-boundary.mjs
+
   storybook-tests:
     name: storybook-tests
     needs: static-checks

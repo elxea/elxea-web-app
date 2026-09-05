@@ -125,6 +125,12 @@ export default defineConfig({
         resolve: {
           alias: {
             '@': dirname,
+            // `server-only` の条件解決 (`react-server`) は Next のバンドラだけが持つ。
+            // Vitest はそれを持たないため本物 (常に throw) を掴んでしまう —
+            // unit プロジェクトだけ無害なシムに差し替える。詳細は
+            // `__tests__/helpers/server-only-empty.ts` のコメント。本番ビルドの
+            // 解決には影響しない (Next 側は素の `server-only` を見続ける)。
+            'server-only': path.join(dirname, '__tests__/helpers/server-only-empty.ts'),
           },
         },
       },
@@ -141,7 +147,26 @@ export default defineConfig({
           browser: {
             enabled: true,
             headless: true,
-            provider: playwright({}),
+            provider: playwright({
+              launchOptions: {
+                // 一部の story (`components/viz/terroir/*-map.stories.tsx`) は
+                // MapLibre GL = WebGL2 コンテキストを要求する。使える GPU
+                // スタックが無いホスト (例: このリポの headless Chromium が
+                // ハードウェア GL を掴めないマシン) では `GPUInitializationError`
+                // で落ち、そのマシンからの storybook プロジェクト実行が
+                // 全滅する (再現・実測: このセッションで origin/main
+                // 未変更のまま同じ失敗を確認済み)。
+                //
+                // Chromium に SwiftShader (ソフトウェア WebGL2 実装) を渡すと
+                // Mac・Actions runner・コンテナのどこでも動く。skip でも
+                // 緩和でもない — interaction / axe のアサーションは不変。
+                // 前例: 2026-08-19 に同じ根本原因で一度導入されたが、その後
+                // main の履歴からこの変更だけが失われていた
+                // (`git log --follow -- vitest.config.ts` で該当コミットが
+                // 現行 main の系譜に無いことを確認)。
+                args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
+              },
+            }),
             instances: [{ browser: 'chromium' }],
           },
           setupFiles: ['.storybook/vitest.setup.ts'],
