@@ -78,6 +78,9 @@ const ZOOM_SLIDER_MAX = 200;
 const ZOOM_TRACK_LENGTH = 176;
 const ZOOM_TRACK_THICKNESS = 44;
 
+/** 帯を板の右の縁からこれだけ内側に置く (フォーカスの輪郭ぶんの逃げ)。 */
+const ZOOM_EDGE_INSET = 6;
+
 export function ProfileStage({ label, zoomLabel, facet, category, className }: ProfileStageProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const sliderRef = useRef<HTMLInputElement>(null);
@@ -304,7 +307,10 @@ export function ProfileStage({ label, zoomLabel, facet, category, className }: P
         data-slot="profile-stage-zoom"
         style={{
           position: "absolute",
-          right: 0,
+          /* 板の縁にぴったり付けない。`:focus-visible` の輪郭は帯の外側へ
+             2px + 3px はみ出すので、0 にすると上の `overflow: hidden` が
+             輪郭の右端を切る (キーボードで来た人にだけ欠けて見える)。 */
+          right: ZOOM_EDGE_INSET,
           top: 0,
           bottom: 0,
           width: ZOOM_TRACK_THICKNESS,
