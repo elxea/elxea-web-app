@@ -82,9 +82,10 @@ describe("匿名性 (d) — 生成データは production で throw する (fail
     vi.unstubAllEnvs();
   });
 
-  it("VERCEL_ENV=production かつ PROFILE_DATA_SOURCE=synthetic は例外", async () => {
+  it("VERCEL_ENV=production かつ PROFILE_DATA_SOURCE=synthetic は PROFILE_DEMO_MODE 無しなら例外", async () => {
     vi.stubEnv("VERCEL_ENV", "production");
     vi.stubEnv("PROFILE_DATA_SOURCE", "synthetic");
+    vi.stubEnv("PROFILE_DEMO_MODE", "");
     await expect(getProfileSource()).rejects.toBeInstanceOf(ProfileSourceConfigError);
   });
 
@@ -100,6 +101,23 @@ describe("匿名性 (d) — 生成データは production で throw する (fail
     vi.stubEnv("PROFILE_DATA_SOURCE", "");
     const source = await getProfileSource();
     expect(source.kind).toBe("live");
+  });
+
+  it("PROFILE_DEMO_MODE=true があれば production でも synthetic を許す (「初期はダミーデータで見せる」決定)", async () => {
+    vi.stubEnv("VERCEL_ENV", "production");
+    vi.stubEnv("PROFILE_DATA_SOURCE", "synthetic");
+    vi.stubEnv("PROFILE_DEMO_MODE", "true");
+    const source = await getProfileSource();
+    expect(source.kind).toBe("synthetic");
+  });
+
+  it("デモモードの応答でも source:\"synthetic\" の開示は維持される", async () => {
+    vi.stubEnv("VERCEL_ENV", "production");
+    vi.stubEnv("PROFILE_DATA_SOURCE", "synthetic");
+    vi.stubEnv("PROFILE_DEMO_MODE", "true");
+    const source = await getProfileSource();
+    const res = await source.getField({ facet: "tea", category: "green", z: 0 });
+    expect(res.source).toBe("synthetic");
   });
 });
 

@@ -116,12 +116,21 @@ export const ProfileWordSharedSchema = z.object({
   cohort: z.number().int().nonnegative(),
 });
 
+/**
+ * `personal` に載る一件。**常に呼び出し本人が書いたものだけ** (Setaka決定
+ * 2026-09-05・反論なし。Decision Log
+ * https://app.notion.com/p/3d270c9d064c81139c05e51c73d374ac — 「他者のコメントが
+ * 見えるのはプライバシー上問題。俯瞰したときに見えるのは匿名化・一般化された
+ * 粒度 (= `general`/`shared`) だけ」)。他者の個人語をこの契約で返す経路は
+ * 存在しない。旧版にあった `mine: boolean` は「他者のものも返り得る」ことを
+ * 前提にした設計だったため削除した — 型そのものが「これは常に自分のもの」を
+ * 表す。
+ */
 export const ProfileWordPersonalSchema = z.object({
   id: z.string(),
   text: z.string(),
   x: z.number(),
   y: z.number(),
-  mine: z.boolean(),
 });
 
 export const ProfileWordsResponseSchema = z.object({
@@ -130,7 +139,11 @@ export const ProfileWordsResponseSchema = z.object({
   category: TeaCategorySchema.optional(),
   general: z.array(ProfileWordGeneralSchema),
   shared: z.array(ProfileWordSharedSchema),
-  /** 引用許可の仕組みが未実装のため、実装されるまで常に空配列 (正しい振る舞い)。 */
+  /**
+   * 呼び出し本人が書いた言葉のみ (他者の個人語は契約から除外・上記
+   * `ProfileWordPersonalSchema` 参照)。引用許可の仕組みも未実装のため、
+   * 実装されるまで常に空配列 (正しい振る舞い)。
+   */
   personal: z.array(ProfileWordPersonalSchema),
 });
 export type ProfileWordsResponse = z.infer<typeof ProfileWordsResponseSchema>;

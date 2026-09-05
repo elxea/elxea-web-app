@@ -8,10 +8,20 @@
  * ## 生成データ混入防止 (5層防御・層1 + 層2)
  *
  * - **層1 到達不能化**: `lib/profile/synthetic/**` を import できるのはこの
- *   ファイルだけ (`eslint.config.mjs` の `no-restricted-imports` で強制)。
- * - **層2 実行時 fail-closed**: `VERCEL_ENV === "production"` かつ
- *   `PROFILE_DATA_SOURCE === "synthetic"` の組み合わせはここで例外を投げる。
- *   設定ミスでは通り抜けられない。
+ *   ファイルだけ (`eslint.config.mjs` の `no-restricted-imports` で強制。
+ *   CI 側の裏取りは `scripts/check-synthetic-import-boundary.mjs`)。
+ * - **層2 実行時 fail-closed (改訂 2026-09-05)**: 既定では `VERCEL_ENV ===
+ *   "production"` かつ `PROFILE_DATA_SOURCE === "synthetic"` の組み合わせは
+ *   ここで例外を投げる。ただし「初期はダミーデータで見せる」
+ *   (Setaka決定・反論なし。Decision Log
+ *   https://app.notion.com/p/3d270c9d064c81139c05e51c73d374ac) により、
+ *   明示フラグ `PROFILE_DEMO_MODE=true` があるときだけ本番でも synthetic を
+ *   許す。フラグが無ければ従来どおり設定ミスでは通り抜けられない。
+ *   デモモードでも `source: "synthetic"` の開示・`X-Profile-Source` ヘッダー・
+ *   `Cache-Control: private, no-store` は変わらず適用される (層3/層5は
+ *   `SyntheticSource` 自身が `source:"synthetic"` を名乗り、
+ *   `lib/profile/cache-policy.ts` が `synthetic` を常に private,no-store に
+ *   倒すため、デモモード有無で分岐を増やす必要が無い)。
  *
  * 層3 (キャッシュ隔離) は API route 側、層4 (テスト) は
  * `__tests__/profile-anonymity.test.ts`、層5 (開示) は `source` フィールドと
@@ -53,10 +63,12 @@ export async function getProfileSource(): Promise<ProfileSource> {
   const mode = env("PROFILE_DATA_SOURCE");
 
   if (mode === "synthetic") {
-    if (env("VERCEL_ENV") === "production") {
+    const isProductionWithoutDemoMode = env("VERCEL_ENV") === "production" && !env("PROFILE_DEMO_MODE");
+    if (isProductionWithoutDemoMode) {
       throw new ProfileSourceConfigError(
         "PROFILE_DATA_SOURCE=synthetic は本番では使用できません " +
-          "(生成データ混入防止・fail-closed。lib/profile/source.ts#getProfileSource)。",
+          "(生成データ混入防止・fail-closed。PROFILE_DEMO_MODE=true が無い限り通さない。" +
+          "lib/profile/source.ts#getProfileSource)。",
       );
     }
     const mod = await import("@/lib/profile/synthetic");

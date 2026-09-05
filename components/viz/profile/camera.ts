@@ -1,8 +1,23 @@
 /**
- * カメラ・慣性・ズーム中心・戻る。座標だけ知る純粋な状態機械 (DOM を持たない)。
+ * カメラ・慣性・ズーム。座標だけ知る純粋な状態機械 (DOM を持たない)。
  *
- * 試作 `roji-r4-zoom-20260904.html` の「入れ子の10の冪」(`SX`/`SY`/`NX`/`NY`) と
- * `zoomAt` (ズーム中心の方針) ・`goHome` の考え方を移植。
+ * 試作 `roji-r4-zoom-20260904.html` の「入れ子の10の冪」(`SX`/`SY`/`NX`/`NY`) の
+ * 考え方を移植。
+ *
+ * ## ズームの中心は常に自分 (Setaka決定 2026-09-05・反論なし)
+ *
+ * Decision Log https://app.notion.com/p/3d270c9d064c81139c05e51c73d374ac —
+ * 「自分中心にズームするのは特別扱いではない。個と全体のつながりを自覚する
+ * ためのプロセス」。よって world 座標の原点 (= 自分) は常に画面中心に固定し、
+ * カーソル位置中心・折衷・中央固定の切替設定は持たない (差し替え可能にする
+ * 判断点にもしない — 確定事項)。
+ *
+ * ## 自由パン (泳ぐ操作) は廃止
+ *
+ * 同じ決定の帰結として「他者のコメントを自由パンで探しに行く」操作を廃止した。
+ * 移動はズームだけで行い、`panBy` は持たない。自分は常に中心にいるため
+ * 「じぶんへ戻る」も「画面外に出た」の印も存在しない (どちらも旧設計の
+ * 自由パンを前提にしていた)。
  */
 
 import type { CameraState } from "@/components/viz/profile/renderer";
@@ -15,6 +30,7 @@ const MIN_Z = 0;
 const MAX_Z = 2;
 const ZOOM_BASE = 10;
 
+/** 自分 (world 原点) を常に画面中心に据えたカメラ。位置は常にこれで固定。 */
 export function initialCamera(): CameraState {
   return { cx: 0, cy: 0, scale: BASE_SCALE, z: MIN_Z };
 }
@@ -28,54 +44,36 @@ function clampZ(z: number): number {
 }
 
 /**
- * 触れた画面座標 (screenX, screenY) を中心に保ったまま倍率を変える
- * (試作 `zoomAt` の方針)。
+ * 倍率段だけを変える。中心は常に自分 (world 原点) — `cx`/`cy` は常に 0 のまま
+ * (差し替え可能な「ズーム中心」設定は持たない・確定事項)。
  */
-export function zoomAt(
-  camera: CameraState,
-  screenX: number,
-  screenY: number,
-  viewW: number,
-  viewH: number,
-  deltaZ: number,
-): CameraState {
-  const worldXBefore = camera.cx + (screenX - viewW / 2) / camera.scale;
-  const worldYBefore = camera.cy + (screenY - viewH / 2) / camera.scale;
+export function zoomBy(camera: CameraState, deltaZ: number): CameraState {
   const nextZ = clampZ(camera.z + deltaZ);
-  const nextScale = scaleForZ(nextZ);
-  const cx = worldXBefore - (screenX - viewW / 2) / nextScale;
-  const cy = worldYBefore - (screenY - viewH / 2) / nextScale;
-  return { cx, cy, scale: nextScale, z: nextZ };
+  return { cx: 0, cy: 0, scale: scaleForZ(nextZ), z: nextZ };
 }
 
-/** 「じぶんへ戻る」— 自分 (world 原点) を画面中心に据える。倍率は変えない。 */
-export function goHome(camera: CameraState): CameraState {
-  return { ...camera, cx: 0, cy: 0 };
-}
-
-export function panBy(camera: CameraState, dxScreen: number, dyScreen: number): CameraState {
-  return {
-    ...camera,
-    cx: camera.cx - dxScreen / camera.scale,
-    cy: camera.cy - dyScreen / camera.scale,
-  };
+/** 倍率段を直接指定する (ズームスライダー用)。中心は常に自分。 */
+export function zoomTo(camera: CameraState, z: number): CameraState {
+  const nextZ = clampZ(z);
+  return { cx: 0, cy: 0, scale: scaleForZ(nextZ), z: nextZ };
 }
 
 /**
- * カメラのなめらかな追従 (EMA)。滑らかさ最優先の要件により、位置・倍率は
- * 毎フレーム目標値へこの割合ずつ寄せる。`prefers-reduced-motion` のときは
- * 呼び出し側がそもそもこれを使わず、目標値をそのまま採用する。
+ * カメラのなめらかな追従 (EMA)。滑らかさ最優先の要件により、倍率は毎フレーム
+ * 目標値へこの割合ずつ寄せる。`prefers-reduced-motion` のときは呼び出し側が
+ * そもそもこれを使わず、目標値をそのまま採用する。位置は常に 0,0 なので
+ * 補間は倍率 (`scale`) のみが実質的な効果を持つ。
  */
 export function easeCamera(current: CameraState, target: CameraState, alpha = 0.18): CameraState {
   return {
-    cx: current.cx + (target.cx - current.cx) * alpha,
-    cy: current.cy + (target.cy - current.cy) * alpha,
+    cx: 0,
+    cy: 0,
     scale: current.scale + (target.scale - current.scale) * alpha,
     z: target.z,
   };
 }
 
-/** world 座標 → screen 座標。 */
+/** world 座標 → screen 座標。自分 (0,0) は常に画面中心に写る。 */
 export function worldToScreen(
   camera: CameraState,
   worldX: number,
@@ -87,9 +85,4 @@ export function worldToScreen(
     x: viewW / 2 + (worldX - camera.cx) * camera.scale,
     y: viewH / 2 + (worldY - camera.cy) * camera.scale,
   };
-}
-
-export function isAway(camera: CameraState, viewW: number, viewH: number): boolean {
-  const { x, y } = worldToScreen(camera, 0, 0, viewW, viewH);
-  return x < 0 || y < 0 || x > viewW || y > viewH;
 }

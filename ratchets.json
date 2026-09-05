@@ -34,7 +34,7 @@
       "why": "「押した瞬間に効く」共通 hook への未移行画面。表そのものが残りの移行計画を兼ねている。"
     },
     "interaction-exempt": {
-      "max": 436,
+      "max": 431,
       "source": "interaction-inventory.json の exempt を持つ行",
       "why": "「この操作は応答を検査しない」と申告した操作。縮小方向にのみ動く。",
       "note": "417 → 425 (2026-09-01)。顧客プロファイル 第1段 (web-app 画面側) で足した押せるもののうち、exempt に落ちたのは 8 件だけ。内訳は (a) 別ページへ移るだけの内部リンク 6 本 (/account/this-month の 3 本 = お問い合わせ・避けたいもの・ログイン、/account/safety の 1 本 = ログイン、safety-form の 1 本 = お問い合わせ、フッターの 1 本 = 今月のお茶) = 自動 exempt (b) this-month-board が子へ渡すコールバック props 2 件 (onSettled)。押されるのは子側のボタンで、そちらは cup-feedback-card / recipient-card の行として応答を宣言済み — ここを数えると同じ 1 操作が 2 行になる。新しく足した押せるもの 22 件のうち exempt はこの 8 件で、残り 11 件は sync-dom / pessimistic-form として応答を宣言し、e2e/interaction-response.spec.ts に手順も置いてある (ログイン必須の面なので CI では requiresMemberSession により理由付き skip。skip は pnpm report:e2e-skips が出す)。 418 → 417 (2026-08-31)。チャットの会話 ID をサーバ発行の署名付きにした変更で、LINE ログインボタンの onClick (localStorage の会話 ID を cookie に書き写すだけの処理) が不要になり削除されたぶん。操作が 1 つ消えたので上限も 1 つ下げる。416 → 418 (2026-08-29)。CDP 統合 Stage 4 で足した内部リンク 2 本 (フッターの茶葉診断 /diagnosis・診断結果から /products) がどちらも自動 exempt (別ページへ移るだけ) に落ちたぶん。新しく足した押せるもの 7 件のうち exempt はこの 2 件だけで、残り 5 件は sync-dom / async-fetch として応答を宣言してある。初期値 445 は憲章 R9 導入 (2026-08-27) 時点の据え置き。内訳は (a) 別ページへ移るだけの内部リンク = 自動 exempt (b) 第1段の据え置き。段階導入の理由は網羅表 §7: 機構と実際の遅さを一度に入れると、機構の不具合とプロダクトの遅さの区別がつかないまま大量の赤に埋もれる。先に『増えない』を確定させ、次に『減らす』に入る。減った分は本 ratchet が上限の引き下げを強制する。"

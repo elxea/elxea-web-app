@@ -8,25 +8,22 @@
  * この層は「取得して渡す」「操作を状態機械 (`camera.ts`) に伝える」だけを持ち、
  * 画面の意味 (色・形) を一切知らない。
  *
- * 操作:
- * - ドラッグ / ホイールでパン・ズーム (試作を踏襲)
- * - `+` / `-` で倍率、`0` で自分へ戻る、矢印キーでパン
- * - 縦置きスライダー (板の右端) と「じぶんへ戻る」ボタン (板の内側の隅) —
- *   canvas の中にボタンを描かない (板は `role="img"` + `aria-label` のみ)
+ * ## 操作 (Setaka決定 2026-09-05・反論なし で確定)
+ *
+ * - ホイール / `+` / `-` / 縦置きスライダーで**ズームのみ**。中心は常に自分
+ *   (Decision Log https://app.notion.com/p/3d270c9d064c81139c05e51c73d374ac)
+ * - **自由パン (ドラッグして探す「泳ぐ」操作) は無い** — 同じ決定の帰結。
+ *   自分は常に画面中心にいるため「じぶんへ戻る」ボタンも画面外の印も無い
+ * - `0` キーで倍率だけ ×1 (マクロ) へ戻す
+ * - 縦置きスライダー (板の右端) だけを操作として置く。canvas の中にボタンを
+ *   描かない (板は `role="img"` + `aria-label` のみ)
  * - `prefers-reduced-motion` のときは EMA を切り、目標値を即時反映する
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { CanvasProfileRenderer } from "@/components/viz/profile/renderers/canvas";
-import {
-  easeCamera,
-  goHome,
-  initialCamera,
-  isAway,
-  panBy,
-  zoomAt,
-} from "@/components/viz/profile/camera";
+import { easeCamera, initialCamera, zoomBy, zoomTo } from "@/components/viz/profile/camera";
 import type { CameraState, ProfileScene } from "@/components/viz/profile/renderer";
 import type { ProfileFacet, TeaCategory } from "@/lib/profile/contract";
 import { ROJI_VIZ_COLOR } from "@/lib/viz/roji-viz-palette";
@@ -48,7 +45,6 @@ export function ProfileStage({ label, facet, category, className }: ProfileStage
   const cameraRef = useRef<CameraState>(initialCamera());
   const targetCameraRef = useRef<CameraState>(initialCamera());
   const sceneRef = useRef<ProfileScene>({ self: null, field: null, words: null });
-  const [away, setAway] = useState(false);
   const [reducedMotion, setReducedMotion] = useState<boolean>(
     () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches,
   );
@@ -81,8 +77,6 @@ export function ProfileStage({ label, facet, category, className }: ProfileStage
         : easeCamera(cameraRef.current, targetCameraRef.current);
       cameraRef.current = cam;
       renderer.draw(sceneRef.current, cam);
-      const rect = host.getBoundingClientRect();
-      setAway(isAway(cam, rect.width, rect.height));
       raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
@@ -128,60 +122,21 @@ export function ProfileStage({ label, facet, category, className }: ProfileStage
 
   const onWheel = useCallback((e: React.WheelEvent<HTMLDivElement>) => {
     e.preventDefault();
-    const rect = hostRef.current?.getBoundingClientRect();
-    if (!rect) return;
     const delta = e.deltaY > 0 ? -0.02 : 0.02;
-    targetCameraRef.current = zoomAt(
-      targetCameraRef.current,
-      e.clientX - rect.left,
-      e.clientY - rect.top,
-      rect.width,
-      rect.height,
-      delta,
-    );
-  }, []);
-
-  const dragState = useRef<{ x: number; y: number } | null>(null);
-  const onPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    dragState.current = { x: e.clientX, y: e.clientY };
-  }, []);
-  const onPointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    if (!dragState.current) return;
-    const dx = e.clientX - dragState.current.x;
-    const dy = e.clientY - dragState.current.y;
-    dragState.current = { x: e.clientX, y: e.clientY };
-    targetCameraRef.current = panBy(targetCameraRef.current, dx, dy);
-  }, []);
-  const onPointerUp = useCallback(() => {
-    dragState.current = null;
+    targetCameraRef.current = zoomBy(targetCameraRef.current, delta);
   }, []);
 
   const onKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
-    const rect = hostRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const step = 40;
     switch (e.key) {
       case "+":
       case "=":
-        targetCameraRef.current = zoomAt(targetCameraRef.current, rect.width / 2, rect.height / 2, rect.width, rect.height, 0.1);
+        targetCameraRef.current = zoomBy(targetCameraRef.current, 0.1);
         break;
       case "-":
-        targetCameraRef.current = zoomAt(targetCameraRef.current, rect.width / 2, rect.height / 2, rect.width, rect.height, -0.1);
+        targetCameraRef.current = zoomBy(targetCameraRef.current, -0.1);
         break;
       case "0":
-        targetCameraRef.current = goHome(targetCameraRef.current);
-        break;
-      case "ArrowLeft":
-        targetCameraRef.current = panBy(targetCameraRef.current, step, 0);
-        break;
-      case "ArrowRight":
-        targetCameraRef.current = panBy(targetCameraRef.current, -step, 0);
-        break;
-      case "ArrowUp":
-        targetCameraRef.current = panBy(targetCameraRef.current, 0, step);
-        break;
-      case "ArrowDown":
-        targetCameraRef.current = panBy(targetCameraRef.current, 0, -step);
+        targetCameraRef.current = zoomTo(targetCameraRef.current, 0);
         break;
       default:
         return;
@@ -191,20 +146,7 @@ export function ProfileStage({ label, facet, category, className }: ProfileStage
 
   const onZoomSlider = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const z = Number(e.target.value) / 100;
-    const rect = hostRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    targetCameraRef.current = zoomAt(
-      targetCameraRef.current,
-      rect.width / 2,
-      rect.height / 2,
-      rect.width,
-      rect.height,
-      z - targetCameraRef.current.z,
-    );
-  }, []);
-
-  const onHome = useCallback(() => {
-    targetCameraRef.current = goHome(targetCameraRef.current);
+    targetCameraRef.current = zoomTo(targetCameraRef.current, z);
   }, []);
 
   return (
@@ -215,10 +157,6 @@ export function ProfileStage({ label, facet, category, className }: ProfileStage
         aria-label={label}
         tabIndex={0}
         onWheel={onWheel}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerLeave={onPointerUp}
         onKeyDown={onKeyDown}
         data-slot="profile-stage-canvas-host"
         style={{
@@ -248,36 +186,6 @@ export function ProfileStage({ label, facet, category, className }: ProfileStage
           transform: "translateY(-50%) rotate(-90deg)",
         }}
       />
-      <button
-        type="button"
-        aria-label="じぶんへ戻る"
-        onClick={onHome}
-        data-away={away}
-        data-slot="profile-stage-home"
-        style={{
-          position: "absolute",
-          right: 56,
-          bottom: 8,
-          width: 44,
-          height: 44,
-          border: 0,
-          background: "none",
-          cursor: "pointer",
-          opacity: away ? 1 : 0.25,
-        }}
-      >
-        <span
-          aria-hidden="true"
-          style={{
-            display: "block",
-            width: 30,
-            height: 30,
-            borderRadius: "50%",
-            border: `1.5px solid ${ROJI_VIZ_COLOR.fukamidori}`,
-            margin: "0 auto",
-          }}
-        />
-      </button>
     </div>
   );
 }

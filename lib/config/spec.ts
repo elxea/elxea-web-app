@@ -737,6 +737,17 @@ export const ENV_SPEC = {
       .transform((v) => v ?? "live")
       .pipe(z.enum(["live", "synthetic"])),
   },
+  /**
+   * 「初期はダミーデータで見せる」(Setaka決定 2026-09-05・反論なし。Decision Log
+   * https://app.notion.com/p/3d270c9d064c81139c05e51c73d374ac)。
+   * この明示フラグが立っているときだけ、本番 (`VERCEL_ENV=production`) でも
+   * `PROFILE_DATA_SOURCE=synthetic` を許す (`lib/profile/source.ts`)。
+   * フラグが無ければ従来どおり本番×synthetic は fail-closed で例外。
+   */
+  PROFILE_DEMO_MODE: {
+    read: () => process.env.PROFILE_DEMO_MODE,
+    schema: optionalTrimmed().transform((v) => v === "1" || v === "true"),
+  },
 } as const satisfies Record<string, EnvEntry>;
 
 /** Every variable name the application is allowed to read. */
