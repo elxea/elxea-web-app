@@ -24,6 +24,12 @@ import { describe, expect, it } from "vitest";
 import { worldToScreen } from "@/components/viz/profile/camera";
 import { cameraForFraming } from "@/components/viz/profile/camera";
 import { profileFieldBbox, sceneFraming } from "@/lib/profile/framing";
+import {
+  clampLabelIntoView,
+  WORD_PLATE_PAD_X,
+  WORD_PLATE_PAD_Y,
+  ZOOM_SLIDER_KEEPOUT,
+} from "@/components/viz/profile/renderers/canvas";
 import { placeLabels, type LabelCandidate } from "@/lib/profile/labels";
 import { buildWordsLayers } from "@/lib/profile/words";
 import { SyntheticSource } from "@/lib/profile/synthetic";
@@ -205,5 +211,38 @@ describe("言葉の予算は地の面と分けて持つ", () => {
     const total = words.general.length + words.shared.length + words.personal.length;
     expect(total).toBeGreaterThan(0);
     expect(PROFILE_WORDS_FRAME_BUDGET).toBeGreaterThanOrEqual(total);
+  });
+});
+
+describe("札は板の中に収める (端で切れない・スライダーに重ならない)", () => {
+  /* 本番実測 2026-09-06: 読み物の面の「積んだままの号」が、板の右端の縦置き
+     スライダーの溝を跨いでいた。逃げ (`PROFILE_VIEW_PADDING_X`) は札の**中心**を
+     内側に留めるが、札には幅があるので中心が内側でも端の字が重なる。 */
+  const view = { w: 510, h: 638 };
+  const label = { w: 96, h: 13 };
+
+  it("右端へはみ出す札はスライダーの手前へ寄る", () => {
+    const p = clampLabelIntoView({ x: 500, y: 300 }, label.w, label.h, view.w, view.h);
+    const rightEdge = p.x + label.w / 2 + WORD_PLATE_PAD_X;
+    expect(rightEdge).toBeLessThanOrEqual(view.w - ZOOM_SLIDER_KEEPOUT);
+  });
+
+  it("左端・上端・下端も板の中に収まる", () => {
+    const l = clampLabelIntoView({ x: -20, y: 300 }, label.w, label.h, view.w, view.h);
+    expect(l.x - label.w / 2 - WORD_PLATE_PAD_X).toBeGreaterThanOrEqual(0);
+    const t = clampLabelIntoView({ x: 200, y: -5 }, label.w, label.h, view.w, view.h);
+    expect(t.y - label.h / 2 - WORD_PLATE_PAD_Y).toBeGreaterThanOrEqual(0);
+    const b = clampLabelIntoView({ x: 200, y: 999 }, label.w, label.h, view.w, view.h);
+    expect(b.y + label.h / 2 + WORD_PLATE_PAD_Y).toBeLessThanOrEqual(view.h);
+  });
+
+  it("もともと内側にある札は動かさない (位置は意味なので必要なときだけ寄せる)", () => {
+    const p = clampLabelIntoView({ x: 240, y: 300 }, label.w, label.h, view.w, view.h);
+    expect(p).toEqual({ x: 240, y: 300 });
+  });
+
+  it("収まる余地が無いほど長い札は動かさない (中央に寄せて両端を切らない)", () => {
+    const p = clampLabelIntoView({ x: 80, y: 300 }, 900, label.h, view.w, view.h);
+    expect(p.x).toBe(80);
   });
 });

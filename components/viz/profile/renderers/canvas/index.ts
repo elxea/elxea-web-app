@@ -64,8 +64,19 @@ export const WORD_LAYERS = [
 ] as const;
 
 /** 字の下に敷く紙の色の板 (ノックアウト) の余白 px。 */
-const WORD_PLATE_PAD_X = 5;
-const WORD_PLATE_PAD_Y = 3;
+export const WORD_PLATE_PAD_X = 5;
+export const WORD_PLATE_PAD_Y = 3;
+
+/**
+ * 板の右端で、縦置きの倍率スライダーが見えている幅 px。字をこの下に置かない。
+ *
+ * 内訳は `app/globals.css` の `.roji-zoom-slider` — 右余白 6px + 当たり判定
+ * 44px の中央に置いたつまみ 12px = 板の縁から 34px。逃げ
+ * (`PROFILE_VIEW_PADDING_X`) は札の**中心**を板の内側に留めるが、札には幅が
+ * あるので、中心が内側でも端の字がスライダーに重なることがある (実測 2026-09-06:
+ * 読み物の面の「積んだままの号」が本番でスライダーの溝を跨いでいた)。
+ */
+export const ZOOM_SLIDER_KEEPOUT = 34;
 
 export class CanvasProfileRenderer implements ProfileRenderer {
   private canvas: HTMLCanvasElement | null = null;
@@ -349,8 +360,12 @@ export class CanvasProfileRenderer implements ProfileRenderer {
           stats.offscreen++;
           continue;
         }
+        /* 札の**板ごと**板の中に収める。位置は意味なので動かしたくないが、
+           端で切れた字・スライダーに重なった字はそもそも読めない。地図の注記と
+           同じで、枠に触れる注記は枠の内側へ寄せる。 */
         const key = `${layer.key}:${i}`;
-        candidates.push({ key, x: p.x, y: p.y, w: width, h: height, priority: layer.priority });
+        const spot = clampLabelIntoView(p, width, height, w, h);
+        candidates.push({ key, x: spot.x, y: spot.y, w: width, h: height, priority: layer.priority });
         draws.set(key, {
           text: item.text,
           size: layer.size,
@@ -458,4 +473,29 @@ function tracePlate(
   ctx.arc(x + radius, y + h - radius, radius, Math.PI / 2, Math.PI);
   ctx.arc(x + radius, y + radius, radius, Math.PI, Math.PI * 1.5);
   ctx.closePath();
+}
+
+/**
+ * 札の中心を、板 (と右端のスライダー) の内側へ寄せる。
+ *
+ * 収まる余地が無いほど札が長いときは動かさない — 中央に寄せて両端を切るより、
+ * 元の位置のまま片側が切れるほうが、どこの語かは読める。
+ */
+export function clampLabelIntoView(
+  point: { x: number; y: number },
+  labelW: number,
+  labelH: number,
+  viewW: number,
+  viewH: number,
+): { x: number; y: number } {
+  const halfW = labelW / 2 + WORD_PLATE_PAD_X;
+  const halfH = labelH / 2 + WORD_PLATE_PAD_Y;
+  const minX = halfW;
+  const maxX = viewW - ZOOM_SLIDER_KEEPOUT - halfW;
+  const minY = halfH;
+  const maxY = viewH - halfH;
+  return {
+    x: maxX < minX ? point.x : Math.min(Math.max(point.x, minX), maxX),
+    y: maxY < minY ? point.y : Math.min(Math.max(point.y, minY), maxY),
+  };
 }
