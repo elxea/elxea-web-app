@@ -246,3 +246,75 @@ describe("札は板の中に収める (端で切れない・スライダーに�
     expect(p.x).toBe(80);
   });
 });
+
+/**
+ * 寄せた札が「そこに在る」と言い続けられるか — 位置の意味を失っていないかの検査。
+ *
+ * 端で切れる札を内側へ寄せるのは読めるようにするためだが、**寄せすぎれば嘘になる**。
+ * どこまでなら嘘でないかの線は「錨 (語がほんとうに在る点) が板の下に残っているか」に
+ * 引ける。板が自分の錨を覆っている限り、札は隣の語ではなく自分の場所を指している。
+ *
+ * 実測 (語彙表の全語 × 面 2 × 段 3 × 板幅 280〜512px) では、寄せ量は板の半幅の
+ * **最大 83%** で、錨が板から出た語は 1 つも無かった。語の中心が溝の下に入ることも
+ * 無く (最小でも溝の 22px 手前)、寄せ先が溝を跨ぐことはない。幅は `approxWidth` で
+ * **多めに**見積もるので、この判定は本番より厳しい側に出る。
+ *
+ * この余裕は語彙表・逃げ (`PROFILE_VIEW_PADDING_X` = 36px)・溝の幅
+ * (`ZOOM_SLIDER_KEEPOUT` = 34px) の釣り合いで生まれているので、どれかを動かした
+ * ときにここが落ちる。落ちたら値を緩めるのではなく、**寄せ方を見直す**
+ * (寄せ量に上限を設けて、収まらない札は次の段へ回す等)。
+ */
+describe("寄せても語は自分の場所を指し続ける", () => {
+  /* 板は `aspect-[4/5] w-full max-w-128` (`profile-surface.tsx`)。SP の実寸は
+     余白しだいで縮むので、実機より狭い 280px まで含めて確かめる。 */
+  const WIDTHS = [280, 320, 350, 390, 448, 512];
+
+  it("寄せた札は板の中に収まり、溝に掛からない", () => {
+    for (const facet of ["reading", "event"] as VocabularyFacet[]) {
+      for (const w of WIDTHS) {
+        const view = { w, h: (w * 5) / 4 };
+        for (const z of [0, 1, 2]) {
+          for (const c of candidatesFor(facet, view, z)) {
+            const halfW = c.w / 2 + WORD_PLATE_PAD_X;
+            const halfH = c.h / 2 + WORD_PLATE_PAD_Y;
+            /* 描き手と同じく、画面から外れた札は候補にしない。 */
+            if (c.x + c.w / 2 < 0 || c.x - c.w / 2 > view.w) continue;
+            if (c.y + c.h < 0 || c.y - c.h > view.h) continue;
+            const p = clampLabelIntoView(c, c.w, c.h, view.w, view.h);
+            const where = `${facet} w=${w} z=${z} ${c.key}`;
+            expect(p.x - halfW, `${where}: 左端`).toBeGreaterThanOrEqual(-1e-6);
+            expect(p.x + halfW, `${where}: 右端 (溝の手前)`).toBeLessThanOrEqual(
+              view.w - ZOOM_SLIDER_KEEPOUT + 1e-6,
+            );
+            expect(p.y - halfH, `${where}: 上端`).toBeGreaterThanOrEqual(-1e-6);
+            expect(p.y + halfH, `${where}: 下端`).toBeLessThanOrEqual(view.h + 1e-6);
+          }
+        }
+      }
+    }
+  });
+
+  it("寄せ量は板の半分を超えない (錨が板から出ない = 位置が嘘にならない)", () => {
+    let worstRatio = 0;
+    for (const facet of ["reading", "event"] as VocabularyFacet[]) {
+      for (const w of WIDTHS) {
+        const view = { w, h: (w * 5) / 4 };
+        for (const z of [0, 1, 2]) {
+          for (const c of candidatesFor(facet, view, z)) {
+            if (c.x + c.w / 2 < 0 || c.x - c.w / 2 > view.w) continue;
+            if (c.y + c.h < 0 || c.y - c.h > view.h) continue;
+            const halfW = c.w / 2 + WORD_PLATE_PAD_X;
+            const halfH = c.h / 2 + WORD_PLATE_PAD_Y;
+            const p = clampLabelIntoView(c, c.w, c.h, view.w, view.h);
+            const ratio = Math.max(Math.abs(p.x - c.x) / halfW, Math.abs(p.y - c.y) / halfH);
+            if (ratio > worstRatio) worstRatio = ratio;
+            expect(ratio, `${facet} w=${w} z=${z} ${c.key}: 寄せ量 / 板の半分`).toBeLessThan(1);
+          }
+        }
+      }
+    }
+    /* 実測 0.83。1 に達したら錨が板から出る = 位置が嘘になる。ここは 1 に近づいた
+       ことを早めに知るための見張りで、緩めて通す値ではない。 */
+    expect(worstRatio).toBeLessThan(0.9);
+  });
+});
