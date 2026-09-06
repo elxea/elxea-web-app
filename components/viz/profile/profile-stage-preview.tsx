@@ -56,7 +56,9 @@ export function ProfileStagePreview({ label, scene, z = 0, className }: ProfileS
       role="img"
       aria-label={label}
       className={className}
-      style={{ width: "100%", height: "100%", minHeight: 420, backgroundColor: ROJI_VIZ_COLOR.kinari }}
+      /* 高さは呼び出し側 (story の枠) が決める。ここで `minHeight` を持つと、
+         機械検査が小さな枠を並べて数えるときだけ縦横比が崩れる。 */
+      style={{ width: "100%", height: "100%", backgroundColor: ROJI_VIZ_COLOR.kinari }}
     />
   );
 }

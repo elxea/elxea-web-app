@@ -23,14 +23,15 @@
  * どちらも「中心」と「倍率」をデータから決めていないことが原因なので、両方を
  * ここで 1 度だけ決める。
  *
- * ## 中心は自分。自分が居ないときは「みんな」の重心
+ * ## 中心は自分。自分が居ないときは「中身の真ん中」
  *
  * ズームの中心は常に自分 (Decision Log
  * https://app.notion.com/p/3d270c9d064c81139c05e51c73d374ac — 「自分中心に
  * ズームするのは特別扱いではない。個と全体のつながりを自覚するプロセス」)。
  * 未ログインでは `self` が 401 で落ちて自分の粒がそもそも描かれないので、
- * そのときは**みんなの分布の重心**を中心に据える。どちらの場合も「画面の
- * まんなかが、この面の主体」という読み方が崩れない。
+ * そのときは**描くもの全体の外接矩形の中心**に据える (2026-09-06 訂正 —
+ * 旧実装の「みんなの重心」が余白の偏りと『輪の穴を中心に据える』を生んでいた。
+ * 理由は `sceneFraming` の doc comment)。
  */
 
 import { teaAxisBbox } from "@/lib/profile/axes";
@@ -76,7 +77,7 @@ export interface SceneFraming {
   /** 画面中心に据える world 座標。 */
   anchor: FramingPoint;
   /** `anchor` が何に由来するか (報告・テストで「なぜそこか」を言えるように持つ)。 */
-  anchorOf: "self" | "field" | "words" | "bbox";
+  anchorOf: "self" | "content" | "bbox";
   radius: FramingRadius;
 }
 
@@ -98,6 +99,24 @@ const MIN_RADIUS = 0.05;
 
 /** 倍率の下限 (px / world-unit)。データが空でも板が真っ白にならないように。 */
 const MIN_SCALE = 1;
+
+/**
+ * 板の左右の縁と中身のあいだに残す px。
+ *
+ * 右端の縦置きスライダーは、当たり判定こそ 44px あるが**目に見える部分は
+ * つまみ 12px + 右余白 6px + 中央寄せの逃げ 16px = 板の縁から 34px** までしか
+ * 来ない (`app/globals.css` の `.roji-zoom-slider::-webkit-slider-thumb`)。
+ * その 34px を越える最小の丸い値を取る。旧実装の 56px は当たり判定ぶんまで
+ * 見込んだ値で、短辺 358px の板では左右で 31% を余白に使っていた。
+ */
+export const PROFILE_VIEW_PADDING_X = 36;
+
+/**
+ * 板の上下の縁と中身のあいだに残す px。
+ *
+ * 上下にはスライダーが無いので、左右と同じだけ取る理由が無い。
+ */
+export const PROFILE_VIEW_PADDING_Y = 28;
 
 interface DensityCell extends FramingPoint {
   v: number;
@@ -128,63 +147,50 @@ function wordPoints(words: ProfileWordsResponse | null): FramingPoint[] {
   return [...words.general, ...words.shared, ...words.personal].map((w) => ({ x: w.x, y: w.y }));
 }
 
-/** 濃度で重み付けした重心。空なら null。 */
-function weightedCentroid(cells: readonly DensityCell[]): FramingPoint | null {
-  let x = 0;
-  let y = 0;
-  let t = 0;
-  for (const c of cells) {
-    x += c.x * c.v;
-    y += c.y * c.v;
-    t += c.v;
-  }
-  if (t <= 0) return null;
-  return { x: x / t, y: y / t };
-}
-
-function meanPoint(points: readonly FramingPoint[]): FramingPoint | null {
+/** 点群の外接矩形。空なら null。 */
+function boundsOf(
+  points: readonly FramingPoint[],
+): { x0: number; y0: number; x1: number; y1: number } | null {
   if (points.length === 0) return null;
-  let x = 0;
-  let y = 0;
+  let x0 = Infinity;
+  let y0 = Infinity;
+  let x1 = -Infinity;
+  let y1 = -Infinity;
   for (const p of points) {
-    x += p.x;
-    y += p.y;
+    if (p.x < x0) x0 = p.x;
+    if (p.y < y0) y0 = p.y;
+    if (p.x > x1) x1 = p.x;
+    if (p.y > y1) y1 = p.y;
   }
-  return { x: x / points.length, y: y / points.length };
+  return { x0, y0, x1, y1 };
 }
 
 /**
  * この面で「1 画面に収めたい中身」と「その中心」を決める。
  *
- * 中心の優先順位は 自分 → みんなの重心 → 言葉の重心 → bbox の中央。
- * 半径は中心から見た中身の広がりで、**自分を中心に置いてもみんなが板から
- * はみ出さない**ように、自分・みんな・言葉のすべてを覆う。
+ * ## 中心
+ *
+ * 自分が居れば自分 (確定要件)。居なければ**中身の外接矩形の中心**。
+ *
+ * 旧実装は自分が居ないとき「みんなの重心 (濃度で重み付けした平均)」を中心に
+ * 据えていた。重心は中身の真ん中とは限らないので、
+ *
+ *   - 半径 (`radius`) は中心から見た最遠点で決まる → 中身が中心の片側に偏って
+ *     いると、**反対側にだけ大きな余白が残る**。独立 QA の実測では下の余白が
+ *     上の 1.8 倍あった。
+ *   - 読み物・イベントの面は語彙表が象限の名を輪のように配るので、重心は
+ *     **輪の内側の穴**に落ちる。そこは誰も居ない場所である。
+ *
+ * どちらも「中心をデータの平均で決めた」ことが原因なので、自分が居ないときは
+ * 平均ではなく**外接矩形の中心**にする。中心の両側の距離が定義から等しくなり、
+ * 余白は上下・左右とも必ず等しくなる (`__tests__/profile-framing.test.ts` で
+ * 固定)。
  */
 export function sceneFraming(scene: FramingScene, facet: ProfileFacet): SceneFraming {
   const bbox = scene.field?.grid ? scene.field.bbox : profileFieldBbox(facet);
   const cells = densityCells(scene.field);
   const words = wordPoints(scene.words);
   const self = scene.self?.centroid ?? null;
-
-  const anchorFromField = weightedCentroid(cells);
-  const anchorFromWords = meanPoint(words);
-  const bboxCenter: FramingPoint = { x: (bbox[0] + bbox[2]) / 2, y: (bbox[1] + bbox[3]) / 2 };
-
-  let anchor: FramingPoint;
-  let anchorOf: SceneFraming["anchorOf"];
-  if (self) {
-    anchor = { x: self.x, y: self.y };
-    anchorOf = "self";
-  } else if (anchorFromField) {
-    anchor = anchorFromField;
-    anchorOf = "field";
-  } else if (anchorFromWords) {
-    anchor = anchorFromWords;
-    anchorOf = "words";
-  } else {
-    anchor = bboxCenter;
-    anchorOf = "bbox";
-  }
 
   /* 収める対象。格子は「人が居ると言える濃さ」だけを見るが、そこまで濃い
      セルが 1 つも無い面 (sparse) では 0 より大きいセルへ落とす。 */
@@ -193,6 +199,22 @@ export function sceneFraming(scene: FramingScene, facet: ProfileFacet): SceneFra
   if (self) {
     const spread = Math.max(0, scene.self?.spread ?? 0);
     contents.push({ x: self.x - spread, y: self.y - spread }, { x: self.x + spread, y: self.y + spread });
+  }
+
+  const bboxCenter: FramingPoint = { x: (bbox[0] + bbox[2]) / 2, y: (bbox[1] + bbox[3]) / 2 };
+  const extent = boundsOf(contents);
+
+  let anchor: FramingPoint;
+  let anchorOf: SceneFraming["anchorOf"];
+  if (self) {
+    anchor = { x: self.x, y: self.y };
+    anchorOf = "self";
+  } else if (extent) {
+    anchor = { x: (extent.x0 + extent.x1) / 2, y: (extent.y0 + extent.y1) / 2 };
+    anchorOf = "content";
+  } else {
+    anchor = bboxCenter;
+    anchorOf = "bbox";
   }
 
   let rx = 0;
@@ -218,20 +240,26 @@ export function sceneFraming(scene: FramingScene, facet: ProfileFacet): SceneFra
 }
 
 /**
- * ×1 (z=0) のときの px / world-unit。
+ * ×1 (z=0) のときの px / world-unit。全段で同じ値を使う
+ * (`components/viz/profile/camera.ts` の「倍率段 `z` は『拡大率』ではなく
+ * 『細かさ』である」参照 — 段が変わっても枠は動かない)。
  *
- * 「中身が板の short 側に収まる」ように決めるので、板の縦横比が変わっても
- * 中身は必ず全部見え、余白は中心の周りに対称に付く (絵が下に寄って上が
- * 空く、が起きない)。`padding` は板の縁と中身のあいだに残す px。
+ * 「中身が板に収まる」ように決めるので、板の縦横比が変わっても中身は必ず全部
+ * 見え、余白は中心の周りに対称に付く。
+ *
+ * `paddingX` / `paddingY` を分けるのは、**逃げが要るのは左右だけ**だから
+ * (右端に縦置きの倍率スライダーが乗る)。四方を同じ 56px にしていた旧実装は、
+ * 短辺 480px の板で 23% を余白に使っていた (独立 QA 指摘「板が空きすぎている」)。
  */
 export function fitBaseScale(
   radius: FramingRadius,
   viewW: number,
   viewH: number,
-  padding: number,
+  paddingX: number = PROFILE_VIEW_PADDING_X,
+  paddingY: number = PROFILE_VIEW_PADDING_Y,
 ): number {
-  const halfW = Math.max(1, viewW / 2 - padding);
-  const halfH = Math.max(1, viewH / 2 - padding);
+  const halfW = Math.max(1, viewW / 2 - paddingX);
+  const halfH = Math.max(1, viewH / 2 - paddingY);
   const sx = halfW / Math.max(MIN_RADIUS, radius.rx);
   const sy = halfH / Math.max(MIN_RADIUS, radius.ry);
   return Math.max(MIN_SCALE, Math.min(sx, sy));

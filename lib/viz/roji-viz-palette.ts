@@ -98,3 +98,37 @@ export function seededRandom(seed: number): () => number {
 export function clamp01(value: number): number {
   return value < 0 ? 0 : value > 1 ? 1 : value;
 }
+
+/**
+ * 目に見える明るさ (0..255)。`0.2126R + 0.7152G + 0.0722B` の素の重みづけ。
+ *
+ * WCAG の相対輝度 (下の `relativeLuminance`) と違ってガンマを戻さないので、
+ * **画素の値をそのまま人が「暗い」と言う感覚に近い順番**に並べられる。
+ * 「黒・近黒を大面積に使わない」の判定はこちらで行う (墨 `#2B2B2B` は 43)。
+ */
+export function perceivedLuma(r: number, g: number, b: number): number {
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+/** WCAG 2.x の相対輝度 (0..1)。コントラスト比の計算に使う。 */
+export function relativeLuminance(hex: string): number {
+  const [r, g, b] = hexToRgb(hex).map((v) => {
+    const c = v / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+/**
+ * WCAG 2.x のコントラスト比 (1..21)。可読の基準は本文で 4.5:1。
+ *
+ * 図の中の字は Canvas に描くので、DS のトークンや CSS の検査 (axe) が届かない。
+ * 数値で固定できるのはここだけなので、比の計算をこの 1 か所に置く。
+ */
+export function contrastRatio(hexA: string, hexB: string): number {
+  const a = relativeLuminance(hexA);
+  const b = relativeLuminance(hexB);
+  const light = Math.max(a, b);
+  const dark = Math.min(a, b);
+  return (light + 0.05) / (dark + 0.05);
+}

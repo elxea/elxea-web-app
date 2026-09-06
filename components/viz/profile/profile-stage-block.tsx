@@ -39,8 +39,10 @@ export function ProfileStageBlock({ label, zoomLabel, facet, category, className
       {inView ? (
         <ProfileStage label={label} zoomLabel={zoomLabel} facet={facet} category={category} />
       ) : (
+        /* 場所取りは板と同寸 (高さは板が決める)。ここで別の高さを持つと、
+           読み込みの前後で板の大きさが跳ねる。 */
         <div
-          className="h-120 w-full lg:h-160"
+          className="h-full w-full"
           style={{ backgroundColor: ROJI_VIZ_COLOR.kinari }}
           aria-hidden="true"
         />

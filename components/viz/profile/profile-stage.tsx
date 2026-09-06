@@ -10,7 +10,7 @@
  *
  * ## 操作 (Setaka決定 2026-09-05・反論なし で確定)
  *
- * - ホイール / `+` / `-` / 縦置きスライダーで**ズームのみ**。中心は常に自分
+ * - ホイール / `+` / `-` / 縦置きスライダーで**細かさの段のみ**。中心は常に自分
  *   (Decision Log https://app.notion.com/p/3d270c9d064c81139c05e51c73d374ac)
  * - **自由パン (ドラッグして探す「泳ぐ」操作) は無い** — 同じ決定の帰結。
  *   自分は常に画面中心にいるため「じぶんへ戻る」ボタンも画面外の印も無い。
@@ -20,6 +20,14 @@
  * - 縦置きスライダー (板の右端) だけを操作として置く。canvas の中にボタンを
  *   描かない (板は `role="img"` + `aria-label` のみ)。上部・下部には何も置かない
  * - `prefers-reduced-motion` のときは EMA を切り、目標値を即時反映する
+ *
+ * ## 段を動かしても枠は動かない (2026-09-06・本 PR)
+ *
+ * 段 (`z`) は幾何的な拡大率ではなく**細かさ**である (理由は `camera.ts` の
+ * 冒頭)。段が変わったら枠 (中心・縮尺) は一切動かさず、`z` を付けて 3 本の
+ * GET を取り直す — 密度格子は 1 段細かい LOD に、等値線は段数が増え、言葉は
+ * 一般語から共通語・個人語へ分解される。旧実装は `field` にだけ `z` を渡し、
+ * `words` には渡していなかったので、**語は最後まで分解されなかった**。
  *
  * ## 中心と倍率は毎回データから決め直す (2026-09-06)
  *
@@ -63,10 +71,15 @@ export interface ProfileStageProps {
   className?: string;
 }
 
-/** `zoomLabel` 省略時の文言。数は漢数字で言う (図に算用数字を出さない作法)。 */
-const DEFAULT_ZOOM_LABEL = "倍率 一倍からせん倍";
+/**
+ * `zoomLabel` 省略時の文言。
+ *
+ * 段は拡大率ではなく細かさなので「倍率 一倍から…」とは言わない (画面が言って
+ * いることと、実際に起きることを一致させる)。図に算用数字を出さない作法も継続。
+ */
+const DEFAULT_ZOOM_LABEL = "細かさ 粗いから細かいまで";
 
-/** スライダーの目盛り。倍率段 0..2 を 1/100 段で刻む。 */
+/** スライダーの目盛り。細かさの段 0..2 を 1/100 段で刻む。 */
 const ZOOM_SLIDER_STEPS = 100;
 const ZOOM_SLIDER_MAX = 200;
 
@@ -92,12 +105,12 @@ export function ProfileStage({ label, zoomLabel, facet, category, className }: P
     () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches,
   );
   /**
-   * いま要る格子の細かさ (LOD の帯 = 倍率段の整数)。
+   * いま要る細かさの帯 (LOD の帯 = 段の整数)。
    *
-   * 段1の実装はマウント時に z=0 で 1 回取るだけで、寄っても取り直していなかった。
-   * LOD 表 (`lib/profile/field.ts#resolveGridDims`) は macro 32×24 / mid 64×48 /
-   * micro 96×64 を返すのに、**その分岐は一度も通っていなかった** — 寄るほど
-   * 地の面が粗い四角に引き伸ばされるだけで、「寄ると分解される」が起きない。
+   * `field` の格子解像度 (`lib/profile/field.ts#resolveGridDims`)・等値線の段数
+   * (`contourLevelsFor`)・`words` の層の深さ (`wordLayerDepth`) の 3 つが、
+   * すべてこの 1 つの値から決まる。3 本の GET すべてに同じ `z` を渡すのが
+   * 「寄ると分解される」の実装本体。
    */
   const [zBand, setZBand] = useState(0);
   /** 中心と縮尺を最後に引き直した面 (`facet:category`)。 */
@@ -141,8 +154,8 @@ export function ProfileStage({ label, zoomLabel, facet, category, className }: P
       el.value = String(raw);
       el.style.setProperty("--roji-zoom-progress", `${(raw / ZOOM_SLIDER_MAX) * 100}%`);
     }
-    /* 倍率段をまたいだら、その段に見合う細かさの格子を取り直す (LOD)。同じ値の
-       ときは React が更新を落とすので、寄っている最中に毎フレーム走ることはない。 */
+    /* 段をまたいだら、その段に見合う細かさで 3 本を取り直す。同じ値のときは
+       React が更新を落とすので、動かしている最中に毎フレーム走ることはない。 */
     setZBand(Math.min(2, Math.max(0, Math.round(z))));
   }, []);
 
@@ -193,7 +206,9 @@ export function ProfileStage({ label, zoomLabel, facet, category, className }: P
     async function load() {
       const bbox = profileFieldBbox(facet);
       const fieldQs = new URLSearchParams({ facet, z: String(zBand) });
-      const wordsQs = new URLSearchParams({ facet, bbox: bbox.join(",") });
+      /* `bbox` は面の全域で固定 (寄っても狭めない)。狭めると Spec が禁じている
+         「極小 bbox で少人数を孤立抽出する」経路を開く。`z` だけが変わる。 */
+      const wordsQs = new URLSearchParams({ facet, bbox: bbox.join(","), z: String(zBand) });
       if (category) {
         fieldQs.set("category", category);
         wordsQs.set("category", category);
@@ -213,9 +228,8 @@ export function ProfileStage({ label, zoomLabel, facet, category, className }: P
       if (cancelled) return;
       sceneRef.current = { self: selfRes, field: fieldRes, words: wordsRes };
       /* 中心と倍率の基準を引き直すのは**面・カテゴリーが変わったとき**だけ。
-         倍率段をまたいで格子を取り直しただけのときに引き直すと、細かくなった
-         格子の重心のわずかな違い (0.01 world 相当) が寄っているぶんだけ拡大
-         されて絵がずれる。寄っているあいだ、中心と縮尺は動かさない。 */
+         段をまたいで格子を取り直しただけのときに引き直すと、細かくなった格子の
+         外接矩形のわずかな違いで絵がわずかに跳ねる。段のあいだ、枠は動かさない。 */
       if (framedKeyRef.current !== key) {
         framedKeyRef.current = key;
         reframe();
@@ -292,7 +306,10 @@ export function ProfileStage({ label, zoomLabel, facet, category, className }: P
         style={{
           width: "100%",
           height: "100%",
-          minHeight: 480,
+          /* 高さは板 (`profile-surface.tsx` の縦横比を持つ箱) が決める。ここで
+             `minHeight` を持つと、SP で箱より背の高い canvas になり縦横比が
+             崩れる (中身は短辺に合わせて縮むので、余白だけが増える)。 */
+          minHeight: 240,
           backgroundColor: ROJI_VIZ_COLOR.kinari,
           touchAction: "none",
           outline: "none",
@@ -352,7 +369,9 @@ export function ProfileStage({ label, zoomLabel, facet, category, className }: P
               pointerEvents: "auto",
               /* 実値の正本は roji のデータ表現パレット
                  (`lib/viz/roji-viz-palette.ts`)。CSS 側に色をもう一組持たない。
-                 苔の系統だけで組み、黒・近黒 (`sumi`) は使わない (却下済み)。 */
+                 部品は苔の系統だけで組む。黒・近黒 (`sumi`) を**背景・大面積に
+                 使わない**のがルールで (Setaka の元の言葉は「黒背景が怖い」)、
+                 文字・記号のインクとしては可 — つまみや溝は面なので使わない。 */
               ["--roji-zoom-track" as string]: ROJI_VIZ_COLOR.suna,
               ["--roji-zoom-fill" as string]: ROJI_VIZ_COLOR.usukoke,
               ["--roji-zoom-thumb" as string]: ROJI_VIZ_COLOR.koke,

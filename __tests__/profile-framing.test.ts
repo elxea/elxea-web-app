@@ -1,24 +1,34 @@
 /**
- * roji プロファイル (ミクロ⇔マクロ) — 「自分が画面の中心にいる」の機械化。
+ * roji プロファイル (ミクロ⇔マクロ) — 「自分が画面の中心にいる」と「板が空か
+ * ない」の機械化。
  *
  * ## この検査が存在する理由 (実際に本番で出た不具合)
  *
- * 段1の実装は world 原点 (0,0) を自分と見なして画面中心に固定していた。
- * お茶の面の写像B は `y = 香り + 味わい ∈ [2,10]` なので**原点は嗜好空間の中に
- * 無く**、生成データ 240 人の分布は画面中心から 198〜291px 右下にずれて描かれ、
- * 画面が読み上げる「自分は中心にいて」と絵が食い違っていた (2026-09-06 実測)。
+ * 1. 段1の実装は world 原点 (0,0) を自分と見なして画面中心に固定していた。
+ *    お茶の面の写像B は `y = 香り + 味わい ∈ [2,10]` なので**原点は嗜好空間の中に
+ *    無く**、生成データ 240 人の分布は画面中心から 198〜291px 右下にずれて描かれ、
+ *    画面が読み上げる「自分は中心にいて」と絵が食い違っていた (2026-09-06 実測)。
+ * 2. 続く実装は中心を「みんなの重心 (濃度で重み付けした平均)」に置いた。平均は
+ *    中身の真ん中ではないので、**中身が片側に偏ると反対側にだけ大きな余白が残る**
+ *    (独立 QA 実測: 下の余白が上の 1.8 倍 / PC で横幅の 68% が空)。
  *
- * 見た目の話に見えるが、これは Decision Log
+ * どちらも見た目の話に見えるが、1 は Decision Log
  * https://app.notion.com/p/3d270c9d064c81139c05e51c73d374ac の確定事項
- * 「ズームの中心は常に自分」が守れていないという**振る舞いの不具合**なので、
- * 視覚回帰 (人が見る) ではなく px の数値で固定する。
+ * 「ズームの中心は常に自分」が守れていないという**振る舞いの不具合**であり、
+ * 2 は「板に対して図が小さすぎる」という可読性の不具合である。どちらも人が見る
+ * 視覚回帰ではなく px の数値で固定する。
  */
 
 import { describe, expect, it } from "vitest";
 
 import { mapTeaAxes } from "@/lib/profile/axes";
 import { decodeU8FromBase64 } from "@/lib/profile/field";
-import { cameraForFraming, worldToScreen } from "@/components/viz/profile/camera";
+import {
+  cameraForFraming,
+  PROFILE_VIEW_PADDING_X,
+  PROFILE_VIEW_PADDING_Y,
+  worldToScreen,
+} from "@/components/viz/profile/camera";
 import { fitBaseScale, profileFieldBbox, sceneFraming } from "@/lib/profile/framing";
 import { SyntheticSource } from "@/lib/profile/synthetic";
 import type {
@@ -28,10 +38,13 @@ import type {
   TeaCategory,
 } from "@/lib/profile/contract";
 
+/** 板は 4:5 の縦長 (`profile-surface.tsx`)。上限 32rem = 512px。 */
 const VIEWS = [
-  { name: "PC", w: 1024, h: 640 },
-  { name: "SP", w: 358, h: 480 },
+  { name: "PC", w: 512, h: 640 },
+  { name: "SP", w: 358, h: 448 },
 ];
+
+const ZOOM_STEPS = [0, 1, 2];
 
 /** 画面に描かれる「みんな」の重心 (= 濃度で重み付けした格子の重心)。 */
 function crowdCentroid(field: ProfileFieldResponse): { x: number; y: number } | null {
@@ -56,16 +69,35 @@ function crowdCentroid(field: ProfileFieldResponse): { x: number; y: number } | 
   return t > 0 ? { x: x / t, y: y / t } : null;
 }
 
-async function loadScene(facet: ProfileFacet, category: TeaCategory | undefined, withSelf: boolean) {
+async function loadScene(
+  facet: ProfileFacet,
+  category: TeaCategory | undefined,
+  withSelf: boolean,
+  z = 0,
+) {
   const source = new SyntheticSource();
-  const field = await source.getField({ facet, category, z: 0 });
-  const words = await source.getWords({ facet, category, bbox: profileFieldBbox(facet), userKey: null });
+  const field = await source.getField({ facet, category, z });
+  const words = await source.getWords({
+    facet,
+    category,
+    bbox: profileFieldBbox(facet),
+    z,
+    userKey: null,
+  });
   let self: ProfileSelfResponse | null = null;
   if (withSelf && facet === "tea" && category) {
     self = await source.getSelf({ facet: "tea", category, userKey: "test-user" });
   }
   return { self, field, words };
 }
+
+const CASES: Array<[ProfileFacet, TeaCategory | undefined]> = [
+  ["tea", "green"],
+  ["tea", "red"],
+  ["tea", "oolong"],
+  ["reading", undefined],
+  ["event", undefined],
+];
 
 describe("嗜好空間の bbox は写像から導く (手で置いた四角にしない)", () => {
   it("写像Bの到達範囲そのもので、原点を含まない", () => {
@@ -98,7 +130,7 @@ describe("嗜好空間の bbox は写像から導く (手で置いた四角に�
   });
 });
 
-describe("画面の中心は自分。自分が居なければみんなの重心", () => {
+describe("画面の中心は自分。自分が居なければ中身の真ん中", () => {
   it("ログイン済みなら anchor は自分の重心そのもの", async () => {
     const scene = await loadScene("tea", "green", true);
     const framing = sceneFraming(scene, "tea");
@@ -107,13 +139,10 @@ describe("画面の中心は自分。自分が居なければみんなの重心"
     expect(framing.anchor.y).toBeCloseTo(scene.self!.centroid!.y, 10);
   });
 
-  it("未ログイン (self が 401 で null) ならみんなの重心に落ちる", async () => {
+  it("未ログイン (self が 401 で null) なら中身の外接矩形の中心に落ちる", async () => {
     const scene = await loadScene("tea", "green", false);
     const framing = sceneFraming(scene, "tea");
-    expect(framing.anchorOf).toBe("field");
-    const crowd = crowdCentroid(scene.field)!;
-    expect(framing.anchor.x).toBeCloseTo(crowd.x, 6);
-    expect(framing.anchor.y).toBeCloseTo(crowd.y, 6);
+    expect(framing.anchorOf).toBe("content");
   });
 
   it("何も無い面でも anchor と縮尺が決まる (板が真っ白にならない)", () => {
@@ -121,42 +150,67 @@ describe("画面の中心は自分。自分が居なければみんなの重心"
     expect(framing.anchorOf).toBe("bbox");
     expect(framing.radius.rx).toBeGreaterThan(0);
     expect(framing.radius.ry).toBeGreaterThan(0);
-    const scale = fitBaseScale(framing.radius, 1024, 640, 56);
+    const scale = fitBaseScale(framing.radius, 512, 640);
     expect(scale).toBeGreaterThan(0);
     expect(Number.isFinite(scale)).toBe(true);
   });
 });
 
-describe("回帰: 未ログインの本番で、みんなの重心が画面中心に来る", () => {
-  /* 旧実装での実測値 (1024×640・z=0): 緑茶 235px / 紅茶 291px / 青茶 198px の
-     ずれ。「中心にいる」と読み上げながら右下に寄っていた。 */
-  const CASES: Array<[ProfileFacet, TeaCategory | undefined]> = [
-    ["tea", "green"],
-    ["tea", "red"],
-    ["tea", "oolong"],
-    ["reading", undefined],
-    ["event", undefined],
-  ];
-
+describe("回帰: 余白は四方で対称 (下だけ 1.8 倍、が起きない)", () => {
+  /* 旧実装での実測 (独立 QA・2026-09-06): 下の余白が上の 1.8 倍 / PC で横幅の
+     68% が空。原因は「中心を平均で決めていた」こと。 */
   for (const [facet, category] of CASES) {
     for (const view of VIEWS) {
-      it(`${facet}${category ? `/${category}` : ""} (${view.name}) は倍率3段すべてで 1px 未満`, async () => {
+      it(`${facet}${category ? `/${category}` : ""} (${view.name}) は上下・左右の余白が等しい`, async () => {
         const scene = await loadScene(facet, category, false);
         const framing = sceneFraming(scene, facet);
-        const crowd = crowdCentroid(scene.field)!;
-        expect(crowd).not.toBeNull();
+        const camera = cameraForFraming({ ...framing, viewW: view.w, viewH: view.h, z: 0 });
 
-        for (const z of [0, 1, 2]) {
-          const camera = cameraForFraming({
-            anchor: framing.anchor,
-            radius: framing.radius,
-            viewW: view.w,
-            viewH: view.h,
-            z,
-          });
-          const p = worldToScreen(camera, crowd.x, crowd.y, view.w, view.h);
-          expect(Math.hypot(p.x - view.w / 2, p.y - view.h / 2)).toBeLessThan(1);
-        }
+        const top = worldToScreen(camera, framing.anchor.x, framing.anchor.y - framing.radius.ry, view.w, view.h);
+        const bottom = worldToScreen(camera, framing.anchor.x, framing.anchor.y + framing.radius.ry, view.w, view.h);
+        const left = worldToScreen(camera, framing.anchor.x - framing.radius.rx, framing.anchor.y, view.w, view.h);
+        const right = worldToScreen(camera, framing.anchor.x + framing.radius.rx, framing.anchor.y, view.w, view.h);
+
+        // 中身は板の中に収まる。
+        expect(top.y).toBeGreaterThanOrEqual(0);
+        expect(bottom.y).toBeLessThanOrEqual(view.h);
+        expect(left.x).toBeGreaterThanOrEqual(0);
+        expect(right.x).toBeLessThanOrEqual(view.w);
+
+        // 余白は対称。
+        expect(top.y).toBeCloseTo(view.h - bottom.y, 6);
+        expect(left.x).toBeCloseTo(view.w - right.x, 6);
+
+        // 短辺のどちらかは padding ちょうどまで使う (無駄な余白を残さない)。
+        const usedX = Math.abs(left.x - PROFILE_VIEW_PADDING_X) < 1e-6;
+        const usedY = Math.abs(top.y - PROFILE_VIEW_PADDING_Y) < 1e-6;
+        expect(usedX || usedY, `left=${left.x} top=${top.y}`).toBe(true);
+      });
+    }
+  }
+});
+
+describe("回帰: 板に対して図が小さすぎない", () => {
+  /* 独立 QA 実測: PC で横幅の 68% が空。板を 4:5 の縦長にし、逃げを左右 36px・
+     上下 28px にしたうえで、**縮尺を決めた側の軸は逃げを除く全部を中身が使う**
+     ことを固定する。もう一方の軸は中身の縦横比で決まる (歪めないので 100% には
+     できない) が、実測の下限 0.59 を割らないことを固定する。 */
+  for (const [facet, category] of CASES) {
+    for (const view of VIEWS) {
+      it(`${facet}${category ? `/${category}` : ""} (${view.name}) は板の広い面積を中身が使う`, async () => {
+        const scene = await loadScene(facet, category, false);
+        const framing = sceneFraming(scene, facet);
+        const camera = cameraForFraming({ ...framing, viewW: view.w, viewH: view.h, z: 0 });
+        const spanX = 2 * framing.radius.rx * camera.scale;
+        const spanY = 2 * framing.radius.ry * camera.scale;
+
+        const fillX = spanX / view.w;
+        const fillY = spanY / view.h;
+        /* 縮尺を決めた側の軸は 8 割以上を使う (余白は逃げのぶんだけ)。 */
+        expect(Math.max(fillX, fillY), `fillX=${fillX} fillY=${fillY}`).toBeGreaterThan(0.78);
+        /* もう一方の軸は中身の縦横比で決まる。歪めないので 100% にはできないが、
+           旧実装の実測 (横 32% = 68% が空) を大きく上回ることを固定する。 */
+        expect(Math.min(fillX, fillY), `fillX=${fillX} fillY=${fillY}`).toBeGreaterThan(0.55);
       });
     }
   }
@@ -164,64 +218,50 @@ describe("回帰: 未ログインの本番で、みんなの重心が画面中�
 
 describe("回帰: ログイン済みなら自分の粒がちょうど画面中心に描かれる", () => {
   for (const category of ["green", "red", "oolong"] as TeaCategory[]) {
-    it(`${category} は倍率3段すべてで自分が中心 (ずれ 0px)`, async () => {
+    it(`${category} は全段で自分が中心 (ずれ 0px)`, async () => {
       const scene = await loadScene("tea", category, true);
       const framing = sceneFraming(scene, "tea");
       const self = scene.self!.centroid!;
-      for (const z of [0, 1, 2]) {
-        const camera = cameraForFraming({
-          anchor: framing.anchor,
-          radius: framing.radius,
-          viewW: 1024,
-          viewH: 640,
-          z,
-        });
-        const p = worldToScreen(camera, self.x, self.y, 1024, 640);
-        expect(p.x).toBeCloseTo(512, 6);
+      for (const z of ZOOM_STEPS) {
+        const camera = cameraForFraming({ ...framing, viewW: 512, viewH: 640, z });
+        const p = worldToScreen(camera, self.x, self.y, 512, 640);
+        expect(p.x).toBeCloseTo(256, 6);
         expect(p.y).toBeCloseTo(320, 6);
       }
     });
 
-    it(`${category} は ×1 でみんなの重心も板の中に収まる`, async () => {
+    it(`${category} はみんなの重心も板の中に収まる`, async () => {
       const scene = await loadScene("tea", category, true);
       const framing = sceneFraming(scene, "tea");
-      const camera = cameraForFraming({
-        anchor: framing.anchor,
-        radius: framing.radius,
-        viewW: 1024,
-        viewH: 640,
-        z: 0,
-      });
+      const camera = cameraForFraming({ ...framing, viewW: 512, viewH: 640, z: 0 });
       const crowd = crowdCentroid(scene.field)!;
-      const p = worldToScreen(camera, crowd.x, crowd.y, 1024, 640);
-      /* 自分を中心に置いたぶん、みんなの重心は中心から少し離れる。それでも
-         板の中央寄り (short 辺の 1/4 以内) に居ることを固定する。 */
-      expect(Math.hypot(p.x - 512, p.y - 320)).toBeLessThan(640 / 4);
+      const p = worldToScreen(camera, crowd.x, crowd.y, 512, 640);
+      expect(p.x).toBeGreaterThanOrEqual(0);
+      expect(p.x).toBeLessThanOrEqual(512);
+      expect(p.y).toBeGreaterThanOrEqual(0);
+      expect(p.y).toBeLessThanOrEqual(640);
     });
   }
 });
 
-describe("余白は中心の周りに対称に付く (絵が下に寄って上が空く、を止める)", () => {
-  it("中身が板に収まり、上下の余白が等しい", async () => {
-    const scene = await loadScene("tea", "green", false);
-    const framing = sceneFraming(scene, "tea");
-    const view = { w: 1024, h: 640 };
-    const padding = 56;
-    const camera = cameraForFraming({ ...framing, viewW: view.w, viewH: view.h, z: 0, padding });
-
-    const top = worldToScreen(camera, framing.anchor.x, framing.anchor.y - framing.radius.ry, view.w, view.h);
-    const bottom = worldToScreen(camera, framing.anchor.x, framing.anchor.y + framing.radius.ry, view.w, view.h);
-    const left = worldToScreen(camera, framing.anchor.x - framing.radius.rx, framing.anchor.y, view.w, view.h);
-    const right = worldToScreen(camera, framing.anchor.x + framing.radius.rx, framing.anchor.y, view.w, view.h);
-
-    expect(top.y).toBeGreaterThanOrEqual(0);
-    expect(bottom.y).toBeLessThanOrEqual(view.h);
-    expect(left.x).toBeGreaterThanOrEqual(0);
-    expect(right.x).toBeLessThanOrEqual(view.w);
-
-    expect(top.y).toBeCloseTo(view.h - bottom.y, 6);
-    expect(left.x).toBeCloseTo(view.w - right.x, 6);
-    /* short 辺のどちらかは padding ちょうどまで使う (無駄な余白を残さない)。 */
-    expect(Math.min(top.y, left.x)).toBeCloseTo(padding, 6);
-  });
+describe("段を動かしても枠は動かない (寄って消えるものはない)", () => {
+  /* 本 PR の核心。旧実装は `scale = baseScale * 10^z` で、z=2 の可視 world 窓が
+     0.034 単位しかなく (語の野は 2.0 単位・格子 1 セルは 0.0625 単位)、
+     **構造的に何も入らない窓**になっていた。段は拡大率ではなく細かさなので、
+     枠 (中心・縮尺) は段によらず一定でなければならない。 */
+  for (const [facet, category] of CASES) {
+    it(`${facet}${category ? `/${category}` : ""} は全段で中心・縮尺が同じ`, async () => {
+      const scene = await loadScene(facet, category, false);
+      const framing = sceneFraming(scene, facet);
+      const cameras = ZOOM_STEPS.map((z) =>
+        cameraForFraming({ ...framing, viewW: 512, viewH: 640, z }),
+      );
+      for (const cam of cameras) {
+        expect(cam.scale).toBeCloseTo(cameras[0].scale, 10);
+        expect(cam.cx).toBeCloseTo(cameras[0].cx, 10);
+        expect(cam.cy).toBeCloseTo(cameras[0].cy, 10);
+      }
+      expect(cameras.map((c) => c.z)).toEqual(ZOOM_STEPS);
+    });
+  }
 });

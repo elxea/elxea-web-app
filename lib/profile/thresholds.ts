@@ -68,8 +68,35 @@ export const PROFILE_FRAME_ELEMENT_BUDGET = 1_500;
  */
 export const PROFILE_WORDS_FRAME_BUDGET = 400;
 
+/**
+ * 地の面 (密度の面) を塗る下限のセル値 (0..255)。
+ *
+ * これ以下のセルは透明にする — 箱ぼかしの裾まで塗ると、誰も居ない所まで薄く
+ * 色が乗って「みんなが居る範囲」が実際より広く見える。描き手
+ * (`components/viz/profile/renderers/canvas/index.ts`) と、機械検査
+ * (`__tests__/profile-zoom-coverage.test.ts`) の**両方**がこの 1 つの値を読む
+ * — 別々に持つと「検査は塗られていると言うのに画面は空」がすり抜ける。
+ */
+export const PROFILE_WASH_MIN_VALUE = 2;
+
 /** 密度格子のセル数の上限 (LOD 表の上限値)。 */
 export const PROFILE_GRID_CELL_BUDGET = 8_000;
+
+/**
+ * 「黒・近黒」と見なす明るさの上限 (`perceivedLuma` の 0..255)。
+ *
+ * Setaka の元の言葉は「黒**背景**が怖い」なので、ルールは値の禁止ではなく
+ * **面積の禁止**である — 黒・近黒は背景・大面積に使わない / 文字・記号のインクと
+ * しては可。墨 (`sumi` #2B2B2B) の luma は 43 なので、この 40 という線は
+ * 「墨より暗いものを大面積に置いていないか」を見ていることになる。
+ */
+export const PROFILE_DARK_LUMA_THRESHOLD = 40;
+
+/** 上の暗さの画素が描画領域に占めてよい割合の上限 (0.5%)。 */
+export const PROFILE_DARK_AREA_MAX_RATIO = 0.005;
+
+/** 図の中の字が地に対して満たすコントラスト比の下限 (WCAG 2.x の本文基準)。 */
+export const PROFILE_TEXT_MIN_CONTRAST = 4.5;
 
 /** 1 画面あたりのペイロード上限 (バイト)。 */
 export const PROFILE_PAYLOAD_BYTE_BUDGET = 30_000;

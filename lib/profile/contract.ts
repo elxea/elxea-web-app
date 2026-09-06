@@ -162,7 +162,11 @@ export interface ProfileSelfParams {
 export interface ProfileFieldParams {
   facet: ProfileFacet;
   category?: TeaCategory;
-  /** カメラの倍率段 (10 の冪)。0 = マクロ。 */
+  /**
+   * 細かさの段 (0 = 最も粗い / 2 = 最も細かい)。**拡大率ではない** —
+   * 密度格子の解像度 (LOD 表) と等値線の段数を決める
+   * (`components/viz/profile/camera.ts` の冒頭参照)。
+   */
   z: number;
 }
 
@@ -170,6 +174,11 @@ export interface ProfileWordsParams {
   facet: ProfileFacet;
   category?: TeaCategory;
   bbox: readonly [number, number, number, number];
+  /**
+   * 細かさの段 (0=粗い / 2=細かい)。どの層まで分解して返すかを決める
+   * (`lib/profile/words.ts#wordLayerDepth`)。`field` の `z` と同じ意味。
+   */
+  z: number;
   /** 認証済みなら userKey (D6b: personal は認証必須が既定)。 */
   userKey: string | null;
 }

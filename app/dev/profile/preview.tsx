@@ -29,7 +29,7 @@ const LABELS: ProfileSurfaceLabels = {
     reading: "roji プロファイル — 言葉の野",
     event: "roji プロファイル — 言葉の野",
   },
-  zoom: "倍率 一倍からせん倍",
+  zoom: "細かさ 粗いから細かいまで",
 };
 
 export function ProfileDevPreview() {

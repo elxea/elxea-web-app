@@ -20,15 +20,23 @@ export interface CameraState {
    *
    * 原点 (0,0) ではない — 嗜好空間の写像によっては原点が空間の外にある
    * (`lib/profile/framing.ts` の冒頭参照)。未ログインで自分の粒が描かれない
-   * ときはみんなの分布の重心が入る。
+   * ときは描くもの全体の外接矩形の中心が入る。
    */
   cx: number;
   cy: number;
-  /** z=0 (×1) のときの px per world-unit。板の大きさと中身の広がりで決まる。 */
+  /** 板の大きさと中身の広がりで決まる px per world-unit。 */
   baseScale: number;
-  /** px per world-unit (= `baseScale * 10^z`)。 */
+  /**
+   * px per world-unit。**`z` に依らず `baseScale` と同じ**。
+   *
+   * 段が上がっても枠は動かない — 動かすと中身が枠の外へ出て「寄って消える
+   * ものはない」に反する (理由は `components/viz/profile/camera.ts` の冒頭)。
+   */
   scale: number;
-  /** 倍率段 (10 の冪。0 = ×1)。 */
+  /**
+   * 細かさの段 (0 = 最も粗い / 2 = 最も細かい)。拡大率ではない。
+   * 密度格子の解像度 (LOD)・等値線の段数・言葉の層の深さを決める。
+   */
   z: number;
 }
 
