@@ -11,9 +11,11 @@ import { PROFILE_MIN_BBOX_SIZE } from "@/lib/profile/thresholds";
 import { resolveProfileCacheControl } from "@/lib/profile/cache-policy";
 
 /**
- * GET /api/profile/words?facet=&category=&bbox=x0,y0,x1,y1
+ * GET /api/profile/words?facet=&category=&bbox=x0,y0,x1,y1&z=
  *
- * 言葉の三層。`bbox` で見えている範囲だけを返す。
+ * 言葉の三層。`bbox` で見えている範囲だけを返す。`z` は細かさの段で、どの層まで
+ * 分解して返すかを決める (粗い段は一般語だけ / 段が上がるほど共通語・個人語へ
+ * 分解される。`lib/profile/words.ts#wordLayerDepth`)。
  *
  * `personal` は認証必須 (判断点 D6b の推奨どおり — 個人の一文は再識別リスクが
  * 最も高いデータ種のため)。未ログインでも 400 にはせず `personal` を空配列に
@@ -53,11 +55,14 @@ export async function GET(request: NextRequest) {
       PROFILE_MIN_BBOX_SIZE,
     );
 
+    const zRaw = Number(searchParams.get("z") ?? "0");
+    const z = Number.isFinite(zRaw) ? zRaw : 0;
+
     const identity = await resolveIdentity();
     const userKey = identity.authenticated ? identity.userKey : null;
 
     const source = await getProfileSource();
-    const data = await source.getWords({ facet, category, bbox, userKey });
+    const data = await source.getWords({ facet, category, bbox, z, userKey });
 
     const cacheControl = resolveProfileCacheControl(data.source, env("VERCEL_ENV"));
 

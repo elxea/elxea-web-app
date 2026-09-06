@@ -17,7 +17,7 @@ import { asContourValues, traceContour } from "@/lib/viz/contour-path";
 import { ROJI_VIZ_COLOR, ROJI_VIZ_SERIF, rampFn } from "@/lib/viz/roji-viz-palette";
 import { decodeU8FromBase64 } from "@/lib/profile/field";
 import { placeLabels, type LabelCandidate } from "@/lib/profile/labels";
-import { PROFILE_WORDS_FRAME_BUDGET } from "@/lib/profile/thresholds";
+import { PROFILE_WASH_MIN_VALUE, PROFILE_WORDS_FRAME_BUDGET } from "@/lib/profile/thresholds";
 import { worldToScreen } from "@/components/viz/profile/camera";
 import type {
   CameraState,
@@ -36,16 +36,36 @@ const WASH_RAMP = rampFn([
 /**
  * 言葉の三層。数が小さいほど先に場所を取る (粗い語から立つ)。
  *
- * `halo` は字の下に敷く紙の色の縁取りの濃さ。等高線と濃度の面の上に字が乗るので、
- * 縁取りが無いと**線が字の隙間を横切って読めなくなる** (「火の入れかた」が
- * 「火2入れかた」に見える、が実際に出た)。地図の注記と同じ作法。
- * 一般語 (象限の名) は地に沈めておきたいので薄く、読ませる共通語・個人語は濃く。
+ * ## 読める濃さを持たせる (独立 QA 実測 2026-09-06 の是正)
+ *
+ * 旧実装の一般語は淡い苔 (`usukoke`) を 65% で置いており、紙 (`kinari`) に対する
+ * コントラストは **1.48〜2.23:1** しかなかった (可読の基準は 4.5:1)。ここを
+ * 深緑 (`fukamidori`) の全不透明にして **5.32:1** にする。共通語・個人語は墨
+ * (`sumi`) の全不透明で **12.6:1**。
+ *
+ * ## 「自分」と「他者」は明度とウェイトで分ける
+ *
+ * 色数は増やさない (roji の単色系を崩さない)。分けるのは 3 つだけ —
+ * 一般語 = 深緑・少し大きい (地に近い層) / 共通語 = 墨・標準ウェイト /
+ * 個人語 (= 常に**自分の言葉**) = 墨・太い。淡さで区別すると読めなくなるので、
+ * 濃さの下限を割らない範囲でだけ差をつける。
+ *
+ * ## 黒・近黒の扱い
+ *
+ * 墨 (`sumi` #2B2B2B) は**文字・記号のインクとしては可**。禁じているのは
+ * 背景・大面積に敷くこと (Setaka の元の言葉は「黒背景が怖い」)。この判定は色の
+ * 値ではなく**面積**で行い、「輝度 40 未満の画素が描画領域の 0.5% 以下」を
+ * `profile-stage.stories.tsx` の機械検査が実画素で固定している。
  */
-const WORD_LAYERS = [
-  { key: "general", size: 15, color: ROJI_VIZ_COLOR.usukoke, alpha: 0.65, halo: 0.45, priority: 0 },
-  { key: "shared", size: 12, color: ROJI_VIZ_COLOR.sumi, alpha: 0.85, halo: 0.9, priority: 1 },
-  { key: "personal", size: 11, color: ROJI_VIZ_COLOR.sumi, alpha: 1, halo: 0.9, priority: 2 },
+export const WORD_LAYERS = [
+  { key: "general", size: 15, weight: 400, color: ROJI_VIZ_COLOR.fukamidori, priority: 0 },
+  { key: "shared", size: 13, weight: 400, color: ROJI_VIZ_COLOR.sumi, priority: 1 },
+  { key: "personal", size: 13, weight: 600, color: ROJI_VIZ_COLOR.sumi, priority: 2 },
 ] as const;
+
+/** 字の下に敷く紙の色の板 (ノックアウト) の余白 px。 */
+const WORD_PLATE_PAD_X = 5;
+const WORD_PLATE_PAD_Y = 3;
 
 export class CanvasProfileRenderer implements ProfileRenderer {
   private canvas: HTMLCanvasElement | null = null;
@@ -142,7 +162,7 @@ export class CanvasProfileRenderer implements ProfileRenderer {
     for (let i = 0; i < grid.w * grid.h; i++) {
       const v = u8[i] ?? 0;
       const o = i * 4;
-      if (v <= 2) {
+      if (v <= PROFILE_WASH_MIN_VALUE) {
         buffer.data[o + 3] = 0;
         continue;
       }
@@ -271,14 +291,26 @@ export class CanvasProfileRenderer implements ProfileRenderer {
   }
 
   /**
-   * 言葉の三層。**重なったら消すのではなく、この倍率では置かない**
-   * (`lib/profile/labels.ts`)。倍率が上がれば札どうしの画面距離は倍率に比例して
-   * 開き、札の大きさ (px) は変わらないので、寄れば必ず現れる — Setaka 確定要件
+   * 言葉の三層。**重なったら消すのではなく、この段では置かない**
+   * (`lib/profile/labels.ts`)。段が上がると層が増える (一般語 → 共通語 →
+   * 個人語) ので、置けなかった語も段を上げれば現れる — Setaka 確定要件
    * 「寄って消えるものはない。すべては分解されるだけ」。
    *
-   * 予算は地の面と別に持つ。ひとつの予算を共有すると、格子のセル数が多い倍率
+   * 予算は地の面と別に持つ。ひとつの予算を共有すると、格子のセル数が多い段
    * (LOD micro) で地が予算を使い切り、**言葉が 1 つも描かれない**という、まさに
    * 上の要件に反する落ち方をする。
+   *
+   * ## 字は紙の色の板の上に置く (ノックアウト)
+   *
+   * 濃度の面と等高線の上に字が乗るので、地のままだと **線が字を貫通して読めない**
+   * (独立 QA 実測: 「香」「台」を等値線が貫通)。旧実装は半透明の縁取り
+   * (`strokeText`) だけで守ろうとしていたが、縁取りは字の輪郭に沿うだけなので
+   * 字の内側の空きは地のまま残る。ここでは**不透明な紙の色の板**を先に敷いてから
+   * 字を置く (地図の注記と同じ作法)。板は `placeLabels` が確保した矩形と同じ
+   * 大きさなので、隣の札の字を覆うことはない。
+   *
+   * 板を先に全部敷いてから字を全部書くのは、描き順で後の板が前の字を欠けさせる
+   * 事故を構造的に無くすため。
    */
   private drawWords(
     ctx: CanvasRenderingContext2D,
@@ -302,12 +334,12 @@ export class CanvasProfileRenderer implements ProfileRenderer {
     const candidates: LabelCandidate[] = [];
     const draws = new Map<
       string,
-      { text: string; size: number; color: string; alpha: number; halo: number }
+      { text: string; size: number; weight: number; color: string; w: number; h: number }
     >();
     for (const layer of WORD_LAYERS) {
       const list = lists[layer.key] ?? [];
       if (list.length === 0) continue;
-      ctx.font = `400 ${layer.size}px ${ROJI_VIZ_SERIF}`;
+      ctx.font = `${layer.weight} ${layer.size}px ${ROJI_VIZ_SERIF}`;
       for (let i = 0; i < list.length; i++) {
         const item = list[i];
         const p = worldToScreen(camera, item.x, item.y, w, h);
@@ -322,9 +354,10 @@ export class CanvasProfileRenderer implements ProfileRenderer {
         draws.set(key, {
           text: item.text,
           size: layer.size,
+          weight: layer.weight,
           color: layer.color,
-          alpha: layer.alpha,
-          halo: layer.halo,
+          w: width,
+          h: height,
         });
       }
     }
@@ -333,22 +366,32 @@ export class CanvasProfileRenderer implements ProfileRenderer {
     const budgeted = candidates.slice(0, PROFILE_WORDS_FRAME_BUDGET);
     stats.culled += candidates.length - budgeted.length;
 
-    const { placed, deferred } = placeLabels(budgeted);
+    /* 場所取りの隙間は**板の大きさ**で決める。字の大きさだけで場所を取ると、
+       字は重ならないのに板が隣の字を欠けさせる (板は字より左右 5px・上下 3px
+       大きい)。 */
+    const { placed, deferred } = placeLabels(budgeted, { gap: WORD_PLATE_PAD_X * 2 });
     stats.culled += deferred.length;
 
+    /* 1周目: 紙の色の板を敷く。 */
+    ctx.save();
+    ctx.fillStyle = ROJI_VIZ_COLOR.kinari;
+    ctx.globalAlpha = 1;
+    for (const spot of placed) {
+      const d = draws.get(spot.key);
+      if (!d) continue;
+      const plateW = d.w + WORD_PLATE_PAD_X * 2;
+      const plateH = d.h + WORD_PLATE_PAD_Y * 2;
+      tracePlate(ctx, spot.x - plateW / 2, spot.y - plateH / 2, plateW, plateH, plateH / 2);
+      ctx.fill();
+    }
+    ctx.restore();
+
+    /* 2周目: 字を置く。 */
     for (const spot of placed) {
       const d = draws.get(spot.key);
       if (!d) continue;
       ctx.save();
-      ctx.font = `400 ${d.size}px ${ROJI_VIZ_SERIF}`;
-      /* 紙の色で縁取ってから字を置く (等高線が字を横切っても読める)。 */
-      ctx.globalAlpha = d.halo;
-      ctx.strokeStyle = ROJI_VIZ_COLOR.kinari;
-      ctx.lineWidth = 3;
-      ctx.lineJoin = "round";
-      ctx.miterLimit = 2;
-      ctx.strokeText(d.text, spot.x, spot.y);
-      ctx.globalAlpha = d.alpha;
+      ctx.font = `${d.weight} ${d.size}px ${ROJI_VIZ_SERIF}`;
       ctx.fillStyle = d.color;
       ctx.fillText(d.text, spot.x, spot.y);
       ctx.restore();
@@ -356,6 +399,13 @@ export class CanvasProfileRenderer implements ProfileRenderer {
     }
   }
 
+  /**
+   * 自分の粒。
+   *
+   * 墨 (`sumi`) の点は**インク**なので使ってよい (背景・大面積に黒・近黒を敷か
+   * ない、が実際のルール。`WORD_LAYERS` の doc comment 参照)。粒は半径 3px、
+   * 広がりの輪は線だけなので、面としての黒は生じない。
+   */
   private drawSelf(
     ctx: CanvasRenderingContext2D,
     centroid: { x: number; y: number },
@@ -384,4 +434,28 @@ export class CanvasProfileRenderer implements ProfileRenderer {
     ctx.restore();
     stats.drawn += 2;
   }
+}
+
+/**
+ * 角の丸い矩形のパスを積む。
+ *
+ * `CanvasRenderingContext2D.roundRect` を使わないのは、Storybook の
+ * headless Chromium など一部の実行環境で欠けることがあるため (機械検査が
+ * そこで落ちると、検査の意味が「実装が壊れた」から「環境が古い」へすり替わる)。
+ */
+function tracePlate(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r: number,
+): void {
+  const radius = Math.max(0, Math.min(r, w / 2, h / 2));
+  ctx.beginPath();
+  ctx.arc(x + w - radius, y + radius, radius, -Math.PI / 2, 0);
+  ctx.arc(x + w - radius, y + h - radius, radius, 0, Math.PI / 2);
+  ctx.arc(x + radius, y + h - radius, radius, Math.PI / 2, Math.PI);
+  ctx.arc(x + radius, y + radius, radius, Math.PI, Math.PI * 1.5);
+  ctx.closePath();
 }

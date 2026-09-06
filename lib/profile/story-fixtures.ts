@@ -113,13 +113,13 @@ export function buildStoryScene(
   if (facet === "tea") {
     words = { source: "synthetic", facet: "tea", category, general: [], shared: [], personal: [] };
   } else {
-    const layers = buildWordsLayers(facet, STORY_POPULATION);
+    const layers = buildWordsLayers(facet, STORY_POPULATION, z);
     words = {
       source: "synthetic",
       facet,
       general: layers.general,
       shared: layers.shared,
-      personal: buildPersonalWords(),
+      personal: buildPersonalWords(z),
     };
   }
 

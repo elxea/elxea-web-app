@@ -54,6 +54,7 @@ describe("匿名性 (a) — field/words 応答の実JSONを再帰走査しても
     const res = await synthetic.getWords({
       facet: "reading",
       bbox: [-1, -1, 1, 1],
+      z: 2,
       userKey: "leak-marker-should-not-appear",
     });
     const asJson = JSON.parse(JSON.stringify(res));

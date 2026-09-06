@@ -11,6 +11,7 @@
  */
 
 import { vocabularyFor, type VocabularyFacet } from "@/lib/profile/vocabulary";
+import { zoomBandFromZ } from "@/lib/profile/field";
 import { PROFILE_WORDS_PERSONAL_MIN_SUBJECTS, roundCohort } from "@/lib/profile/thresholds";
 import type { ProfileWordPersonalSchema } from "@/lib/profile/contract";
 import type { z } from "zod";
@@ -73,19 +74,52 @@ export interface WordsLayers {
   shared: Array<{ text: string; x: number; y: number; weight: number; cohort: number }>;
 }
 
+/** 言葉の層の深さ。細かさの段 `z` が上がるほど深くなる (層は増えるだけ)。 */
+export type WordLayerDepth = 1 | 2 | 3;
+
+/**
+ * 細かさの段 `z` → 言葉の層の深さ。
+ *
+ * 「寄るほど語が細かい語に分解される (一般化された語 → より具体的な語)」を
+ * 契約の側で表す唯一の場所。段が上がると層が**増える**だけで、一度出た層が
+ * 消えることは無い (Setaka 確定要件「寄って消えるものはない。すべては分解
+ * されるだけ」)。
+ *
+ *   - 1 (粗い) … 一般語だけ (象限の名)
+ *   - 2 (中間) … + 共通語 (匿名・一般化された粒度。他者の具体的な言葉ではない)
+ *   - 3 (細かい) … + 個人語。**個人語は常に呼び出し本人のものだけ**
+ *     (`ProfileWordPersonalSchema` の doc comment。他者の個人語を返す経路は
+ *     契約そのものに存在しない)。引用許可 (カルテ項目18) の仕組みが未実装の
+ *     いまは 0 件で、仕組みが入った時点でこの段に現れる。
+ *
+ * z の帯分けは密度格子の LOD (`lib/profile/field.ts#zoomBandFromZ`) と同じ関数を
+ * 使う — 「格子は細かくなったのに語は分解されない」段を作らないため。
+ */
+export function wordLayerDepth(z: number): WordLayerDepth {
+  const band = zoomBandFromZ(z);
+  if (band === "macro") return 1;
+  if (band === "mid") return 2;
+  return 3;
+}
+
 /**
  * 一般語・共通語レイヤーを組み立てる。
  *
  * 段1は語彙表 (固定レイアウト) をそのまま返す。実データの使われ方に応じた
  * 重みづけは段3の前提工事 (カルテ集計) を待つ。共通語は母集団が最小人数未満
  * (`PROFILE_WORDS_PERSONAL_MIN_SUBJECTS`) なら出さない (匿名性の閾値を共通語にも
- * 揃える)。
+ * 揃える)。加えて、粗い段 (`wordLayerDepth` = 1) では共通語をまだ出さない —
+ * そこは共通語が一般語へ**束ねられている**段だから。
  */
-export function buildWordsLayers(facet: VocabularyFacet, rawSubjectCount: number): WordsLayers {
+export function buildWordsLayers(
+  facet: VocabularyFacet,
+  rawSubjectCount: number,
+  z = 0,
+): WordsLayers {
   const table = vocabularyFor(facet);
   const cohort = roundCohort(rawSubjectCount);
   const general = table.general.map((g) => ({ text: g.text, x: g.x, y: g.y, weight: 1 }));
-  if (cohort < PROFILE_WORDS_PERSONAL_MIN_SUBJECTS) {
+  if (cohort < PROFILE_WORDS_PERSONAL_MIN_SUBJECTS || wordLayerDepth(z) < 2) {
     return { general, shared: [] };
   }
   const relaxed = relax(
@@ -99,13 +133,29 @@ export function buildWordsLayers(facet: VocabularyFacet, rawSubjectCount: number
 export type PersonalWord = z.infer<typeof ProfileWordPersonalSchema>;
 
 /**
- * `words.personal` を組み立てる。
+ * `words.personal` を組み立てる。**常に呼び出し本人のものだけ** (契約に他者の
+ * 個人語を返す経路が無い — `ProfileWordPersonalSchema` 参照)。
  *
  * 引用許可 (カルテ項目18) の仕組みが未実装なので、実装されるまで常に空配列を
- * 返す。呼び出し側 (`app/api/profile/words/route.ts`) はこの関数だけを呼べば、
- * 認証要否 (D6b) や bbox 内人数の下限判定より前に確実に空へ倒れる。
+ * 返す。呼び出し側はこの関数だけを呼べば、認証要否 (D6b) や bbox 内人数の下限
+ * 判定より前に確実に空へ倒れる。
+ *
+ * `z` を受けるのは、最も細かい段 (`wordLayerDepth` = 3) でだけ個人語が現れる、
+ * という層の順序をこの関数の側でも守るため。仕組みが入っても、粗い段に個人語が
+ * 混ざることは無い。
  */
-export function buildPersonalWords(): PersonalWord[] {
+export function buildPersonalWords(z = 0): PersonalWord[] {
+  if (wordLayerDepth(z) < 3) return [];
+  return permittedOwnWords();
+}
+
+/**
+ * 引用許可 (カルテ項目18) 済みの、**本人が書いた**言葉。
+ *
+ * フラグの実装が入るまでは常に空。空を返すことが正しい振る舞いで、契約テストが
+ * それを固定している (Spec §「実データ契約」C)。
+ */
+function permittedOwnWords(): PersonalWord[] {
   return [];
 }
 

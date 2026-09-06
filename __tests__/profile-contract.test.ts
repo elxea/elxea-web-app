@@ -58,8 +58,8 @@ describe("契約テスト — LiveSource と SyntheticSource は同一スキー�
   it.each(FACETS)("words(%s) は両ソースともスキーマを満たす", async (facet) => {
     const category = facet === "tea" ? "green" : undefined;
     const bbox: [number, number, number, number] = [-1, -1, 1, 1];
-    const s = await synthetic.getWords({ facet, category, bbox, userKey: null });
-    const l = await live.getWords({ facet, category, bbox, userKey: null });
+    const s = await synthetic.getWords({ facet, category, bbox, z: 2, userKey: null });
+    const l = await live.getWords({ facet, category, bbox, z: 2, userKey: null });
     expect(ProfileWordsResponseSchema.safeParse(s).success).toBe(true);
     expect(ProfileWordsResponseSchema.safeParse(l).success).toBe(true);
     // 引用許可の仕組みが未実装のため、どちらのソースでも常に空 (D6/QA致命1)。
@@ -68,7 +68,13 @@ describe("契約テスト — LiveSource と SyntheticSource は同一スキー�
   });
 
   it("お茶の言葉 (facet=tea) は段1の対象外で常に空", async () => {
-    const s = await synthetic.getWords({ facet: "tea", category: "green", bbox: [-9, -9, 9, 9], userKey: null });
+    const s = await synthetic.getWords({
+      facet: "tea",
+      category: "green",
+      bbox: [-9, -9, 9, 9],
+      z: 2,
+      userKey: null,
+    });
     expect(s.general).toEqual([]);
     expect(s.shared).toEqual([]);
   });

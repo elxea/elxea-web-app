@@ -93,7 +93,11 @@ export class LiveSource implements ProfileSource {
       shared: [],
       personal: [],
     };
-    const qs = new URLSearchParams({ facet: params.facet, bbox: params.bbox.join(",") });
+    const qs = new URLSearchParams({
+      facet: params.facet,
+      bbox: params.bbox.join(","),
+      z: String(params.z),
+    });
     if (params.category) qs.set("category", params.category);
     if (params.userKey) qs.set("userKey", params.userKey);
     const data = await fetchCxAgentProfile<ProfileWordsResponse>(`/api/profile/words?${qs.toString()}`);

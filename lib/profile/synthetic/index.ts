@@ -87,7 +87,7 @@ export class SyntheticSource implements ProfileSource {
 
   async getField(params: ProfileFieldParams): Promise<ProfileFieldResponse> {
     const bbox = profileFieldBbox(params.facet);
-    const key = fieldPublishKey(params.facet, params.category);
+    const key = fieldPublishKey(params.facet, params.category, params.z);
     const previousPublish = await this.publishStore.get(key);
 
     let points: WeightedPoint[];
@@ -125,7 +125,7 @@ export class SyntheticSource implements ProfileSource {
         personal: [],
       };
     }
-    const layers = buildWordsLayers(params.facet, SYNTHETIC_POPULATION);
+    const layers = buildWordsLayers(params.facet, SYNTHETIC_POPULATION, params.z);
     return {
       source: "synthetic",
       facet: params.facet,
@@ -133,7 +133,7 @@ export class SyntheticSource implements ProfileSource {
       shared: layers.shared,
       // 引用許可の仕組みが未実装のため常に空 (D6/QA致命1)。synthetic でも本番と
       // 同じ振る舞いにしておくことで、視覚回帰 story が個人語の有無で分岐しない。
-      personal: buildPersonalWords(),
+      personal: buildPersonalWords(params.z),
     };
   }
 }

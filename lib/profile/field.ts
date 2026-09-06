@@ -81,10 +81,19 @@ export function aggTea(cups: readonly TeaCupInput[]): TeaAggEntry[] {
 
 export type ZoomBand = "macro" | "mid" | "micro";
 
-/** カメラの倍率段 (10 の冪。0=×1) から LOD 表の帯へ写す。 */
+/**
+ * 細かさの段 (0..2) から LOD 表の帯へ写す。
+ *
+ * **境界は 0.5 / 1.5 で丸める。** 旧実装は `z === 1` の完全一致で mid を判定して
+ * いたため、`?z=0.6` のような整数でない要求が**いきなり最も細かい帯 (micro)**
+ * に落ちていた。画面側は段を整数へ丸めてから要求するので普段は表に出ないが、
+ * API は誰でも任意の `z` を渡せる。ここは画面側の丸め (`Math.round`) と同じ
+ * 境界にしておく — 別の境界を持つと「画面が要求した段」と「サーバーが返した段」
+ * が静かにずれる。
+ */
 export function zoomBandFromZ(z: number): ZoomBand {
-  if (z <= 0) return "macro";
-  if (z === 1) return "mid";
+  if (!Number.isFinite(z) || z < 0.5) return "macro";
+  if (z < 1.5) return "mid";
   return "micro";
 }
 
@@ -224,10 +233,24 @@ export function decodeU8FromBase64(data: string): Uint8Array {
   return new Uint8Array(Buffer.from(data, "base64"));
 }
 
-/** 等高線の水準 (0..1 の正規化割合)。quiet/sparse は引かない (試作の判断を踏襲)。 */
-export function contourLevelsFor(state: ProfileFieldState): number[] {
+/**
+ * 等高線の水準 (0..1 の正規化割合)。
+ *
+ * `quiet` / `sparse` では引かない — 線を引くと形が確定して見え、10 名の偶然が
+ * 事実に見える (Spec §「初期母集団とコールドスタート」)。
+ *
+ * `formed` では**段の数が細かさの段 `z` とともに増える**。これが「寄ると分解
+ * される」の等値線側の担い手で、格子の解像度 (`resolveGridDims`) と対になる:
+ * 粗い段では山の大づかみな 2 本、細かい段では起伏の刻みが 6 本まで見える。
+ * 旧実装は `z` を見ず常に 2 本だったので、格子だけ細かくなって**段が増えず**、
+ * 寄っても絵が変わらなかった。
+ */
+export function contourLevelsFor(state: ProfileFieldState, z = 0): number[] {
   if (state !== "formed") return [];
-  return [0.35, 0.62];
+  const band = zoomBandFromZ(z);
+  if (band === "macro") return [0.35, 0.62];
+  if (band === "mid") return [0.24, 0.4, 0.56, 0.72];
+  return [0.16, 0.28, 0.4, 0.52, 0.64, 0.78];
 }
 
 /* ------------------------------------------------------------------ *
@@ -330,7 +353,7 @@ export function decideFieldPublish(params: {
     state,
     cohort,
     grid,
-    levels: contourLevelsFor(state),
+    levels: contourLevelsFor(state, params.z),
   };
 }
 
@@ -419,11 +442,19 @@ export interface FieldPublishStore {
   set(key: string, snapshot: FieldPublishSnapshot): Promise<void>;
 }
 
-/** `field` の公開状態を束ねる鍵。カメラの倍率段 (z) はキーに含めない —
- *  公開してよいかどうかの判定は母集団の増減だけで決まり、LOD (z) は
- *  同じ版の中で解像度が変わるだけの表示上の違いのため。 */
-export function fieldPublishKey(facet: string, category: string | undefined): string {
-  return `${facet}:${category ?? "-"}`;
+/**
+ * `field` の公開状態を束ねる鍵。
+ *
+ * **細かさの段 (z) を含める。** 公開してよいか (kバッチ・版番号) の判定は母集団の
+ * 増減だけで決まるが、据え置き (frozen) のときスナップショットは*中身ごと*
+ * 前回を返す。z をキーから外すと、粗い段で作った格子が細かい段の要求にそのまま
+ * 返り、**寄っても解像度が上がらない** (本 PR で直した欠陥の再発経路そのもの)。
+ * 段ごとに独立した公開列にすれば、どの段も自分の解像度で kバッチ判定を受ける。
+ * 匿名性は段ごとに同じ規則が働くので弱まらない (どの段も丸め・据え置き・版番号を
+ * 通る)。
+ */
+export function fieldPublishKey(facet: string, category: string | undefined, z = 0): string {
+  return `${facet}:${category ?? "-"}:z${zoomBandFromZ(z)}`;
 }
 
 export class InMemoryFieldPublishStore implements FieldPublishStore {

@@ -12,7 +12,11 @@
  *
  * Setaka 確定要件「寄って消えるものはない。すべては分解されるだけ」。よって
  * 検査するのは「重なりが 0 になったか」だけではなく、**入力が出力から失われて
- * いないか** と **寄れば現れるか** の 2 つ。
+ * いないか** と **段を上げると語は増えるだけか** の 2 つ。
+ *
+ * 段 (`z`) は拡大率ではなく細かさなので、語が現れる仕組みは「寄れば札の画面
+ * 距離が開く」ではなく「層が増える (一般語 → 共通語 → 個人語)」である
+ * (`components/viz/profile/camera.ts` の冒頭・`lib/profile/words.ts#wordLayerDepth`)。
  */
 
 import { describe, expect, it } from "vitest";
@@ -47,9 +51,9 @@ const LAYERS = [
   { key: "shared", size: 12, priority: 1 },
 ] as const;
 
-/** 語彙表 1 面ぶんを、指定の倍率で画面へ写した候補にする。 */
+/** 語彙表 1 面ぶんを、指定の段で画面へ写した候補にする。 */
 function candidatesFor(facet: VocabularyFacet, view: { w: number; h: number }, z: number): LabelCandidate[] {
-  const layers = buildWordsLayers(facet, 240);
+  const layers = buildWordsLayers(facet, 240, z);
   const framing = sceneFraming(
     {
       self: null,
@@ -101,7 +105,8 @@ describe("札は重ねない", () => {
         { w: 1024, h: 640 },
         { w: 358, h: 480 },
       ]) {
-        const candidates = candidatesFor(facet, view, 0);
+        /* 語が最も多い段 (すべての層が出ている段) で見る。 */
+        const candidates = candidatesFor(facet, view, 2);
         const byKey = new Map(candidates.map((c) => [c.key, c]));
         const { placed } = placeLabels(candidates);
         expect(overlappingPairs(placed, byKey), `${facet} ${view.w}x${view.h}`).toBe(0);
@@ -128,7 +133,7 @@ describe("札は重ねない", () => {
 describe("消さない — 入力は必ず「置いた」か「保留」のどちらかになる", () => {
   it("置いた枚数 + 保留の枚数 = 候補の枚数", () => {
     for (const facet of ["reading", "event"] as VocabularyFacet[]) {
-      const candidates = candidatesFor(facet, { w: 358, h: 480 }, 0);
+      const candidates = candidatesFor(facet, { w: 358, h: 358 }, 2);
       const { placed, deferred } = placeLabels(candidates);
       expect(placed.length + deferred.length).toBe(candidates.length);
       const keys = new Set([...placed.map((p) => p.key), ...deferred]);
@@ -137,13 +142,33 @@ describe("消さない — 入力は必ず「置いた」か「保留」のど�
   });
 });
 
-describe("寄れば現れる — 倍率を上げると保留は増えない", () => {
-  /* 札の大きさ (px) は倍率で変わらないのに、札どうしの画面距離は倍率に比例して
-     開く。だから「いま重なっているから置かない」は、寄れば必ず解ける。
-     画面外へ出たものは母数から外して比べる (枠の外は「消えた」ではない)。 */
+describe("段を上げると語は増えるだけ (減らない)", () => {
+  /* 「寄って消えるものはない。すべては分解されるだけ」の言葉の側の担い手。
+     段が上がると層が増えるので、前の段に出ていた語は必ず次の段にも出る。 */
+  it.each(["reading", "event"] as VocabularyFacet[])("%s は段が上がるほど語が増える", (facet) => {
+    let previous = new Set<string>();
+    let previousCount = 0;
+    for (const z of [0, 1, 2]) {
+      const layers = buildWordsLayers(facet, 240, z);
+      const texts = new Set([...layers.general, ...layers.shared].map((w) => w.text));
+      for (const t of previous) expect(texts.has(t), `${facet} z=${z} で「${t}」が消えた`).toBe(true);
+      expect(texts.size).toBeGreaterThanOrEqual(previousCount);
+      previous = texts;
+      previousCount = texts.size;
+    }
+    // 粗い段は一般語だけ、細かい段では共通語まで分解される。
+    expect(buildWordsLayers(facet, 240, 0).shared).toHaveLength(0);
+    expect(buildWordsLayers(facet, 240, 2).shared.length).toBeGreaterThan(0);
+  });
+});
+
+describe("重なりは間隔が開けば必ず解ける (placeLabels の性質)", () => {
+  /* 札の大きさ (px) は間隔によらないので、札どうしの画面距離が開けば
+     「いま重なっているから置かない」は必ず解ける。板が大きくなったとき・
+     語の配置が広がったときに保留が残り続けないことを固定する。 */
   it("同じ候補集合を引き伸ばすと、保留の割合が単調に減る", () => {
     for (const facet of ["reading", "event"] as VocabularyFacet[]) {
-      const base = candidatesFor(facet, { w: 1024, h: 640 }, 0);
+      const base = candidatesFor(facet, { w: 1024, h: 640 }, 2);
       let previousRatio = Number.POSITIVE_INFINITY;
       for (const factor of [1, 1.5, 2, 3, 5]) {
         const spread = base.map((c) => ({
@@ -163,13 +188,14 @@ describe("寄れば現れる — 倍率を上げると保留は増えない", ()
 
 describe("言葉の予算は地の面と分けて持つ", () => {
   it("格子のセル数が最大でも、言葉の予算は減らない", async () => {
-    /* LOD micro (z=2) は格子が最大になる倍率。ひとつの予算を共有していた頃は
+    /* LOD micro (z=2) は格子が最大になる段。ひとつの予算を共有していた頃は
        ここで地がすべて使い切り、言葉が 1 つも描かれなかった。 */
     const source = new SyntheticSource();
     const field = await source.getField({ facet: "reading", z: 2 });
     const words = await source.getWords({
       facet: "reading",
       bbox: profileFieldBbox("reading"),
+      z: 2,
       userKey: null,
     });
     const cells = (field.grid?.w ?? 0) * (field.grid?.h ?? 0);
