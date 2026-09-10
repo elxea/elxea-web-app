@@ -1,4 +1,12 @@
 import { test, expect } from "@playwright/test";
+import { requireVisible } from "./support/preconditions";
+
+/**
+ * 「一覧が 0 件なら skip」を廃した理由 (2026-08-19): 商品一覧は見本カタログで、
+ * ジャーナル一覧は CI にも入っている公開 Sanity 座標 (ci.yml のコメント参照) で
+ * 必ず描画される。0 件は環境差ではなく一覧が壊れている証拠なので、skip (灰色) では
+ * なく失敗 (赤) にする。詳細は e2e/support/preconditions.ts。
+ */
 
 test.describe("Community features — Unauthenticated", () => {
   // ---------------------------------------------------------------------------
@@ -10,12 +18,10 @@ test.describe("Community features — Unauthenticated", () => {
 
       // Find the first product link and navigate to it
       const productLink = page.locator('a[href*="/ja/products/"]').first();
-      const productExists = await productLink.isVisible().catch(() => false);
-
-      if (!productExists) {
-        test.skip(true, "商品一覧に商品カードが無い — Shopify に公開商品が必要です");
-        return;
-      }
+      await requireVisible(
+        productLink,
+        "商品一覧 (/ja/products) に商品カードが 1 件以上ある (見本カタログでも必ず出る)",
+      );
 
       await productLink.click();
       await page.waitForURL(/\/ja\/products\/.+/);
@@ -53,12 +59,10 @@ test.describe("Community features — Unauthenticated", () => {
 
       // Find the first article link
       const articleLink = page.locator('a[href*="/ja/journal/"]').first();
-      const articleExists = await articleLink.isVisible().catch(() => false);
-
-      if (!articleExists) {
-        test.skip(true, "ジャーナル一覧に記事カードが無い — Sanity に公開記事が必要です");
-        return;
-      }
+      await requireVisible(
+        articleLink,
+        "ジャーナル一覧 (/ja/journal) に記事カードが 1 件以上ある (CI にも公開 Sanity 座標が入っている)",
+      );
 
       await articleLink.click();
       await page.waitForURL(/\/ja\/journal\/.+/);

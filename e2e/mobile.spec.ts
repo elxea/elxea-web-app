@@ -85,12 +85,13 @@ test.describe("Mobile viewport", () => {
     await page.goto("/ja/products");
 
     const productLink = page.locator("a[href*='/products/']").first();
-    const hasProduct = await productLink.isVisible().catch(() => false);
-
-    if (!hasProduct) {
-      test.skip(true, "商品一覧に商品カードが無い — Shopify に公開商品が必要です");
-      return;
-    }
+    // 旧: 0 件なら test.skip — 商品一覧が本当に壊れてもテストは赤でなく灰色だった。
+    // 商品一覧は見本カタログ (PREVIEW_SEED_STOREFRONT) でも必ず描画されるため、
+    // 0 件は環境差ではなく故障。skip ではなく失敗にする。
+    await expect(
+      productLink,
+      "商品一覧 (/ja/products) に商品カードが 1 件も無い — 商品一覧の故障",
+    ).toBeVisible();
 
     await productLink.click();
     await page.waitForURL(/\/ja\/products\/.+/);

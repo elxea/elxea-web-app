@@ -34,6 +34,38 @@
 `push` は **docsのみの変更 (`**/*.md` / `docs/**` / `LICENSE`) では走らない**
 (このブランチのコミットの約21% が対比表markdownのため。PRは絞り込みなしで全部走る)。
 
+### ローカルpre-pushとCIの分担
+
+`.pre-commit-config.yaml` のpre-push stageが走らせるのは
+**マシンに依存しない検査だけ** (`lint` / `typecheck` / `vitest --project unit`)。
+
+| 検査 | ローカルpre-push | CI |
+|---|---|---|
+| gitleaks / shellcheck | 実行 (pre-commit stage) | 無し |
+| lint / typecheck | 実行 | `static-checks` |
+| unit (`--project unit`) | 実行 | `unit-tests` |
+| storybook (ブラウザ) | **走らせない** | `storybook-tests` |
+| e2e (ブラウザ) | 走らせない | `e2e-tests` |
+| coverage / build / Chromatic | 走らせない | 各job |
+
+**なぜstorybookをローカルの門から外すか** (2026-08-19):
+`--project storybook` はheadless Chromiumを起動してstoryを描画する**ブラウザ**スイート。
+`components/viz/terroir/*-map.stories.tsx` の2本がMapLibre GL = **WebGL2** を要求するため、
+使えるGPUスタックが無いホストでは `GPUInitializationError` で落ちる。
+結果として **UIに一切触っていないpushまでそのマシンから出せなくなる**。
+GPUの有無で可否が変わるものは、コードの門にならない。
+
+**捨てていない**: `storybook-tests` はpush・PRの両方で必ず走る必須job (上の表)。
+加えて `vitest.config.ts` のbrowser providerにSwiftShader (`--use-gl=angle` /
+`--use-angle=swiftshader` / `--enable-unsafe-swiftshader`) を渡したので、
+ソフトウェアWebGL2でどの環境でも動く。手元で見たいときは `pnpm test --project storybook`。
+
+**unitの `testTimeout` を5s → 20sにした理由** (同日): `@/app/sitemap` のような
+Next.jsのappモジュールを動的 `import()` する単体テストは、初回のVite変換に実測5.4s
+かかることがある (storybookプロジェクトと並列に走りCPUを取り合ったとき)。
+`__tests__/site-url-consumers.test.ts` はこれで**単独では通るのに並列時だけ赤**になっていた。
+アサーションは変えていない。本当に固まったテストは20s後に同じように落ちる。
+
 ### 実行時間の予算 (無料枠を使い切らないための数字)
 
 private repoのActionsは**分課金**で、GitHub Freeの無料枠は **2,000分/月**
