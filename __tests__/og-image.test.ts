@@ -20,6 +20,11 @@ import { OG_IMAGE, ogImages } from "@/lib/og-image";
  * **`app/` 配下の `openGraph` 宣言を全数走査**し、`images` を持たない宣言が
  * 1 つでもあれば落とす。個別ページのテストを増やす方式にしないのは、
  * 「増えたページを検査に足し忘れる」という同じ種類の穴を作らないため。
+ *
+ * 走査は 3 段構えで、og:image が消える 3 通りをそれぞれ落とす:
+ * 1. `images` を書いていない
+ * 2. `images` はあるが空配列 (`[]`) に落ちる
+ * 3. `images` はあるが `undefined` / `null` 等に落ちる (`ogImages()` を通していない)
  */
 
 const APP_DIR = join(process.cwd(), "app");
@@ -58,6 +63,30 @@ function openGraphBlocks(source: string): string[] {
     blocks.push(source.slice(start, i + 1));
   }
   return blocks;
+}
+
+/**
+ * `openGraph` 宣言の中で `images:` に与えられている値の**先頭**を、`images:` 1 つにつき
+ * 1 件ずつ取り出す。値の直前に挟まったコメントは値ではないので落とす。
+ *
+ * 値の全体を構文解析しないのは、判定に必要なのが「何で始まるか」だけだから。
+ * 先頭さえ分かれば `ogImages(` を通したかどうかは決まる。
+ */
+function imagesValues(block: string): string[] {
+  const values: string[] = [];
+  const marker = /\bimages\s*:/g;
+  let m: RegExpExecArray | null;
+  while ((m = marker.exec(block)) !== null) {
+    let rest = block.slice(m.index + m[0].length);
+    for (;;) {
+      const trimmed = rest.replace(/^\s+/, "");
+      const stripped = trimmed.replace(/^(?:\/\/[^\n]*|\/\*[\s\S]*?\*\/)/, "");
+      rest = stripped;
+      if (stripped === trimmed) break;
+    }
+    values.push(rest.slice(0, 60).replace(/\s+/g, " ").trim());
+  }
+  return values;
 }
 
 describe("og:image のフォールバック", () => {
@@ -107,6 +136,41 @@ describe("og:image のフォールバック", () => {
       offenders,
       `openGraph 宣言に空配列が残っている。空配列は og:image を消すので ` +
         `'ogImages(url)' に置き換えること (引数が falsy なら既定の 1 枚に落ちる)。対象:\n` +
+        offenders.map((f) => `  - ${f}`).join("\n"),
+    ).toEqual([]);
+  });
+
+  it("app/ 配下の openGraph の images は ogImages() を通している", () => {
+    /* `images` が書いてあるだけでは足りない。`images: image ? [{ url: image }] : undefined`
+       の形は「images がある」し「空配列でもない」ので上の 2 つを素通りするが、
+       ドキュメントに画像が無いときの値は `undefined` で、これは `images` を
+       書かなかったのと同じ — og:image は消える。`null` を返す形、変数経由で
+       undefined が入る形も結果は同じ。
+
+       危険な書き方を 1 つずつ列挙して禁止する方式にしないのは、少し崩した書き方
+       (`: void 0` / `: undefined` を別行に折り返す / ヘルパ経由) を静かに取り逃がすから。
+       og:image が必ず 1 枚以上残ることを保証できるのは、**空を返さないと型と単体テストで
+       担保された `ogImages()` を通した値だけ**なので、許可する書き方をそれ 1 つに固定し、
+       それ以外は落とす (禁止リストではなく許可リストで見る)。 */
+    const offenders: string[] = [];
+
+    for (const file of collectTsx(APP_DIR)) {
+      const source = readFileSync(file, "utf8");
+      if (!source.includes("openGraph:")) continue;
+      for (const block of openGraphBlocks(source)) {
+        for (const value of imagesValues(block)) {
+          if (!/^ogImages\s*\(/.test(value)) {
+            offenders.push(`${file.replace(process.cwd() + "/", "")}  (images: ${value})`);
+          }
+        }
+      }
+    }
+
+    expect(
+      offenders,
+      `openGraph の images が 'ogImages(...)' 以外の値になっている。三項で ` +
+        `undefined / null / 空配列に落ちる書き方はどれも og:image を消す。` +
+        `'images: ogImages()' (固有画像があれば 'ogImages(url)') に置き換えること。対象:\n` +
         offenders.map((f) => `  - ${f}`).join("\n"),
     ).toEqual([]);
   });
