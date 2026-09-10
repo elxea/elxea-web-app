@@ -1,8 +1,9 @@
+import { env } from "@/lib/config";
+
 import { SHOPIFY_API_VERSION } from "./api-version";
 
-const SHOPIFY_STORE_DOMAIN = process.env.SHOPIFY_STORE_DOMAIN || "";
-const SHOPIFY_STOREFRONT_ACCESS_TOKEN =
-  process.env.SHOPIFY_STOREFRONT_ACCESS_TOKEN || "";
+const SHOPIFY_STORE_DOMAIN = env("SHOPIFY_STORE_DOMAIN") ?? "";
+const SHOPIFY_STOREFRONT_ACCESS_TOKEN = env("SHOPIFY_STOREFRONT_ACCESS_TOKEN") ?? "";
 
 const endpoint = `https://${SHOPIFY_STORE_DOMAIN}/api/${SHOPIFY_API_VERSION}/graphql.json`;
 

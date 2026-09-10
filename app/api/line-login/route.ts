@@ -3,6 +3,19 @@ import { cookies } from "next/headers";
 import crypto from "crypto";
 import { getBaseUrl, getRequestHostname, isTrustedAuthHost } from "@/lib/base-url";
 import { getCookieSpec, isSecure, resolveCookieDomain } from "@/lib/auth/cookies";
+import { wantsAutoLoginDisabled } from "@/lib/line/auto-login";
+import {
+  buildLineAuthorizeUrl,
+  lineAppHandoffFromRequest,
+  lineUiLocales,
+} from "@/lib/line/authorize-url";
+import {
+  loginBotPrompt,
+  loginScopeParam,
+  resolveLoginChannelId,
+} from "@/lib/line/login-channel";
+import { reportChannelNamespace } from "@/lib/line/login-channel-report";
+import { COOKIE_NAME } from "@/lib/auth/cookie-names";
 
 /**
  * Direct LINE Login OAuth 2.0 redirect endpoint.
@@ -40,7 +53,23 @@ export async function GET(request: NextRequest) {
       { status: 503 },
     );
   }
-  const channelId = process.env.AUTH_LINE_ID;
+  /* 読み方は `resolveLoginChannelId()` に寄せる。生の `process.env.AUTH_LINE_ID` は
+   * 読まない。
+   *
+   * `lib/line/login-channel.ts` はこの 2 本を読む唯一の入口として書かれているのに、
+   * 認可 URL を組む 2 経路 (ここと `/init`) だけが生読みのまま残っていた。差は trim
+   * ひとつだが、`vercel env add NAME production < file` で入れた値は末尾の改行まで
+   * 保存されるので、生読みの経路だけが `client_id=...\n` を認可 URL に載せる。
+   *
+   * そのとき壊れ方は沈黙する: token 交換をする `/api/line-callback` と
+   * `/api/health/line` は既に同じ helper 経由で trim 済みの値を使うため、
+   * **ヘルスチェックは緑のままログインだけが落ちる**。2026-08-25 の本番障害が
+   * まさにこれ (`AUTH_LINE_SECRET` 不一致で token 交換が全滅)。
+   *
+   * ⚠ ここで読むのはログイン用の `AUTH_LINE_ID` である。連携 (LIFF) 側の
+   *   `LINE_LIFF_CHANNEL_ID` とは**別のチャネルを指す別の env** であり、
+   *   「揃える」ために片方をもう片方へ置き換えてはならない。 */
+  const channelId = resolveLoginChannelId();
   if (!channelId) {
     // Same rationale as /api/line-login/init: unconfigured, not broken.
     return NextResponse.json({ error: "auth_not_configured" }, { status: 503 });
@@ -48,6 +77,11 @@ export async function GET(request: NextRequest) {
 
   // Generate state for CSRF protection
   const state = crypto.randomBytes(32).toString("hex");
+  /* OIDC nonce (D11). Issued here too, not only in /init: the callback verifies the
+   * id_token's nonce unconditionally, so a login started through this legacy
+   * redirect would fail closed if it did not carry one. Same value rules as /init
+   * — a separate random value from `state`, same cookie scope and lifetime. */
+  const nonce = crypto.randomBytes(32).toString("hex");
 
   /* Store state in a cookie for verification in the callback.
    *
@@ -58,11 +92,20 @@ export async function GET(request: NextRequest) {
    * issued here was invisible to a callback arriving on the sibling host.
    * Both routes now go through the same registry-driven scope. */
   const cookieStore = await cookies();
-  const stateSpec = getCookieSpec("line_oauth_state")!;
+  const stateSpec = getCookieSpec(COOKIE_NAME.lineOauthState)!;
   const cookieDomain = resolveCookieDomain(request);
-  cookieStore.set("line_oauth_state", state, {
+  cookieStore.set(COOKIE_NAME.lineOauthState, state, {
     httpOnly: true,
     secure: isSecure(stateSpec),
+    sameSite: "lax",
+    maxAge: 600, // 10 minutes
+    path: "/",
+    ...(cookieDomain ? { domain: cookieDomain } : {}),
+  });
+  const nonceSpec = getCookieSpec(COOKIE_NAME.lineOauthNonce)!;
+  cookieStore.set(COOKIE_NAME.lineOauthNonce, nonce, {
+    httpOnly: true,
+    secure: isSecure(nonceSpec),
     sameSite: "lax",
     maxAge: 600, // 10 minutes
     path: "/",
@@ -73,23 +116,44 @@ export async function GET(request: NextRequest) {
 
   const redirectUri = `${baseUrl}/api/line-callback`;
 
-  // Note: bot_prompt=aggressive removed 2026-04-13. The production LINE Official
-  // Account (@307tzhkw) is owned under a different LINE Developers Console
-  // provider (channel 2008324925, 404 from setaka-on@elxea.com). Linked OA on
-  // the elxea provider's LINE Login channel can only point to the test OA
-  // (@426vlcyb), which is wrong for production users. Until the channel
-  // ownership is reconciled, login proceeds without the friend-add prompt.
-  // Restore bot_prompt: "aggressive" once the production OA's channel can be
-  // linked to this LINE Login channel.
-  const params = new URLSearchParams({
-    response_type: "code",
-    client_id: channelId,
-    redirect_uri: redirectUri,
-    state: state,
-    scope: "profile openid email",
-  });
+  /* 名前空間ガード（M-0）。ログインは止めない — 止めると「連携を直す変更で
+   * ログインが全滅する」ことになる。不一致は必ず記録に残し、監視で拾う。 */
+  reportChannelNamespace("line-login");
 
-  const authUrl = `https://access.line.me/oauth2/v2.1/authorize?${params.toString()}`;
+  /* `bot_prompt` は 2026-04-13 に外され、2026-08-25 に戻した。
+   *
+   * 外した理由は「本番 OA `@307tzhkw` が別プロバイダにあり、この Login チャネルに
+   * 紐付けられる OA がテスト用 `@426vlcyb` しか無かった」。新チャネル 2011239425 は
+   * 本番 OA を紐付け済みなので、前提ごと解消している。判断の中身は
+   * `lib/line/login-channel.ts` の `loginBotPrompt` に置いた。 */
+  /* 組み立ては `buildLineAuthorizeUrl` に一本化した。この route が
+   * `/api/line-login/init` と別々に `URLSearchParams` を書いていたことが、
+   * 2026-03-25 に `prompt=consent` が片方だけに入って 146 日間残った経緯
+   * （`ab25915` で除去）の下地である。以後は方針を 1 か所でしか持たない。
+   *
+   * ⚠ この route は **302 でしか遷移しない**ので、iOS の Universal Link は
+   *   発火しないことがある（LINE 公式: JavaScript リダイレクト / URL 直打ちは
+   *   発火しない）。画面から使う導線は `/api/line-login/init` + 実 `<a>` タップ
+   *   の方（`line-login-button.tsx`）であり、ここは後方互換のために残している。 */
+  const authUrl = buildLineAuthorizeUrl({
+    channelId,
+    redirectUri,
+    state,
+    nonce,
+    scope: loginScopeParam(),
+    botPrompt: loginBotPrompt(),
+    uiLocales: lineUiLocales(request),
+    // Same auto-login-failure escape hatch as the init route; see lib/line/auto-login.ts.
+    disableAutoLogin: wantsAutoLoginDisabled(request),
+    /* 着地点の切り替えも 3 経路で同じ判定を使う（`/api/line-login/init` の同じ箇所）。
+     *
+     * ⚠ この route は 302 なので、切り替えても Universal Link が発火する保証は無い
+     *   （公式が発火しないと名指しするのは JS リダイレクト / URL 直打ちで、302 の
+     *   扱いは書かれていない）。それでも同じ判定を通すのは、**経路ごとに方針が
+     *   分かれること自体**が 2026-03-25 の再発の下地だったからである。外れたときの
+     *   行き先は LINE の通常ログイン画面で、今日と同じである。 */
+    appHandoff: lineAppHandoffFromRequest(request),
+  });
 
   return NextResponse.redirect(authUrl);
 }

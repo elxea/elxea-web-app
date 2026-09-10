@@ -6,10 +6,15 @@
  * the Shopify Customer API call is skipped entirely. This reduces p50 latency
  * for authenticated API routes from ~400ms to ~5ms.
  */
+import { cache } from "react";
 import { cookies } from "next/headers";
+import { logger } from "@/lib/log";
 import { getSession } from "@/lib/shopify/auth";
 import { getCustomer, decryptToken } from "@/lib/shopify/customer";
+import { fetchShopifyCustomerIdForLineUser } from "@/lib/line/linkage-status";
+import { readVerifiedLineUserIdFrom } from "@/lib/line/session";
 import { extractCustomerId } from "./types";
+import { COOKIE_NAME } from "@/lib/auth/cookie-names";
 
 type AuthResult =
   | { authenticated: true; customerId: string; customerName: string }
@@ -53,7 +58,7 @@ export async function requireAuth(): Promise<AuthResult> {
 
     // Fast path: use cached customer ID from id_token (set at login)
     const cookieStore = await cookies();
-    const cidEnc = cookieStore.get("shop_cid")?.value;
+    const cidEnc = cookieStore.get(COOKIE_NAME.shopCustomerId)?.value;
     if (cidEnc) {
       const customerId = decryptToken(cidEnc);
       if (customerId) {
@@ -73,7 +78,12 @@ export async function requireAuth(): Promise<AuthResult> {
       .join(" ") || "Anonymous";
 
     return { authenticated: true, customerId, customerName };
-  } catch {
+  } catch (err) {
+    /* ここは上流 (Shopify) の障害を「未ログイン」に畳んで返す場所。返し方は変えない
+       が、残さないと障害はお客さまの画面上の「ログアウト」としてしか現れない。 */
+    logger.error("firebase.auth-guard.require-auth-failed", err, {
+      operation: "requireAuth",
+    });
     return { authenticated: false, error: "Authentication failed", status: 401 };
   }
 }
@@ -93,8 +103,41 @@ export async function requireAuth(): Promise<AuthResult> {
  * prefix), so no data migration is required. When a LINE-only user later
  * completes Shopify OAuth, the callback route is responsible for merging
  * `users/line:<id>/*` into `users/<shopifyNumericId>/*`.
+ *
+ * ## 連携済みの LINE セッションは Shopify 顧客の棚に解決する（分裂の修正）
+ *
+ * 上の 2 つの名前空間が交わらないこと自体は設計どおりだが、**連携台帳を一切
+ * 見ていなかった**のが「連携したはずなのにログイン手段ごとに別のマイページが
+ * 見える」の根因。よって LINE セッションのときは、cx-agent の連携台帳
+ * （既存 `GET /api/identity/linkage-status` の逆引き）に問い合わせ、
+ * **検証済みの連携があればその Shopify 顧客の棚に解決する**。
+ *
+ * 判断の倒し方（安全側は常に「自分の棚」）:
+ *   - 連携あり   … `userKey = shopifyCustomerId`・`provider = "shopify"`
+ *   - 連携なし   … 従来どおり `userKey = "line:<id>"`（＝解除後もここに戻る）
+ *   - 読めない   … 従来どおり `userKey = "line:<id>"`。**顧客 ID を推測しない**
+ *
+ * 「読めない」を連携済みに倒さないのは、外れた推測が他人のお気に入り・行動ログを
+ * 見せる事故に直結するから。逆に自分の棚に倒れても失うのは一時的な利便だけで、
+ * cx-agent が復旧すれば最大 60 秒（キャッシュ TTL）で正しい棚に戻る。
+ *
+ * ⚠ `provider` は解決後の棚に合わせて `"shopify"` になるが、これは
+ *   **Shopify セッションを持っていることを意味しない**。金額・住所・支払い方法など
+ *   Shopify 顧客トークンを要する操作は、この関数ではなく `requireAuth()`
+ *   （Shopify セッション専用）で守ること。本関数が守るのは Firestore 上の
+ *   お気に入り / フォロー / イベント / 行動ログの棚だけ。
+ *
+ * ## 1 リクエスト 1 回に畳んである（`React.cache`）
+ *
+ * この関数は 1 枚の画面から何度も呼ばれる（お気に入り・イベント・行動ログの
+ * それぞれが自分で本人解決をする）。中身は `getSession()` と cx-agent への逆引きで、
+ * どちらも外向きの往復を含む。リクエスト単位でメモ化しておけば、**同じ描画の中で
+ * 同じ答えを何度も取りに行かない**。リクエストの外（テスト・スクリプト）では
+ * メモ化されず素通しになるので、呼び出し側の意味は変わらない。
  */
-export async function resolveIdentity(): Promise<Identity> {
+export const resolveIdentity: () => Promise<Identity> = cache(loadIdentity);
+
+async function loadIdentity(): Promise<Identity> {
   try {
     const cookieStore = await cookies();
 
@@ -102,7 +145,7 @@ export async function resolveIdentity(): Promise<Identity> {
     //    semantics so Shopify-auth'd users keep the existing `userKey` shape.
     const session = await getSession();
     if (session) {
-      const cidEnc = cookieStore.get("shop_cid")?.value;
+      const cidEnc = cookieStore.get(COOKIE_NAME.shopCustomerId)?.value;
       if (cidEnc) {
         const customerId = decryptToken(cidEnc);
         if (customerId) {
@@ -136,23 +179,58 @@ export async function resolveIdentity(): Promise<Identity> {
     }
 
     // 2) LINE session fallback.
-    const hasLineSession = cookieStore.has("line_session");
-    const lineUidEnc = cookieStore.get("line_uid")?.value;
-    if (hasLineSession && lineUidEnc) {
-      const lineUserId = decryptToken(lineUidEnc);
+    //    「LINE セッションの本人が誰か」の判定は lib/line/session.ts に 1 本化して
+    //    ある（cookie 2 本の組み合わせと復号を、ここと API route で別々に書かない）。
+    {
+      const lineUserId = readVerifiedLineUserIdFrom(cookieStore);
       if (lineUserId) {
         let displayName = "LINE User";
-        const lineUserCookie = cookieStore.get("line_user")?.value;
+        const lineUserCookie = cookieStore.get(COOKIE_NAME.lineUser)?.value;
         if (lineUserCookie) {
           try {
             const parsed = JSON.parse(lineUserCookie);
             if (typeof parsed?.displayName === "string" && parsed.displayName) {
               displayName = parsed.displayName;
             }
-          } catch {
+          } catch (err) {
+            /* 表示名が既定値に落ちるだけで本人判定には効かないが、cookie の書式が
+               変わると全員の表示名が黙って "LINE User" になるので残す。 */
+            logger.error("firebase.auth-guard.line-user-cookie-unreadable", err, {
+              operation: "resolveIdentity",
+            });
             // Ignore malformed cookie — keep default display name.
           }
         }
+        /* 連携台帳を引く。`lineUserId` は暗号化 cookie の復号結果＝サーバ確定値で、
+           ブラウザ自己申告ではない（自己申告を渡すと他人の棚を開けられる）。 */
+        const linkedCustomerId =
+          await fetchShopifyCustomerIdForLineUser(lineUserId);
+
+        if (typeof linkedCustomerId === "string") {
+          /* 連携済み: メールでログインしたときと同じ棚を返す。
+           *
+           * 台帳が返す顧客 ID の形は保証されていない (cx-agent 側の書き込み経路に
+           * よって GID `gid://shopify/Customer/123` と数値 `123` の両方がありうる)。
+           * 一方メールログイン経路の棚のキーは、`shop_cid` も Customer API 経路も
+           * `extractCustomerId` を通した**数値**で確定している
+           * (`lib/shopify/id-token.ts` / 上の Shopify 分岐)。
+           *
+           * ここで正規化を挟まないと、同じ人が「LINE で入ったとき」だけ
+           * `users/gid://shopify/Customer/123` という別の棚を持ち、
+           * **直したはずの棚の分裂がそのまま再発する**。比較 (identity-link.ts の
+           * 本人一致判定) と同じ正規化を、棚のキーにも通す。 */
+          const customerId = extractCustomerId(linkedCustomerId);
+          return {
+            authenticated: true,
+            userKey: customerId,
+            provider: "shopify",
+            displayName,
+            shopifyCustomerId: customerId,
+            lineUserId,
+          };
+        }
+
+        // 未連携（false）/ 読めない（null）はどちらも従来どおり LINE 単独の人格。
         return {
           authenticated: true,
           userKey: `line:${lineUserId}`,
@@ -165,7 +243,12 @@ export async function resolveIdentity(): Promise<Identity> {
     }
 
     return { authenticated: false, error: "Not authenticated", status: 401 };
-  } catch {
+  } catch (err) {
+    /* `requireAuth` と同じ理由。本人解決の失敗を「未ログイン」に畳むので、
+       ここで残さないと上流の障害が誰にも届かない。 */
+    logger.error("firebase.auth-guard.identity-resolve-failed", err, {
+      operation: "resolveIdentity",
+    });
     return { authenticated: false, error: "Authentication failed", status: 401 };
   }
 }

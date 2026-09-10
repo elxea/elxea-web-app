@@ -15,7 +15,7 @@ import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
 import { ImageCard } from "@/components/media/image-card";
 import { getProducts } from "@/lib/shopify";
-import { formatPrice } from "@/lib/utils";
+import { formatPriceRange } from "@/lib/utils";
 import {
   getRecommendedProducts,
   PERSONA_TAG_AFFINITY,
@@ -25,6 +25,7 @@ import { cookies } from "next/headers";
 import { getSession } from "@/lib/shopify/auth";
 import { getCustomer, decryptToken } from "@/lib/shopify/customer";
 import { extractCustomerId } from "@/lib/firebase/types";
+import { COOKIE_NAME } from "@/lib/auth/cookie-names";
 
 // --------------------------------------------------------------------------
 // Persona display labels (Japanese)
@@ -52,7 +53,7 @@ async function resolveCustomerId(): Promise<string | null> {
     if (!session) return null;
 
     const cookieStore = await cookies();
-    const cidEnc = cookieStore.get("shop_cid")?.value;
+    const cidEnc = cookieStore.get(COOKIE_NAME.shopCustomerId)?.value;
     if (cidEnc) {
       const customerId = decryptToken(cidEnc);
       if (customerId) return customerId;
@@ -135,7 +136,10 @@ export async function ProductRecommendSection() {
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
         {recommended.map((product) => {
-          const price = product.priceRange.minVariantPrice;
+          const price = formatPriceRange(
+            product.priceRange.minVariantPrice,
+            product.priceRange.maxVariantPrice
+          );
 
           return (
             <Link
@@ -156,7 +160,7 @@ export async function ProductRecommendSection() {
                 {product.title}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
-                {formatPrice(price.amount, price.currencyCode)}
+                {price}
               </p>
             </Link>
           );

@@ -1,6 +1,9 @@
 import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 
+import { env } from "@/lib/config";
+import { logger } from "@/lib/log";
+
 /**
  * Verify a Shopify webhook request using HMAC-SHA256 signature.
  *
@@ -57,7 +60,7 @@ export async function validateWebhookRequest(
     };
   }
 
-  const webhookSecret = process.env.SHOPIFY_WEBHOOK_SECRET;
+  const webhookSecret = env("SHOPIFY_WEBHOOK_SECRET");
   if (!webhookSecret) {
     console.error("[Webhook] SHOPIFY_WEBHOOK_SECRET is not configured");
     return {
@@ -128,7 +131,13 @@ export async function validateWebhookRequest(
   let payload: unknown;
   try {
     payload = JSON.parse(rawBody);
-  } catch {
+  } catch (err) {
+    /* HMAC は通っている = Shopify からの正規の配信なのに本文が読めない。400 を返すと
+       その通知 (注文・定期便の状態変化) は落ちるので、握り潰さずに残す。 */
+    logger.error("shopify.webhook.payload-unparsable", err, {
+      topic,
+      webhookId,
+    });
     return {
       ok: false,
       response: NextResponse.json(

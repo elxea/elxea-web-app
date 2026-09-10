@@ -15,7 +15,7 @@
       "figma_name": "Header (Module)",
       "code_path": "components/layout/header.tsx",
       "kind": "module",
-      "notes": "共通 chrome。AudioToggle/auth-status/language-switcher を内包。"
+      "notes": "共通 chrome。auth-status/language-switcher を内包 (BGM トグルは 2026-08-25 に撤去)。"
     },
     {
       "figma_node_id": "5662:49",
@@ -23,13 +23,6 @@
       "code_path": "components/layout/footer.tsx",
       "kind": "module",
       "notes": "共通 chrome。"
-    },
-    {
-      "figma_node_id": "6820:120",
-      "figma_name": "AudioToggle",
-      "code_path": "components/audio/audio-toggle.tsx",
-      "kind": "ds-component",
-      "notes": "Figma 上は Header 5653:29 内。コードは独立ファイル。"
     },
     {
       "figma_node_id": "6821:124",
@@ -736,7 +729,7 @@
       "figma_name": "開閉UI / R1: SPメニュー展開 — SP 375",
       "code_path": "components/layout/header.tsx",
       "kind": "module",
-      "notes": "SP ハンバーガー展開時の全幅オーバーレイ (Sheet)。ヘッダー56 / Nav行56 / 検索(下線2px) / アカウント導線の4ブロック。AudioToggle は Figma 非掲載だが機能維持のため末尾に残す (意図的差分)。"
+      "notes": "SP ハンバーガー展開時の全幅オーバーレイ (Sheet)。ヘッダー56 / Nav行56 / 検索(下線2px) / アカウント導線の4ブロック。BGM トグルは 2026-08-25 に撤去 (Setaka 指示)。"
     },
     {
       "figma_node_id": "8079:3748",
@@ -939,7 +932,7 @@
       "figma_name": "マイページ (トップ) / R2: 確定版",
       "code_path": "app/[locale]/account/page.tsx",
       "kind": "module",
-      "notes": "【R2: 確定版】マイページの section。PC 8095:733 / SP 8095:792。7 ブロック (TitleBlock / GreetingBand / これから / 続き / これまで / お支払い方法 / OpsBand) を組む。部品は components/account/account-parts.tsx。"
+      "notes": "【R2: 確定版】マイページの section。PC 8095:733 / SP 8095:792。8 ブロック (TitleBlock / GreetingBand / これから / お気に入り / これまで / お支払い方法 / LINE連携 / OpsBand) を組む。部品は components/account/account-parts.tsx。F16: 連携・ログインの導線はこの画面に 1 本だけ (LINE連携ブロック)。使えない項目の AccountLockedCard は理由だけを出し行動リンクを持たない (以前は Shopify が要る 3 項目それぞれが同じ導線を持ち、末尾の LINE連携と合わせて 1 画面に 4 本並んでいた)。"
     },
     {
       "figma_node_id": "8095:735",

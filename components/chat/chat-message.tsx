@@ -2,6 +2,7 @@
 
 import { type UIMessage } from "ai";
 import { cn } from "@/lib/utils";
+import { env } from "@/lib/config";
 import { useCallback, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { useChatContext } from "./chat-provider";
@@ -95,9 +96,8 @@ function getExistingFeedback(messageId: string): number | null {
 // Feedback API
 // ---------------------------------------------------------------------------
 
-const CHAT_API_URL = (
-  process.env.NEXT_PUBLIC_CHAT_API_URL ?? "http://localhost:8787/api/chat"
-).trim();
+const CHAT_API_URL =
+  env("NEXT_PUBLIC_CHAT_API_URL") ?? "http://localhost:8787/api/chat";
 const CHAT_API_BASE = CHAT_API_URL.replace(/\/api\/chat\/?$/, "");
 
 async function submitFeedback(

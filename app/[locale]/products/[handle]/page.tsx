@@ -1,20 +1,21 @@
 import type { Metadata } from "next";
-import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { decodeHandle } from "@/lib/handle";
 import { getProductByHandle, getProducts } from "@/lib/shopify";
-import { formatPrice } from "@/lib/utils";
+import { formatPrice, formatPriceRange } from "@/lib/utils";
 import { ImageGallery } from "@/components/product/image-gallery";
 import { VariantSelector } from "@/components/product/variant-selector";
-import { AddToCartButton } from "@/components/product/add-to-cart-button";
-import { ProductPurchaseOptions } from "@/components/product/product-purchase-options";
-import { FavoriteButton } from "@/components/product/favorite-button";
+import { VariantPrice } from "@/components/product/variant-price";
+import { VariantPurchase } from "@/components/product/variant-purchase";
+import { VariantSelectionProvider } from "@/components/product/variant-selection-context";
+import { readSelectionFromParams } from "@/components/product/variant-selection-state";
+import { FavoriteToggleButton } from "@/components/favorites/favorite-toggle-button";
 import { TasteMap, type TastePoint } from "@/components/product/taste-map";
 import { Breadcrumb } from "@/components/seo/breadcrumb";
 import { CatalogCard, CatalogGrid } from "@/components/catalog/catalog-list";
 import { ArticleCard } from "@/components/journal/article-card";
-import { getClient } from "@/sanity/lib/client";
+import { sanityFetch } from "@/sanity/lib/fetch";
 import { ARTICLES_BY_PRODUCT_QUERY } from "@/sanity/lib/queries";
 import { ChapterBreak, bodySmClass, captionClass, overlineClass } from "@/components/editorial/rule-list";
 import {
@@ -113,10 +114,13 @@ export default async function ProductPage({
 
   if (!product) notFound();
 
-  const selectedVariant =
-    product.variants.find((v) =>
-      v.selectedOptions.every((opt) => currentSearchParams[opt.name] === opt.value)
-    ) || product.variants[0];
+  /**
+   * 初回表示ぶんの選択だけを URL から読む。**これ以降の選択はサーバを通さない**
+   * (`VariantSelectionProvider` がブラウザ側で保持し、URL は history API で
+   * 後追い同期する)。以前はここで決めた変種を価格・購入ボタンに配っていたので、
+   * サイズやタイプを押すたびにサーバ往復が必要だった = 押しても反応が遅い、の原因。
+   */
+  const initialSelection = readSelectionFromParams(product.options, currentSearchParams);
 
   const mf = product.metafields;
 
@@ -143,10 +147,10 @@ export default async function ProductPage({
    */
   let readingArticles: Parameters<typeof ArticleCard>[0]["article"][] = [];
   try {
-    readingArticles = await getClient().fetch(ARTICLES_BY_PRODUCT_QUERY, {
-      language: locale,
-      productHandle: handle,
-      limit: 3,
+    readingArticles = await sanityFetch({
+      query: ARTICLES_BY_PRODUCT_QUERY,
+      params: { language: locale, productHandle: handle, limit: 3 },
+      cache: { tag: "sanity:articles" },
     });
   } catch {
     readingArticles = [];
@@ -267,59 +271,54 @@ export default async function ProductPage({
             </p>
           ) : null}
 
-          {product.sellingPlanGroups.length === 0 && (
-            <p
-              className={cn(
-                "[font:var(--typography-style-h3)] [letter-spacing:var(--typography-style-h3-tracking)]",
-                "mt-5 text-foreground lg:mt-6"
-              )}
-            >
-              {formatPrice(selectedVariant.price.amount, selectedVariant.price.currencyCode)}
-            </p>
-          )}
-
-          <hr className="mt-5 border-border lg:mt-6" />
-
-          <div className="mt-5 flex flex-col gap-6 lg:mt-6">
-            <Suspense fallback={null}>
-              <VariantSelector options={product.options} variants={product.variants} />
-            </Suspense>
-
-            {product.sellingPlanGroups.length > 0 ? (
-              <ProductPurchaseOptions
-                merchandiseId={selectedVariant.id}
-                availableForSale={selectedVariant.availableForSale}
-                sellingPlanGroups={product.sellingPlanGroups}
-                sellingPlanAllocations={selectedVariant.sellingPlanAllocations}
-                productName={product.title}
-                price={selectedVariant.price.amount}
-                currencyCode={selectedVariant.price.currencyCode}
-                subscriptionOnly
-              />
-            ) : (
-              <AddToCartButton
-                merchandiseId={selectedVariant.id}
-                availableForSale={selectedVariant.availableForSale}
-                productName={product.title}
-                price={selectedVariant.price.amount}
-                currencyCode={selectedVariant.price.currencyCode}
+          {/* 選択 (サイズ / タイプ / 種類) は押した瞬間にブラウザ側で確定する。
+              価格・購入導線も同じ入れ物から読むので、枠と価格が同時に変わる。
+              Provider 自体は DOM を出さないので、見た目の構造は変わらない。 */}
+          <VariantSelectionProvider
+            options={product.options}
+            variants={product.variants}
+            initialSelection={initialSelection}
+          >
+            {product.sellingPlanGroups.length === 0 && (
+              <VariantPrice
+                className={cn(
+                  "[font:var(--typography-style-h3)] [letter-spacing:var(--typography-style-h3-tracking)]",
+                  "mt-5 text-foreground lg:mt-6"
+                )}
               />
             )}
 
-            <FavoriteButton
-              productHandle={product.handle}
-              productTitle={product.title}
-              productImageUrl={product.featuredImage?.url ?? null}
-              addLabel={t("addToFavorites")}
-              removeLabel={t("removeFromFavorites")}
-              addedMessage={t("addedToFavorites")}
-              removedMessage={t("removedFromFavorites")}
-              errorMessage={t("favoriteError")}
-              loginRequiredMessage={t("loginRequiredForFavorite")}
-              variant="text"
-              className="w-full"
-            />
-          </div>
+            <hr className="mt-5 border-border lg:mt-6" />
+
+            <div className="mt-5 flex flex-col gap-6 lg:mt-6">
+              <VariantSelector options={product.options} />
+
+              <VariantPurchase
+                sellingPlanGroups={product.sellingPlanGroups}
+                productName={product.title}
+              />
+
+              {/* 保存トグルは商品・読みもの・人で 1 実装 (D-12)。見た目だけ
+                  `appearance` で選ぶ (ここは購入カラムの outline 小ボタン)。 */}
+              <FavoriteToggleButton
+                kind="product"
+                targetId={product.handle}
+                title={product.title}
+                imageUrl={product.featuredImage?.url ?? null}
+                appearance="product"
+                labels={{
+                  add: t("addToFavorites"),
+                  remove: t("removeFromFavorites"),
+                  saved: t("removeFromFavorites"),
+                  added: t("addedToFavorites"),
+                  removed: t("removedFromFavorites"),
+                  error: t("favoriteError"),
+                  loginRequiredMessage: t("loginRequiredForFavorite"),
+                }}
+                className="w-full"
+              />
+            </div>
+          </VariantSelectionProvider>
 
           <hr className="mt-5 border-border lg:mt-6" />
 
@@ -421,9 +420,9 @@ export default async function ProductPage({
                   imageAlt={p.title}
                   overline={p.vendor}
                   title={p.title}
-                  meta={formatPrice(
-                    p.priceRange.minVariantPrice.amount,
-                    p.priceRange.minVariantPrice.currencyCode
+                  meta={formatPriceRange(
+                    p.priceRange.minVariantPrice,
+                    p.priceRange.maxVariantPrice
                   )}
                   /* Figma は SP 2 枚 / PC 3 枚 (8057:1790 / 8056:1613)。 */
                   className={i === 2 ? "hidden lg:flex" : undefined}

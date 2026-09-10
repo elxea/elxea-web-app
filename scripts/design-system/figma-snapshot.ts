@@ -1,8 +1,8 @@
 /**
  * figma-snapshot.ts  (package.json: `snapshot:figma`)
  *
- * 経済化施策② の取得側。Proposals ページの @/<route> section subtree を Figma REST
- * API で取得し、決定論的に正規化した baseline snapshot を repo 内に書き出す。
+ * 経済化施策② の取得側。「<領域> / Layouts」ページ群の凍結 section (【R2: 確定版】/【採用:】、
+ * route は frozen-sections.json) の subtree を Figma REST API で取得し、決定論的に正規化した baseline snapshot を repo 内に書き出す。
  * このファイルを git に commit すると次回 diff の基準 (baseline) になる。
  *
  * ── これは検証の置換ではない ───────────────────────────────────────────────
@@ -62,15 +62,15 @@ async function main() {
 
   console.log(`figma-snapshot: wrote ${outPath}`);
   console.log(
-    `  file: ${snap.file_name} / page: ${snap.meta.page.name} (last modified ${snap.meta.file_last_modified})`
+    `  file: ${snap.file_name} / pages: ${snap.meta.pages.map((p) => p.name).join(", ")} (last modified ${snap.meta.file_last_modified})`
   );
   console.log(
-    `  routes: ${snap.counts.routes}, nodes: ${snap.counts.nodes}, excluded sections (no @/route): ${snap.counts.excluded_sections}`
+    `  routes: ${snap.counts.routes}, nodes: ${snap.counts.nodes}, excluded sections (not in frozen-sections.json): ${snap.counts.excluded_sections}`
   );
   if (snap.excluded.sections_without_route.length > 0) {
     console.log(`  excluded (reported, not silently dropped):`);
     for (const s of snap.excluded.sections_without_route) {
-      console.log(`    - ${s.id} ${JSON.stringify(s.name)}`);
+      console.log(`    - ${s.id} ${JSON.stringify(s.name)} (${s.reason})`);
     }
   }
   console.log(

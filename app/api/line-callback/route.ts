@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { getBaseUrl, getRequestOrigin } from "@/lib/base-url";
+import { env, isProduction } from "@/lib/config";
 import { encryptToken } from "@/lib/shopify/customer";
 import {
   clearFlowCookie,
@@ -8,6 +9,23 @@ import {
   isSecure,
   resolveCookieDomain,
 } from "@/lib/auth/cookies";
+import {
+  AUTO_LOGIN_FAILED_PARAM,
+  AUTO_LOGIN_FAILED_VALUE,
+} from "@/lib/line/auto-login";
+import { logger } from "@/lib/log";
+import { verifyLineIdToken } from "@/lib/line/verify-liff-token";
+import { lineApiBaseUrl } from "@/lib/line/endpoints";
+import {
+  resolveLoginChannelId,
+  resolveLoginChannelSecret,
+} from "@/lib/line/login-channel";
+import {
+  classifyTokenExchangeError,
+  reportMisconfiguredChannel,
+} from "@/lib/line/token-error";
+import { COOKIE_NAME } from "@/lib/auth/cookie-names";
+import { resolveChatSession, writeChatSessionCookie } from "@/lib/chat/session-server";
 
 /**
  * LINE Login OAuth 2.0 callback endpoint.
@@ -21,18 +39,6 @@ import {
 /**
  * I4: Resolve locale from cookie or accept-language header, defaulting to "ja".
  */
-/**
- * Base for LINE's API endpoints.
- *
- * Env-overridable for the same reason `SHOPIFY_CUSTOMER_ACCOUNT_*_URL` already
- * is: these calls are made server-side, so a browser-level test harness cannot
- * intercept them, and without an override there is no way to drive this route's
- * SUCCESS path in an end-to-end test. That gap is not hypothetical — it is why a
- * change that destroyed the session cookies this route issues passed a full green
- * suite. Unset (production, and every normal run) it is the real LINE host.
- */
-const LINE_API_BASE = process.env.LINE_API_BASE_URL || "https://api.line.me";
-
 function resolveLocale(request: NextRequest): string {
   // Check NEXT_LOCALE cookie first (set by next-intl)
   const localeCookie = request.cookies.get("NEXT_LOCALE")?.value;
@@ -66,28 +72,6 @@ export async function GET(request: NextRequest) {
   const error = searchParams.get("error");
   const locale = resolveLocale(request);
 
-  // Handle LINE auth errors
-  if (error) {
-    console.error("[line-callback] LINE auth error:", error);
-    return NextResponse.redirect(new URL(`/${locale}/login?error=LineAuthFailed`, requestOrigin));
-  }
-
-  if (!code || !state) {
-    return NextResponse.redirect(new URL(`/${locale}/login?error=MissingParams`, requestOrigin));
-  }
-
-  // Verify state (CSRF protection)
-  const cookieStore = await cookies();
-  const savedState = cookieStore.get("line_oauth_state")?.value;
-
-  if (!savedState || savedState !== state) {
-    console.error("[line-callback] State mismatch");
-    return NextResponse.redirect(new URL(`/${locale}/login?error=StateMismatch`, requestOrigin));
-  }
-
-  const baseUrl = getBaseUrl(request);
-  const stateDomain = resolveCookieDomain(request);
-
   /* Expire the one-shot state cookie at BOTH scopes, on whatever response we end
    * up returning.
    *
@@ -100,15 +84,76 @@ export async function GET(request: NextRequest) {
    * from the request, which is a different input from the one used at issue time;
    * that mismatch is what made the delete a silent no-op.
    *
-   * Applied at every exit after the state check, so a failed exchange does not
-   * strand a state cookie that a later attempt would compare against. */
+   * ## なぜ handler の先頭で定義するのか (2026-08-25 に塞いだ穴)
+   *
+   * 以前これは state 照合のあとで定義されており、その結果 **`if (error)` の枝だけが
+   * 掃除を通らなかった**。LINE 側でユーザーが「キャンセル」を押すと、この route は
+   * `?error=...` で呼ばれてそのまま login へ戻す — `line_oauth_state` と
+   * `line_oauth_nonce` を残したまま。使い捨てのはずの値が自然失効 (10 分) まで
+   * ブラウザに残り、次の往復がその古い値と突き合わせられる状態が生まれていた。
+   * 「往復が終わったら必ず落とす」を守れる唯一の書き方は、**掃除の定義を、途中で
+   * return しうるどの分岐よりも前に置く**こと。 */
   const clearState = <T extends NextResponse>(res: T): T => {
-    clearFlowCookie(res, "line_oauth_state");
+    clearFlowCookie(res, COOKIE_NAME.lineOauthState);
+    /* nonce も同じ往復の使い捨て値。state だけ消して nonce を残すと、次の試行が
+     * 前回の nonce と突き合わせられる状態が生まれる。必ず一緒に落とす。 */
+    clearFlowCookie(res, COOKIE_NAME.lineOauthNonce);
     return res;
   };
 
-  const channelId = process.env.AUTH_LINE_ID;
-  const channelSecret = process.env.AUTH_LINE_SECRET;
+  // Handle LINE auth errors
+  if (error) {
+    console.error("[line-callback] LINE auth error:", error);
+    /* この往復はここで終わり。使い捨ての state / nonce を残さない。 */
+    return clearState(
+      NextResponse.redirect(new URL(`/${locale}/login?error=LineAuthFailed`, requestOrigin)),
+    );
+  }
+
+  if (!code || !state) {
+    return NextResponse.redirect(new URL(`/${locale}/login?error=MissingParams`, requestOrigin));
+  }
+
+  // Verify state (CSRF protection)
+  const cookieStore = await cookies();
+  const savedState = cookieStore.get(COOKIE_NAME.lineOauthState)?.value;
+
+  if (!savedState || savedState !== state) {
+    /* A mismatch has two possible causes and LINE says they are indistinguishable:
+     * a CSRF attempt, or an auto login that failed (LINE still redirects here,
+     * but with an unusable `code` and a `state` that does not match). We keep
+     * treating it as a hard failure — nothing below this point runs — and only
+     * add a hint to the redirect so the login screen can offer a retry with
+     * `disable_auto_login=true`. Without it the user re-enters the same failing
+     * auto login and loops.
+     *
+     * The hint carries no authority: it never relaxes a check, it only changes
+     * which authorize URL the next attempt builds.
+     * https://developers.line.biz/en/docs/line-login/how-to-handle-auto-login-failure/ */
+    console.error("[line-callback] State mismatch");
+    const retryUrl = new URL(`/${locale}/login?error=StateMismatch`, requestOrigin);
+    retryUrl.searchParams.set(AUTO_LOGIN_FAILED_PARAM, AUTO_LOGIN_FAILED_VALUE);
+    /* 使い捨ての state / nonce をここでも落とす。
+     *
+     * ここだけ `clearState` を通っていなかった。他の失敗分岐（`error` / 未設定 /
+     * token 交換失敗）は全部落としているのに、この分岐だけが**照合に失敗した
+     * state cookie を最大 10 分生かしたまま**返していた。次の試行は
+     * `/api/line-login/init` が上書きするので実害は出にくいが、「照合に落ちた
+     * 値を消さない」は CSRF 対策の一部を無効化しうるうえ、分岐ごとに後始末が
+     * 違うこと自体が次の読み手を誤らせる。 */
+    return clearState(NextResponse.redirect(retryUrl));
+  }
+
+  const baseUrl = getBaseUrl(request);
+  const stateDomain = resolveCookieDomain(request);
+
+  /* 生の `process.env` を読まない。`vercel env add` に標準入力で値を流し込むと
+     末尾の改行まで保存され、Channel Secret なら「32 文字 + 見えない 1 文字」に
+     なる — ダッシュボードでは正しく見え、LINE の `400 invalid_client` でしか
+     気づけない。連携側は 2026-08-22 にこれで壊れて trim 済みだったが、ログイン側
+     だけ生読みが残っていた。`lib/line/login-channel.ts` の doc を読むこと。 */
+  const channelId = resolveLoginChannelId();
+  const channelSecret = resolveLoginChannelSecret();
 
   if (!channelId || !channelSecret) {
     return clearState(NextResponse.redirect(new URL(`/${locale}/login?error=NotConfigured`, requestOrigin)));
@@ -116,7 +161,7 @@ export async function GET(request: NextRequest) {
 
   try {
     // Exchange code for tokens
-    const tokenRes = await fetch(`${LINE_API_BASE}/oauth2/v2.1/token`, {
+    const tokenRes = await fetch(`${lineApiBaseUrl()}/oauth2/v2.1/token`, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
@@ -131,13 +176,38 @@ export async function GET(request: NextRequest) {
     if (!tokenRes.ok) {
       const err = await tokenRes.text();
       console.error("[line-callback] Token exchange failed:", err);
+
+      /* 「もう一度お試しください」と言ってよい失敗と、言ってはいけない失敗を分ける。
+       *
+       * LINE は token 交換の失敗をほぼ全て 400 に畳むが、`invalid_client` だけは
+       * 意味が違う: **こちらのチャネル設定が壊れている**ので、何度やり直しても
+       * 必ず同じところで落ちる。2026-08-22 / 2026-08-25 の本番障害はどちらもこれで、
+       * 画面はその間ずっと「もう一度お試しください」と案内し続けた。直らないものを
+       * 直るかのように見せて、利用者に無意味な再試行をさせていた。
+       *
+       * 分けたうえで Sentry に即時で上げる。ログだけだと、このプロジェクトの
+       * Runtime Logs 保持 (1 時間) を越えた区間は永久に消える。 */
+      const { kind, code } = classifyTokenExchangeError(tokenRes.status, err);
+      if (kind === "misconfigured-channel") {
+        reportMisconfiguredChannel({
+          source: "line-callback",
+          channel: "login",
+          code,
+        });
+        return clearState(
+          NextResponse.redirect(
+            new URL(`/${locale}/login?error=MisconfiguredChannel`, requestOrigin),
+          ),
+        );
+      }
+
       return clearState(NextResponse.redirect(new URL(`/${locale}/login?error=TokenFailed`, requestOrigin)));
     }
 
     const tokens = await tokenRes.json();
 
     // Get user profile
-    const profileRes = await fetch(`${LINE_API_BASE}/v2/profile`, {
+    const profileRes = await fetch(`${lineApiBaseUrl()}/v2/profile`, {
       headers: { Authorization: `Bearer ${tokens.access_token}` },
     });
 
@@ -150,40 +220,77 @@ export async function GET(request: NextRequest) {
     const lineUserId = profile.userId;
     const displayName = profile.displayName;
 
-    // I1: Verify id_token via LINE verify API before extracting claims
-    let email: string | null = null;
-    if (tokens.id_token) {
-      try {
-        const verifyRes = await fetch(`${LINE_API_BASE}/oauth2/v2.1/verify`, {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: new URLSearchParams({
-            id_token: tokens.id_token,
-            client_id: channelId,
-          }),
-        });
-        if (verifyRes.ok) {
-          const verified = await verifyRes.json();
-          email = verified.email || null;
-        } else {
-          console.warn("[line-callback] id_token verification failed:", await verifyRes.text());
-        }
-      } catch {
-        // id_token verification failed, continue without email
-      }
+    /* Verify the id_token, and bind it to THIS authorization request (D11).
+     *
+     * What changed and why it is now fatal:
+     *
+     * The previous shape asked LINE to verify the token, then used the result only
+     * to read `email` — and on any failure it fell through with `email = null` and
+     * carried on logging the user in. That made the verification decorative: a
+     * token that failed every check produced the same session as one that passed.
+     * Worse, nothing checked `nonce` at all, so an id_token minted for a different
+     * authorization request could be presented here and the flow would not notice
+     * (OIDC Core §3.1.3.7 step 11 — the gap the design doc tracks as D11).
+     *
+     * It is now a gate. `verifyLineIdToken` checks signature-equivalent validity
+     * via LINE's verify endpoint plus aud / iss / exp / **nonce** locally, and a
+     * failure aborts the login before any session cookie is written. The cost of
+     * fail-closed here is one retry for a user; the cost of fail-open is a session
+     * established from a token we never established the provenance of.
+     *
+     * A missing `line_oauth_nonce` cookie is a failure, not a reason to skip the
+     * check — anything an attacker can supply, they can also omit. Both init
+     * routes issue the cookie alongside `line_oauth_state`, which has the same
+     * 10-minute lifetime, so the only users who meet this are ones mid-flight
+     * across the deploy; they land on the login screen and start again. */
+    const rejectIdToken = (reason: string) => {
+      console.warn(`[line-callback] id_token rejected: ${reason}`);
+      return clearState(
+        NextResponse.redirect(new URL(`/${locale}/login?error=InvalidIdToken`, requestOrigin)),
+      );
+    };
+
+    const savedNonce = cookieStore.get(COOKIE_NAME.lineOauthNonce)?.value;
+    if (!savedNonce) return rejectIdToken("no nonce cookie for this round trip");
+
+    const verified = await verifyLineIdToken(tokens.id_token, channelId, {
+      expectedNonce: savedNonce,
+    });
+    if (!verified.ok) return rejectIdToken(verified.reason);
+
+    /* Cross-check the two sources of "who is this". `lineUserId` came from the
+     * profile API (authenticated by the access token); `sub` came from the
+     * id_token we just verified. They describe the same LINE user and must agree.
+     * They are separate values from separate calls, so a disagreement means one of
+     * the two responses does not belong to this exchange — which is precisely the
+     * confusion an attacker would need to engineer. Cheap check, and it fails
+     * closed. */
+    if (lineUserId !== verified.payload.sub) {
+      return rejectIdToken("profile userId does not match id_token sub");
     }
+
+    const email: string | null = verified.email;
 
     // Link LINE userId to cx-agent identity
     const chatApiBase = (
-      process.env.NEXT_PUBLIC_CHAT_API_URL ?? "http://localhost:8787/api/chat"
+      env("NEXT_PUBLIC_CHAT_API_URL") ?? "http://localhost:8787/api/chat"
     ).replace(/\/api\/chat\/?$/, "");
 
-    const chatSessionId = cookieStore.get("chat_session_id")?.value;
+    /* ## ここが恒久的な乗っ取りの入口だった (P1)
+     *
+     * 以前は `chat_session_id` — **ブラウザの JS が自分で書いた cookie** — を
+     * そのまま `link-line` に渡していた。つまり他人の会話 ID を自分の cookie に
+     * 入れて LINE ログインするだけで、他人の匿名会話を自分の LINE アカウントに
+     * **恒久的に**結び付けられた。本人は自分の会話から締め出される。
+     *
+     * `resolveChatSession()` はサーバが署名した `chat_sid` しか受け付けないので、
+     * 「他人の会話 ID を知っている」ことは何の根拠にもならなくなる。 */
+    const chatSession = await resolveChatSession();
 
     // C1: Include X-API-Key for identity linking. In production, never call the worker without it
     // (avoids silently sending unauthenticated requests).
-    const syncApiSecret = process.env.SYNC_API_SECRET;
-    const isProd = process.env.NODE_ENV === "production";
+    const syncApiSecret = env("SYNC_API_SECRET");
+    const isProd = isProduction();
     const shouldLinkIdentity = !isProd || Boolean(syncApiSecret);
 
     if (isProd && !syncApiSecret) {
@@ -205,12 +312,20 @@ export async function GET(request: NextRequest) {
             line_user_id: lineUserId,
             email,
             display_name: displayName,
-            session_id: chatSessionId ?? null,
+            session_id: chatSession.sessionId,
+            /* 署名は別フィールド。cx-agent は未署名の会話 ID を identity として
+               扱わないので、鍵が無い環境では黙って匿名側に落ちる (fail-closed)。 */
+            session_proof: chatSession.proof,
           }),
         });
       } catch (e) {
-        console.error("[line-callback] Identity link failed:", e);
         // Don't block login on link failure
+        /* ログインは通るが連携は成立していない。無音にすると「LINE でログイン
+           できたのに購入履歴が出ない」だけが顧客側に残る。 */
+        logger.error("api.line-callback.identity-link-failed", e, {
+          route: "/api/line-callback",
+          operation: "identity/link-line",
+        });
       }
     }
 
@@ -221,6 +336,11 @@ export async function GET(request: NextRequest) {
 
     const response = NextResponse.redirect(new URL(`/${locale}/login/complete?linked=true`, requestOrigin));
 
+    /* この往復で会話 ID を発行したなら、その ID をブラウザにも渡しておく。
+       渡さないと「`link-line` には登録したのに、戻ってきたブラウザは別の会話を
+       始める」というズレが残り、連携直後の履歴が空になる。 */
+    if (chatSession.minted) writeChatSessionCookie(response, chatSession);
+
     /* Scope session cookies to the apex so the user stays logged in whether they
      * browse `elxea.com` or `www.elxea.com`. See the init route for context.
      *
@@ -230,7 +350,7 @@ export async function GET(request: NextRequest) {
      * observable over plain http locally and in Ring 2, where a Secure cookie is
      * simply not stored and the Domain-scoped deletion under test could never be
      * verified. */
-    const lineSessionSecure = isSecure(getCookieSpec("line_session")!);
+    const lineSessionSecure = isSecure(getCookieSpec(COOKIE_NAME.lineSession)!);
     const sharedCookieOpts = {
       ...(stateDomain ? { domain: stateDomain } : {}),
       secure: lineSessionSecure,
@@ -239,7 +359,7 @@ export async function GET(request: NextRequest) {
       path: "/",
     };
 
-    response.cookies.set("line_user", lineUserCookie, {
+    response.cookies.set(COOKIE_NAME.lineUser, lineUserCookie, {
       ...sharedCookieOpts,
       httpOnly: false, // readable by client
     });
@@ -249,7 +369,7 @@ export async function GET(request: NextRequest) {
     // masquerading as a Shopify session. We intentionally DO NOT set
     // `shop_auth` here — that cookie is reserved for genuine Shopify
     // sessions so that identity resolution (auth-guard) stays unambiguous.
-    response.cookies.set("line_auth", "1", {
+    response.cookies.set(COOKIE_NAME.lineAuth, "1", {
       ...sharedCookieOpts,
       httpOnly: false,
     });
@@ -258,14 +378,14 @@ export async function GET(request: NextRequest) {
     // `userKey = "line:" + lineUserId` for Firestore subcollection lookups,
     // and by the Shopify OAuth callback to merge LINE-only data into the
     // Shopify user key after account linking.
-    response.cookies.set("line_uid", encryptToken(lineUserId), {
+    response.cookies.set(COOKIE_NAME.lineUid, encryptToken(lineUserId), {
       ...sharedCookieOpts,
       httpOnly: true,
     });
 
     // P1-fix: Set line_session=1 (httpOnly) so middleware can recognize LINE-authenticated users
     // for /account route protection without requiring Shopify tokens.
-    response.cookies.set("line_session", "1", {
+    response.cookies.set(COOKIE_NAME.lineSession, "1", {
       ...sharedCookieOpts,
       httpOnly: true,
     });
@@ -273,7 +393,9 @@ export async function GET(request: NextRequest) {
     // Redirect to login complete page
     return clearState(response);
   } catch (err) {
-    console.error("[line-callback] Unexpected error:", err);
+    logger.error("api.line-callback.callback-failed", err, {
+      route: "/api/line-callback",
+    });
     return clearState(NextResponse.redirect(new URL(`/${locale}/login?error=Unexpected`, requestOrigin)));
   }
 }

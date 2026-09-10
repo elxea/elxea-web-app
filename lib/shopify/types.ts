@@ -139,6 +139,13 @@ export type CartItem = {
   };
   cost: {
     totalAmount: Money;
+    /**
+     * 1 個あたりの実額。**定期便プランの調整後**の値。
+     *
+     * `merchandise.price` はプラン調整前の定価なので、行合計を数量から引き直す
+     * ときの基準にはこちらを使う (`components/cart/cart-money.ts`)。
+     */
+    amountPerQuantity: Money;
   };
   sellingPlanAllocation: {
     sellingPlan: { id: string; name: string };

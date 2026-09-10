@@ -1,0 +1,442 @@
+{
+  "$comment": [
+    "site-slots.manifest.json — このサイトが持つ画像枠の宣言 (SoT / 単一正本)。",
+    "",
+    "【この 1 ファイルだけを書き換える】",
+    "ページを足す・レイアウトを変えて写真枠が増減したら、編集するのはここだけ。",
+    "asset-hub はこのファイルを URL で読み、載っている枠を『空き枠』として出す。",
+    "asset-hub 側に枠定義を書かない (向きは サイトが宣言 → asset-hub が読む)。",
+    "",
+    "【編集したら必ず】",
+    "  pnpm generate:site-slots   ... lib/site-slots.generated.ts (id の union 型) を作り直す",
+    "  pnpm check:site-slots      ... manifest とコードの突き合わせ (build の前段でも走る)",
+    "生成物を作り直さないと build が落ちる。落ちること自体がガード。",
+    "",
+    "【version は「スキーマの版」であって「中身の版」ではない (2026-09-01 訂正)】",
+    "枠を足す・消す・比率を変えるだけでは version を上げない。据え置きが正しい。",
+    "上げてよいのは『この JSON の書き方そのもの』を変えたとき (項目の追加・意味の変更) だけ。",
+    "",
+    "ここには以前『slots に 1 件でも変更を入れたら version を +1 する』と書いてあったが、",
+    "それに従うと本番が壊れる。読み手である asset-hub は version を **スキーマ版** として",
+    "扱い、自分が理解できる上限 (SUPPORTED_MANIFEST_VERSION) を超えた version の宣言を",
+    "『読めないファイル』として丸ごと捨てる (lib/site-slot-registry.ts)。つまり中身を変えた",
+    "だけで version を上げると、枠が増えるどころか **全枠が消える**。",
+    "",
+    "中身が変わったことは version ではなく **指紋** (manifestFingerprint) で検出される。",
+    "指紋は全枠の id・比率・fit・required・order から作られるので、version を据え置いても",
+    "『枠が増えた/減った/比率が変わった』は asset-hub 側で正しく差分に出る。空ファイル",
+    "ガード (枠 0 件 / 前回の 50% 未満 / version の逆行) もそのまま働く。",
+    "",
+    "version を上げるときは、**先に asset-hub の SUPPORTED_MANIFEST_VERSION を上げて",
+    "デプロイしてから** こちらを上げる。順番を逆にすると、その間ずっと枠が 0 件になる。",
+    "",
+    "【比率 (surfaces) の決め方】",
+    "surfaces は『その枠が実際に画面に出る場所』を実測で書く。1 枠が複数の見え方を",
+    "持つ (SP と PC で比率が違う等) 場合は全部並べる。ratio は表示上の縦横比、",
+    "fit は収め方 (cover = はみ出しを切る / contain = 切らずに収める・余白が付く)。",
+    "『チャネルに 1 つの比率』ではない — 同じ写真が場所ごとに違う切られ方をするため。",
+    "",
+    "【media (面の出し分け条件)】",
+    "media はその面が選ばれる CSS メディア条件で、<picture> の <source media> に",
+    "そのまま出る。省略した面が『既定の面』= どの条件にも当たらないときに出る面で、",
+    "枠ごとにちょうど 1 件必要 (check:site-slots が強制)。既定は狭い方 (SP) に置く。",
+    "asset-hub は surface の id / ratio / fit しか見ず未知キーを無視するので、",
+    "media を足しても切り抜き・指紋は変わらない = version 規約の対象外。",
+    "",
+    "【validFrom / validTo (任意)】",
+    "期間限定 LP・季節ページ用。省略時は常時有効。枠を消すときは slots から削るのでは",
+    "なく validTo を入れて履歴を残すのが既定 (削ると asset-hub 側で割当が孤児になる)。"
+  ],
+  "version": 1,
+  "org": "ELX",
+  "slots": [
+    {
+      "id": "site:top:hero-01",
+      "label": "トップ Hero (KV)",
+      "page": "top",
+      "required": true,
+      "order": 10,
+      "surfaces": [
+        {
+          "id": "sp",
+          "label": "スマホ表示 (幅 1024px 未満)",
+          "ratio": { "width": 5, "height": 4 },
+          "fit": "cover"
+        },
+        {
+          "id": "pc",
+          "label": "PC 表示 (幅 1024px 以上)",
+          "ratio": { "width": 864, "height": 560 },
+          "fit": "cover",
+          "media": "(min-width: 1024px)"
+        }
+      ]
+    },
+    {
+      "id": "site:top:leaf-liquor-01",
+      "label": "トップ「葉と、水色」1 枚目 — 嬉野・釜炒り (丸くよれた茶葉マクロ + 澄んだ黄金色の水色。3 枚は画角・光源・背景・湯呑みを統一した同一シリーズで)",
+      "page": "top",
+      "required": false,
+      "order": 15,
+      "surfaces": [
+        {
+          "id": "base",
+          "label": "スマホ・PC 共通",
+          "ratio": { "width": 4, "height": 3 },
+          "fit": "cover"
+        }
+      ]
+    },
+    {
+      "id": "site:top:leaf-liquor-02",
+      "label": "トップ「葉と、水色」2 枚目 — 知覧・浅蒸し (針状に細くよられた茶葉 + 淡い若草色の水色。1 枚目と同一の画角・光・背景で)",
+      "page": "top",
+      "required": false,
+      "order": 16,
+      "surfaces": [
+        {
+          "id": "base",
+          "label": "スマホ・PC 共通",
+          "ratio": { "width": 4, "height": 3 },
+          "fit": "cover"
+        }
+      ]
+    },
+    {
+      "id": "site:top:leaf-liquor-03",
+      "label": "トップ「葉と、水色」3 枚目 — 川根・中蒸し (細かくくだけた茶葉 + とろりと濃い緑の水色。1・2 枚目と同一条件で)",
+      "page": "top",
+      "required": false,
+      "order": 17,
+      "surfaces": [
+        {
+          "id": "base",
+          "label": "スマホ・PC 共通",
+          "ratio": { "width": 4, "height": 3 },
+          "fit": "cover"
+        }
+      ]
+    },
+    {
+      "id": "site:top:philosophy-01",
+      "label": "トップ「OUR PHILOSOPHY」帯の背景写真",
+      "page": "top",
+      "required": false,
+      "order": 20,
+      "surfaces": [
+        {
+          "id": "sp",
+          "label": "スマホ表示 (幅 1024px 未満)",
+          "ratio": { "width": 4, "height": 5 },
+          "fit": "cover"
+        },
+        {
+          "id": "pc",
+          "label": "PC 表示 (幅 1024px 以上)",
+          "ratio": { "width": 3, "height": 1 },
+          "fit": "cover",
+          "media": "(min-width: 1024px)"
+        }
+      ]
+    },
+    {
+      "id": "site:top:overview-01",
+      "label": "トップ「elxea でできること」1 枚目 (TEA)",
+      "page": "top",
+      "required": false,
+      "order": 30,
+      "surfaces": [
+        {
+          "id": "base",
+          "label": "スマホ・PC 共通",
+          "ratio": { "width": 3, "height": 2 },
+          "fit": "cover"
+        }
+      ]
+    },
+    {
+      "id": "site:top:overview-02",
+      "label": "トップ「elxea でできること」2 枚目 (JOURNAL)",
+      "page": "top",
+      "required": false,
+      "order": 40,
+      "surfaces": [
+        {
+          "id": "base",
+          "label": "スマホ・PC 共通",
+          "ratio": { "width": 3, "height": 2 },
+          "fit": "cover"
+        }
+      ]
+    },
+    {
+      "id": "site:top:overview-03",
+      "label": "トップ「elxea でできること」3 枚目 (EVENT)",
+      "page": "top",
+      "required": false,
+      "order": 50,
+      "surfaces": [
+        {
+          "id": "base",
+          "label": "スマホ・PC 共通",
+          "ratio": { "width": 3, "height": 2 },
+          "fit": "cover"
+        }
+      ]
+    },
+    {
+      "id": "site:top:overview-04",
+      "label": "トップ「elxea でできること」4 枚目 (ROJI)",
+      "page": "top",
+      "required": false,
+      "order": 60,
+      "surfaces": [
+        {
+          "id": "base",
+          "label": "スマホ・PC 共通",
+          "ratio": { "width": 3, "height": 2 },
+          "fit": "cover"
+        }
+      ]
+    },
+    {
+      "id": "site:top:subscription-item-01",
+      "label": "トップ 定期便 4 項目 1 枚目 (茶葉 3 種)",
+      "page": "top",
+      "required": false,
+      "order": 70,
+      "surfaces": [
+        {
+          "id": "base",
+          "label": "スマホ・PC 共通",
+          "ratio": { "width": 3, "height": 2 },
+          "fit": "cover"
+        }
+      ]
+    },
+    {
+      "id": "site:top:subscription-item-02",
+      "label": "トップ 定期便 4 項目 2 枚目 (淹れ方の栞)",
+      "page": "top",
+      "required": false,
+      "order": 80,
+      "surfaces": [
+        {
+          "id": "base",
+          "label": "スマホ・PC 共通",
+          "ratio": { "width": 3, "height": 2 },
+          "fit": "cover"
+        }
+      ]
+    },
+    {
+      "id": "site:top:subscription-item-03",
+      "label": "トップ 定期便 4 項目 3 枚目 (生産者の便り)",
+      "page": "top",
+      "required": false,
+      "order": 90,
+      "surfaces": [
+        {
+          "id": "base",
+          "label": "スマホ・PC 共通",
+          "ratio": { "width": 3, "height": 2 },
+          "fit": "cover"
+        }
+      ]
+    },
+    {
+      "id": "site:top:subscription-item-04",
+      "label": "トップ 定期便 4 項目 4 枚目 (お届け)",
+      "page": "top",
+      "required": false,
+      "order": 100,
+      "surfaces": [
+        {
+          "id": "base",
+          "label": "スマホ・PC 共通",
+          "ratio": { "width": 3, "height": 2 },
+          "fit": "cover"
+        }
+      ]
+    },
+    {
+      "id": "site:about:us-01",
+      "label": "About「01 わたしたちのこと」本文の隣の写真",
+      "page": "about",
+      "required": false,
+      "order": 110,
+      "surfaces": [
+        {
+          "id": "sp",
+          "label": "スマホ表示 (幅 1024px 未満)",
+          "ratio": { "width": 16, "height": 9 },
+          "fit": "cover"
+        },
+        {
+          "id": "pc",
+          "label": "PC 表示 (幅 1024px 以上)",
+          "ratio": { "width": 10, "height": 7 },
+          "fit": "cover",
+          "media": "(min-width: 1024px)"
+        }
+      ]
+    },
+    {
+      "id": "site:about:origin-01",
+      "label": "About 産地タイル 1 枚目 (左上)",
+      "page": "about",
+      "required": false,
+      "order": 120,
+      "surfaces": [
+        {
+          "id": "base",
+          "label": "スマホ・PC 共通",
+          "ratio": { "width": 19, "height": 14 },
+          "fit": "cover"
+        }
+      ]
+    },
+    {
+      "id": "site:about:origin-02",
+      "label": "About 産地タイル 2 枚目",
+      "page": "about",
+      "required": false,
+      "order": 130,
+      "surfaces": [
+        {
+          "id": "base",
+          "label": "スマホ・PC 共通",
+          "ratio": { "width": 19, "height": 14 },
+          "fit": "cover"
+        }
+      ]
+    },
+    {
+      "id": "site:about:origin-03",
+      "label": "About 産地タイル 3 枚目",
+      "page": "about",
+      "required": false,
+      "order": 140,
+      "surfaces": [
+        {
+          "id": "base",
+          "label": "スマホ・PC 共通",
+          "ratio": { "width": 19, "height": 14 },
+          "fit": "cover"
+        }
+      ]
+    },
+    {
+      "id": "site:about:origin-04",
+      "label": "About 産地タイル 4 枚目",
+      "page": "about",
+      "required": false,
+      "order": 150,
+      "surfaces": [
+        {
+          "id": "base",
+          "label": "スマホ・PC 共通",
+          "ratio": { "width": 19, "height": 14 },
+          "fit": "cover"
+        }
+      ]
+    },
+    {
+      "id": "site:about:philosophy-01",
+      "label": "About「NO RIGHT ANSWER」帯の背景写真",
+      "page": "about",
+      "required": false,
+      "order": 160,
+      "surfaces": [
+        {
+          "id": "sp",
+          "label": "スマホ表示 (幅 1024px 未満)",
+          "ratio": { "width": 4, "height": 5 },
+          "fit": "cover"
+        },
+        {
+          "id": "pc",
+          "label": "PC 表示 (幅 1024px 以上)",
+          "ratio": { "width": 3, "height": 1 },
+          "fit": "cover",
+          "media": "(min-width: 1024px)"
+        }
+      ]
+    },
+    {
+      "id": "site:subscription:first-delivery-01",
+      "label": "定期便LP「初回お届け」3 枚組 1 枚目",
+      "page": "subscription",
+      "required": false,
+      "order": 210,
+      "surfaces": [
+        {
+          "id": "base",
+          "label": "スマホ・PC 共通",
+          "ratio": { "width": 3, "height": 2 },
+          "fit": "cover"
+        }
+      ]
+    },
+    {
+      "id": "site:subscription:first-delivery-02",
+      "label": "定期便LP「初回お届け」3 枚組 2 枚目",
+      "page": "subscription",
+      "required": false,
+      "order": 220,
+      "surfaces": [
+        {
+          "id": "base",
+          "label": "スマホ・PC 共通",
+          "ratio": { "width": 3, "height": 2 },
+          "fit": "cover"
+        }
+      ]
+    },
+    {
+      "id": "site:subscription:first-delivery-03",
+      "label": "定期便LP「初回お届け」3 枚組 3 枚目",
+      "page": "subscription",
+      "required": false,
+      "order": 230,
+      "surfaces": [
+        {
+          "id": "base",
+          "label": "スマホ・PC 共通",
+          "ratio": { "width": 3, "height": 2 },
+          "fit": "cover"
+        }
+      ]
+    },
+    {
+      "id": "site:subscription:story-01",
+      "label": "定期便LP「語り」の正方形写真",
+      "page": "subscription",
+      "required": false,
+      "order": 240,
+      "surfaces": [
+        {
+          "id": "base",
+          "label": "スマホ・PC 共通 (正方形)",
+          "ratio": { "width": 1, "height": 1 },
+          "fit": "cover"
+        }
+      ]
+    },
+    {
+      "id": "site:subscription:next-month-01",
+      "label": "定期便LP「次月のお届け」の写真",
+      "page": "subscription",
+      "required": false,
+      "order": 250,
+      "surfaces": [
+        {
+          "id": "base",
+          "label": "スマホ・PC 共通",
+          "ratio": { "width": 13, "height": 9 },
+          "fit": "cover"
+        }
+      ]
+    }
+  ]
+}

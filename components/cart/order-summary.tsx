@@ -75,16 +75,25 @@ export function OrderSummary({
         {heading}
       </h2>
 
+      {/* `cart-subtotal` / `cart-total` は台帳 (`interaction-inventory.json`) の
+          `observe` から名指しされる。数量を押したとき、**サーバの往復を遮断した
+          状態でも**この 2 つが更新完了することが検査される。ここが古いままだと
+          「2 個になっているのに 1 個ぶんの金額」(網羅表 G2) が再発した合図なので、
+          e2e が落ちる。名前を変えるなら台帳も一緒に直す。 */}
       <div className="flex items-center justify-between gap-4">
         <p className="text-muted-foreground">{subtotalLabel}</p>
-        <p className="text-foreground">{subtotal}</p>
+        <p data-slot="cart-subtotal" className="text-foreground">
+          {subtotal}
+        </p>
       </div>
 
       <Separator />
 
       <div className="flex items-center justify-between gap-4">
         <p className="text-foreground">{totalLabel}</p>
-        <p className={cn(h4Class, "text-foreground")}>{total}</p>
+        <p data-slot="cart-total" className={cn(h4Class, "text-foreground")}>
+          {total}
+        </p>
       </div>
 
       <Button asChild className="h-auto w-full px-6 py-3 leading-normal">

@@ -47,7 +47,19 @@ export function CartContent() {
 
   return (
     <div className="flex flex-col gap-10 lg:flex-row lg:items-start lg:gap-12">
-      <ul data-slot="cart-lines" className="divide-border min-w-0 flex-1 divide-y">
+      {/* 書き込みが走っていることは `aria-busy` で名乗るが、**操作は止めない**。
+          以前はここから `disabled={isPending}` を全行に配っていて、+ を 1 回
+          押すと本番実測 1,905〜2,062ms のあいだ**全行の数量と削除が固まって**
+          いた。数字自体は 16〜30ms で動いていたのに「2 秒かかる」と感じられて
+          いたのはこれで、250ms 間隔の 2 回目は黙って捨てられていた
+          (6 → 7。本番実測 2026-08-26 / Setaka 実機指摘)。
+          いまは押した回数がそのまま入り、往復は `quantity-write-queue` が
+          1 行 1 本にまとめる。 */}
+      <ul
+        data-slot="cart-lines"
+        aria-busy={isPending}
+        className="divide-border min-w-0 flex-1 divide-y"
+      >
         {cart.lines.map((item) => (
           <CartLine
             key={item.id}
@@ -72,12 +84,16 @@ export function CartContent() {
               item.cost.totalAmount.currencyCode,
             )}
             quantity={item.quantity}
-            disabled={isPending}
             quantityLabel={t("quantity")}
             removeLabel={t("remove")}
-            onQuantityChange={(next) =>
-              updateQuantity(item.id, item.merchandise.id, next)
-            }
+            onQuantityChange={async (next) => {
+              /* 数量だけは今まで**失敗しても何も出していなかった**
+                 (`cart-context` の `console.error` 止まり)。外れたときに数字が
+                 黙って戻るのは、追加・削除と約束が揃っていない。言い直す。 */
+              if ((await updateQuantity(item.id, item.merchandise.id, next)) === "failed") {
+                toast.error(t("updateQuantityFailed"));
+              }
+            }}
             onRemove={async () => {
               trackRemoveFromCart({
                 id: item.merchandise.id,
@@ -86,8 +102,19 @@ export function CartContent() {
                 currency: item.merchandise.price.currencyCode,
                 quantity: item.quantity,
               });
-              await removeFromCart(item.id);
+              /* 着地を待たずに知らせる (監査 #15 / 2026-08-25)。
+                 以前は `await removeFromCart(...)` の**後**にトーストを出して
+                 いたので、行が消えたあとの本番実測 4.3 秒は「消えたけれど本当に
+                 消えたのか分からない」無言の時間だった。しかも着地の成否に
+                 関わらず「削除しました」と言い切っていたので、失敗して行が
+                 戻ってきたときに**嘘だけが残る**。
+                 いまは押した瞬間に知らせ、外れたときだけ言い直す
+                 (`AddToCartButton` と同じ約束)。 */
+              const pending = removeFromCart(item.id);
               toast(t("removedFromCart"));
+              if ((await pending) === "failed") {
+                toast.error(t("removeFromCartFailed"));
+              }
             }}
           />
         ))}

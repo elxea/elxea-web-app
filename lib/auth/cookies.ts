@@ -1,5 +1,13 @@
 import type { NextRequest, NextResponse } from "next/server";
 
+import { env, isProduction } from "@/lib/config";
+
+import type { CookieSpec } from "./cookie-names";
+import {
+  COOKIE_NAME,
+  LINE_SESSION_COOKIES,
+  SHOPIFY_SESSION_COOKIES,
+} from "./cookie-names";
 import { normalizeHost } from "./normalize-host";
 
 /**
@@ -95,162 +103,122 @@ export function validateApex(raw: string): string {
 }
 
 /** Canonical apex. Default matches the pre-existing hard-coded production value. */
-export const AUTH_COOKIE_APEX = validateApex(process.env.AUTH_COOKIE_APEX ?? "elxea.com");
+export const AUTH_COOKIE_APEX = validateApex(env("AUTH_COOKIE_APEX"));
 
 /** The one Domain value this application is ever allowed to emit. */
 const SHARED_COOKIE_DOMAIN = `.${AUTH_COOKIE_APEX}`;
 
-// --- registry ---------------------------------------------------------------
+// --- registry (moved) --------------------------------------------------------
 
 /**
- * `host-only` — no Domain attribute; readable only on the exact issuing host.
- * `shared-domain` — Domain-scoped to the apex so `elxea.com` and `www.elxea.com`
- * share one jar. The LINE flow needs this because the init POST can land on
- * either host while the callback always returns to one.
- */
-export type CookieScope = "host-only" | "shared-domain";
-
-/**
- * `prod-only` — `secure` mirrors `NODE_ENV === "production"`. This is what lets
- * the flow be exercised over plain http locally and in Ring 2.
- * `always` — `secure` is unconditionally true.
- */
-export type CookieSecureRule = "prod-only" | "always";
-
-export type CookieGroup =
-  | "shopify-session"
-  | "line-session"
-  | "transient"
-  | "not-auth";
-
-export type CookieSpec = {
-  readonly name: string;
-  readonly group: CookieGroup;
-  readonly scope: CookieScope;
-  readonly secure: CookieSecureRule;
-};
-
-/**
- * Every cookie this application sets, with the scope it is actually issued at.
+ * 名前・グループ・scope・secure 規則の正本は `@sot cookie-name-registry`
+ * (`lib/auth/cookie-names.ts`)。ここは**その表を使って Domain を決め、発行し、
+ * 消す**側で、表そのものは持たない。
  *
- * The scopes are NOT uniform, and that is the crux of the bug this registry
- * closes: a single Domain rule cannot be applied to all of them. Emitting
- * `Domain=.elxea.com` for the Shopify session cookies would fail to clear the
- * host-only ones they are actually issued at, which is a *new* defect — logout
- * that leaves the Shopify session intact.
- */
-export const COOKIE_REGISTRY: readonly CookieSpec[] = [
-  // Shopify session — issued host-only by auth/callback and lib/shopify/auth.
-  { name: "shop_at", group: "shopify-session", scope: "host-only", secure: "prod-only" },
-  { name: "shop_rt", group: "shopify-session", scope: "host-only", secure: "prod-only" },
-  { name: "shop_exp", group: "shopify-session", scope: "host-only", secure: "prod-only" },
-  { name: "shop_it", group: "shopify-session", scope: "host-only", secure: "prod-only" },
-  { name: "shop_cid", group: "shopify-session", scope: "host-only", secure: "prod-only" },
-  { name: "shop_auth", group: "shopify-session", scope: "host-only", secure: "prod-only" },
-
-  // LINE session — issued Domain-scoped by line-callback.
-  { name: "line_user", group: "line-session", scope: "shared-domain", secure: "prod-only" },
-  { name: "line_auth", group: "line-session", scope: "shared-domain", secure: "prod-only" },
-  { name: "line_uid", group: "line-session", scope: "shared-domain", secure: "prod-only" },
-  { name: "line_session", group: "line-session", scope: "shared-domain", secure: "prod-only" },
-
-  // Short-lived flow state.
-  { name: "shop_cv", group: "transient", scope: "host-only", secure: "prod-only" },
-  { name: "shop_state", group: "transient", scope: "host-only", secure: "prod-only" },
-  { name: "shop_nonce", group: "transient", scope: "host-only", secure: "prod-only" },
-  { name: "shop_locale", group: "transient", scope: "host-only", secure: "prod-only" },
-  { name: "shop_return_to", group: "transient", scope: "host-only", secure: "prod-only" },
-  /* Shared-domain for the same reason as the LINE session: the init POST may
-   * land on apex or www, and the callback returns to whichever host is pinned. A
-   * host-only state cookie misses the opposite host and the CSRF check fails —
-   * this was seen in production as "session expired" on login. */
-  /* `secure` is prod-only, not `always`, for the same reason the LINE session
-   * cookies are: a Secure cookie is not stored over plain http, so with `always`
-   * the CSRF state issued by /api/line-login/init never reaches the browser in
-   * any http environment and the callback always fails the state check. That
-   * makes the LINE login flow impossible to exercise outside production —
-   * including in Ring 2, which must run against `next dev` over http. In
-   * production `NODE_ENV === "production"`, so the emitted attribute is
-   * unchanged. */
-  { name: "line_oauth_state", group: "transient", scope: "shared-domain", secure: "prod-only" },
-  /* Name verified against lib/line/account-link.ts:22 — it is `acct_link_tk`,
-   * not the longer form the design assumed. */
-  { name: "acct_link_tk", group: "transient", scope: "host-only", secure: "prod-only" },
-  { name: "chat_session_id", group: "transient", scope: "host-only", secure: "always" },
-
-  // Not auth state; listed so the registry is a complete map of what we set.
-  { name: "site_auth", group: "not-auth", scope: "host-only", secure: "prod-only" },
-  { name: "shopify_cart_id", group: "not-auth", scope: "host-only", secure: "prod-only" },
-  { name: "sidebar_state", group: "not-auth", scope: "host-only", secure: "prod-only" },
-  /* Written from the browser by `buildConsentCookie` (`lib/consent.ts`), not
-   * through this module's helpers. It is listed because the registry is a map of
-   * every cookie we set, not only the ones set here — the scanner in
-   * `__tests__/auth-cookie-registry.test.ts` now follows cookie-builder calls and
-   * would otherwise report it as an unknown name.
-   *
-   * `shared-domain`: `consentCookieDomain` sets a `domain=` attribute.
-   * `prod-only`: `Secure` is added only when the page is served over https. */
-  { name: "cookie_consent", group: "not-auth", scope: "shared-domain", secure: "prod-only" },
-] as const;
-
-/**
- * Cookies set by third-party libraries, where no `set` call exists in our source
- * for a scanner to find.
+ * 切り出した理由はあちらの冒頭に書いてある — 要点は、このファイルは module load 時に
+ * `env("AUTH_COOKIE_APEX")` を読むのでクライアント束から import できず、
+ * 一方で cookie 名はクライアントの画面からも要るため。
  *
- * This list exists so that "unknown cookie name" can be a hard failure. Without
- * it the registry check would have to tolerate anything it did not recognise,
- * which is the same as not checking.
+ * 従来 `@/lib/auth/cookies` から名前を import していた呼び出し側を壊さないよう、
+ * ここで素通しの re-export を置いてある (2 つ目の定義ではない — 実体は 1 つ)。
  */
-export const EXTERNAL_LIBRARY_COOKIES: readonly string[] = [
-  "NEXT_LOCALE", // next-intl
-] as const;
+export type {
+  CookieScope,
+  CookieSecureRule,
+  CookieGroup,
+  CookieSpec,
+} from "./cookie-names";
+export {
+  COOKIE_REGISTRY,
+  EXTERNAL_LIBRARY_COOKIES,
+  COOKIE_NAME,
+  getCookieSpec,
+  cookieNamesInGroup,
+  AUTH_COOKIE_GROUPS,
+  SHOPIFY_SESSION_COOKIES,
+  LINE_SESSION_COOKIES,
+} from "./cookie-names";
 
-/**
- * Named handles for the cookies referenced from code, so call sites read as
- * `COOKIE_NAME.shopAccessToken` rather than repeating a bare string literal.
- *
- * These are `as const` string literals, not computed lookups, so the registry
- * scanner in `__tests__/auth-cookie-registry.test.ts` can still resolve every
- * `cookies.set(...)` argument statically. A scanner that cannot resolve a name
- * has to either guess or ignore, and both defeat the point of the check.
- */
-export const COOKIE_NAME = {
-  shopAccessToken: "shop_at",
-  shopRefreshToken: "shop_rt",
-  shopExpiresAt: "shop_exp",
-  shopIdToken: "shop_it",
-  shopCustomerId: "shop_cid",
-  shopAuthFlag: "shop_auth",
-  lineUser: "line_user",
-  lineAuth: "line_auth",
-  lineUid: "line_uid",
-  lineSession: "line_session",
-  lineOauthState: "line_oauth_state",
-  accountLinkToken: "acct_link_tk",
-} as const;
-
-const BY_NAME = new Map(COOKIE_REGISTRY.map((s) => [s.name, s]));
-
-export function getCookieSpec(name: string): CookieSpec | undefined {
-  return BY_NAME.get(name);
-}
-
-export function cookieNamesInGroup(group: CookieGroup): readonly string[] {
-  return COOKIE_REGISTRY.filter((s) => s.group === group).map((s) => s.name);
-}
-
-/** Names of every cookie that carries authentication state. */
-export const AUTH_COOKIE_GROUPS: readonly CookieGroup[] = [
-  "shopify-session",
-  "line-session",
-] as const;
-
-export const SHOPIFY_SESSION_COOKIES = cookieNamesInGroup("shopify-session");
-export const LINE_SESSION_COOKIES = cookieNamesInGroup("line-session");
 
 /** `secure` for a given cookie, per its registry rule. */
 export function isSecure(spec: CookieSpec): boolean {
-  return spec.secure === "always" || process.env.NODE_ENV === "production";
+  return spec.secure === "always" || isProduction();
+}
+
+/**
+ * Shopify のセッションが「まだ生きているとみなせるか」を、復号せずに見る。
+ *
+ * ## 判定は `shop_rt` ただ 1 つ (as-is D-1)
+ *
+ * 以前ここは 2 か所に分かれていて、どちらも `shop_at`（アクセストークン）を
+ * 要求していた。`shop_at` はアクセストークンの寿命を maxAge に持っていたので
+ * 数時間でブラウザから消える。その瞬間に `/account` の門
+ * (`middleware.ts`) が閉まり、30 日の `shop_rt` を持っている人まで
+ * ログイン画面へ弾かれていた。
+ *
+ * どれだけログインが続くかを決めるのは **リフレッシュトークン**である。
+ * アクセストークンが切れているかどうかは別の話で、それは
+ * `lib/shopify/auth.ts` の `getSession()` が `shop_exp` の中身を見て判断し、
+ * 必要ならリフレッシュする。ここでその 2 つを混ぜない。
+ *
+ * この module は node crypto を読まないので Edge (middleware) から使える。
+ * 判定を持てる唯一の場所なのでここに置く。
+ *
+ * @param has cookie の有無を返す関数（`(name) => request.cookies.has(name)` 等）。
+ *   値を返す関数（`get(name)?.value`）でも動くよう truthy 判定にしてある。
+ */
+export function hasShopifySessionCookies(
+  has: (name: string) => boolean | string | undefined,
+): boolean {
+  return Boolean(has(COOKIE_NAME.shopRefreshToken));
+}
+
+/**
+ * LINE だけでログインしている状態か。`hasShopifySessionCookies` の対。
+ *
+ * ## なぜ 1 行の判定を関数にするのか
+ *
+ * 同じ `line_session` の有無判定が **5 か所**に別々に書かれていたため
+ * (`middleware.ts` / マイページ 2 か所 / 定期便 / ログイン画面)。1 行だから
+ * 揃っているだろう、が成り立たないことは同じファイルの
+ * `hasShopifySessionCookies` が実証している — あれも「1 行だから」2 か所に
+ * 書かれ、片方だけ `shop_at` を要求して門とページの判定が割れた (as-is D-1)。
+ *
+ * 実際 Wave 4 の棚卸しで同じ割れ方がもう 1 件見つかっている:
+ * `app/[locale]/account/page.tsx` は「middleware と同じ条件」と註釈しながら
+ * `shop_at && shop_rt` を要求していて、`shop_at` が寿命で消えた人は
+ * **middleware は通すのにマイページだけログイン画面に落ちていた**。
+ * 註釈は揃っていると言い、コードは揃っていなかった。
+ *
+ * `httpOnly` の `line_session` **だけ**を見る。`line_user` (表示名の入った
+ * 非 httpOnly cookie) を AND 条件に混ぜてはいけない — 表示名が取れたかどうかは
+ * 認証の強さと無関係で、混ぜると cookie 掃除で表示名だけ消えた人が
+ * 「ログインが必要です」に落ちる。
+ *
+ * この module は node crypto を読まないので Edge (middleware) から使える。
+ *
+ * @param has `hasShopifySessionCookies` と同じ。有無でも値でも渡せる。
+ */
+export function hasLineSessionCookies(
+  has: (name: string) => boolean | string | undefined,
+): boolean {
+  return Boolean(has(COOKIE_NAME.lineSession));
+}
+
+/**
+ * 「どの経路で入っているか」の鏡。門 (`middleware.ts`) と画面が同じ 1 回の
+ * 呼び出しで同じ答えを得るための入り口。
+ *
+ * 認証を確定させるものではない (それは実データを得たあとの `AccountAuth`)。
+ * ここが答えるのは **cookie から見て、その画面を描き始めてよいか** だけ。
+ */
+export function readSessionMirror(
+  has: (name: string) => boolean | string | undefined,
+): { shopify: boolean; line: boolean } {
+  return {
+    shopify: hasShopifySessionCookies(has),
+    line: hasLineSessionCookies(has),
+  };
 }
 
 // --- Domain decision --------------------------------------------------------

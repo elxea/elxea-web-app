@@ -1,48 +1,20 @@
 "use client";
 
-import { useSearchParams, useRouter, usePathname } from "next/navigation";
-import type { ProductVariant } from "@/lib/shopify/types";
 import { Button } from "@/components/ui/button";
 
-export function VariantSelector({
-  options,
-  variants,
-}: {
-  options: { id: string; name: string; values: string[] }[];
-  variants: ProductVariant[];
-}) {
-  const searchParams = useSearchParams();
-  const router = useRouter();
-  const pathname = usePathname();
+import { useVariantSelection } from "./variant-selection-context";
+import type { ProductOption } from "./variant-selection-state";
 
-  function handleSelect(name: string, value: string) {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set(name, value);
-    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
-  }
-
-  function isSelected(name: string, value: string) {
-    return searchParams.get(name) === value;
-  }
-
-  function isAvailable(name: string, value: string) {
-    const currentSelections: Record<string, string> = {};
-    options.forEach((opt) => {
-      const selected = searchParams.get(opt.name);
-      if (selected) currentSelections[opt.name] = selected;
-    });
-    currentSelections[name] = value;
-
-    return variants.some(
-      (variant) =>
-        variant.availableForSale &&
-        variant.selectedOptions.every(
-          (opt) =>
-            !currentSelections[opt.name] ||
-            currentSelections[opt.name] === opt.value
-        )
-    );
-  }
+/**
+ * サイズ / タイプ / 種類の選択ボタン。**見た目だけ**を持つ。
+ *
+ * 選択の保持・解決・URL 同期は `VariantSelectionProvider` 側にある。
+ * ここが `useSearchParams` / `useRouter` を触らないことが速さの条件で、
+ * 触った瞬間に「押す → サーバ往復 → やっと枠が付く」に戻る
+ * (`__tests__/variant-selection.test.ts` の契約テストが見張っている)。
+ */
+export function VariantSelector({ options }: { options: ProductOption[] }) {
+  const { select, isSelected, isAvailable } = useVariantSelection();
 
   if (options.length === 1 && options[0].values.length === 1) {
     return null;
@@ -63,7 +35,7 @@ export function VariantSelector({
                   data-slot="variant-option"
                   variant={selected ? "default" : "outline"}
                   size="sm"
-                  onClick={() => handleSelect(option.name, value)}
+                  onClick={() => select(option.name, value)}
                   disabled={!available}
                   aria-pressed={selected}
                   aria-label={`${option.name}: ${value}`}

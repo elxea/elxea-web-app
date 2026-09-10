@@ -46,8 +46,23 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
+/**
+ * `app/sitemap.ts` reaches Shopify and Sanity over the network for its dynamic
+ * entries (both branches are try/caught, so the assertions below hold either
+ * way — but the call still waits on a real round trip). Under Vitest's default
+ * 5s budget that made this block fail intermittently whenever the `storybook`
+ * project's Chromium was booting on the same machine: the whole cost was cold
+ * connection setup, not anything the sitemap does.
+ *
+ * The budget is widened rather than any assertion being weakened — every
+ * expectation is unchanged. The real fix is to stub the two fetches so this
+ * stops depending on wall-clock latency at all; that is a change to what the
+ * test covers, so it is left for its own commit.
+ */
+const NETWORK_TIMEOUT_MS = 30_000;
+
 describe("app/sitemap.ts", () => {
-  it("emits no URL containing whitespace when the env value has a trailing newline", async () => {
+  it("emits no URL containing whitespace when the env value has a trailing newline", { timeout: NETWORK_TIMEOUT_MS }, async () => {
     const { default: sitemap } = await import("@/app/sitemap");
     const entries = await sitemap();
 
@@ -57,7 +72,7 @@ describe("app/sitemap.ts", () => {
     expect(dirty).toEqual([]);
   });
 
-  it("produces parseable absolute URLs on the canonical origin", async () => {
+  it("produces parseable absolute URLs on the canonical origin", { timeout: NETWORK_TIMEOUT_MS }, async () => {
     const { default: sitemap } = await import("@/app/sitemap");
     const entries = await sitemap();
 

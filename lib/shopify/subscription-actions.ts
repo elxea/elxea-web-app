@@ -28,6 +28,17 @@ type ActionResult = { success: boolean; error?: string };
  */
 const NOT_AUTHORIZED = "Subscription not found or not accessible";
 
+/**
+ * 所有者照合そのものが行えなかったときに投げる印。
+ *
+ * **顧客に見える文言は `NOT_AUTHORIZED` と同じ**にしてある (下の catch が必ず
+ * `NOT_AUTHORIZED` を返す) ので、契約 ID の存在を探る手掛かりにはならない。
+ * 分けているのは**サーバー側の記録**のためだけ — 「他人の契約に触ろうとした」と
+ * 「Shopify が落ちていて確かめられなかった」が Sentry で同じ 1 行になっていると、
+ * どちらのアラートも引けなくなる。
+ */
+const OWNERSHIP_UNVERIFIABLE = "Subscription ownership could not be verified";
+
 async function getAccessToken(): Promise<string> {
   const session = await getSession();
   if (!session) throw new Error("Not authenticated");
@@ -58,8 +69,13 @@ async function authorizeContractAccess(contractId: string): Promise<string> {
     throw new Error(NOT_AUTHORIZED);
   }
 
-  const owned = await verifySubscriptionContractOwnership(token, contractId);
-  if (!owned) {
+  /* 3 値で受ける。`ok: false` は「所有していない」ではなく「確かめられなかった」。
+     どちらも操作は通さない (fail-closed は不変) が、記録では区別する。 */
+  const ownership = await verifySubscriptionContractOwnership(token, contractId);
+  if (!ownership.ok) {
+    throw new Error(OWNERSHIP_UNVERIFIABLE);
+  }
+  if (!ownership.data) {
     throw new Error(NOT_AUTHORIZED);
   }
 

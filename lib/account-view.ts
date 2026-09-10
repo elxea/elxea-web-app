@@ -16,6 +16,8 @@
  *   カードを描かず外部リンクだけを残す。権限が付いたらここに取得を足す。
  */
 
+import { type FavoriteInput, type FavoriteKind } from "@/lib/account-favorites";
+
 export type AccountRecordKind = "subscription" | "event" | "order";
 
 /** 「これから」「これまで」に並ぶ 1 枚 (写真なしカード = Figma RecordCard)。 */
@@ -29,12 +31,47 @@ export type AccountRecord = {
   href?: string;
   /** 注文金額など、カード 3 行目に出す値の素材。 */
   amount?: { value: string; currencyCode: string };
+  /**
+   * 注文の入金状態 (注文だけが持つ)。**金額と対で出すために要る**。
+   *
+   * Customer Account API の `totalPrice` は「いま請求されている額」なので、
+   * 全額返金・無効化された注文では 0 になる。金額だけを出すと過去の注文が
+   * すべて「¥0」に見え、買った覚えのある人の信頼を損なう (実測 2026-08-25:
+   * #1027 / #1028 / #1030 はいずれも全額返金済みで ¥0 表示)。
+   * 数字を偽らず、返金済みなら金額の代わりに状態を言う。
+   */
+  status?: AccountOrderStatus;
 };
 
-/** 「続き」に並ぶ 1 枚 (写真つきカード = Figma ExpCard)。 */
+/** カードに出す注文状態。判定できない / 通常の入金済みは `null`。 */
+export type AccountOrderStatus = "refunded" | "voided" | "partiallyRefunded" | null;
+
+/** Shopify の `financialStatus` を、画面に出す状態へ畳む。 */
+export function orderStatusOf(financialStatus: string | null | undefined): AccountOrderStatus {
+  switch ((financialStatus ?? "").toUpperCase()) {
+    case "REFUNDED":
+      return "refunded";
+    case "VOIDED":
+    case "EXPIRED":
+      return "voided";
+    case "PARTIALLY_REFUNDED":
+      return "partiallyRefunded";
+    default:
+      return null;
+  }
+}
+
+/**
+ * 「続き」に並ぶ 1 枚 (写真つきカード = Figma ExpCard)。
+ *
+ * `kind` は種類 (商品 / 読みもの) をそのまま持つ。画面はこれを見てカードの
+ * 種類ラベルを出す — 以前は全部「お気に入り」と書いていたので、並んだカードの
+ * どれが商品でどれが読みものか、押すまで分からなかった (Setaka 指摘 2026-08-25)。
+ * 種類の正本は `lib/account-favorites.ts`。
+ */
 export type AccountMediaItem = {
   id: string;
-  kind: "favorite-article" | "favorite-product";
+  kind: FavoriteKind;
   title: string;
   imageUrl: string | null;
   href?: string;
@@ -46,16 +83,14 @@ export type AccountView = {
   displayName: string | null;
   email: string | null;
   upcoming: AccountRecord[];
-  continueItems: AccountMediaItem[];
   past: AccountRecord[];
   paymentMethod: AccountPaymentMethod | null;
   /** プレビュー用の見本データで描いているか (production では常に false)。 */
   seeded: boolean;
 };
 
-/** 節ごとの最大枚数。Figma の 1 行分 (PC これから 3 / 続き 2 / これまで 3)。 */
+/** 節ごとの最大枚数。Figma の 1 行分 (PC これから 3 / これまで 3)。 */
 export const ACCOUNT_UPCOMING_LIMIT = 3;
-export const ACCOUNT_CONTINUE_LIMIT = 2;
 export const ACCOUNT_PAST_LIMIT = 3;
 
 /* -------------------------------------------------------------------------- */
@@ -72,6 +107,7 @@ export type AccountCustomerInput = {
         id?: string | null;
         name?: string | null;
         processedAt?: string | null;
+        financialStatus?: string | null;
         totalPrice?: { amount?: string | null; currencyCode?: string | null } | null;
       } | null;
     }[];
@@ -93,16 +129,90 @@ export type AccountEventInput = {
   eventDate?: unknown;
 };
 
-export type AccountFavoriteInput = {
-  id?: string;
-  type?: unknown;
-  targetId?: unknown;
-  title?: unknown;
-  imageUrl?: unknown;
-};
+/**
+ * お気に入りの生ドキュメント。形の正本は `lib/account-favorites.ts` の
+ * `FavoriteInput` で、ここは既存の呼び出し側のための別名 (二重定義しない)。
+ */
+export type AccountFavoriteInput = FavoriteInput;
 
 function str(value: unknown): string | null {
   return typeof value === "string" && value.trim() !== "" ? value : null;
+}
+
+/**
+ * 送信専用アドレス (no-reply@…) — **本人のメールではない**。
+ *
+ * LINE だけで入った人にも Shopify 顧客レコードを作る都合で、メール欄に
+ * 送信専用アドレスが入っていることがある。これをそのまま
+ * 「no-reply@elxea.com としてログイン中」と出すと、本人の識別子として
+ * 読めてしまう (実測 2026-08-25)。本人が名乗ったアドレスではないので、
+ * 識別子としては **無い** ものとして扱う。
+ *
+ * 判定はローカル部だけを見る (ドメインは自社とは限らない)。
+ *
+ * ## なぜ「6 語の完全一致」では足りないのか (QA 指摘 2026-08-25)
+ *
+ * 最初の実装は `no-reply` / `noreply` / `no_reply` / `donotreply` /
+ * `do-not-reply` / `do_not_reply` の **6 語との完全一致**だった。これは
+ * 「今この目で見た 1 つの綴り」を書き写しただけで、区切りの流儀 (`no.reply`)・
+ * 連番 (`noreply2`)・タグ (`noreply+line`) のどれか 1 つでも付いた瞬間に
+ * すり抜ける。すり抜けると「no-reply@… としてログイン中」が本人の識別子の
+ * ように出る — つまり **落ち方が静かで、間違った情報を自信満々に出す**。
+ *
+ * そこで綴りを列挙するのをやめ、**正規化してから語で照合する**:
+ *
+ *   1. `+tag` を落とす (配送上は同じ宛先。判定は本体で行う)
+ *   2. 区切り (`.` `-` `_`) を畳む → `no-reply` / `no_reply` / `no.reply` が 1 語に
+ *   3. 末尾の連番を落とす → `noreply2` / `no-reply-01` が 1 語に
+ *
+ * 正規化した語が送信専用の語彙と**完全に一致**したときだけ真にする。前方一致に
+ * しないのは `noreplytea@…` (実在しうる屋号) を巻き込まないため。
+ *
+ * 加えて、**到達しないと規格で決まっているドメイン** (RFC 2606 / RFC 6761 の
+ * 予約 TLD) も本人のアドレスではない。ローカル部が何であっても届かないので、
+ * 語彙に載っているかに関わらず落とす。`example.com` は「予約されたドメイン」で
+ * あって予約 TLD ではないので**対象外** — 手元やテストで人のアドレスとして
+ * 普通に使われており、落とすと本人のメールが消える。
+ */
+const PLACEHOLDER_EMAIL_LOCAL_WORDS = new Set([
+  "noreply",
+  "donotreply",
+  "nonreply",
+  "noemail",
+  "nomail",
+  "mailerdaemon",
+  "postmaster",
+  "bounce",
+  "bounces",
+  "unknown",
+  "none",
+  "null",
+  "placeholder",
+]);
+
+/** 到達しないと規格で決まっている TLD (RFC 2606 / RFC 6761)。 */
+const UNROUTABLE_TLDS = new Set(["invalid", "test", "localhost", "local"]);
+
+/** 区切り・タグ・連番を落として 1 語に畳む。 */
+function canonicalEmailLocalPart(local: string): string {
+  const withoutTag = local.split("+")[0] ?? "";
+  return withoutTag
+    .trim()
+    .toLowerCase()
+    .replace(/[.\-_]/g, "")
+    .replace(/\d+$/, "");
+}
+
+export function isPlaceholderEmail(email: string | null | undefined): boolean {
+  if (!email) return false;
+  const trimmed = email.trim();
+  const at = trimmed.lastIndexOf("@");
+  if (at <= 0) return false;
+
+  const tld = trimmed.slice(at + 1).toLowerCase().split(".").pop() ?? "";
+  if (UNROUTABLE_TLDS.has(tld)) return true;
+
+  return PLACEHOLDER_EMAIL_LOCAL_WORDS.has(canonicalEmailLocalPart(trimmed.slice(0, at)));
 }
 
 /** 日付昇順。日付が無いものは末尾。 */
@@ -164,35 +274,6 @@ export function buildUpcoming({
   return [...fromSubscriptions, ...fromEvents].sort(byDateAsc).slice(0, ACCOUNT_UPCOMING_LIMIT);
 }
 
-/** 「続き」= お気に入り (記事を先、次に商品)。写真が無いものは placeholder に落ちる。 */
-export function buildContinueItems(favorites: AccountFavoriteInput[]): AccountMediaItem[] {
-  const items: AccountMediaItem[] = favorites
-    .map((f, i): AccountMediaItem | null => {
-      const type = str(f.type);
-      const targetId = str(f.targetId);
-      const title = str(f.title);
-      if (title === null || (type !== "article" && type !== "product")) return null;
-      return {
-        id: str(f.id) ?? `favorite-${i}`,
-        kind: (type === "article" ? "favorite-article" : "favorite-product") as
-          | "favorite-article"
-          | "favorite-product",
-        title,
-        imageUrl: str(f.imageUrl),
-        href: targetId
-          ? type === "article"
-            ? `/journal/${targetId}`
-            : `/products/${targetId}`
-          : undefined,
-      };
-    })
-    .filter((f): f is AccountMediaItem => f !== null);
-
-  // 記事を先に (確定版の 1 枚目は読みもの)。同種の順序は入力順 = createdAt 降順のまま。
-  const articles = items.filter((f) => f.kind === "favorite-article");
-  const products = items.filter((f) => f.kind === "favorite-product");
-  return [...articles, ...products].slice(0, ACCOUNT_CONTINUE_LIMIT);
-}
 
 /** 「これまで」= 注文履歴 (新しい順)。 */
 export function buildPast(customer: AccountCustomerInput): AccountRecord[] {
@@ -212,6 +293,7 @@ export function buildPast(customer: AccountCustomerInput): AccountRecord[] {
         date: str(node.processedAt),
         title: name,
         amount: amountValue && currency ? { value: amountValue, currencyCode: currency } : undefined,
+        status: orderStatusOf(node.financialStatus),
       } satisfies AccountRecord;
     })
     .filter((o): o is AccountRecord => o !== null)
@@ -230,33 +312,43 @@ export function buildPast(customer: AccountCustomerInput): AccountRecord[] {
 export function buildAccountView({
   customer,
   subscriptions = [],
-  favorites = [],
   events = [],
   now,
 }: {
   customer: AccountCustomerInput;
   subscriptions?: AccountSubscriptionInput[];
-  favorites?: AccountFavoriteInput[];
   events?: AccountEventInput[];
   now?: Date;
 }): AccountView {
+  const rawEmail = str(customer.emailAddress?.emailAddress);
+
   return {
     displayName: accountDisplayName(customer),
-    email: str(customer.emailAddress?.emailAddress),
+    /* 送信専用アドレスは識別子ではないので持たせない (画面は表示名に落ちる)。 */
+    email: isPlaceholderEmail(rawEmail) ? null : rawEmail,
     upcoming: buildUpcoming({ subscriptions, events, now }),
-    continueItems: buildContinueItems(favorites),
     past: buildPast(customer),
     paymentMethod: null,
     seeded: false,
   };
 }
 
-/** 「8月20日(木)」。Figma 確定版のカード 1 行目と同じ形。 */
+/**
+ * 「2024年3月21日(木)」。Figma 確定版のカード 1 行目に **年を足した**形。
+ *
+ * ## なぜ Figma (「8月20日(木)」) から外すのか
+ *
+ * 注文履歴は何年でも遡る。年を落とすと 2 年前の注文が今年の注文に見える
+ * (実測 2026-08-25: 2024-03-21 の注文 3 件が「3月21日(木)」と並び、直近の
+ * 買い物と区別が付かなかった)。「これから」の予定側も同じ書式に揃える —
+ * 予定と記録で日付の読み方が変わるほうが混乱する。
+ */
 export function formatRecordDate(iso: string | null, locale: string): string | null {
   if (!iso) return null;
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return null;
   return new Intl.DateTimeFormat(locale === "ja" ? "ja-JP" : "en-US", {
+    year: "numeric",
     month: "long",
     day: "numeric",
     weekday: "short",

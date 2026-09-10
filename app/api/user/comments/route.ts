@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAuth } from "@/lib/firebase/auth-guard";
+import { logger } from "@/lib/log";
 import {
   addComment,
   getComments,
@@ -69,7 +70,14 @@ export async function GET(request: NextRequest) {
     );
     return NextResponse.json({ comments });
   } catch (err) {
-    console.error("[GET /api/user/comments]", err);
+    /* 読めなかったのに画面には「コメントなし」に見える。届く側に載せる。
+       載せるのは対象の種類と ID だけで、本文は載せない。 */
+    logger.error("api.user-comments.list-failed", err, {
+      route: "GET /api/user/comments",
+      targetType: parsed.data.targetType,
+      targetId: parsed.data.targetId,
+      status: 500,
+    });
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
@@ -105,7 +113,11 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(result);
   } catch (err) {
-    console.error("[POST /api/user/comments]", err);
+    /* 投稿が保存されていない。本文・投稿者名は載せない (載せる必要が無い)。 */
+    logger.error("api.user-comments.create-failed", err, {
+      route: "POST /api/user/comments",
+      status: 500,
+    });
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
@@ -153,7 +165,12 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json(result);
   } catch (err) {
-    console.error("[DELETE /api/user/comments]", err);
+    /* 削除を頼まれて消えていない。本人には「失敗」と出るが、
+       消し残りが起きたことはこちらが知る必要がある。 */
+    logger.error("api.user-comments.delete-failed", err, {
+      route: "DELETE /api/user/comments",
+      status: 500,
+    });
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

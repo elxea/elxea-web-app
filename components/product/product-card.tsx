@@ -1,6 +1,6 @@
 import { useTranslations } from "next-intl";
 
-import { formatPrice } from "@/lib/utils";
+import { formatPrice, formatPriceRange } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { CatalogCard } from "@/components/catalog/catalog-list";
 import type { Product } from "@/lib/shopify/types";
@@ -15,6 +15,10 @@ import type { Product } from "@/lib/shopify/types";
 export function ProductCard({ product }: { product: Product }) {
   const t = useTranslations("common");
   const price = product.priceRange.minVariantPrice;
+  /* バリアントで値段が変わる商品は「¥1,598〜」と幅を明かす。最安値を裸で出すと
+     詳細 (既定バリアント = 最安とは限らない) を開いたときに値上がりに見える。
+     判断は `formatPriceRange` が持つ (理由もそこに書いてある)。 */
+  const priceLabel = formatPriceRange(price, product.priceRange.maxVariantPrice);
   const comparePrice = product.variants[0]?.compareAtPrice;
   const onSale =
     comparePrice && parseFloat(comparePrice.amount) > parseFloat(price.amount);
@@ -28,7 +32,7 @@ export function ProductCard({ product }: { product: Product }) {
       title={product.title}
       meta={
         <span className="flex items-baseline gap-2">
-          <span>{formatPrice(price.amount, price.currencyCode)}</span>
+          <span>{priceLabel}</span>
           {onSale ? (
             <span className="text-muted-foreground/60 line-through">
               {formatPrice(comparePrice.amount, comparePrice.currencyCode)}

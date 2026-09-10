@@ -4,6 +4,7 @@ import { useLocale } from "next-intl";
 import { usePathname, useRouter } from "@/i18n/navigation";
 import { enabledLocales, type Locale } from "@/i18n/config";
 import { Button } from "@/components/ui/button";
+import { useOptimisticNavigation } from "@/hooks/use-optimistic-navigation";
 
 const localeLabels: Record<Locale, string> = {
   ja: "日本語",
@@ -15,8 +16,26 @@ export function LanguageSwitcher() {
   const pathname = usePathname();
   const router = useRouter();
 
+  /**
+   * 押した瞬間にどちらを選んだかを先に見せる (網羅表 2026-08-27 / G9)。
+   *
+   * `router.replace` だけを呼んでいたので、選んだ言語が濃く出るのは**サーバの
+   * 往復が着地してから**だった。ページ全体が描き直る操作なので着地までは長く、
+   * そのあいだ「押したのに何も選ばれていない」状態が見える。
+   *
+   * 注記: いま `enabledLocales` は `["ja"]` なので、この切替 UI は本番では
+   * 描画されない (下の early return)。将来 `"en"` を戻したときに同じ症状を
+   * 作り直さないために、いま直しておく。
+   */
+  const nav = useOptimisticNavigation(locale);
+
   function handleChange(newLocale: Locale) {
-    router.replace(pathname, { locale: newLocale });
+    nav.navigate(newLocale, () => router.replace(pathname, { locale: newLocale }));
+  }
+
+  function warmOther(target: Locale) {
+    if (target === locale) return;
+    router.prefetch(pathname, { locale: target });
   }
 
   // 公開中の locale が 1 つしかないときは切替 UI 自体を出さない。押しても
@@ -26,15 +45,21 @@ export function LanguageSwitcher() {
   if (enabledLocales.length < 2) return null;
 
   return (
-    <div className="flex gap-3">
+    <div className="flex gap-3" data-slot="language-switcher" aria-busy={nav.isNavigating}>
       {enabledLocales.map((l) => (
         <Button
           key={l}
           variant="ghost"
           size="sm"
           onClick={() => handleChange(l)}
+          /* 押す仕草が見えた時点で相手の言語のページを取りにいく。いま居る言語は
+             取りにいかない (もう手元にある)。 */
+          onPointerEnter={() => warmOther(l)}
+          onFocus={() => warmOther(l)}
+          data-slot="language-option"
+          aria-pressed={nav.value === l}
           className={
-            locale === l
+            nav.value === l
               ? "text-foreground font-medium"
               : "text-muted-foreground"
           }

@@ -2,10 +2,11 @@ import { cookies } from "next/headers";
 import { CartProvider } from "./cart-context";
 import { seedCart } from "@/lib/preview-seed";
 import type { Cart } from "@/lib/shopify/types";
+import { COOKIE_NAME } from "@/lib/auth/cookie-names";
 
 async function getInitialCart(): Promise<Cart | null> {
   const cookieStore = await cookies();
-  const cartId = cookieStore.get("shopify_cart_id")?.value;
+  const cartId = cookieStore.get(COOKIE_NAME.shopifyCartId)?.value;
   if (!cartId) return null;
 
   try {

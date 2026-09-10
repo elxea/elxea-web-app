@@ -1,11 +1,11 @@
 import { Resend } from "resend";
-import { getSiteUrl } from "@/lib/env";
 
+import { env } from "@/lib/config";
 import { formatPrice } from "@/lib/format-price";
 import { siteUrl } from "@/lib/site-url";
 
-const RESEND_API_KEY = process.env.RESEND_API_KEY;
-const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "no-reply@elxea.com";
+const RESEND_API_KEY = env("RESEND_API_KEY");
+const FROM_EMAIL = env("RESEND_FROM_EMAIL") ?? "no-reply@elxea.com";
 const SITE_URL = siteUrl();
 
 type DunningEmailData = {

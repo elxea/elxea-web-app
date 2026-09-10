@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { getLocale, getTranslations } from "next-intl/server";
 
 import {
@@ -20,6 +21,13 @@ import {
 import { captionClass } from "@/components/editorial/rule-list";
 import { Button } from "@/components/ui/button";
 import { Link } from "@/i18n/navigation";
+import {
+  accountActionHref,
+  isSignedIn,
+  lockedActionFor,
+  type AccountAuth,
+} from "@/lib/account-capabilities";
+import { hasLineSessionCookies } from "@/lib/auth/cookies";
 import { seedSubscriptionContracts } from "@/lib/preview-seed";
 import { getCustomerFromSession, getSubscriptionsFromSession } from "@/lib/shopify/auth";
 import type { SubscriptionContract } from "@/lib/shopify/customer";
@@ -67,18 +75,88 @@ export default async function SubscriptionsPage() {
   const tCommon = await getTranslations("common");
   const locale = await getLocale();
 
-  let customer = null;
-  try {
-    customer = await getCustomerFromSession();
-  } catch {
-    // fall through to login required
-  }
+  /* 3 値で受ける (設計憲章 R1)。`ok: false` は「未ログイン」ではなく「判定できな
+     かった」。以前は try/catch で両方 null に潰していたので、Shopify の一時障害が
+     そのまま「ログインが必要です」→ /login への堂々巡りになっていた。 */
+  const customerResult = await getCustomerFromSession();
+  const customer = customerResult.ok ? customerResult.data : null;
+  const shopifyUndetermined = !customerResult.ok;
 
   /* 計測用の見本 (PREVIEW_SEED=1 のときだけ)。実セッションがあるときは呼ばない
      ので、実データを見本で上書きすることはない。フラグ未設定なら null。 */
   const seeded = customer ? null : seedSubscriptionContracts();
 
+  /* 判定できなかった人を「未ログイン」の分岐に落とさない。その人は cookie を
+     持っていて middleware を通っている以上、ログインし直しても同じ画面に戻る。 */
+  if (!customer && !seeded && shopifyUndetermined) {
+    return (
+      <div className="flex min-h-[70vh] items-center justify-center px-4 py-24">
+        <div className="max-w-sm text-center">
+          <h1 className="page-title mb-4 text-foreground">{t("subscriptions")}</h1>
+          <p className={cn(captionClass, "mb-8 text-muted-foreground")}>
+            {t("networkError")}
+          </p>
+          <div className="flex justify-center gap-4">
+            <Button variant="outline" asChild>
+              <a href={`/${locale}/account/subscriptions`}>{tCommon("retry")}</a>
+            </Button>
+            <Button variant="link" className="h-auto p-0 text-muted-foreground" asChild>
+              <Link href="/account">{t("backToAccountLink")}</Link>
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (!customer && !seeded) {
+    /* LINE だけでログインしている人もここに来る。`middleware.ts` の /account
+     * ガードは `line_session` があれば通すので、この画面に到達すること自体は正しい。
+     * ところが定期便は Shopify の顧客トークンが無いと引けず、LINE ログインでは
+     * そのトークンが発行されない (外部 IdP から Shopify セッションを作る正規手段は
+     * Multipass だけで、Plus + legacy 会員に限られる)。
+     *
+     * つまりこの人は「ログインしていない」のではなく「メールアドレスが連携されて
+     * いない」。ログイン済みの人に「ログインが必要です」と出して /login へ送り返すと、
+     * LINE で入り直しても同じ画面に戻る堂々巡りになる。案内を出し分ける。
+     *
+     * どの認証状態で何が使えるかの正本は `lib/account-capabilities.ts`。 */
+    const cookieStore = await cookies();
+    const auth: AccountAuth = {
+      shopify: false,
+      line: hasLineSessionCookies((name) => cookieStore.has(name)),
+    };
+
+    /* ラベルも行き先もカタログから引く。この画面だけ別の文言・別の行き先を
+       持たせない (以前は `/api/auth/login` を直書きしていた — as-is D-18)。 */
+    const action = lockedActionFor("subscriptions");
+
+    if (isSignedIn(auth)) {
+      return (
+        <div className="flex min-h-[70vh] items-center justify-center px-4 py-24">
+          <div className="max-w-sm text-center">
+            <h1 className="page-title mb-4 text-foreground">{t("subscriptions")}</h1>
+            <p className={cn(captionClass, "mb-3 text-foreground")}>
+              {t("subscriptionsEmailRequired")}
+            </p>
+            <p className={cn(captionClass, "mb-8 text-muted-foreground")}>
+              {t("emailRequiredReason")}
+            </p>
+            {action ? (
+              <Button variant="outline" asChild>
+                <a href={accountActionHref(action.target, locale)}>{t(action.labelKey)}</a>
+              </Button>
+            ) : null}
+            <div className="mt-6">
+              <Button variant="link" className="h-auto p-0 text-muted-foreground" asChild>
+                <Link href="/account">{t("backToAccountLink")}</Link>
+              </Button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="flex min-h-[70vh] items-center justify-center px-4 py-24">
         <div className="max-w-sm text-center">
@@ -96,12 +174,36 @@ export default async function SubscriptionsPage() {
 
   let contracts: SubscriptionContract[] = seeded ?? [];
   if (customer) {
-    try {
-      contracts = await getSubscriptionsFromSession();
-    } catch {
-      // Subscription API may not be available — 空扱いにして節ごと差し替える
-      contracts = [];
+    const contractsResult = await getSubscriptionsFromSession();
+    if (!contractsResult.ok) {
+      /* **ここが 0 件表示に潰れてはいけない最重要地点** (設計憲章 R1)。
+       *
+       * 以前は catch で `contracts = []` に倒していた。この画面の 0 件は
+       * 「まだ定期便のご契約はありません」という EmptyCard に差し替わるので、
+       * Shopify が詰まった瞬間、**契約中の顧客に「契約はありません」と表示**して
+       * いたことになる。解約されたと誤解させる表示であり、実際には契約も課金も
+       * 生きている。空配列は「0 件だった」という主張であって、「引けなかった」を
+       * 表す値ではない。 */
+      return (
+        <div className="flex min-h-[70vh] items-center justify-center px-4 py-24">
+          <div className="max-w-sm text-center">
+            <h1 className="page-title mb-4 text-foreground">{t("subscriptions")}</h1>
+            <p className={cn(captionClass, "mb-8 text-muted-foreground")}>
+              {t("networkError")}
+            </p>
+            <div className="flex justify-center gap-4">
+              <Button variant="outline" asChild>
+                <a href={`/${locale}/account/subscriptions`}>{tCommon("retry")}</a>
+              </Button>
+              <Button variant="link" className="h-auto p-0 text-muted-foreground" asChild>
+                <Link href="/account">{t("backToAccountLink")}</Link>
+              </Button>
+            </div>
+          </div>
+        </div>
+      );
     }
+    contracts = contractsResult.data;
   }
 
   const cards = sortSubscriptionCards(contracts.map(toSubscriptionCardView));

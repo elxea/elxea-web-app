@@ -48,6 +48,16 @@ const UNLINKED_BY_DESIGN: Record<string, string> = {
     "LINE の LIFF から起動される連携画面。入口は LINE アプリ側であり、サイト内に導線は持たない。",
   "/login/complete":
     "ログイン完了後の着地点。認証フローのリダイレクト先であって、人がナビから選ぶ面ではない。",
+  "/account/favorites":
+    "お気に入り一覧をマイページ本体 (/account) へ移した後の、旧 URL の恒久リダイレクト (J-5)。" +
+    "サイト内の導線は本体に一本化してあり、ここは残しておかないとブックマーク・過去の案内・" +
+    "検索結果からの流入が 404 になるためだけに存在する。中身は持たない。",
+  "/profile":
+    "roji プロファイル (ミクロ⇔マクロ)。PROFILE_MICRO_MACRO が立っている環境にしか存在せず、" +
+    "本番は SITE_PASSWORD の門の内側にある段階公開の面。noindex で、名称も Setaka 未決 " +
+    "(仮の名前でナビに出すと既成事実になる)。入口は URL 直打ちのみ。名称と表現が確定したら " +
+    "(Spec 段2/段3) ナビか /account からの導線を足し、この例外を外す。" +
+    "Spec: https://app.notion.com/p/3d270c9d064c8171b70be803150d6d5d",
   "/tasting-note":
     "TODO(2026-08-18): 一覧側の導線が未配線。/tasting-note/feedback は chat の CTA から入れるが、" +
     "この一覧そのものはどこからも入れない。/signs と同型の欠落として検出済み。IA の置き場は Setaka 判断待ち。",

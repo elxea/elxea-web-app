@@ -1,8 +1,9 @@
+import type { Metadata } from "next";
 import { useTranslations } from "next-intl";
 import { getLocale, getTranslations } from "next-intl/server";
 import { Sprout } from "lucide-react";
 import { Link } from "@/i18n/navigation";
-import { getClient } from "@/sanity/lib/client";
+import { sanityFetch } from "@/sanity/lib/fetch";
 import { ImageCard } from "@/components/media/image-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { pillClass } from "@/components/ui/pill-button";
@@ -25,6 +26,24 @@ type EventCard = {
   memberOnly?: boolean;
   externalUrl?: string;
 };
+
+/**
+ * ページの題。
+ *
+ * これが無いと `<title>` はレイアウトの既定 (素の「elxea」) のままになり、
+ * トップ・フッターの 3 導線から着いた先が、タブでも検索結果でも共有リンクでも
+ * 「elxea」としか名乗らない (監査 #19 / 2026-08-25)。文言は既存の
+ * `common.events` / `event.lead` を使い、題を二重管理しない。
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("common");
+  const te = await getTranslations("event");
+  return {
+    title: t("events"),
+    description: te("lead"),
+    openGraph: { title: t("events"), description: te("lead") },
+  };
+}
 
 export default function EventsPage() {
   const t = useTranslations("common");
@@ -53,8 +72,15 @@ async function EventsList() {
   const tCommon = await getTranslations("common");
 
   try {
-    const client = getClient();
-    const published = await client.fetch(EVENTS_QUERY, { language: locale });
+    // EVENTS_QUERY は `coalesce(endDate, date) >= now()` を含む — 結果が
+    // **時間の経過だけで変わる**。どの名札を貼っても「終わったイベントが
+    // 一覧から消える」を webhook では起こせないので、名札ではなく noStore で
+    // 扱う (会期切れの取りこぼしは 2026-08 に実際に起きている)。
+    const published = await sanityFetch({
+      query: EVENTS_QUERY,
+      params: { language: locale },
+      cache: { noStore: true },
+    });
 
     // Hide the fictional/seed events (bodies contain "ダミー") still present
     // in the production dataset. Code-only; no Sanity mutation.
@@ -88,10 +114,20 @@ async function EventsList() {
           count={t("empty.eyebrow")}
           title={t("empty.title")}
           body={t("empty.body")}
+          /* 出口を 2 つ出す (監査 #19)。ここはトップ・フッターの 3 導線が
+             着地する先で、しかも予定が無い期間は常設で空になる。出口が
+             1 つだけだと「イベントを探しに来た人」が商品一覧しか選べない。
+             読みものは同じ「お茶を囲む時間」の話が読める面なので、
+             関心のずれが最も小さい行き先として並べる。 */
           action={
-            <Link href="/products" className={pillClass("outline")}>
-              {t("empty.ctaLabel")}
-            </Link>
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              <Link href="/products" className={pillClass("outline")}>
+                {t("empty.ctaLabel")}
+              </Link>
+              <Link href="/journal" className={pillClass("outline")}>
+                {t("empty.secondaryCtaLabel")}
+              </Link>
+            </div>
           }
         />
       );

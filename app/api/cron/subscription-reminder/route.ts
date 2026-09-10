@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
+import { env } from "@/lib/config";
 import { getSubscriptionContracts } from "@/lib/shopify/subscription-admin";
 import { sendSubscriptionReminder } from "@/lib/email/subscription-reminder";
 import {
@@ -25,7 +26,7 @@ import {
  *      一切乗らなかった。エラー応答も監視に上げる。
  */
 
-const CRON_SECRET = process.env.CRON_SECRET || "";
+const CRON_SECRET = env("CRON_SECRET") ?? "";
 const REMINDER_DAYS_BEFORE = 3;
 
 function formatInterval(interval: string, intervalCount: number): string {

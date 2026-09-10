@@ -17,6 +17,8 @@
  * Read-only scripts pass `writes: false` and skip rule 2 (rule 1 still applies).
  */
 
+import { envSnapshot } from "@/lib/config";
+
 export const DATASET_ENV_VAR = "NEXT_PUBLIC_SANITY_DATASET";
 export const DATASET_ARG = "--dataset";
 export const PRODUCTION_CONFIRM_FLAG = "--i-know-this-is-production";
@@ -50,7 +52,17 @@ function datasetFromArgv(argv: readonly string[]): string | undefined {
 export interface ResolveWriteDatasetOptions {
   /** Shown in error messages so the operator knows what to re-run. */
   scriptName: string;
-  /** Defaults to `process.env`. */
+  /**
+   * The environment the dataset is resolved from.
+   *
+   * Defaults to `envSnapshot()` — the normalised registry declared in
+   * `lib/config/spec.ts` — rather than `process.env`, because application code
+   * no longer reads `process.env` directly (憲章 R4). The registry deliberately
+   * omits variables only `scripts/**` use, so a caller that needs
+   * `NEXT_PUBLIC_SANITY_DATASET` picked up from the ambient environment passes
+   * `env: process.env` itself (as every write-capable script here already
+   * does), or names the target with `--dataset <name>`.
+   */
   env?: Record<string, string | undefined>;
   /** Defaults to `process.argv.slice(2)`. */
   argv?: readonly string[];
@@ -107,7 +119,7 @@ export function resolveWriteDataset(
 ): string {
   const {
     scriptName,
-    env = process.env,
+    env = envSnapshot(),
     argv = process.argv.slice(2),
     writes = true,
   } = options;

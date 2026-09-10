@@ -21,6 +21,11 @@
  *   - `LINE_LIFF_CHANNEL_ID` に、その LINE Login チャネルの Channel ID を設定すること。
  */
 
+import { createHash, timingSafeEqual } from "crypto";
+
+import { lineApiBaseUrl, lineAuthBaseUrl } from "@/lib/line/endpoints";
+import { logger } from "@/lib/log";
+
 /** verify API が返す最小の payload（本フローで使うフィールドのみ）。 */
 export interface LiffIdTokenPayload {
   /** LINE userId（同一プロバイダー前提で Messaging userId と一致）。 */
@@ -31,14 +36,28 @@ export interface LiffIdTokenPayload {
   iss?: string;
   /** 有効期限（Unix 秒）。 */
   exp: number;
+  /**
+   * 認可 URL に載せた `nonce`。認可要求で nonce を送らなかった場合は含まれない
+   * （LINE 公式仕様）。Web 発の連携フロー（P2）は必ず送るので、そこでは必須になる。
+   */
+  nonce?: string;
   /** 表示名（scope による・任意）。 */
   name?: string;
   /** メール（email scope 承認時のみ・任意）。 */
   email?: string;
 }
 
-/** LINE ID トークンの発行者（iss）固定値（LINE 公式仕様）。 */
-const LINE_TOKEN_ISSUER = "https://access.line.me";
+/**
+ * LINE ID トークンの発行者（iss）。本物の LINE では常に `https://access.line.me`（LINE 公式仕様）。
+ *
+ * `LINE_AUTH_BASE_URL` で差し替えられるのは verify エンドポイント（`LINE_API_BASE_URL`）と同じ
+ * 理由。偽 LINE サーバーに向けたテストでは iss も偽サーバーのオリジンになるため、ここだけ
+ * 本物固定だと必ず「iss が LINE でない」で落ちて SUCCESS 経路を一度も通せない。
+ * env 未設定（本番・通常実行）では本物の LINE と完全に同じ値になる。
+ */
+function lineTokenIssuer(): string {
+  return lineAuthBaseUrl();
+}
 
 /** exp 検証の時刻ずれ許容（秒）。サーバ時計の微差で正当トークンを弾かないための猶予。 */
 const EXP_CLOCK_SKEW_SEC = 300;
@@ -48,10 +67,33 @@ export type VerifyResult =
   | { ok: true; messagingUserId: string; email: string | null; payload: LiffIdTokenPayload }
   | { ok: false; reason: string };
 
-const LINE_VERIFY_ENDPOINT = "https://api.line.me/oauth2/v2.1/verify";
+/**
+ * verify エンドポイント。`LINE_API_BASE_URL` で差し替えられるのは、`app/api/line-callback`
+ * が token / profile 呼び出しで既に同じ env を見ているため（テストが LINE の API ホストを
+ * 丸ごとスタブに向けられる）。ここだけ固定値のままだと、同じフローの一部だけ本物の
+ * api.line.me を叩きに行く。
+ */
+function lineVerifyEndpoint(): string {
+  return `${lineApiBaseUrl()}/oauth2/v2.1/verify`;
+}
 
 /** Messaging userId 形式（U + 32 hex）。sub がこの形でなければ拒否（多層防御）。 */
 const LINE_MESSAGING_USER_ID_REGEX = /^U[0-9a-f]{32}$/;
+
+export type VerifyLineIdTokenOptions = {
+  /** テスト用の fetch 差し替え（省略時は global fetch）。 */
+  fetchImpl?: typeof fetch;
+  /**
+   * 認可を開始したときに発行した `nonce`。**渡した場合は必須チェックになる**
+   * （claim が無い / 違う → 失敗）。
+   *
+   * 渡さないのは LIFF 経路だけ。LIFF の id_token は LINE アプリが発行するもので、
+   * こちらが認可 URL を組み立てていないため nonce を仕込む余地が無い。LIFF 側の
+   * リプレイ束縛は「Shopify セッション（requireAuth）+ サーバ側 verify」で取っている。
+   * OAuth 認可 URL を自分で組み立てる経路（Web 発連携 = P2）では必ず渡すこと。
+   */
+  expectedNonce?: string | null;
+};
 
 /**
  * LIFF ID トークンを LINE の verify API で検証し、Messaging userId（sub）を取り出す。
@@ -62,16 +104,24 @@ const LINE_MESSAGING_USER_ID_REGEX = /^U[0-9a-f]{32}$/;
  *   - LINE verify が非 200 / aud 不一致 / iss 不一致 / exp 期限切れ / sub 形式不正 → 失敗。
  *     （iss / exp は docstring の LINE 仕様を「実チェック」に格上げした多層防御。LINE verify が
  *      期限切れを弾く前提でも、応答の握りつぶし・時刻ずれ・仕様変更に備え自前でも検証する。）
+ *   - `expectedNonce` を渡したのに nonce claim が無い / 一致しない → 失敗（D11）。
  *
- * @param idToken  liff.getIDToken() で得た JWT
- * @param channelId  LIFF が属する LINE Login チャネル ID（env LINE_LIFF_CHANNEL_ID）
- * @param fetchImpl  テスト用の fetch 差し替え（省略時は global fetch）
+ * nonce は **LINE にも渡し、こちらでも突き合わせる**。verify API は `nonce` パラメータを
+ * 受け取って不一致なら 400 を返すが、その 1 本に寄りかからない（LINE 側の挙動変更や、
+ * 将来 verify を別実装へ差し替えたときに検証が黙って消えるのを避ける）。
+ *
+ * @param idToken  liff.getIDToken() / token 交換で得た JWT
+ * @param channelId  トークンの発行元 LINE Login チャネル ID（env LINE_LIFF_CHANNEL_ID）
+ * @param options  fetch 差し替えと nonce 期待値
  */
-export async function verifyLiffIdToken(
+export async function verifyLineIdToken(
   idToken: string | undefined | null,
   channelId: string | undefined | null,
-  fetchImpl: typeof fetch = fetch,
+  options: VerifyLineIdTokenOptions = {},
 ): Promise<VerifyResult> {
+  const fetchImpl = options.fetchImpl ?? fetch;
+  const expectedNonce = options.expectedNonce ?? null;
+
   if (!channelId) {
     return { ok: false, reason: "LINE_LIFF_CHANNEL_ID is not configured" };
   }
@@ -81,12 +131,19 @@ export async function verifyLiffIdToken(
 
   let res: Response;
   try {
-    res = await fetchImpl(LINE_VERIFY_ENDPOINT, {
+    const form = new URLSearchParams({ id_token: idToken, client_id: channelId });
+    if (expectedNonce) form.set("nonce", expectedNonce);
+    res = await fetchImpl(lineVerifyEndpoint(), {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ id_token: idToken, client_id: channelId }).toString(),
+      body: form.toString(),
     });
   } catch (err) {
+    /* verify に届かない = 連携がその場で全滅する。fail-closed は変えずに、
+       届かなかったこと自体は必ず残す。 */
+    logger.error("line.verify-liff-token.request-failed", err, {
+      operation: "verifyLineIdToken",
+    });
     return {
       ok: false,
       reason: `LINE verify request failed: ${err instanceof Error ? err.message : String(err)}`,
@@ -101,7 +158,13 @@ export async function verifyLiffIdToken(
   let payload: LiffIdTokenPayload;
   try {
     payload = (await res.json()) as LiffIdTokenPayload;
-  } catch {
+  } catch (err) {
+    /* 200 なのに JSON でない = LINE 側の仕様変更か手前の何かが応答を差し替えて
+       いる。本人確認が通らなくなる話なので、黙って失敗させない。 */
+    logger.error("line.verify-liff-token.response-not-json", err, {
+      operation: "verifyLineIdToken",
+      status: res.status,
+    });
     return { ok: false, reason: "LINE verify returned non-JSON" };
   }
 
@@ -111,7 +174,7 @@ export async function verifyLiffIdToken(
   }
 
   // iss（発行者）が LINE であることを確認する（docstring の LINE 仕様を実チェック化・多層防御）。
-  if (payload.iss !== LINE_TOKEN_ISSUER) {
+  if (payload.iss !== lineTokenIssuer()) {
     return { ok: false, reason: "id_token iss is not LINE" };
   }
 
@@ -119,6 +182,20 @@ export async function verifyLiffIdToken(
   const nowSec = Math.floor(Date.now() / 1000);
   if (typeof payload.exp !== "number" || payload.exp <= nowSec - EXP_CLOCK_SKEW_SEC) {
     return { ok: false, reason: "id_token is expired or has no exp" };
+  }
+
+  /* nonce（D11）。この経路で認可 URL を組み立てたのは我々なので、戻ってきた id_token が
+   * **その認可要求のもの**であることを nonce が証明する。state は「応答がこのブラウザ宛か」
+   * しか言わない。長さ差で例外を投げない固定長比較にしてから timingSafeEqual に渡す。 */
+  if (expectedNonce) {
+    if (typeof payload.nonce !== "string" || payload.nonce.length === 0) {
+      return { ok: false, reason: "id_token has no nonce" };
+    }
+    const actual = createHash("sha256").update(payload.nonce).digest();
+    const expected = createHash("sha256").update(expectedNonce).digest();
+    if (!timingSafeEqual(actual, expected)) {
+      return { ok: false, reason: "id_token nonce does not match" };
+    }
   }
 
   const sub = payload.sub;

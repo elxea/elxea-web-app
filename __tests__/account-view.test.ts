@@ -1,15 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  ACCOUNT_CONTINUE_LIMIT,
   ACCOUNT_PAST_LIMIT,
   ACCOUNT_UPCOMING_LIMIT,
   accountDisplayName,
   buildAccountView,
-  buildContinueItems,
   buildPast,
   buildUpcoming,
   formatRecordDate,
+  isPlaceholderEmail,
 } from "@/lib/account-view";
 
 /**
@@ -107,37 +106,6 @@ describe("buildUpcoming (これから)", () => {
   });
 });
 
-describe("buildContinueItems (続き)", () => {
-  it("記事を先に、商品を後にする", () => {
-    const result = buildContinueItems([
-      { id: "f1", type: "product", targetId: "sencha-akane", title: "煎茶 茜", imageUrl: "/a.jpg" },
-      { id: "f2", type: "article", targetId: "hiire", title: "火入れという時間のかけ方", imageUrl: null },
-    ]);
-    expect(result.map((r) => r.kind)).toEqual(["favorite-article", "favorite-product"]);
-    expect(result[0]?.href).toBe("/journal/hiire");
-    expect(result[1]?.href).toBe("/products/sencha-akane");
-  });
-
-  it("題名なし・未知の type は落とす", () => {
-    expect(
-      buildContinueItems([
-        { id: "f1", type: "article", targetId: "x", title: null },
-        { id: "f2", type: "farmer", targetId: "y", title: "農家" },
-      ])
-    ).toEqual([]);
-  });
-
-  it("確定版 1 行分 (2 枚) までに切る", () => {
-    const favorites = Array.from({ length: 5 }, (_, i) => ({
-      id: `f-${i}`,
-      type: "article",
-      targetId: `t-${i}`,
-      title: `記事 ${i}`,
-    }));
-    expect(buildContinueItems(favorites)).toHaveLength(ACCOUNT_CONTINUE_LIMIT);
-  });
-});
-
 describe("buildPast (これまで = 注文履歴)", () => {
   const order = (name: string, processedAt: string, amount = "6000") => ({
     node: {
@@ -195,12 +163,127 @@ describe("buildAccountView", () => {
 });
 
 describe("formatRecordDate", () => {
-  it("確定版のカード 1 行目と同じ「8月20日(木)」形にする", () => {
-    expect(formatRecordDate("2026-08-20T00:00:00.000Z", "ja")).toBe("8月20日(木)");
+  /* 年を出すのは Figma (「8月20日(木)」) からの意図的な逸脱。注文履歴は何年でも
+     遡るので、年が無いと 2 年前の注文が今年の注文に見える (実測 2026-08-25)。 */
+  it("年つきの「2026年8月20日(木)」形にする", () => {
+    expect(formatRecordDate("2026-08-20T00:00:00.000Z", "ja")).toBe("2026年8月20日(木)");
+  });
+
+  it("何年前の記録でも年で見分けが付く", () => {
+    expect(formatRecordDate("2024-03-21T01:28:32.000Z", "ja")).toBe("2024年3月21日(木)");
   });
 
   it("日付が無い・壊れているときは null", () => {
     expect(formatRecordDate(null, "ja")).toBeNull();
     expect(formatRecordDate("not-a-date", "ja")).toBeNull();
+  });
+});
+
+describe("送信専用アドレスは識別子として出さない", () => {
+  it("no-reply 系はメール欄を空にする (表示名に落ちる)", () => {
+    const view = buildAccountView({
+      customer: {
+        firstName: "世堅",
+        lastName: "温",
+        emailAddress: { emailAddress: "no-reply@elxea.com" },
+      },
+    });
+
+    expect(view.email).toBeNull();
+    expect(view.displayName).toBe("世堅 温");
+  });
+
+  it("本人のアドレスはそのまま残す", () => {
+    const view = buildAccountView({
+      customer: { emailAddress: { emailAddress: "yuki@example.com" } },
+    });
+
+    expect(view.email).toBe("yuki@example.com");
+  });
+
+  it("大文字・別綴りの送信専用アドレスも落とす", () => {
+    for (const email of ["NoReply@example.com", "do-not-reply@example.jp"]) {
+      expect(isPlaceholderEmail(email)).toBe(true);
+    }
+    expect(isPlaceholderEmail("noreplytea@example.com")).toBe(false);
+  });
+
+  /* 完全一致の語彙だけでは、区切り・連番・タグのどれか 1 つで静かにすり抜けた
+     (QA 指摘 2026-08-25)。すり抜けると本人の識別子として画面に出てしまうので、
+     正規化の 3 段 (タグ / 区切り / 連番) を 1 件ずつ固定する。 */
+  it("区切り・連番・タグが付いた送信専用アドレスも落とす", () => {
+    for (const email of [
+      "no.reply@elxea.com", // 区切りがドット
+      "noreply2@elxea.com", // 末尾の連番
+      "no-reply-01@elxea.com", // 区切り + 連番
+      "noreply+line@elxea.com", // 配送タグ
+      "NO_REPLY@ELXEA.COM", // 大文字
+      "mailer-daemon@elxea.com", // 送信系の別語彙
+      "postmaster@elxea.com",
+      "unknown@elxea.com",
+    ]) {
+      expect(isPlaceholderEmail(email), email).toBe(true);
+    }
+  });
+
+  it("到達しないと規格で決まっているドメインは本人のアドレスとして扱わない", () => {
+    for (const email of ["yuki@elxea.invalid", "u123@line.local"]) {
+      expect(isPlaceholderEmail(email), email).toBe(true);
+    }
+  });
+
+  it("本人が名乗りうるアドレスは巻き込まない", () => {
+    for (const email of [
+      "noreplytea@example.com", // 屋号が偶然 noreply で始まる
+      "nobuo@example.com",
+      "none-of-your-business@example.com", // 語としては none ではない
+      "yuki@example.com",
+      "yuki@example.jp",
+    ]) {
+      expect(isPlaceholderEmail(email), email).toBe(false);
+    }
+  });
+
+  it("メールアドレスの形をしていない値では真にならない", () => {
+    for (const value of ["", "  ", "noreply", "@elxea.com", null, undefined]) {
+      expect(isPlaceholderEmail(value), String(value)).toBe(false);
+    }
+  });
+});
+
+describe("返金済みの注文を ¥0 と言い切らない", () => {
+  const order = (financialStatus: string, amount: string) => ({
+    orders: {
+      edges: [
+        {
+          node: {
+            id: `gid://order/${financialStatus}`,
+            name: "#1027",
+            processedAt: "2024-03-21T01:28:32.000Z",
+            financialStatus,
+            totalPrice: { amount, currencyCode: "JPY" },
+          },
+        },
+      ],
+    },
+  });
+
+  it("全額返金は refunded", () => {
+    expect(buildPast(order("REFUNDED", "0.0"))[0].status).toBe("refunded");
+  });
+
+  it("無効・期限切れは voided", () => {
+    expect(buildPast(order("VOIDED", "0.0"))[0].status).toBe("voided");
+    expect(buildPast(order("EXPIRED", "0.0"))[0].status).toBe("voided");
+  });
+
+  it("一部返金は partiallyRefunded (金額と併記する)", () => {
+    const record = buildPast(order("PARTIALLY_REFUNDED", "1200.0"))[0];
+    expect(record.status).toBe("partiallyRefunded");
+    expect(record.amount).toEqual({ value: "1200.0", currencyCode: "JPY" });
+  });
+
+  it("通常の入金済みは状態を持たない (金額だけ出す)", () => {
+    expect(buildPast(order("PAID", "1598.0"))[0].status).toBeNull();
   });
 });

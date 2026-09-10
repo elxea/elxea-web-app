@@ -103,9 +103,22 @@ async function requestAccount(cookieHeader: string) {
   return (await middleware(req)) as NextResponse;
 }
 
+async function requestLogin(cookieHeader: string, search = "") {
+  const { default: middleware } = await import("@/middleware");
+  const headers: Record<string, string> = { host: "www.elxea.com" };
+  if (cookieHeader) headers.cookie = cookieHeader;
+  const req = new NextRequest(`https://www.elxea.com/ja/login${search}`, { headers });
+  return (await middleware(req)) as NextResponse;
+}
+
 function redirectedTo(res: NextResponse): string | null {
   const loc = res.headers.get("location");
   return loc ? new URL(loc).pathname : null;
+}
+
+function redirectedToUrl(res: NextResponse): URL | null {
+  const loc = res.headers.get("location");
+  return loc ? new URL(loc) : null;
 }
 
 describe("/account guard", () => {
@@ -123,6 +136,47 @@ describe("/account guard", () => {
 
   it("requires BOTH Shopify tokens, not either", async () => {
     expect(redirectedTo(await requestAccount("shop_at=x"))).toBe("/ja/login");
+  });
+});
+
+/**
+ * /login guard — 二重アカウントの入口を閉じる。ただし連携の入口は閉じない。
+ *
+ * 監査 2026-08-25 #10: ログイン中でも /ja/login が素通しで、そこで別の方法を押すと
+ * もう 1 つアカウントを作れた。門を閉じる条件を「Shopify セッションがあるとき」に
+ * 限っているのが要点で、LINE だけの人にとってこの画面の「メールアドレスでログイン」
+ * は連携の唯一の入口なので閉じてはいけない。
+ */
+describe("/login guard", () => {
+  it("何のセッションも無ければ素通し (通常のログイン画面)", async () => {
+    expect(redirectedTo(await requestLogin(""))).toBeNull();
+  });
+
+  it("Shopify セッションがあればマイページへ送り、理由を渡す", async () => {
+    const url = redirectedToUrl(await requestLogin("shop_at=x; shop_rt=y"));
+    expect(url?.pathname).toBe("/ja/account");
+    expect(url?.searchParams.get("notice")).toBe("already-signed-in");
+  });
+
+  it("LINE だけの人は飛ばさない (ここが連携の入口)", async () => {
+    expect(redirectedTo(await requestLogin("line_session=1"))).toBeNull();
+  });
+
+  it("認証フローの戻り (?error= / ?linked=) は素通しする", async () => {
+    expect(
+      redirectedTo(await requestLogin("shop_at=x; shop_rt=y", "?error=LineAuthFailed")),
+    ).toBeNull();
+    expect(
+      redirectedTo(await requestLogin("shop_at=x; shop_rt=y", "?linked=true")),
+    ).toBeNull();
+  });
+
+  it("/login 配下 (完了画面など) は対象にしない", async () => {
+    const { default: middleware } = await import("@/middleware");
+    const req = new NextRequest("https://www.elxea.com/ja/login/complete", {
+      headers: { host: "www.elxea.com", cookie: "shop_at=x; shop_rt=y" },
+    });
+    expect(redirectedTo((await middleware(req)) as NextResponse)).toBeNull();
   });
 });
 

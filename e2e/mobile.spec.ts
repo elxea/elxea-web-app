@@ -147,6 +147,62 @@ test.describe("Mobile viewport", () => {
     await searchInput.press("Enter");
     await page.waitForURL(/\/ja\/search\?q=tea/);
   });
+
+  /**
+   * 記事詳細の見出しと保存トグルは SP では縦に積む (Setaka 指摘 2026-08-25)。
+   *
+   * 横並びのままだと、保存トグルが `whitespace-nowrap` + `shrink-0` で 182px を
+   * 確保し、SP 390 では見出しに 160px = 行の 45% しか残らず 5〜6 行に折り返して
+   * いた。検査は**クラス名ではなく矩形**で行う — クラスを見ると、見た目が同じ
+   * まま書き換えただけで落ちるし、逆に別の指定で横並びに戻っても気づけない。
+   */
+  test("article title takes the full width on mobile, with the bookmark button below it", async ({
+    page,
+  }) => {
+    await page.goto("/ja/journal");
+
+    // `:visible` を付ける。一覧には画面外・折り畳み側の導線も同じ href 形で
+    // 入っており、`.first()` だけだと隠れた方を掴んで「記事が無い」と誤判定し、
+    // テストが黙って skip する (= 何も検証しない緑になる)。
+    const articleLink = page.locator('a[href*="/ja/journal/"]:visible').first();
+    await expect(
+      articleLink,
+      "ジャーナル一覧に記事カードが無い — Sanity に公開記事が必要です",
+    ).toBeVisible({ timeout: 15000 });
+    await articleLink.click();
+    await page.waitForURL(/\/ja\/journal\/.+/);
+
+    const title = page.locator("article h1").first();
+    // 文字ではなく `data-slot` で掴む。読みもの版 (`appearance="panel"`) は
+    // aria-label を被せず見えている文字をそのままアクセシブル名にする作りなので、
+    // `aria-label="ブックマークに追加"` では**永遠に一致しない** (= 黙って skip
+    // する緑になる)。`data-slot` は文言変更でも壊れない。
+    const bookmark = page.locator('button[data-slot="favorite-toggle"]').first();
+    await expect(title).toBeVisible();
+    await expect(bookmark, "記事詳細に保存トグルが出ていない").toBeVisible({
+      timeout: 15000,
+    });
+
+    const titleBox = (await title.boundingBox())!;
+    const bookmarkBox = (await bookmark.boundingBox())!;
+
+    // 1. 保存トグルは見出しの「下」にある (横に並んでいない)。
+    expect(
+      bookmarkBox.y,
+      "保存トグルが見出しの下に来ていない (SP で横並びに戻っている)",
+    ).toBeGreaterThanOrEqual(titleBox.y + titleBox.height);
+
+    // 2. 見出しは本文カラムの幅をほぼ丸ごと使う。
+    //    圧迫されていた頃は 45% だったので、80% を下回ったら退行とみなす。
+    const columnWidth = (await page
+      .locator("article")
+      .first()
+      .boundingBox())!.width;
+    expect(
+      titleBox.width / columnWidth,
+      `見出しが本文カラムの ${Math.round((titleBox.width / columnWidth) * 100)}% しか使えていない`,
+    ).toBeGreaterThan(0.8);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -333,6 +389,23 @@ async function startAudioPlayback(page: Page): Promise<Rect> {
     `音声ドックが画面下端に着いていない (${describeRect(dock)})`,
   ).toBe(viewportHeight);
   return dock;
+}
+
+/**
+ * SP のチャットランチャを呼び戻す。
+ *
+ * 2026-08-27 (通しテスト E-1) から、SP のランチャは **下へ動いたあと静止しても
+ * 戻らない** — 静止時に本文 (商品カード) を覆っていたのが実害だったため。出す
+ * 条件は「画面最上部」と「上へ動かしたとき」の 2 つだけ (規則の正本は
+ * `hooks/use-retreat-on-scroll.ts`)。
+ *
+ * ここより下の検査は「ランチャが出ている」ことが前提だが、`click()` の
+ * 自動スクロールで下へ動いていることがある。**人がやるのと同じ手順**で呼び戻す。
+ */
+async function summonChatLauncher(page: Page) {
+  await page.evaluate(() => window.scrollTo(0, 0));
+  // RETREAT_SETTLE_MS (240ms) より十分長く待って、判定が済んだ状態にする。
+  await page.waitForTimeout(600);
 }
 
 /**
@@ -550,6 +623,7 @@ test.describe("Bottom-fixed occlusion (SP)", () => {
     page,
   }) => {
     const dock = await startAudioPlayback(page);
+    await summonChatLauncher(page);
 
     const launcher = page.locator('[data-slot="chat-launcher"]');
     await requireVisibleWithin(launcher, "SP でチャットランチャが出ている");
@@ -584,6 +658,7 @@ test.describe("Bottom-fixed occlusion (SP)", () => {
     page,
   }) => {
     await startAudioPlayback(page);
+    await summonChatLauncher(page);
 
     await page.locator('[data-slot="chat-launcher"]').click();
     const panel = page.locator('[data-slot="chat-panel-mobile"]');

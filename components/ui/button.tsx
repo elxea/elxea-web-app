@@ -4,6 +4,41 @@ import { Slot } from "radix-ui";
 
 import { cn } from "@/lib/utils";
 
+/**
+ * @sot button-component
+ *
+ * 押せるもの (button / リンク型 CTA) の正本。**新しい押しどころはここから作る。**
+ *
+ * ## なぜ宣言するのか (監査 P2 / 領域 8)
+ *
+ * このリポジトリには押せる部品が 2 つある — ここ (`components/ui/button.tsx`) と
+ * `components/ui/pill-button.tsx`。どちらも Figma に裏付けがあり、どちらも
+ * 「自分が正しい」と読める書き方をしていた。結果、新しい画面を作る人が
+ * **どちらを使うべきか判断する材料が無い**状態が続いていた。
+ *
+ * 憲章 R5 が止めたいのはまさにこれで、散文で「ここが正本」と書くのは何箇所でも
+ * できてしまう。機械可読なタグにして、2 箇所で名乗ったら CI が落ちるようにする。
+ *
+ * ## どちらを使うのか (判断規則)
+ *
+ * - **既定はこちら。** variant / size を持ち、`asChild` でリンクにもなる。
+ *   destructive・outline・secondary・ghost・link・service の 6 系統と
+ *   9 サイズを 1 部品で賄う。
+ * - **`PillButton` は Figma `Button / Pill (Module)` (8171:286) の再現専用。**
+ *   カテゴリ絞り込みの丸いタグ列など、**その Figma 部品が指定されている場所**
+ *   でだけ使う。高さ 48 / radius-full / body-sm が固定で、variant を持たない。
+ *
+ * 迷ったらこちらを使う。`PillButton` を選ぶのは「Figma がその部品を指している」
+ * ときだけで、見た目が近いからという理由で選ばない。
+ *
+ * ## Wave 4 では統合しない (意図的)
+ *
+ * `variant="service"` は既に `rounded-full` で、`PillButton` の outline と
+ * 見た目が近い。重なっているのは事実だが、**この Wave では宣言と登録だけ**を
+ * 行い実装は動かさない。統合は Figma 側の DS 改訂 (Pill に focus バリアントを
+ * 足す件を含む) と対で行うべきで、コード側だけ先に畳むと Figma と実装の対応が
+ * 切れる。ここに書いた判断規則が、統合までのあいだの拠り所になる。
+ */
 const buttonVariants = cva(
   // 角丸は rounded-lg (8px) = Figma Buttons の `radius-lg`。shadcn 既定の
   // rounded-md (6px) からの Δ2px は c6-1 §5 注6 の既知差分で、DS トークン整合

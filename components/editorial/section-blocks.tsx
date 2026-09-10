@@ -116,7 +116,15 @@ export function SectionNote({ className, ...props }: React.ComponentProps<"p">) 
 /* PC 4列 304 gap32 / SP 2列 163.5 gap16。上に罫線 1 本。                       */
 /* -------------------------------------------------------------------------- */
 
-export type SpecItem = { term: React.ReactNode; value: React.ReactNode };
+export type SpecItem = {
+  term: React.ReactNode;
+  value: React.ReactNode;
+  /**
+   * 項目の頭に置く写真 (`SiteImageCard`)。省略時は今日どおり用語 + 値だけ。
+   * 未割当のときは呼び出し側が `null` を返すので、写真が当たるまで見た目は動かない。
+   */
+  figure?: React.ReactNode;
+};
 
 /**
  * `emphasis` — 値を 1 段大きく見せ、SP を縦積みにする variant。
@@ -159,6 +167,7 @@ export function SpecBand({
     >
       {items.map((item, i) => (
         <div data-slot="spec-item" key={i}>
+          {item.figure ? <div className="mb-3 lg:mb-4">{item.figure}</div> : null}
           <dt className={cn(captionClass, "text-muted-foreground")}>{item.term}</dt>
           <dd className={cn(bodySmClass, "m-0 mt-1 text-foreground lg:mt-2")}>
             {item.value}

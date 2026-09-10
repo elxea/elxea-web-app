@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAuth } from "@/lib/firebase/auth-guard";
+import { applyLinkageEstablished } from "@/lib/auth/identity-link";
+import { logger } from "@/lib/log";
 import { parseJsonBody } from "@/lib/validation/zod-helpers";
 import { enforceRateLimit, limiters } from "@/lib/ratelimit";
-import { verifyLiffIdToken } from "@/lib/line/verify-liff-token";
+import { verifyLineIdToken } from "@/lib/line/verify-liff-token";
+import { resolveLinkChannelId } from "@/lib/line/link-flow";
 import { CX_AGENT_BASE_URL } from "@/lib/chat/proxy";
+import { env } from "@/lib/config";
 
 /**
  * POST /api/user/line-link-liff
@@ -51,9 +55,17 @@ export async function POST(request: NextRequest) {
     const parsed = await parseJsonBody(request, LinkLiffSchema);
     if (!parsed.ok) return parsed.response;
 
-    // 2. LIFF id_token をサーバで検証 → Messaging userId（sub）を取り出す
-    const channelId = process.env.LINE_LIFF_CHANNEL_ID;
-    const verified = await verifyLiffIdToken(parsed.data.idToken, channelId);
+    /* 2. LIFF id_token をサーバで検証 → Messaging userId（sub）を取り出す
+     *
+     * ここだけ `expectedNonce` を渡さない。LIFF のトークンは LINE アプリが発行し、
+     * こちら側は認可 URL を組み立てていないので nonce を仕込む余地が無い（仕込めない値を
+     * 「必須」にすると LIFF 連携が全滅する）。この経路のリプレイ束縛は
+     * requireAuth（サーバ確定の Shopify セッション）+ サーバ側 verify が担う。
+     * 認可 URL を自分で作る Web 発の経路（/api/user/line-link/callback）では必ず渡す。 */
+    /* Web 発の経路と同じ読み取り（trim 付き）。ここで読んだ値は id_token の `aud` と
+     * 等値比較されるので、末尾改行が 1 文字混じるだけで検証が必ず外れる。 */
+    const channelId = resolveLinkChannelId();
+    const verified = await verifyLineIdToken(parsed.data.idToken, channelId);
     if (!verified.ok) {
       console.warn("[line-link-liff] id_token verification failed:", verified.reason);
       return NextResponse.json(
@@ -63,7 +75,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 3. cx-agent の customer_linkages upsert を server-to-server で呼ぶ（SYNC_API_SECRET）
-    const secret = process.env.SYNC_API_SECRET;
+    const secret = env("SYNC_API_SECRET");
     if (!secret) {
       // fail-closed: 秘密が無ければ連携を成立させない（cx-agent は 401 を返すため無駄打ちも避ける）
       console.error("[line-link-liff] SYNC_API_SECRET not set; cannot link.");
@@ -85,15 +97,50 @@ export async function POST(request: NextRequest) {
         }),
       });
     } catch (err) {
-      console.error("[line-link-liff] cx-agent unreachable:", err);
+      /* 台帳に届かなければ連携は成立しない。id_token は載せない
+         (載せるのはサーバ確定の顧客 ID だけ)。 */
+      logger.error("api.line-link-liff.cx-agent-unreachable", err, {
+        customerId: auth.customerId,
+        status: 502,
+      });
       return NextResponse.json({ error: "linking_upstream_unreachable" }, { status: 502 });
     }
 
     if (!upstream.ok) {
       const detail = await upstream.text().catch(() => "");
+      /* 409 = このメールアドレスには既に別の LINE が連携済み（1 対 1 固定・J-4）。
+         502 に潰すと、画面は「時間をおいてもう一度」に倒れる — **恒久的な衝突を
+         一時エラーとして提示し、永久に成功しない再試行を促す**ことになる。
+         恒久か一時かは呼び出し側が知る必要があるので、そのまま 409 で返す。 */
+      if (upstream.status === 409) {
+        console.warn("[line-link-liff] shopify customer already linked to another LINE");
+        return NextResponse.json({ error: "already_linked" }, { status: 409 });
+      }
       console.error(`[line-link-liff] cx-agent returned ${upstream.status}: ${detail}`);
       return NextResponse.json({ error: "linking_failed" }, { status: 502 });
     }
+
+    /* 4. 台帳に行が立った。**同じ流れの中で**データも合体させる。
+     *
+     * ここが無かったせいで、LIFF から連携したお客さまは連携した瞬間に
+     * お気に入りが消えたように見えていた（PR #100 の B3 と同じ根）。台帳の行が
+     * 立つと `resolveIdentity` は LINE セッションを顧客の棚に解決するのに、
+     * `line:` の棚に貯めた中身は運ばれないままなので、**どちらのログイン手段
+     * からも読めない**場所に取り残される。
+     *
+     * **台帳を引き直さない**（M-2）。この経路は直前に自分で cx-agent へ書き、
+     * その 200 を受け取っている — 書いた側より確かな情報源は無い。以前はここで
+     * キャッシュを捨てて 3 秒タイムアウト付きの HTTP を投げ直しており、その
+     * 一発が外れると「連携しました」と表示したまま合体だけが起きなかった。
+     *
+     * `applyLinkageEstablished` は throw しない。合体が転んでも連携自体は成立して
+     * いるので 200 を返す — ここで 502 に倒すと、実際には連携できている人に
+     * 失敗を告げることになる。 */
+    await applyLinkageEstablished({
+      lineUserId: verified.messagingUserId,
+      shopifyCustomerId: auth.customerId,
+      source: "line-link-liff",
+    });
 
     // cx-agent の応答から「連携先に注文/定期便があるか」を受け取り、完了画面の過大約束回避に渡す（CX S2）。
     //   取得できない/未知は false（＝「ご注文・定期便を確認できます」と約束しない安全側コピーにフォールバック）。
@@ -101,13 +148,23 @@ export async function POST(request: NextRequest) {
     try {
       const data = (await upstream.json()) as { has_purchase_activity?: boolean };
       hasPurchaseActivity = data.has_purchase_activity === true;
-    } catch {
-      // 応答が JSON でない/欠落 → 過大約束しない安全側（false）のまま。
+    } catch (err) {
+      /* 応答が JSON でない/欠落 → 過大約束しない安全側（false）のまま返す。
+         ただし黙って落とさない: これが続くと全員に安全側コピーが出続け、
+         完了画面が静かに劣化したまま誰も気づけない。 */
+      logger.error("api.line-link-liff.purchase-activity-unreadable", err, {
+        customerId: auth.customerId,
+      });
     }
 
     return NextResponse.json({ success: true, hasPurchaseActivity });
   } catch (err) {
-    console.error("[POST /api/user/line-link-liff]", err);
+    /* 連携経路の想定外。連携できたかどうかが誰にも分からない状態なので、
+       Vercel のログ止まりにしない。 */
+    logger.error("api.line-link-liff.link-failed", err, {
+      route: "POST /api/user/line-link-liff",
+      status: 500,
+    });
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

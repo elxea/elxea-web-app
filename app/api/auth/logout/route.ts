@@ -3,6 +3,7 @@ import * as Sentry from "@sentry/nextjs";
 import { buildLogoutUrl, decryptToken } from "@/lib/shopify/customer";
 import { getRequestHostname, getRequestOrigin, isRegisteredAuthHost } from "@/lib/base-url";
 import { clearAuthCookies } from "@/lib/auth/cookies";
+import { COOKIE_NAME } from "@/lib/auth/cookie-names";
 
 /**
  * Logout endpoint.
@@ -48,7 +49,7 @@ export async function GET(request: NextRequest) {
    * into one silent case. The second is a real signal — a rotated or corrupted
    * SESSION_SECRET, or tampering — and it should be visible rather than
    * indistinguishable from a normal LINE-only logout. */
-  const encryptedIdToken = request.cookies.get("shop_it")?.value;
+  const encryptedIdToken = request.cookies.get(COOKIE_NAME.shopIdToken)?.value;
   let idTokenHint: string | undefined;
   if (encryptedIdToken) {
     const decrypted = decryptToken(encryptedIdToken);

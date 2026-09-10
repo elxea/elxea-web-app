@@ -83,6 +83,15 @@ export const GET_PRODUCT_BY_HANDLE_QUERY = /* GraphQL */ `
   ${PRODUCT_VARIANT_FRAGMENT}
 `;
 
+/**
+ * `products(first: 1)` は**中身があるかどうかだけ**を見るための探り。
+ *
+ * 空のコレクションをタイルや一覧に出すと、押した先が必ず 0 件になる
+ * (2026-08-27 実測: 本番 18 件のうち中身があるのは 6 件だけ。トップの
+ * 「お茶のコレクション」= `single-item` は 0 件だった)。件数そのものは要らない
+ * ので 1 件だけ引く — `first: 250` にすると collections との積で Storefront の
+ * クエリコスト上限に当たる。
+ */
 export const GET_COLLECTIONS_QUERY = /* GraphQL */ `
   query GetCollections($first: Int = 20) {
     collections(first: $first) {
@@ -102,8 +111,39 @@ export const GET_COLLECTIONS_QUERY = /* GraphQL */ `
             title
             description
           }
+          products(first: 1) {
+            edges {
+              node {
+                id
+              }
+            }
+          }
         }
         cursor
+      }
+    }
+  }
+`;
+
+/**
+ * コレクションの所属商品 **handle だけ**。
+ *
+ * 商品一覧の `?category=` は productType 軸だが、トップ / 検索 / コレクション
+ * 一覧のタイルは**コレクション名**を渡してくる。コレクション名は productType と
+ * 一致しないことがある (`お茶のアソートセット` は緑茶・紅茶・烏龍茶にまたがる)
+ * ので、その場合は所属で絞る。突き合わせに要るのは handle だけなので他は引かない。
+ */
+export const GET_COLLECTION_PRODUCT_HANDLES_QUERY = /* GraphQL */ `
+  query GetCollectionProductHandles($handle: String!, $first: Int = 250) {
+    collection(handle: $handle) {
+      handle
+      title
+      products(first: $first) {
+        edges {
+          node {
+            handle
+          }
+        }
       }
     }
   }

@@ -1,0 +1,63 @@
+{
+  "$comment": [
+    "GENERATED-ASSISTED FILE — max は scripts/ops/check-ratchet.mjs --update が書く。",
+    "source / why は人が書く (何の表で、なぜ例外が要るのか)。",
+    "max を手で増やすだけの変更は、例外を増やしたことの申告である。",
+    "検査は両方向: 増えたら落ちる (例外を足した) / 減ったのに max が残っていても落ちる",
+    "(緩んだ枠を残すと、その分だけ黙って増やせる)。"
+  ],
+  "ratchets": {
+    "eslint-inline-disable": {
+      "max": 19,
+      "source": "app/** components/** lib/** sanity/** middleware.ts instrumentation.ts の eslint-disable コメント",
+      "why": "ソースに直接書く逃げ道。pnpm lint:prune-suppressions の縮小対象にならないので、放っておくと溜まる一方になる。",
+      "note": "16 → 19 (2026-08-27)。instrumentation.ts の 3 件で、いずれも process.env を生読みする no-restricted-syntax の disable。これは『例外を足した』のではなく、NEXT_RUNTIME / NODE_ENV をビルド時にリテラルへ畳ませるための必須要件 (畳めないと nodejs 分岐の firebase-admin が Edge の bundle に残り、Vercel のデプロイが unsupported modules で落ちる。#164 マージ後に実際に発生し #168 で修正)。理由の正本は instrumentation.ts の register() の doc comment。再発防止は scripts/ops/check-edge-bundle.mjs (required check の build に接続済み)。"
+    },
+    "eslint-suppressions-files": {
+      "max": 43,
+      "source": "eslint-suppressions.json のキー数",
+      "why": "件数だけでなく「どれだけ広い範囲が例外か」を別の角度で固定する。"
+    },
+    "eslint-suppressions-total": {
+      "max": 65,
+      "source": "eslint-suppressions.json の count 合計 (no-raw-colors 55 / section-spacing-utility 10)",
+      "why": "デザイントークン移行の積み残し。縮小方向にのみ動かす (pnpm lint:prune-suppressions)。"
+    },
+    "expected-failure-escapes": {
+      "max": 12,
+      "source": "app/** lib/** の `expected-failure:` コメント",
+      "why": "「失敗が答えである」の明示。正当な逃げ道だが、理由さえ書けば何でも通る形でもあるので数を固定する。"
+    },
+    "interaction-allowlist": {
+      "max": 15,
+      "source": "eslint-rules/mutation-through-shared-primitive.mjs の ALLOWLIST",
+      "why": "「押した瞬間に効く」共通 hook への未移行画面。表そのものが残りの移行計画を兼ねている。"
+    },
+    "interaction-exempt": {
+      "max": 431,
+      "source": "interaction-inventory.json の exempt を持つ行",
+      "why": "「この操作は応答を検査しない」と申告した操作。縮小方向にのみ動く。",
+      "note": "417 → 425 (2026-09-01)。顧客プロファイル 第1段 (web-app 画面側) で足した押せるもののうち、exempt に落ちたのは 8 件だけ。内訳は (a) 別ページへ移るだけの内部リンク 6 本 (/account/this-month の 3 本 = お問い合わせ・避けたいもの・ログイン、/account/safety の 1 本 = ログイン、safety-form の 1 本 = お問い合わせ、フッターの 1 本 = 今月のお茶) = 自動 exempt (b) this-month-board が子へ渡すコールバック props 2 件 (onSettled)。押されるのは子側のボタンで、そちらは cup-feedback-card / recipient-card の行として応答を宣言済み — ここを数えると同じ 1 操作が 2 行になる。新しく足した押せるもの 22 件のうち exempt はこの 8 件で、残り 11 件は sync-dom / pessimistic-form として応答を宣言し、e2e/interaction-response.spec.ts に手順も置いてある (ログイン必須の面なので CI では requiresMemberSession により理由付き skip。skip は pnpm report:e2e-skips が出す)。 418 → 417 (2026-08-31)。チャットの会話 ID をサーバ発行の署名付きにした変更で、LINE ログインボタンの onClick (localStorage の会話 ID を cookie に書き写すだけの処理) が不要になり削除されたぶん。操作が 1 つ消えたので上限も 1 つ下げる。416 → 418 (2026-08-29)。CDP 統合 Stage 4 で足した内部リンク 2 本 (フッターの茶葉診断 /diagnosis・診断結果から /products) がどちらも自動 exempt (別ページへ移るだけ) に落ちたぶん。新しく足した押せるもの 7 件のうち exempt はこの 2 件だけで、残り 5 件は sync-dom / async-fetch として応答を宣言してある。初期値 445 は憲章 R9 導入 (2026-08-27) 時点の据え置き。内訳は (a) 別ページへ移るだけの内部リンク = 自動 exempt (b) 第1段の据え置き。段階導入の理由は網羅表 §7: 機構と実際の遅さを一度に入れると、機構の不具合とプロダクトの遅さの区別がつかないまま大量の赤に埋もれる。先に『増えない』を確定させ、次に『減らす』に入る。減った分は本 ratchet が上限の引き下げを強制する。"
+    },
+    "interaction-unclassified": {
+      "max": 0,
+      "source": "interaction-inventory.json の response も exempt も無い行",
+      "why": "憲章 R9「押せるものは、全部台帳に載る」の本体。0 を維持する — 応答の宣言が無い操作を 1 件でも足すと落ちる。押せるものが台帳に載らないまま増えるのを止めるのがこの 0 の意味で、緩めると R9 は宣言だけになる。"
+    },
+    "silent-catch-grandfathered": {
+      "max": 0,
+      "source": "eslint-rules/no-silent-catch-at-boundary.mjs の GRANDFATHERED",
+      "why": "憲章 R1 の例外表。Wave 3 で着手時 75 件を全件処置して 0 になった。0 を維持する — 1 行足すと落ちる。"
+    },
+    "z-layer-fixed-allowlist": {
+      "max": 4,
+      "source": "__tests__/design-system/z-layer-scan.ts の FIXED_Z_ALLOWLIST",
+      "why": "名前付き z レイヤーの走査から外す区画 (shadcn 上流・dev プレビュー・Storybook)。"
+    },
+    "z-layer-pinned-exemptions": {
+      "max": 1,
+      "source": "__tests__/design-system/z-layer-scan.ts の PINNED_EXEMPTIONS",
+      "why": "生の z スケールを残している箇所。直った瞬間にテストが赤くなる形で運用しており、惰性で残らない。"
+    }
+  }
+}

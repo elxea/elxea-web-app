@@ -20,14 +20,16 @@
  * download / remote host is required.
  */
 
-import type { AccountView } from "@/lib/account-view";
+import { env } from "@/lib/config";
+import type { FavoriteInput } from "@/lib/account-favorites";
+import { type AccountView } from "@/lib/account-view";
 import type { SubscriptionContract } from "@/lib/shopify/customer";
 import type { Cart } from "@/lib/shopify/types";
 
 /** True when preview seeding is enabled via either the unified or legacy flag. */
 export function previewSeedEnabled(): boolean {
   return (
-    process.env.PREVIEW_SEED === "1" || process.env.PREVIEW_SEED_EVENTS === "1"
+    env("PREVIEW_SEED") === "1" || env("PREVIEW_SEED_EVENTS") === "1"
   );
 }
 
@@ -87,7 +89,7 @@ const PREVIEW_IMAGES = [
  * Default (flag unset) behaviour is byte-identical to before.
  */
 export function previewSeedDeterministic(): boolean {
-  return process.env.PREVIEW_SEED_DETERMINISTIC === "1";
+  return env("PREVIEW_SEED_DETERMINISTIC") === "1";
 }
 
 /** Deterministic image by numeric index (cycles through the pool). */
@@ -777,7 +779,7 @@ export function seedCart(): Cart | null {
           product: product("sencha-akane", "煎茶 茜 -akane-"),
           price: jpy("1800"),
         },
-        cost: { totalAmount: jpy("3600") },
+        cost: { totalAmount: jpy("3600"), amountPerQuantity: jpy("1800") },
         sellingPlanAllocation: {
           sellingPlan: {
             id: `${SEED_ID_PREFIX}selling-plan-monthly`,
@@ -795,7 +797,7 @@ export function seedCart(): Cart | null {
           product: product("gyokuro-midori", "玉露 翠 -midori-"),
           price: jpy("2400"),
         },
-        cost: { totalAmount: jpy("2400") },
+        cost: { totalAmount: jpy("2400"), amountPerQuantity: jpy("2400") },
         sellingPlanAllocation: null,
       },
     ],
@@ -820,6 +822,100 @@ export function seedCart(): Cart | null {
  * - 実在の顧客データは 1 件も含まない。メールは予約ドメイン (example.com) の見本
  * - 実セッションがあるときは呼ばれない (実データが優先。見本で上書きしない)
  */
+/**
+ * 見本のお気に入り (計測用)。
+ *
+ * お気に入り一覧 (/ja/account/favorites) は Firestore の実データで描くため、
+ * ログインしていない手元では 1 件も出ず、種類別の並びや解除ボタンの体裁を実寸で
+ * 見られない。ここで **種類が混ざった見本** を返し、フラグ未設定時は `null`
+ * (= 実データ経路のまま / production は素通り) にする。
+ *
+ * 形は Firestore の生ドキュメントに合わせる (`type` / `targetId` / `title` /
+ * `imageUrl` / `createdAt`)。正規化・種類分けは実データと同じ関数を通るので、
+ * 見本のためだけの描画経路は増えない。
+ */
+export function seedFavorites(): FavoriteInput[] | null {
+  if (!previewSeedEnabled()) return null;
+
+  return [
+    {
+      id: `${SEED_ID_PREFIX}favorite-article-1`,
+      type: "article",
+      targetId: "seed-journal-0",
+      title: "火入れという時間のかけ方",
+      imageUrl: previewImageAt(0),
+      createdAt: "2026-08-18T02:00:00.000Z",
+    },
+    {
+      id: `${SEED_ID_PREFIX}favorite-article-2`,
+      type: "article",
+      targetId: "seed-journal-1",
+      title: "八女、白折の朝",
+      imageUrl: previewImageAt(1),
+      createdAt: "2026-08-11T02:00:00.000Z",
+    },
+    {
+      id: `${SEED_ID_PREFIX}favorite-article-3`,
+      type: "article",
+      targetId: "seed-journal-2",
+      title: "水のかたさと、抽出の話",
+      imageUrl: previewImageAt(2),
+      createdAt: "2026-07-30T02:00:00.000Z",
+    },
+    {
+      id: `${SEED_ID_PREFIX}favorite-article-4`,
+      type: "article",
+      targetId: "seed-journal-3",
+      title: "茶園の一年をたどる",
+      imageUrl: previewImageAt(3),
+      createdAt: "2026-07-12T02:00:00.000Z",
+    },
+    {
+      id: `${SEED_ID_PREFIX}favorite-product-1`,
+      type: "product",
+      targetId: "seed-product-0",
+      title: "深蒸し煎茶「やまかげ」",
+      imageUrl: previewImageAt(4),
+      createdAt: "2026-08-16T02:00:00.000Z",
+    },
+    {
+      id: `${SEED_ID_PREFIX}favorite-product-2`,
+      type: "product",
+      targetId: "seed-product-1",
+      title: "釜炉り茶「そらね」",
+      imageUrl: previewImageAt(5),
+      createdAt: "2026-08-02T02:00:00.000Z",
+    },
+    {
+      id: `${SEED_ID_PREFIX}favorite-product-3`,
+      type: "product",
+      targetId: "seed-product-2",
+      title: "玉露「はつしも」",
+      imageUrl: previewImageAt(6),
+      createdAt: "2026-07-21T02:00:00.000Z",
+    },
+    /* 人 (F4 で足した 3 つ目の種類)。見本にも入れておかないと、実寸確認のとき
+       「お気に入りの人」節が常に 0 件で、節の見た目 (カード・解除) を目で
+       確かめられない。targetId は /people/[slug] の slug。 */
+    {
+      id: `${SEED_ID_PREFIX}favorite-person-1`,
+      type: "person",
+      targetId: "seed-person-0",
+      title: "久保 雅之",
+      imageUrl: previewImageAt(7),
+      createdAt: "2026-08-19T02:00:00.000Z",
+    },
+    {
+      id: `${SEED_ID_PREFIX}favorite-person-2`,
+      type: "person",
+      targetId: "seed-person-1",
+      title: "西村 藍",
+      imageUrl: previewImageAt(8),
+      createdAt: "2026-08-05T02:00:00.000Z",
+    },
+  ];
+}
+
 export function seedAccountView(): AccountView | null {
   if (!previewSeedEnabled()) return null;
 
@@ -849,22 +945,9 @@ export function seedAccountView(): AccountView | null {
         href: "/events/seed-event-2",
       },
     ],
-    continueItems: [
-      {
-        id: `${SEED_ID_PREFIX}account-favorite-1`,
-        kind: "favorite-article",
-        title: "火入れという時間のかけ方",
-        imageUrl: previewImageAt(0),
-        href: "/journal/seed-journal-0",
-      },
-      {
-        id: `${SEED_ID_PREFIX}account-favorite-2`,
-        kind: "favorite-article",
-        title: "八女、白折の朝",
-        imageUrl: previewImageAt(1),
-        href: "/journal/seed-journal-1",
-      },
-    ],
+    /* 「続き」は見本のお気に入り (`seedFavorites`) から組む。一覧ページ
+       (/account/favorites) と同じ素材を使うので、抜粋 6 枚と一覧の中身が
+       食い違わない。 */
     past: [
       {
         id: `${SEED_ID_PREFIX}account-order-1`,
@@ -1007,7 +1090,7 @@ export function seedEventDetail(slug: string): SeedEventDetail | null {
  */
 export function seedSubscriptionContracts(): SubscriptionContract[] | null {
   if (!previewSeedEnabled()) return null;
-  if (process.env.PREVIEW_SEED_SUBSCRIPTIONS_EMPTY === "1") return [];
+  if (env("PREVIEW_SEED_SUBSCRIPTIONS_EMPTY") === "1") return [];
 
   const line = (
     key: string,

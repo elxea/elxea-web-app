@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { getLocale, getTranslations } from "next-intl/server";
 import { Sprout } from "lucide-react";
 
-import { getClient } from "@/sanity/lib/client";
+import { sanityFetch } from "@/sanity/lib/fetch";
 import {
   ARTICLES_BY_CATEGORY_ASC_QUERY,
   ARTICLES_BY_CATEGORY_COUNT_QUERY,
@@ -71,8 +71,10 @@ export async function generateMetadata({
   const { slug } = await params;
   try {
     const locale = await getLocale();
-    const categories: CategoryItem[] = await getClient().fetch(CATEGORIES_WITH_COUNTS_QUERY, {
-      language: locale,
+    const categories: CategoryItem[] = await sanityFetch({
+      query: CATEGORIES_WITH_COUNTS_QUERY,
+      params: { language: locale },
+      cache: { tag: "sanity:categories" },
     });
     const category = categories?.find((c) => c.slug?.current === slug);
     if (!category) return {};
@@ -101,8 +103,6 @@ export default async function CategoryPage({
   const tCommon = await getTranslations("common");
   const tl = await getTranslations("catalog");
 
-  const client = getClient();
-
   const sort = query.sort === "oldest" ? "oldest" : "newest";
   const show = Math.max(PAGE_SIZE, Number(query.show) || PAGE_SIZE);
 
@@ -114,14 +114,21 @@ export default async function CategoryPage({
   let total = 0;
   try {
     [rawCategories, articles, total] = await Promise.all([
-      client.fetch(CATEGORIES_WITH_COUNTS_QUERY, { language: locale }),
-      client.fetch(
-        sort === "oldest" ? ARTICLES_BY_CATEGORY_ASC_QUERY : ARTICLES_BY_CATEGORY_QUERY,
-        { language: locale, categorySlug: slug, start: 0, end: show }
-      ),
-      client.fetch(ARTICLES_BY_CATEGORY_COUNT_QUERY, {
-        language: locale,
-        categorySlug: slug,
+      sanityFetch<CategoryItem[]>({
+        query: CATEGORIES_WITH_COUNTS_QUERY,
+        params: { language: locale },
+        cache: { tag: "sanity:categories" },
+      }),
+      sanityFetch<ArticleItem[]>({
+        query:
+          sort === "oldest" ? ARTICLES_BY_CATEGORY_ASC_QUERY : ARTICLES_BY_CATEGORY_QUERY,
+        params: { language: locale, categorySlug: slug, start: 0, end: show },
+        cache: { tag: "sanity:articles" },
+      }),
+      sanityFetch<number>({
+        query: ARTICLES_BY_CATEGORY_COUNT_QUERY,
+        params: { language: locale, categorySlug: slug },
+        cache: { tag: "sanity:articles" },
       }),
     ]);
   } catch {

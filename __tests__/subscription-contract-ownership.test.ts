@@ -2,9 +2,17 @@
  * Tests for Customer Account API 所有者照合 + 定期便スキップの引数形状。
  *
  * この層が守るべき契約:
- *   1. verifySubscriptionContractOwnership は「所有が積極的に証明できたときだけ」true。
- *      HTTP エラー / GraphQL エラー / contract=null / GID 形式不正 / 別契約 ID の
- *      いずれも false（fail-closed）。判定不能を「たぶん所有者」に丸めない。
+ *   1. verifySubscriptionContractOwnership は「所有が積極的に証明できたときだけ」
+ *      `{ ok: true, data: true }`。HTTP エラー / GraphQL エラー / contract=null /
+ *      GID 形式不正 / 別契約 ID のいずれも操作を通さない（fail-closed）。
+ *      判定不能を「たぶん所有者」に丸めない。
+ *
+ *      さらに（設計憲章 R1 / Wave 0）**「所有していない」と「確かめられなかった」を
+ *      別の値で返す**ことを検査する。両者を `false` に潰していた頃は、Sentry に
+ *      並ぶのが `NOT_AUTHORIZED` だけになり、**不正アクセスと Shopify 障害が
+ *      同じ 1 行**になってアラートが引けなかった。fail-closed は不変で、
+ *      区別できることだけを足している — この 2 つを取り違えないことが要点なので、
+ *      「拒否される」と「理由が分かれている」を必ず両方 assert する。
  *   2. resolveNextBillingCycleIndex は upcomingBillingCycles の実データから
  *      「まだ skip されていない最初のサイクル」の cycleIndex を返す。
  *      判定不能は null（既定値 0 へフォールバックしない。index は 1-based）。
@@ -93,7 +101,7 @@ describe("verifySubscriptionContractOwnership", () => {
 
     await expect(
       verifySubscriptionContractOwnership(TOKEN, CONTRACT_GID)
-    ).resolves.toBe(true);
+    ).resolves.toEqual({ ok: true, data: true });
 
     // Ownership is asked of the token holder's own `customer` scope.
     const body = requestBody(0);
@@ -105,67 +113,99 @@ describe("verifySubscriptionContractOwnership", () => {
     });
   });
 
-  it("returns false when the contract is not the caller's (null contract)", async () => {
+  /* ---- 「所有していない」と**確定した**ケース: ok:true / data:false ---------
+   *
+   * Shopify は正常に答えている。答えの中身が「あなたのものではない」なだけなので、
+   * これは判定不能ではない。ここを `ok:false` に混ぜると、本物の不正アクセスが
+   * 障害アラートに埋もれる。 */
+
+  it("returns a definitive 'not owned' when the contract is not the caller's (null contract)", async () => {
     stubFetch({ body: { data: { customer: { subscriptionContract: null } } } });
 
     await expect(
       verifySubscriptionContractOwnership(TOKEN, OTHER_CONTRACT_GID)
-    ).resolves.toBe(false);
+    ).resolves.toEqual({ ok: true, data: false });
   });
 
-  it("returns false when the API returns a different contract id", async () => {
+  it("returns a definitive 'not owned' when the API returns a different contract id", async () => {
     stubFetch({
       body: { data: { customer: { subscriptionContract: { id: OTHER_CONTRACT_GID } } } },
     });
 
     await expect(
       verifySubscriptionContractOwnership(TOKEN, CONTRACT_GID)
-    ).resolves.toBe(false);
+    ).resolves.toEqual({ ok: true, data: false });
   });
 
-  it("fails closed on GraphQL errors", async () => {
+  it("rejects a malformed contract id without calling the API (definitive)", async () => {
+    stubFetch({ body: { data: { customer: { subscriptionContract: { id: CONTRACT_GID } } } } });
+
+    await expect(
+      verifySubscriptionContractOwnership(TOKEN, "gid://shopify/Customer/1111")
+    ).resolves.toEqual({ ok: true, data: false });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects an empty access token without calling the API (definitive)", async () => {
+    stubFetch({ body: { data: { customer: { subscriptionContract: { id: CONTRACT_GID } } } } });
+
+    await expect(
+      verifySubscriptionContractOwnership("", CONTRACT_GID)
+    ).resolves.toEqual({ ok: true, data: false });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  /* ---- 「確かめられなかった」ケース: ok:false ------------------------------
+   *
+   * どれも従来は `false` に潰れていた。`data` を持たない形で返るので、
+   * 呼び出し側が `result.data` を読んで「所有していない」と解釈することが
+   * **型の上で** できない。 */
+
+  it("reports GraphQL errors as unverifiable, not as 'not owned'", async () => {
     stubFetch({ body: { errors: [{ message: "Access denied" }] } });
 
-    await expect(
-      verifySubscriptionContractOwnership(TOKEN, CONTRACT_GID)
-    ).resolves.toBe(false);
+    const result = await verifySubscriptionContractOwnership(TOKEN, CONTRACT_GID);
+
+    expect(result).toEqual({ ok: false, reason: "upstream-unavailable" });
+    expect(result).not.toHaveProperty("data");
   });
 
-  it("fails closed on an HTTP error", async () => {
+  it("reports an HTTP error as unverifiable, not as 'not owned'", async () => {
     stubFetch({ ok: false, status: 403, body: {} });
 
-    await expect(
-      verifySubscriptionContractOwnership(TOKEN, CONTRACT_GID)
-    ).resolves.toBe(false);
+    const result = await verifySubscriptionContractOwnership(TOKEN, CONTRACT_GID);
+
+    expect(result).toEqual({ ok: false, reason: "upstream-unavailable" });
+    expect(result).not.toHaveProperty("data");
   });
 
-  it("fails closed when the request throws (network failure)", async () => {
+  it("reports a network failure as unverifiable, not as 'not owned'", async () => {
     fetchMock = vi.fn(async () => {
       throw new Error("network down");
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(
-      verifySubscriptionContractOwnership(TOKEN, CONTRACT_GID)
-    ).resolves.toBe(false);
+    const result = await verifySubscriptionContractOwnership(TOKEN, CONTRACT_GID);
+
+    expect(result).toEqual({ ok: false, reason: "upstream-unavailable" });
+    expect(result).not.toHaveProperty("data");
   });
 
-  it("rejects a malformed contract id without calling the API", async () => {
-    stubFetch({ body: { data: { customer: { subscriptionContract: { id: CONTRACT_GID } } } } });
+  /* ---- 取り違え防止そのものの検査 -----------------------------------------
+   *
+   * 上の 2 群が**別々の値**になっていることを 1 つの assert で固定する。
+   * どちらかを他方に丸める実装（`ok` を落とす / 失敗時に `data:false` を足す）は
+   * ここで落ちる。 */
+  it("keeps 'not owned' and 'could not verify' distinguishable", async () => {
+    stubFetch({ body: { data: { customer: { subscriptionContract: null } } } });
+    const notOwned = await verifySubscriptionContractOwnership(TOKEN, CONTRACT_GID);
 
-    await expect(
-      verifySubscriptionContractOwnership(TOKEN, "gid://shopify/Customer/1111")
-    ).resolves.toBe(false);
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
+    stubFetch({ ok: false, status: 500, body: {} });
+    const unverifiable = await verifySubscriptionContractOwnership(TOKEN, CONTRACT_GID);
 
-  it("rejects an empty access token without calling the API", async () => {
-    stubFetch({ body: { data: { customer: { subscriptionContract: { id: CONTRACT_GID } } } } });
-
-    await expect(
-      verifySubscriptionContractOwnership("", CONTRACT_GID)
-    ).resolves.toBe(false);
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(notOwned).not.toEqual(unverifiable);
+    expect(notOwned.ok).toBe(true);
+    expect(unverifiable.ok).toBe(false);
   });
 });
 

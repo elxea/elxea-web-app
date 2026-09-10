@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import { validateWebhookRequest } from "@/lib/shopify/webhooks/verify";
+import { env } from "@/lib/config";
 
 /**
  * Shopify INVENTORY_LEVELS_UPDATE webhook handler.
@@ -56,7 +57,7 @@ export async function POST(request: NextRequest) {
     // Trigger pipeline job notification (non-blocking)
     // The actual inventory-monitor pipeline will pick this up
     // via its next scheduled run or via a trigger mechanism
-    const triggerUrl = process.env.PIPELINE_TRIGGER_URL;
+    const triggerUrl = env("PIPELINE_TRIGGER_URL");
     if (triggerUrl) {
       fetch(triggerUrl, {
         method: "POST",

@@ -2,6 +2,7 @@ import * as React from "react";
 
 import { Link } from "@/i18n/navigation";
 import { ImageCard } from "@/components/media/image-card";
+import { MoreRowProgress } from "@/components/catalog/more-row-progress";
 import { pillClass } from "@/components/ui/pill-button";
 import {
   bodySmClass,
@@ -233,9 +234,15 @@ export function MoreRow({
       {/* Figma `Button / Pill (Module)` 8171:286 の注記「Journal R2 の手作り
           『Button / もっと見る (pill)』フレーム群は本部品のインスタンスへ
           置換すること」に従い、手組みの pill を DS 部品へ寄せる。
-          hover / active / disabled は pillClass が一括で持つ。 */}
-      <Link href={href} className={pillClass("outline")}>
-        {label}
+          hover / active / disabled は pillClass が一括で持つ。
+
+          `prefetch` を明示しているのは、この行き先が `?show=` 付きの動的な
+          ページで、既定 (auto) では**中身まで温まらない**ため (網羅表 G6)。
+          この pill は一覧のいちばん下に居るので、先読みが走るのは客がそこまで
+          スクロールしたとき = まさに押す直前で、無駄撃ちになりにくい。
+          進行の印は `MoreRowProgress` が `useLinkStatus` で出す。 */}
+      <Link href={href} prefetch className={pillClass("outline")} data-slot="more-row-link">
+        <MoreRowProgress label={label} />
       </Link>
     </div>
   );

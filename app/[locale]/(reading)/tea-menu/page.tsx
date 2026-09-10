@@ -3,7 +3,7 @@ import { getLocale, getTranslations } from "next-intl/server";
 
 import { Sprout } from "lucide-react";
 
-import { getClient } from "@/sanity/lib/client";
+import { sanityFetch } from "@/sanity/lib/fetch";
 import { CATEGORY_LABELS_QUERY, TEA_MENUS_QUERY } from "@/sanity/lib/queries";
 import { urlFor } from "@/sanity/lib/image";
 import { Link } from "@/i18n/navigation";
@@ -98,15 +98,22 @@ async function TeaMenuList({ params }: { params: SearchParams }) {
   let items: TeaMenuItem[];
   let categoryLabels: CategoryLabel[] = [];
   try {
-    const client = getClient();
     // 本番データセットに残っている架空・シードのお茶メニューは読み取り層で落とす
     // (#66 / Sanity は変更しない)。空になったときの出口は下の EmptyState が担う。
     items = filterOutFictional(
       "teaMenu",
-      (await client.fetch(TEA_MENUS_QUERY, { language: locale })) ?? []
+      (await sanityFetch<TeaMenuItem[]>({
+        query: TEA_MENUS_QUERY,
+        params: { language: locale },
+        cache: { tag: "sanity:tea-menus" },
+      })) ?? []
     );
     // 表示名は CMS 側の正本を引く。取得に失敗しても一覧は出す (生値で退避)。
-    categoryLabels = (await client.fetch(CATEGORY_LABELS_QUERY).catch(() => [])) ?? [];
+    categoryLabels =
+      (await sanityFetch<CategoryLabel[]>({
+        query: CATEGORY_LABELS_QUERY,
+        cache: { tag: "sanity:categories" },
+      }).catch(() => [])) ?? [];
   } catch {
     return <p className="mt-8 text-sm text-muted-foreground lg:mt-12">{t("loadError")}</p>;
   }

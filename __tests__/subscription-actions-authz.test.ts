@@ -28,6 +28,15 @@ vi.mock("@/lib/shopify/auth", () => ({
 }));
 
 const verifyOwnershipMock = vi.fn();
+
+/* 所有者照合の 3 値 (設計憲章 R1 / Wave 0)。
+ *
+ * `NOT_OWNED` は「他人の契約だと**確定した**」、`UNVERIFIABLE` は「Shopify が
+ * 答えず**確かめられなかった**」。顧客に返る文言は両方とも同じ一般化文言だが
+ * (契約 ID の存在を探らせないため)、サーバー側では別物として扱う。 */
+const OWNED = { ok: true as const, data: true };
+const NOT_OWNED = { ok: true as const, data: false };
+const UNVERIFIABLE = { ok: false as const, reason: "upstream-unavailable" as const };
 const skipNextBillingCycleMock = vi.fn();
 const pauseSubscriptionMock = vi.fn();
 const activateSubscriptionMock = vi.fn();
@@ -98,7 +107,7 @@ beforeEach(() => {
 
 describe("changeDeliveryFrequencyAction — 所有者照合", () => {
   it("rejects a contract owned by another customer without touching the Admin API", async () => {
-    verifyOwnershipMock.mockResolvedValue(false);
+    verifyOwnershipMock.mockResolvedValue(NOT_OWNED);
 
     const result = await changeDeliveryFrequencyAction(OTHER_CONTRACT, "MONTH", 1);
 
@@ -116,7 +125,7 @@ describe("changeDeliveryFrequencyAction — 所有者照合", () => {
   });
 
   it("rejects a malformed contract id without even verifying", async () => {
-    verifyOwnershipMock.mockResolvedValue(true);
+    verifyOwnershipMock.mockResolvedValue(OWNED);
 
     const result = await changeDeliveryFrequencyAction("1111", "MONTH", 1);
 
@@ -127,7 +136,7 @@ describe("changeDeliveryFrequencyAction — 所有者照合", () => {
 
   it("rejects an unauthenticated caller without verifying or calling the Admin API", async () => {
     getSessionMock.mockResolvedValue(null);
-    verifyOwnershipMock.mockResolvedValue(true);
+    verifyOwnershipMock.mockResolvedValue(OWNED);
 
     const result = await changeDeliveryFrequencyAction(OWN_CONTRACT, "MONTH", 1);
 
@@ -137,18 +146,34 @@ describe("changeDeliveryFrequencyAction — 所有者照合", () => {
   });
 
   it("does not distinguish 'not owned' from 'verification failed' in the message", async () => {
-    verifyOwnershipMock.mockResolvedValue(false);
+    verifyOwnershipMock.mockResolvedValue(NOT_OWNED);
     const notOwned = await changeDeliveryFrequencyAction(OTHER_CONTRACT, "MONTH", 1);
 
-    verifyOwnershipMock.mockResolvedValue(false);
+    verifyOwnershipMock.mockResolvedValue(NOT_OWNED);
     const malformed = await changeDeliveryFrequencyAction("gid://shopify/Customer/9", "MONTH", 1);
 
     expect(notOwned.error).toBe(DENIED);
     expect(malformed.error).toBe(DENIED);
   });
 
+  /**
+   * 照合できなかったときも **fail-closed のまま**で、顧客に見える文言も変わらない。
+   *
+   * Wave 0 で変えたのはサーバー側の記録だけなので、外から見える振る舞いが 1 ミリも
+   * 動いていないことをここで固定する。ここが緩むと「Shopify が落ちている間だけ
+   * 他人の契約を操作できる」という最悪の壊し方になる。
+   */
+  it("still fails closed — with the same customer-facing message — when ownership cannot be verified", async () => {
+    verifyOwnershipMock.mockResolvedValue(UNVERIFIABLE);
+
+    const result = await changeDeliveryFrequencyAction(OWN_CONTRACT, "MONTH", 1);
+
+    expect(result).toEqual({ success: false, error: DENIED });
+    expect(updateSubscriptionContractMock).not.toHaveBeenCalled();
+  });
+
   it("proceeds for the owner, verifying with the session token first", async () => {
-    verifyOwnershipMock.mockResolvedValue(true);
+    verifyOwnershipMock.mockResolvedValue(OWNED);
 
     const result = await changeDeliveryFrequencyAction(OWN_CONTRACT, "MONTH", 2);
 
@@ -165,7 +190,7 @@ describe("changeDeliveryFrequencyAction — 所有者照合", () => {
   });
 
   it("rejects a frequency the store does not actually sell", async () => {
-    verifyOwnershipMock.mockResolvedValue(true);
+    verifyOwnershipMock.mockResolvedValue(OWNED);
 
     // 毎週 / 隔週は Shopify に selling plan が無い。画面が古くても、あるいは
     // リクエストを直接作られても、実在しない頻度で契約を書き換えさせない。
@@ -178,7 +203,7 @@ describe("changeDeliveryFrequencyAction — 所有者照合", () => {
   });
 
   it("still validates the interval payload before authorizing", async () => {
-    verifyOwnershipMock.mockResolvedValue(true);
+    verifyOwnershipMock.mockResolvedValue(OWNED);
 
     // @ts-expect-error deliberately invalid interval from an untrusted caller
     const badInterval = await changeDeliveryFrequencyAction(OWN_CONTRACT, "FORTNIGHT", 1);
@@ -236,7 +261,7 @@ describe("エラーメッセージに内部情報を載せない", () => {
   });
 
   it("Admin API が生メッセージで落ちても、それを顧客に返さない", async () => {
-    verifyOwnershipMock.mockResolvedValue(true);
+    verifyOwnershipMock.mockResolvedValue(OWNED);
     updateSubscriptionContractMock.mockRejectedValue(
       new Error("Shopify subscriptionDraftCommit failed: internal draft 998877")
     );

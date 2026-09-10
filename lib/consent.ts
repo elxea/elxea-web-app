@@ -20,8 +20,10 @@
  *    the last resort so the banner at least stays dismissed for that visit.
  */
 
+import { COOKIE_NAME } from "@/lib/auth/cookie-names";
+
 export const CONSENT_STORAGE_KEY = "cookie-consent";
-export const CONSENT_COOKIE_NAME = "cookie_consent";
+export const CONSENT_COOKIE_NAME = COOKIE_NAME.cookieConsent;
 
 /** 180 days. Long enough not to nag, short enough to re-ask within a year. */
 export const CONSENT_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 180;

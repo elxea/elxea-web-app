@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { getLocale, getTranslations } from "next-intl/server";
 import { Sprout } from "lucide-react";
 
-import { getClient } from "@/sanity/lib/client";
+import { sanityFetch } from "@/sanity/lib/fetch";
 import {
   ARTICLES_BY_CATEGORY_QUERY,
   ARTICLES_QUERY,
@@ -79,15 +79,21 @@ export default async function JournalCategoryIndexPage() {
   const tCommon = await getTranslations("common");
   const tl = await getTranslations("catalog");
 
-  const client = getClient();
-
   let rawCategories: CategoryItem[] = [];
   let newestArticles: ArticleItem[] = [];
   try {
     [rawCategories, newestArticles] = await Promise.all([
-      client.fetch(CATEGORIES_WITH_COUNTS_QUERY, { language: locale }),
+      sanityFetch<CategoryItem[]>({
+        query: CATEGORIES_WITH_COUNTS_QUERY,
+        params: { language: locale },
+        cache: { tag: "sanity:categories" },
+      }),
       // 「最終更新」に使う最新 1 件だけ。全件を引く必要はない。
-      client.fetch(ARTICLES_QUERY, { language: locale, start: 0, end: 1 }),
+      sanityFetch<ArticleItem[]>({
+        query: ARTICLES_QUERY,
+        params: { language: locale, start: 0, end: 1 },
+        cache: { tag: "sanity:articles" },
+      }),
     ]);
   } catch {
     return (
@@ -119,11 +125,15 @@ export default async function JournalCategoryIndexPage() {
   try {
     shelves = await Promise.all(
       categories.map((cat) =>
-        client.fetch(ARTICLES_BY_CATEGORY_QUERY, {
-          language: locale,
-          categorySlug: cat.slug.current,
-          start: 0,
-          end: SHELF_SIZE,
+        sanityFetch<ArticleItem[]>({
+          query: ARTICLES_BY_CATEGORY_QUERY,
+          params: {
+            language: locale,
+            categorySlug: cat.slug.current,
+            start: 0,
+            end: SHELF_SIZE,
+          },
+          cache: { tag: "sanity:articles" },
         })
       )
     );

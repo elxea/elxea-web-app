@@ -1,9 +1,9 @@
 "use client";
 
-import * as Sentry from "@sentry/nextjs";
 import { useTranslations, useLocale } from "next-intl";
 import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import { logger } from "@/lib/log";
 
 /**
  * Account-specific error boundary.
@@ -12,6 +12,11 @@ import { Button } from "@/components/ui/button";
  * that occur when the Shopify Customer Account API is unreachable or
  * the user's session is in an invalid state. Instead of showing a
  * generic error, we offer a retry and a link back to login.
+ *
+ * 記録は `lib/log` を通す (憲章 Wave 3 / R1)。ここは会員資格・定期便が見える
+ * 区画なので、「顧客に契約が見えていない」を数えられる形で残す必要がある。
+ * 通信断かどうかの判定結果もそのまま記録に載せる — 上流障害とアプリ側の欠陥を
+ * 後から切り分ける手がかりになる。
  */
 export default function AccountError({
   error,
@@ -24,14 +29,17 @@ export default function AccountError({
   const tAccount = useTranslations("account");
   const locale = useLocale();
 
-  useEffect(() => {
-    Sentry.captureException(error);
-  }, [error]);
-
   const isLoadFailed =
     error.message?.includes("Load failed") ||
     error.message?.includes("fetch failed") ||
     error.message?.includes("network");
+
+  useEffect(() => {
+    logger.error("ui.boundary.account", error, {
+      digest: error.digest,
+      isLoadFailed,
+    });
+  }, [error, isLoadFailed]);
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] px-6 text-center">

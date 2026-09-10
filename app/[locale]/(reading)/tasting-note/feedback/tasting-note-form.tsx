@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Link } from "@/i18n/navigation";
 import { Leaf } from "lucide-react";
+import { getOrIssueAnonymousId } from "@/lib/cdp/anonymous-id";
 
 const TOTAL_STEPS = 5;
 
@@ -98,6 +99,11 @@ export function TastingNoteForm() {
       setSubmitting(true);
       setError(false);
       try {
+        /* CDP 統合 Stage 4: 匿名の人の回答も L0 に積めるようにする。
+           `getOrIssueAnonymousId()` は同意 (consent="all") が無ければ null を返し、
+           その場合は送らない = 端末に痕跡も残さない。会員は身元がサーバ側で
+           解決できるので送らなくてよい (behavior-tracker と同じ方針)。 */
+        const anonymousId = getOrIssueAnonymousId();
         const res = await fetch("/api/survey", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -108,6 +114,7 @@ export function TastingNoteForm() {
             improvement_suggestion: data.improvement_suggestion || null,
             nps: data.nps,
             round: 1,
+            ...(anonymousId ? { anonymousId } : {}),
           }),
         });
         if (!res.ok) throw new Error("Submit failed");

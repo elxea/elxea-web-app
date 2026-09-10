@@ -1,3 +1,5 @@
+import { logger } from "@/lib/log";
+
 import { adminFetch, throwOnUserErrors } from "./admin-client";
 import {
   SELLING_PLAN_GROUP_CREATE_MUTATION,
@@ -623,8 +625,13 @@ export async function addMembershipTag(
         query: CUSTOMER_TAGS_REMOVE_MUTATION,
         variables: { id: customerId, tags: [...tagsToRemove] },
       });
-    } catch {
-      // Non-critical — tags might not exist
+    } catch (err) {
+      /* 元からタグが無いだけのこともあるので、ここでタグ付けを止めはしない。ただし
+         Admin API 側の障害だと下位プランのタグが残り、会員資格の見え方が食い違う。 */
+      logger.error("shopify.customer-tags.remove-failed", err, {
+        customerId,
+        tier,
+      });
     }
   }
 

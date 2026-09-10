@@ -12,9 +12,11 @@
  * 4. メールアドレスでログインは /api/auth/login → Shopify OAuth (PKCE)
  */
 import { Suspense } from "react";
+import { cookies, headers } from "next/headers";
 import { getTranslations, getLocale } from "next-intl/server";
 import {
   AuthCard,
+  AuthCardBanner,
   AuthCardActions,
   AuthCardDescription,
   AuthCardDivider,
@@ -26,7 +28,12 @@ import {
 } from "@/components/auth/auth-card";
 import { Button } from "@/components/ui/button";
 import { Link } from "@/i18n/navigation";
-import { LineLoginButton } from "./line-login-button";
+import { hasLineSessionCookies } from "@/lib/auth/cookies";
+import {
+  classifyAutoLoginEnvironment,
+  shouldWarnAboutAutoLogin,
+} from "@/lib/line/auto-login-environment";
+import { LineLoginButton, LineLoginButtonFallback } from "./line-login-button";
 import { LinkSuccessBanner } from "./link-success-banner";
 import { AuthErrorBanner } from "./auth-error-banner";
 
@@ -41,9 +48,51 @@ export default async function LoginPage() {
   const t = await getTranslations("login");
   const locale = await getLocale();
 
+  /* LINE だけで入っている人がこの画面に来たときは、**飛ばさずに知らせる**。
+   *
+   * Shopify セッションがある人は middleware がマイページへ送る (押しても得るものが
+   * 無いため)。LINE だけの人はここが連携の入口なので画面を出す必要があるが、素の
+   * ログイン画面に見えると「ログアウトしている」と誤解する。もう入っていることと、
+   * メールで入ると同じアカウントにまとまることを 1 行で言う。 */
+  const loginCookies = await cookies();
+  const signedInWithLineOnly = hasLineSessionCookies((name) =>
+    loginCookies.has(name),
+  );
+
+  /* 自動ログインが公式に成立しない環境 (iPhone の Safari 以外 / アプリ内ブラウザ) に
+   * 出す一言。
+   *
+   * この環境ではボタンのタップ先自体が変わり、LINE アプリに結び付いた URL へ直接
+   * 着地する (`lib/line/authorize-url.ts` / 判定は同じ `auto-login-environment.ts`)。
+   * よって案内の役割も変わった — 「Safari で開き直してから押せ」という**前提条件**
+   * ではなく、それでもアプリが開かなかったときの**逃げ道**を先に置いておく。
+   * アプリ未インストールや、アプリ内 WebView が外部アプリを開かない設定では、
+   * 依然として access.line.me のメール/パスワード/QR 画面に着く。一般の利用者は
+   * LINE のパスワードを覚えておらず、スマホ 1 台では QR も読めないので、そこが
+   * 実際の離脱点である (オーナー指摘 2026-08-30)。
+   *
+   * 判定は UA なので確実ではない。よって**ボタンは塞がず、案内だけ足す**。
+   *
+   * サーバ側で判定するのは、クライアントで出すと一度ボタンだけが描かれてから
+   * 案内が遅れて現れ、その間に押されてしまうため。 */
+  const autoLoginEnv = classifyAutoLoginEnvironment(
+    (await headers()).get("user-agent"),
+  );
+  const autoLoginNoticeKey = shouldWarnAboutAutoLogin(autoLoginEnv)
+    ? autoLoginEnv === "ios-other-browser"
+      ? "autoLoginBrowserNotice"
+      : "autoLoginWebviewNotice"
+    : null;
+
   return (
     <AuthSection>
       <AuthCard>
+        {signedInWithLineOnly ? (
+          <AuthCardBanner tone="success" data-testid="login-line-session-notice">
+            {t("alreadySignedInWithLine")}
+          </AuthCardBanner>
+        ) : null}
+
         {/* 状態バナー — Figma 6706:14468「カード上部に条件表示（該当クエリ時のみ）」 */}
         <Suspense fallback={null}>
           <AuthErrorBanner />
@@ -61,7 +110,44 @@ export default async function LoginPage() {
 
         {/* Actions 6702:9014 */}
         <AuthCardActions>
-          <LineLoginButton>{t("lineButton")}</LineLoginButton>
+          {/* ボタンは `?error=` を読んで「押しても直らない失敗」のときに自分を
+            * 無効化する (line-login-button の解説)。`useSearchParams` を使うので
+            * バナーと同じく Suspense 境界が要る。fallback は押せない同型のボタン —
+            * null にすると境界が解けるまでボタンごと消えて画面が跳ねる。 */}
+          <Suspense fallback={<LineLoginButtonFallback>{t("lineButton")}</LineLoginButtonFallback>}>
+            <LineLoginButton>{t("lineButton")}</LineLoginButton>
+          </Suspense>
+
+          {/* この環境では LINE アプリが開かないと事前に分かるときだけ出す一言。
+            * 出す条件と根拠は `lib/line/auto-login-environment.ts`。 */}
+          {autoLoginNoticeKey ? (
+            <p
+              className="w-full text-center text-xs leading-4 text-muted-foreground"
+              data-testid="line-auto-login-notice"
+              role="status"
+            >
+              {t(autoLoginNoticeKey)}
+            </p>
+          ) : null}
+
+          {/* LINE のメールアドレス取得についての説明 (M-0 の前提整備)。
+            *
+            * ## なぜカード下部の同意文と別に置くのか
+            *
+            * 下の `terms` は「利用規約とプライバシーポリシーに同意したとみなす」という
+            * 包括の一文で、**何を取得するかは書いていない**。LINE ログインの email scope は
+            * 「LINE に登録されたメールアドレスを受け取る」という具体的な取得で、LINE の
+            * 審査もその用途の明示を求める。包括の同意文に埋めると、押す直前に読まれない。
+            *
+            * よって **押すボタンのすぐ下** に、取得するもの (LINE のメールアドレス) と
+            * 使う用途 (注文確認・お問い合わせ対応・アカウント連携) だけを 1 文で置く。
+            * 用途を増やすときはこの文も直すこと — ここが利用者に約束した範囲になる。 */}
+          <p
+            className="w-full text-center text-xs leading-4 text-muted-foreground"
+            data-testid="line-email-consent"
+          >
+            {t("lineEmailConsent")}
+          </p>
 
           <AuthCardDivider>{t("or")}</AuthCardDivider>
 

@@ -3,10 +3,11 @@ import Image from "next/image";
 import { notFound } from "next/navigation";
 import { getLocale, getTranslations } from "next-intl/server";
 
-import { getClient } from "@/sanity/lib/client";
+import { sanityFetch } from "@/sanity/lib/fetch";
 import { ARTICLE_BY_SLUG_QUERY, RELATED_ARTICLES_QUERY } from "@/sanity/lib/queries";
 import { urlFor } from "@/sanity/lib/image";
 import { getProductByHandle } from "@/lib/shopify";
+import { productTypeLabel } from "@/lib/shopify/product-type";
 import type { MembershipTier } from "@/lib/shopify/customer";
 import { getMembershipTier } from "@/lib/shopify/auth";
 import { Link } from "@/i18n/navigation";
@@ -29,7 +30,7 @@ import {
   TeaDetailSection,
 } from "@/components/journal/article-modal-sections";
 import { ArticleProse } from "@/components/journal/article-blocks";
-import { BookmarkButton } from "@/components/journal/bookmark-button";
+import { FavoriteToggleButton } from "@/components/favorites/favorite-toggle-button";
 import { ArticleReadTracker } from "@/components/journal/article-read-tracker";
 import { ReadingProgress } from "@/components/journal/reading-progress";
 import { formatArticleDate } from "@/lib/format-date";
@@ -79,8 +80,11 @@ export async function generateMetadata({
   const { slug } = await params;
   const locale = await getLocale();
   try {
-    const client = getClient();
-    const article = await client.fetch(ARTICLE_BY_SLUG_QUERY, { slug, language: locale });
+    const article = await sanityFetch({
+      query: ARTICLE_BY_SLUG_QUERY,
+      params: { slug, language: locale },
+      cache: { tag: "sanity:articles" },
+    });
     if (!article) return {};
     const seo = article.seo;
     const title = seo?.title || article.title;
@@ -109,8 +113,11 @@ export default async function ArticlePage({
 
   let article;
   try {
-    const client = getClient();
-    article = await client.fetch(ARTICLE_BY_SLUG_QUERY, { slug, language: locale });
+    article = await sanityFetch({
+      query: ARTICLE_BY_SLUG_QUERY,
+      params: { slug, language: locale },
+      cache: { tag: "sanity:articles" },
+    });
   } catch {
     return (
       <Section spacing="none" className="pt-6 pb-16 lg:pb-28">
@@ -141,15 +148,18 @@ export default async function ArticlePage({
   let relatedArticles: RelatedArticle[] = [];
   if (hasAccess && (article.category?._id || tagIds.length > 0)) {
     try {
-      const client = getClient();
-      relatedArticles = await client.fetch(RELATED_ARTICLES_QUERY, {
-        language: locale,
-        currentId: article._id,
-        // カテゴリ未設定のときに null を渡すと `category._ref == null` が
-        // 「カテゴリ未設定の記事すべて」に当たってしまう。決して一致しない
-        // 番兵を渡してタグ一致だけを効かせる。
-        categoryId: article.category?._id ?? "__no-category__",
-        tagIds,
+      relatedArticles = await sanityFetch({
+        query: RELATED_ARTICLES_QUERY,
+        params: {
+          language: locale,
+          currentId: article._id,
+          // カテゴリ未設定のときに null を渡すと `category._ref == null` が
+          // 「カテゴリ未設定の記事すべて」に当たってしまう。決して一致しない
+          // 番兵を渡してタグ一致だけを効かせる。
+          categoryId: article.category?._id ?? "__no-category__",
+          tagIds,
+        },
+        cache: { tag: "sanity:articles" },
       });
     } catch {
       // 関連記事は本文の必須要素ではないので黙って落とす
@@ -219,31 +229,38 @@ export default async function ArticlePage({
           {/* Head — キッカー / 見出し / 著者クレジット */}
           <header className="mt-6">
             <p className={cn(overlineClass, "text-muted-foreground")}>JOURNAL</p>
-            <div className="mt-4 flex items-start justify-between gap-4">
+            {/* SP は縦積み (見出し → 保存トグル)、md 以上で横並びに戻す。
+                横並びのままだと、保存トグルが `whitespace-nowrap` + `shrink-0`
+                で 182px を確保し、SP 390 では見出しに 160px = 行の 45% しか
+                残らなかった (実測: 見出しが 5〜6 行に折り返す)。見出しは
+                ページの主役なので、幅を譲るのはトグルの側にする。 */}
+            <div className="mt-4 flex flex-col items-start gap-3 md:flex-row md:items-start md:justify-between md:gap-4">
               {/* ページ主見出しは一覧・詳細で統一 (Setaka 裁定 2026-08-08):
                   44px display トークン = `.page-title`。Figma 記事詳細の
                   functional 52px 束縛は Figma 側を追従修正中のため、
                   実装は DS 最大の display (44px / lh 1.2) を正とする。
                   SP は base h1 32px のまま (.page-title は md+ のみ)。 */}
               <h1 className="page-title text-foreground">{article.title}</h1>
-              <BookmarkButton
-                articleSlug={slug}
-                articleTitle={article.title}
-                articleImageUrl={
+              {/* 保存トグルは商品・読みもの・人で 1 実装 (D-12)。読みものは
+                  Figma `BookmarkButton (Module)` 8171:299 と同じ高さ 44 の造作。 */}
+              <FavoriteToggleButton
+                kind="article"
+                targetId={slug}
+                title={article.title}
+                imageUrl={
                   article.mainImage?.asset ? urlFor(article.mainImage).width(200).url() : null
                 }
-                addLabel={t("addToBookmarks")}
-                removeLabel={t("removeFromBookmarks")}
-                savedLabel={t("bookmarkSaved")}
-                loadingLabel={t("bookmarkSaving")}
-                loginRequiredLabel={t("bookmarkLoginToSave")}
-                statusUnknownLabel={t("bookmarkStatusUnknown")}
-                addedMessage={t("addedToBookmarks")}
-                removedMessage={t("removedFromBookmarks")}
-                errorMessage={t("bookmarkError")}
-                loginRequiredMessage={t("loginRequiredForBookmark")}
-                statusRetryMessage={t("bookmarkStatusRetry")}
-                className="mt-1 shrink-0"
+                appearance="panel"
+                labels={{
+                  add: t("addToBookmarks"),
+                  remove: t("removeFromBookmarks"),
+                  saved: t("bookmarkSaved"),
+                  added: t("addedToBookmarks"),
+                  removed: t("removedFromBookmarks"),
+                  error: t("bookmarkError"),
+                  loginRequiredMessage: t("loginRequiredForBookmark"),
+                }}
+                className="shrink-0 md:mt-1"
               />
             </div>
             {author || readMinutes ? (
@@ -412,13 +429,19 @@ export default async function ArticlePage({
                   title: product.title,
                   href: `/products/${product.handle}`,
                   imageUrl: product.featuredImage?.url,
-                  meta: product.productType || undefined,
+                  /* Shopify の `productType` は英日を 1 本に畳んだ値
+                     (`Green Tea｜緑茶`)。生のまま出すと日本語の記事の中に
+                     英語が混ざるので、商品一覧のチップと同じ規則で
+                     ロケール側だけを出す (QA 指摘 2026-08-25)。 */
+                  meta: productTypeLabel(product.productType, locale) || undefined,
                   description: product.description || undefined,
                   spec: [
                     { label: t("teaSpecNo"), value: product.metafields?.menuNumber },
                     {
                       label: t("teaSpecCategory"),
-                      value: product.metafields?.teaCategory || product.productType,
+                      value:
+                        product.metafields?.teaCategory ||
+                        productTypeLabel(product.productType, locale),
                     },
                     { label: t("teaSpecName"), value: product.title },
                     { label: t("teaSpecVariety"), value: product.metafields?.variety },

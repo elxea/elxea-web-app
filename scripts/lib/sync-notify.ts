@@ -94,15 +94,33 @@ function renderSummary(report: SyncReport): string {
   return lines.join("\n") + "\n\n";
 }
 
+/**
+ * 通知の見出しに出す同期の名前。
+ *
+ * `job` をそのまま英語で出すと読み手が何の同期か分からないので日本語に寄せる。
+ * 未知の job でも「<job> 同期」で通る形にして、対象が増えたときに
+ * 「記事同期」と誤って名乗らないようにする (茶譜の失敗が記事の失敗に見えた)。
+ */
+function jobLabel(job: string): string {
+  const labels: Record<string, string> = {
+    articles: "記事同期",
+    pages: "ページ同期",
+    "tea-menu": "茶譜同期",
+    config: "同期設定",
+  };
+  return labels[job] ?? `${job} 同期`;
+}
+
 function renderSlackText(report: SyncReport): string {
+  const name = jobLabel(report.job);
   const head =
     report.outcome === "input-failure"
-      ? "記事同期: 入力の取得に失敗"
+      ? `${name}: 入力の取得に失敗`
       : report.outcome === "config-error"
-        ? "記事同期: 設定不足で実行できず"
+        ? `${name}: 設定不足で実行できず`
         : report.outcome === "partial"
-          ? "記事同期: 一部失敗"
-          : "記事同期: 異常終了";
+          ? `${name}: 一部失敗`
+          : `${name}: 異常終了`;
 
   const lines = [
     `${head} (${report.job} / ${report.dataset}${report.dryRun ? " / dry-run" : ""})`,

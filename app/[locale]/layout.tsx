@@ -11,11 +11,11 @@ import { Toaster } from "@/components/ui/sonner";
 import { LenisProvider } from "@/components/providers/lenis-provider";
 import { ChatProvider } from "@/components/chat/chat-provider";
 import { ChatBar } from "@/components/chat/chat-bar";
-import { AudioProvider } from "@/components/audio/audio-provider";
 import { ArticleAudioProvider } from "@/components/audio/article-audio-provider";
 import { AudioDock } from "@/components/audio/audio-dock";
-import { getClient } from "@/sanity/lib/client";
+import { sanityFetch } from "@/sanity/lib/fetch";
 import { SITE_SETTINGS_QUERY } from "@/sanity/lib/queries";
+import { env } from "@/lib/config";
 
 export const metadata: Metadata = {
   title: {
@@ -53,7 +53,7 @@ export const metadata: Metadata = {
      * `?? "local"` marks a build with no VCS metadata (a local dev server). CI
      * treats that literal as a failure rather than a pass, so the check cannot go
      * green by simply not knowing. */
-    "x-elxea-commit": process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? "local",
+    "x-elxea-commit": env("VERCEL_GIT_COMMIT_SHA")?.slice(0, 7) ?? "local",
   },
 };
 
@@ -76,7 +76,10 @@ export default async function LocaleLayout({
   let footerGroups: { label: string; items: { href: string; label: string }[] }[] = [];
 
   try {
-    const settings = await getClient().fetch(SITE_SETTINGS_QUERY);
+    const settings = await sanityFetch({
+      query: SITE_SETTINGS_QUERY,
+      cache: { tag: "sanity:site-settings" },
+    });
     if (settings?.navigation) {
       headerNavItems = settings.navigation
         .filter((item: any) => item.showInHeader)
@@ -134,7 +137,6 @@ export default async function LocaleLayout({
       </head>
       <body className="min-h-screen flex flex-col bg-background text-foreground">
         <NextIntlClientProvider messages={messages}>
-          <AudioProvider>
           {/* 記事音声はページ遷移で止めない (SoundCloud 方式)。provider を
               ここに常駐させるのが前提条件で、記事ページ側に置くと遷移で
               unmount され再生が必ず切れる。 */}
@@ -153,7 +155,6 @@ export default async function LocaleLayout({
             </ChatProvider>
           </CartProviderWrapper>
           </ArticleAudioProvider>
-          </AudioProvider>
         </NextIntlClientProvider>
       </body>
     </html>

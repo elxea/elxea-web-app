@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getLocale, getTranslations } from "next-intl/server";
-import { getClient } from "@/sanity/lib/client";
+import { sanityFetch } from "@/sanity/lib/fetch";
 import { EVENT_BY_SLUG_QUERY } from "@/sanity/lib/queries";
 import { urlFor } from "@/sanity/lib/image";
 import { PortableText } from "@/components/sanity/portable-text";
@@ -70,10 +70,10 @@ function resolveEventImage(event: {
 /** 実データ → (空なら) preview seed の見本詳細。seed はフラグ未設定時 null。 */
 async function loadEvent(slug: string, locale: string) {
   try {
-    const client = getClient();
-    const fetched = await client.fetch(EVENT_BY_SLUG_QUERY, {
-      slug,
-      language: locale,
+    const fetched = await sanityFetch({
+      query: EVENT_BY_SLUG_QUERY,
+      params: { slug, language: locale },
+      cache: { tag: "sanity:events" },
     });
     return { event: fetched ?? seedEventDetail(slug), failed: false };
   } catch {

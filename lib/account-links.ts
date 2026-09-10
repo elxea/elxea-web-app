@@ -1,3 +1,5 @@
+import { env } from "@/lib/config";
+
 /**
  * マイページから外へ出る導線 (Shopify 顧客アカウントポータル)。
  *
@@ -17,10 +19,10 @@
  * リンクを描かない。存在しない URL を指すリンクは出さない。
  */
 export function customerAccountPortalUrl(): string | null {
-  const override = process.env.SHOPIFY_CUSTOMER_ACCOUNT_PORTAL_URL;
+  const override = env("SHOPIFY_CUSTOMER_ACCOUNT_PORTAL_URL");
   if (override) return override;
 
-  const shopId = process.env.SHOPIFY_SHOP_ID;
+  const shopId = env("SHOPIFY_SHOP_ID");
   if (!shopId) return null;
 
   return `https://shopify.com/${shopId}/account`;

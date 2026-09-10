@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { bodySmClass } from "@/components/editorial/rule-list";
+import { useOptimisticNavigation } from "@/hooks/use-optimistic-navigation";
 import { cn } from "@/lib/utils";
 
 /**
@@ -85,7 +86,38 @@ export function CatalogToolbar({
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const current = activeChip ?? chips[0]?.value;
+  const serverChip = activeChip ?? chips[0]?.value;
+  const serverSort = activeSort ?? sortOptions[0]?.value;
+
+  /**
+   * 押した瞬間に選択を先に描く (網羅表 2026-08-27 / G5)。
+   *
+   * ここは `router.push` しか呼んでいなかったので、**塗り替えはサーバの往復が
+   * 着地してから**だった。並び替えの `<select>` にいたっては制御された値なので、
+   * 選び直しても React が古い値へ引き戻し、往復のあいだ「選んだはずの項目が
+   * 選ばれていない」状態が見えていた。
+   *
+   * 通り道は `hooks/use-optimistic-navigation`。着地したらサーバの値
+   * (`activeChip` / `activeSort`) へ自動で合流するので、巻き戻しは書かない。
+   */
+  const chipNav = useOptimisticNavigation(serverChip);
+  const sortNav = useOptimisticNavigation(serverSort);
+  const current = chipNav.value;
+  const isNavigating = chipNav.isNavigating || sortNav.isNavigating;
+
+  /**
+   * 一度先読みした行き先を覚えておく箱。同じチップの上をマウスが何度も通っても
+   * `router.prefetch` を呼び直さない。
+   */
+  const prefetched = React.useRef<Set<string>>(new Set());
+  const prefetch = React.useCallback(
+    (href: string) => {
+      if (prefetched.current.has(href)) return;
+      prefetched.current.add(href);
+      router.prefetch(href);
+    },
+    [router],
+  );
 
   /**
    * チップ列を持たない呼び出し (コレクション詳細 — コレクション自体が絞り込みの
@@ -153,6 +185,11 @@ export function CatalogToolbar({
   return (
     <div
       data-slot="catalog-toolbar"
+      /* 選択の塗り替えは既に済んでいる (楽観)。ここは「まだ一覧が入れ替わって
+         いない」ことを支援技術と検査に伝えるためだけの印で、見た目は変えない
+         (受付も閉じない — 続けて別のチップを押せる)。 */
+      aria-busy={isNavigating}
+      data-navigating={isNavigating ? "true" : undefined}
       className={cn(
         "items-center justify-between gap-4",
         chipless ? "hidden justify-end lg:flex" : "flex",
@@ -209,17 +246,23 @@ export function CatalogToolbar({
             );
           }
 
+          /* 先頭 (「すべて」) はクエリを外す = 絞り込み解除。 */
+          const href = hrefWith(
+            chipParam,
+            chip.value === chips[0]?.value ? undefined : chip.value
+          );
+
           return (
             <button
               key={chip.value}
               type="button"
               data-slot="catalog-chip"
               aria-pressed={selected}
-              onClick={() =>
-                router.push(
-                  hrefWith(chipParam, chip.value === chips[0]?.value ? undefined : chip.value)
-                )
-              }
+              onClick={() => chipNav.navigate(chip.value, () => router.push(href))}
+              /* 押す仕草が見えた時点で行き先を取りにいく。押してから取り始める
+                 と、その往復ぶんだけ画面が変わらない時間になる。 */
+              onPointerEnter={() => prefetch(href)}
+              onFocus={() => prefetch(href)}
               className={chipClass}
             >
               {chip.label}
@@ -263,8 +306,16 @@ export function CatalogToolbar({
         <NativeSelect
           data-slot="catalog-sort"
           aria-label={sortLabel}
-          value={activeSort ?? sortOptions[0]?.value}
-          onChange={(event) => router.push(hrefWith("sort", event.target.value))}
+          value={sortNav.value}
+          onChange={(event) => {
+            const next = event.target.value;
+            sortNav.navigate(next, () => router.push(hrefWith("sort", next)));
+          }}
+          /* 開いた時点で全部の行き先を温める。選択肢は数個しか無いので、
+             1 つずつ hover を待つより開いた瞬間にまとめて取るほうが速い。 */
+          onFocus={() => {
+            for (const option of sortOptions) prefetch(hrefWith("sort", option.value));
+          }}
           /**
            * PC 限定は「外枠ごと」消す。`hidden` を `<select>` 側に置くと、
            * NativeSelect の外枠 div (chevron は absolute なので中身幅 0) が

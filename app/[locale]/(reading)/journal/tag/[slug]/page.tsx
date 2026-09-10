@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { getLocale, getTranslations } from "next-intl/server";
 import { Sprout } from "lucide-react";
 
-import { getClient } from "@/sanity/lib/client";
+import { sanityFetch } from "@/sanity/lib/fetch";
 import {
   ARTICLES_BY_TAG_QUERY,
   TAG_BY_SLUG_QUERY,
@@ -77,7 +77,11 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   try {
-    const tag = await getClient().fetch(TAG_BY_SLUG_QUERY, { tagSlug: slug });
+    const tag = await sanityFetch({
+      query: TAG_BY_SLUG_QUERY,
+      params: { tagSlug: slug },
+      cache: { tag: "sanity:tags" },
+    });
     if (!tag) return {};
     const t = await getTranslations("journal");
     return {
@@ -104,8 +108,6 @@ export default async function TagPage({
   const tCommon = await getTranslations("common");
   const tl = await getTranslations("catalog");
 
-  const client = getClient();
-
   // A7: 障害を notFound() に握り潰さない (本物の 404 と区別がつかず Sentry にも
   // 上がらないため)。取得失敗は他ページと同じ loadError 表示に倒す。
   let tag: { _id: string; title: string; slug: { current: string } } | null = null;
@@ -114,15 +116,25 @@ export default async function TagPage({
   let categories: { _id: string; title: string; slug: { current: string } }[] = [];
   try {
     [tag, articles, tags, categories] = await Promise.all([
-      client.fetch(TAG_BY_SLUG_QUERY, { tagSlug: slug }),
-      client.fetch(ARTICLES_BY_TAG_QUERY, {
-        language: locale,
-        tagSlug: slug,
-        start: 0,
-        end: 60,
+      sanityFetch<{ _id: string; title: string; slug: { current: string } } | null>({
+        query: TAG_BY_SLUG_QUERY,
+        params: { tagSlug: slug },
+        cache: { tag: "sanity:tags" },
       }),
-      client.fetch(TAGS_WITH_COUNTS_QUERY, { language: locale }),
-      client.fetch(CATEGORIES_QUERY),
+      sanityFetch<ArticleItem[]>({
+        query: ARTICLES_BY_TAG_QUERY,
+        params: { language: locale, tagSlug: slug, start: 0, end: 60 },
+        cache: { tag: "sanity:articles" },
+      }),
+      sanityFetch<TagItem[]>({
+        query: TAGS_WITH_COUNTS_QUERY,
+        params: { language: locale },
+        cache: { tag: "sanity:tags" },
+      }),
+      sanityFetch<{ _id: string; title: string; slug: { current: string } }[]>({
+        query: CATEGORIES_QUERY,
+        cache: { tag: "sanity:categories" },
+      }),
     ]);
   } catch {
     return (

@@ -60,7 +60,11 @@ async function CollectionsContent() {
 
   let collections;
   try {
-    collections = await getCollections();
+    /* 中身が空のコレクションは出さない (通しテスト E-3 / 2026-08-27)。着地先は
+       商品一覧の絞り込みなので、0 件のコレクションはカードを押した先が必ず
+       空になる。本番では 18 件中 12 件がこれに当たる (味わい 8 種 / 原産地 /
+       Sample 等、Shopify 側で枠だけ作って中身が入っていないもの)。 */
+    collections = (await getCollections(50)).filter((c) => c.hasProducts);
   } catch {
     return <p className="mt-8 text-sm text-muted-foreground lg:mt-12">{t("loadError")}</p>;
   }
@@ -90,9 +94,10 @@ async function CollectionsContent() {
         <CatalogCard
           key={collection.id}
           /* コレクション詳細 (/collections/[handle]) は 2026-08-14 に廃止。
-             着地先は商品一覧のカテゴリ絞り込み (軸 = Shopify の productType)。
-             商品一覧側は未知の category を「すべて」に落とすので、名前が
-             productType と一致しないコレクションでも 404 や 0 件にはならない。 */
+             着地先は商品一覧の絞り込み。商品一覧側は productType で拾えない
+             名前を**コレクションの所属**で絞る
+             (`lib/shopify/category-filter.ts`)。上で空のコレクションを落として
+             あるので、ここから飛んだ先が 0 件になることはない。 */
           href={`/products?category=${encodeURIComponent(collection.title)}`}
           image={collection.image?.url}
           imageAlt={collection.image?.altText || collection.title}

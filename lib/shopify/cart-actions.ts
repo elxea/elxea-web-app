@@ -2,14 +2,16 @@
 
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
+import { isProduction } from "@/lib/config";
 import {
   createCart,
   addToCart,
   updateCart,
   removeFromCart,
 } from "@/lib/shopify";
+import { COOKIE_NAME } from "@/lib/auth/cookie-names";
 
-const CART_COOKIE = "shopify_cart_id";
+const CART_COOKIE = COOKIE_NAME.shopifyCartId;
 
 async function getCartId(): Promise<string | undefined> {
   const cookieStore = await cookies();
@@ -20,7 +22,7 @@ async function setCartId(cartId: string) {
   const cookieStore = await cookies();
   cookieStore.set(CART_COOKIE, cartId, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: isProduction(),
     sameSite: "lax",
     maxAge: 60 * 60 * 24 * 30, // 30 days
     path: "/",

@@ -1,11 +1,12 @@
 import { Resend } from "resend";
+import { env } from "@/lib/config";
 import { siteUrl } from "@/lib/site-url";
 
 let _resend: Resend | null = null;
 
 function getResend(): Resend {
   if (!_resend) {
-    const key = process.env.RESEND_API_KEY;
+    const key = env("RESEND_API_KEY");
     if (!key) {
       throw new Error("RESEND_API_KEY is not configured");
     }
@@ -14,7 +15,7 @@ function getResend(): Resend {
   return _resend;
 }
 
-const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "info@elxea.com";
+const FROM_EMAIL = env("RESEND_FROM_EMAIL") ?? "info@elxea.com";
 const SITE_URL = siteUrl();
 
 type WelcomeEmailData = {
@@ -193,7 +194,7 @@ function buildHtmlEmail(data: WelcomeEmailData): string {
 export async function sendWelcomeEmail(
   data: WelcomeEmailData
 ): Promise<{ success: boolean; error?: string }> {
-  if (!process.env.RESEND_API_KEY) {
+  if (!env("RESEND_API_KEY")) {
     return { success: false, error: "RESEND_API_KEY not configured" };
   }
 

@@ -5,7 +5,7 @@ Decision Log: `39c70c9d064c81079145f69744e7b8f5` (品質最優先・品質中立
 ## これは何か / 何ではないか
 
 `figma-snapshot` (`snapshot:figma`) と `figma-change-manifest` (`diff:figma`) は、
-Figma の Proposals ページ配下 `@/<route>` セクションを **決定論的に正規化した
+Figma の「<領域> / Layouts」ページ配下の凍結セクション (【R2: 確定版】/【採用:】、route は `frozen-sections.json`) を **決定論的に正規化した
 baseline** を repo に置き、live との **決定論 diff** で「どのページ / どの node が
 変わったか」を機械可読に出力するツールです。デザイン反映セッションが毎回 Figma を
 LLM で全実測する必要をなくし、**変更フレームだけ**を見れば済むようにします
@@ -57,7 +57,7 @@ diff=0 です。baseline を進めたいときは `snapshot:figma` を再実行�
    内部の変更が instance に波及 (C4-ii) すると per-instance の modified になる。
 3. **fail-loud** — nodes API が section の document を返さない (部分取得) → `exit 1`。
    baseline が壊れ JSON / 不在 → `exit 1`。穴を黙って snapshot しない。
-4. **除外の明示計上** — Proposals 直下で `@/<route>` でない section は
+4. **除外の明示計上** — Layouts 直下で `frozen-sections.json` に載らない section は
    件数 + id/name + 理由を manifest に出力 (silent truncation 禁止)。
 5. **completeness シグナル** — file の `lastModified` が baseline 以降に進んでいるのに
    diff が空なら「捕捉外の変更の疑い」を警告。既定は警告 (別ページ編集でも

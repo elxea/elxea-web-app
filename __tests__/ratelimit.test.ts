@@ -17,7 +17,11 @@ import {
   getClientIp,
   limiters,
   millisecondsToDuration,
+  __setUpstashResolverForTests,
+  __resetUpstashCircuitForTests,
+  __getUpstashCircuitStateForTests,
   type Ratelimiter,
+  type UpstashLike,
 } from "@/lib/ratelimit";
 
 function makeReq(headers: Record<string, string> = {}): NextRequest {
@@ -204,5 +208,148 @@ describe("millisecondsToDuration", () => {
 
   it("accepts exactly 1 second", () => {
     expect(millisecondsToDuration(1000)).toBe("1 s");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Upstash failure handling: degrade to in-memory, never fail open.
+//
+// Regression guard for the 2026-08 production incident: the Upstash instance
+// (witty-mantis-70358.upstash.io) was deleted, leaving the hostname NXDOMAIN.
+// Every `limit()` call threw, and the old `catch { return null }` fail-open
+// silently disabled rate limiting on contact-form and authed-user for months.
+// ---------------------------------------------------------------------------
+
+/** Upstash stub that always throws, mimicking ENOTFOUND / fetch failed. */
+function throwingUpstash(onCall?: () => void): UpstashLike {
+  return {
+    async limit() {
+      onCall?.();
+      throw new Error("fetch failed (ENOTFOUND)");
+    },
+  };
+}
+
+/** Upstash stub that answers successfully. */
+function okUpstash(success: boolean, remaining = 5): UpstashLike {
+  return {
+    async limit() {
+      return { success, remaining, reset: Date.now() + 60_000 };
+    },
+  };
+}
+
+describe("enforceRateLimit — Upstash failure handling", () => {
+  beforeEach(() => {
+    __resetUpstashCircuitForTests();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(console, "log").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    __setUpstashResolverForTests(null);
+    __resetUpstashCircuitForTests();
+    vi.restoreAllMocks();
+  });
+
+  it("degrades to in-memory instead of failing open when Upstash throws", async () => {
+    __setUpstashResolverForTests(() => throwingUpstash());
+    const lim: Ratelimiter = {
+      ...fresh(2, 10_000),
+      backend: "upstash",
+    };
+    const req = makeReq();
+
+    // Under the limit: allowed (in-memory counting is active).
+    expect(await enforceRateLimit(req, lim, "degrade-key")).toBeNull();
+    expect(await enforceRateLimit(req, lim, "degrade-key")).toBeNull();
+
+    // Over the limit: MUST still be blocked. A fail-open would return null.
+    const resp = await enforceRateLimit(req, lim, "degrade-key");
+    expect(resp).not.toBeNull();
+    expect(resp?.status).toBe(429);
+  });
+
+  it("keeps per-key isolation while degraded", async () => {
+    __setUpstashResolverForTests(() => throwingUpstash());
+    const lim: Ratelimiter = { ...fresh(1, 10_000), backend: "upstash" };
+    const req = makeReq();
+
+    expect(await enforceRateLimit(req, lim, "iso-a")).toBeNull();
+    expect(await enforceRateLimit(req, lim, "iso-a")).not.toBeNull();
+    // Different key still has its own budget.
+    expect(await enforceRateLimit(req, lim, "iso-b")).toBeNull();
+  });
+
+  it("opens the circuit after the failure threshold and stops dialing Upstash", async () => {
+    let calls = 0;
+    __setUpstashResolverForTests(() => throwingUpstash(() => { calls += 1; }));
+    const lim: Ratelimiter = { ...fresh(100, 10_000), backend: "upstash" };
+    const req = makeReq();
+
+    for (let i = 0; i < 10; i++) {
+      await enforceRateLimit(req, lim, `circuit-${i}`);
+    }
+
+    // Threshold is 3: only the first 3 requests should have dialed Upstash.
+    expect(calls).toBe(3);
+    expect(__getUpstashCircuitStateForTests().open).toBe(true);
+  });
+
+  it("reports the outage to the console only once per instance, not per request", async () => {
+    __setUpstashResolverForTests(() => throwingUpstash());
+    const lim: Ratelimiter = { ...fresh(100, 10_000), backend: "upstash" };
+    const req = makeReq();
+
+    for (let i = 0; i < 5; i++) {
+      await enforceRateLimit(req, lim, `noise-${i}`);
+    }
+
+    expect(console.error).toHaveBeenCalledTimes(1);
+    expect(__getUpstashCircuitStateForTests().outageReported).toBe(true);
+  });
+
+  it("resets failure state after a successful Upstash call", async () => {
+    let mode: "throw" | "ok" = "throw";
+    __setUpstashResolverForTests(() =>
+      mode === "throw" ? throwingUpstash() : okUpstash(true)
+    );
+    const lim: Ratelimiter = { ...fresh(100, 10_000), backend: "upstash" };
+    const req = makeReq();
+
+    // Two failures: below the threshold, circuit still closed.
+    await enforceRateLimit(req, lim, "recover-1");
+    await enforceRateLimit(req, lim, "recover-2");
+    expect(__getUpstashCircuitStateForTests().consecutiveFailures).toBe(2);
+    expect(__getUpstashCircuitStateForTests().open).toBe(false);
+
+    // A success clears the counter, so the next blip starts from zero.
+    mode = "ok";
+    await enforceRateLimit(req, lim, "recover-3");
+    expect(__getUpstashCircuitStateForTests().consecutiveFailures).toBe(0);
+    expect(__getUpstashCircuitStateForTests().outageReported).toBe(false);
+  });
+
+  it("still uses Upstash results when Upstash is healthy", async () => {
+    __setUpstashResolverForTests(() => okUpstash(false, 0));
+    const lim: Ratelimiter = { ...fresh(1, 10_000), backend: "upstash" };
+    const req = makeReq();
+
+    const resp = await enforceRateLimit(req, lim, "healthy-key");
+    expect(resp).not.toBeNull();
+    expect(resp?.status).toBe(429);
+    expect(resp?.headers.get("RateLimit-Remaining")).toBe("0");
+    expect(Number(resp?.headers.get("Retry-After"))).toBeGreaterThan(0);
+  });
+
+  it("never dials Upstash for memory-backed limiters", async () => {
+    let calls = 0;
+    __setUpstashResolverForTests(() => throwingUpstash(() => { calls += 1; }));
+    const lim: Ratelimiter = { ...fresh(1, 10_000), backend: "memory" };
+    const req = makeReq();
+
+    await enforceRateLimit(req, lim, "mem-only");
+    await enforceRateLimit(req, lim, "mem-only");
+    expect(calls).toBe(0);
   });
 });

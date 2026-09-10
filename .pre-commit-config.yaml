@@ -11,9 +11,16 @@
 #   pre-commit run --all-files                 # pre-commit stage のみ
 #   pre-commit run --hook-stage pre-push -a    # pre-push stage を実行
 #
-# 背景: 本リポは Vercel/GitHub 無料プランのため branch protection (required status
-# checks) を張れない。壊れたコードが main へ入るのをローカル pre-push で機械的に止める
-# のが唯一の強制手段なので、この設定を外さないこと (J-2b / Setaka 承認 2026-08-08)。
+# 背景 (訂正 2026-08-27): 元は「本リポは無料プランのため branch protection を張れず、
+# ローカル pre-push が唯一の強制手段」と書いてあったが、これは現在は誤り。実測
+# (gh api repos/elxea/elxea-web-app/branches/main/protection): リポジトリは public、
+# main は required status checks 7 本 (static-checks / unit-tests / coverage / build /
+# storybook-tests / e2e-tests / identity-e2e) で保護済み。赤ではマージできない。
+#
+# ではこのローカルゲートは不要かというと、そうではない。役割が「唯一の強制」から
+# 「速い方の強制」に変わっただけで、CI を待たずに手元で同じ検査を落とせる価値は残る
+# (CI 1 周は数分、ここは数十秒)。したがってこの設定は引き続き外さないこと
+# (J-2b / Setaka 承認 2026-08-08、根拠の記述のみ 2026-08-27 に是正)。
 
 default_install_hook_types: [pre-commit, pre-push]
 default_stages: [pre-commit]

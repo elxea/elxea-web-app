@@ -3,6 +3,11 @@
  * These are called from API routes (not directly from client components).
  */
 import { FieldValue, type Query } from "firebase-admin/firestore";
+import {
+  favoriteDocId,
+  partitionFavoriteDuplicates,
+} from "@/lib/account-favorites";
+import { logger } from "@/lib/log";
 import { getAdminFirestore } from "./admin";
 import { COLLECTIONS, favoritesCol, followsCol, eventRegistrationsCol, behaviorLogCol, userDoc } from "./collections";
 import type {
@@ -20,6 +25,18 @@ const COMMENT_MAX_LENGTH = 500;
 // Favorites
 // ---------------------------------------------------------------------------
 
+/**
+ * お気に入りを 1 件保存する。
+ *
+ * 書き込み先のドキュメント ID は内容から決まる (`favoriteDocId`)。同じものを
+ * 同時に 2 回書いても**同じ 1 ドキュメントを上書きする**だけなので、重複が
+ * 生まれる余地が無い。以前の「問い合わせて無ければ `add()`」は、その 2 手の
+ * あいだに割り込まれると 2 件できる形だった (F16 の原因)。
+ *
+ * 問い合わせ自体は残す。ID が自動採番だった時代に書かれた既存のドキュメントは
+ * 内容でしか見つけられず、それを見ずに新しい ID で書くと**古い 1 件 + 新しい
+ * 1 件**でかえって増えるため。
+ */
 export async function addFavorite(
   customerId: string,
   data: {
@@ -32,26 +49,75 @@ export async function addFavorite(
   const db = getAdminFirestore();
   const colPath = favoritesCol(customerId);
 
-  // Check for duplicate (same type + targetId)
+  const docId = favoriteDocId(data.type, data.targetId);
+
+  // 旧採番 (自動 ID) で既に入っていないか。内容でしか照合できない。
   const existing = await db
     .collection(colPath)
     .where("type", "==", data.type)
     .where("targetId", "==", data.targetId)
-    .limit(1)
     .get();
 
   if (!existing.empty) {
-    return { success: true, action: "already_exists" as const };
+    /* 既にある。ここで**新しい規則の ID へ移しておく** (QA 指摘 3)。
+     *
+     * 以前はそのまま `already_exists` を返していたので、旧 ID のドキュメントは
+     * 何度保存し直しても旧 ID のまま残った。読み出し側 (`getFavorites`) の
+     * 片付けが効くのは**重複しているとき**だけなので、旧 ID が 1 件だけの棚は
+     * 永久に旧採番のままで、`doc(favoriteDocId(...)).set()` を前提にした
+     * 「同じものは同じ 1 件に上書きされる」保証 (F16) の外に居続ける。
+     *
+     * 移すのは「既に新しい ID のものが無い」ときだけ。あるならそれが本命で、
+     * 旧 ID のほうは重複なので消せばよい — どちらの道でも棚には新しい ID の
+     * 1 件だけが残る。保存日 (`createdAt`) は最初の 1 件のものを引き継ぐ
+     * (利用者に見える情報なので、移動で今日に化けさせない)。
+     */
+    const canonical = existing.docs.find((doc) => doc.id === docId);
+    const legacy = existing.docs.filter((doc) => doc.id !== docId);
+
+    if (legacy.length > 0) {
+      try {
+        if (!canonical) {
+          const oldest = legacy.reduce((a, b) =>
+            (a.createTime?.toMillis() ?? 0) <= (b.createTime?.toMillis() ?? 0) ? a : b,
+          );
+          await db
+            .collection(colPath)
+            .doc(docId)
+            .set({ ...oldest.data(), ...data });
+        }
+        /* 消すのは新しい ID への着地が済んだあとだけ (順序を崩さない)。 */
+        for (const doc of legacy) await doc.ref.delete();
+      } catch (err) {
+        /* 移せなくても「保存済み」であることは変わらない。読み出し側の片付けが
+           次に拾うので、ここで利用者に失敗を見せる理由は無い。ただし移行が
+           ずっと失敗し続けているなら気づけるようにしておく。 */
+        logger.error("firebase.favorites.legacy-id-migration-failed", err, {
+          customerId,
+          type: data.type,
+          targetId: data.targetId,
+        });
+      }
+    }
+
+    return { success: true, action: "already_exists" as const, id: docId };
   }
 
-  const docRef = await db.collection(colPath).add({
-    ...data,
-    createdAt: new Date(),
-  });
+  await db
+    .collection(colPath)
+    .doc(docId)
+    .set({ ...data, createdAt: new Date() });
 
-  return { success: true, action: "created" as const, id: docRef.id };
+  return { success: true, action: "created" as const, id: docId };
 }
 
+/**
+ * お気に入りを解除する。**一致するものは全部消す**。
+ *
+ * 1 件だけ消していたころは、棚に重複が残っていると解除しても片割れが残り、
+ * 画面を開き直すと「消したはずのものが戻ってくる」ように見えた。解除の意思は
+ * 「この記事を保存しない」であって「このドキュメントを 1 つ消す」ではない。
+ */
 export async function removeFavorite(
   customerId: string,
   type: FavoriteType,
@@ -64,17 +130,29 @@ export async function removeFavorite(
     .collection(colPath)
     .where("type", "==", type)
     .where("targetId", "==", targetId)
-    .limit(1)
     .get();
 
   if (snapshot.empty) {
     return { success: true, action: "not_found" as const };
   }
 
-  await snapshot.docs[0].ref.delete();
-  return { success: true, action: "removed" as const };
+  for (const doc of snapshot.docs) {
+    await doc.ref.delete();
+  }
+  return { success: true, action: "removed" as const, removed: snapshot.docs.length };
 }
 
+/**
+ * お気に入りの一覧。**読むついでに棚の重複を片付ける**。
+ *
+ * 書き込み側を一意キーに直しても、それ以前に作られた重複は棚に残ったままで、
+ * 放っておくと利用者にはいつまでも 2 件に見える。持ち主が自分のマイページを
+ * 開いた瞬間に、その人の棚だけを直す。件数が極小 (数十件) なので読み出しへの
+ * 影響は無視でき、重複が無ければ書き込みは 1 件も起きない。
+ *
+ * 片付けに失敗しても読み出しは成功させる (画面は `partitionFavoriteDuplicates`
+ * が返した「残す側」だけを見るので、棚が直らなくても 2 件には見えない)。
+ */
 export async function getFavorites(customerId: string, type?: FavoriteType) {
   const db = getAdminFirestore();
   const colPath = favoritesCol(customerId);
@@ -87,11 +165,37 @@ export async function getFavorites(customerId: string, type?: FavoriteType) {
   query = query.orderBy("createdAt", "desc");
 
   const snapshot = await query.get();
-  return snapshot.docs.map((doc) => ({
-    id: doc.id,
+  /* `id` は**展開のあと**に置く。先に置くと、保存されている中身がたまたま `id`
+     という項目を持っていたときにドキュメント ID が上書きされ、重複の片付け
+     (`partitionFavoriteDuplicates` → `doc(id).delete()`) が**別のドキュメントを
+     指す**。中身は利用者の入力を含むので、そうなり得ないとは言えない。 */
+  const rows = snapshot.docs.map((doc) => ({
     ...doc.data(),
     createdAt: doc.data().createdAt?.toDate?.()?.toISOString() ?? null,
+    id: doc.id,
   }));
+
+  const { kept, duplicates } = partitionFavoriteDuplicates(rows);
+
+  if (duplicates.length > 0) {
+    try {
+      for (const duplicate of duplicates) {
+        await db.collection(colPath).doc(duplicate.id).delete();
+      }
+      console.warn(
+        `[favorites] removed ${duplicates.length} duplicate document(s) while reading a favorites shelf`,
+      );
+    } catch (err) {
+      /* 読み出しは成功させる (画面は「残す側」だけを見る)。片付けが効かないまま
+         棚に重複が積み上がる状態を、無音にはしない。 */
+      logger.error("firebase.favorites.duplicate-cleanup-failed", err, {
+        customerId,
+        duplicateCount: duplicates.length,
+      });
+    }
+  }
+
+  return kept;
 }
 
 export async function isFavorited(
@@ -172,10 +276,11 @@ export async function getFollows(customerId: string) {
     .orderBy("createdAt", "desc")
     .get();
 
+  /* `id` は展開のあと (中身の `id` にドキュメント ID を奪わせない)。 */
   return snapshot.docs.map((doc) => ({
-    id: doc.id,
     ...doc.data(),
     createdAt: doc.data().createdAt?.toDate?.()?.toISOString() ?? null,
+    id: doc.id,
   }));
 }
 
@@ -259,10 +364,11 @@ export async function getEventRegistrations(customerId: string) {
     .orderBy("registeredAt", "desc")
     .get();
 
+  /* `id` は展開のあと (中身の `id` にドキュメント ID を奪わせない)。 */
   return snapshot.docs.map((doc) => ({
-    id: doc.id,
     ...doc.data(),
     registeredAt: doc.data().registeredAt?.toDate?.()?.toISOString() ?? null,
+    id: doc.id,
   }));
 }
 
@@ -334,10 +440,12 @@ export async function getComments(
     .limit(limit)
     .get();
 
+  /* `id` は展開のあと。コメントの中身は利用者が書いた JSON なので、`id` という
+     項目が混じったときにドキュメント ID を奪われると、削除の宛先がずれる。 */
   return snapshot.docs.map((doc) => ({
-    id: doc.id,
     ...doc.data(),
     createdAt: doc.data().createdAt?.toDate?.()?.toISOString() ?? null,
+    id: doc.id,
   }));
 }
 
@@ -480,45 +588,18 @@ export async function getBehaviorEventCount(customerId: string): Promise<number>
 // ---------------------------------------------------------------------------
 
 /**
- * Link a LINE user ID to the customer's Firestore user document.
- * Called from the LIFF page after successful LINE authentication.
+ * 顧客ドキュメントから LINE の写しを外す。
  *
- * @param customerId Shopify numeric customer ID
- * @param lineUserId LINE user ID obtained via liff.getProfile()
- */
-export async function linkLineUser(
-  customerId: string,
-  lineUserId: string
-): Promise<{ success: boolean; action: "linked" | "already_linked" }> {
-  const db = getAdminFirestore();
-  const docPath = userDoc(customerId);
-  const docRef = db.doc(docPath);
-
-  const snapshot = await docRef.get();
-
-  if (snapshot.exists) {
-    const existing = snapshot.data()?.lineUserId;
-    if (existing === lineUserId) {
-      return { success: true, action: "already_linked" };
-    }
-    await docRef.update({ lineUserId, lastActiveAt: new Date() });
-  } else {
-    // Create the user document if it doesn't exist yet
-    await docRef.set({ lineUserId, createdAt: new Date(), lastActiveAt: new Date() });
-  }
-
-  return { success: true, action: "linked" };
-}
-
-/**
- * Undo `linkLineUser`: remove the LINE user ID from the customer's Firestore
- * user document so the customer can link a (different) LINE account again.
+ * ⚠ 対になる**書き込み**はここには無い (2026-08-22 / P10)。写しを書くのは
+ *   `lib/auth/identity-link.ts` の `completeLineLinkage` だけで、そこは
+ *   **cx-agent の台帳が本人一致を認めたあと**にしか書かない。かつてここにあった
+ *   `linkLineUser` は「ブラウザが送ってきた LINE userId をそのまま書く」実装で、
+ *   LINE に何も検証させていなかったため、廃止した POST もろとも削除した。
  *
  * 「解除 → 再連携」が成立するために、**フィールドを空文字や null で上書きせず
- * `FieldValue.delete()` で消す**。`linkLineUser` は既存値との一致で
- * `already_linked` を返す実装なので、消し残り (`lineUserId: null` 等) があると
- * 再連携時の分岐が残った値に引っぱられる。フィールドごと消せば、再連携は必ず
- * 「未連携からの新規連携」と同じ経路 (`action: "linked"`) を通る。
+ * `FieldValue.delete()` で消す**。消し残り (`lineUserId: null` 等) があると、
+ * 再連携時に「写しは既にある」と読める余地が残る。フィールドごと消せば、
+ * 再連携は必ず「未連携からの新規連携」と同じ状態から始まる。
  *
  * 冪等: 連携が無い状態で呼ばれても失敗させず `not_linked` を返す (解除は
  * 「その状態にする」操作であり、二重解除をエラーにする意味がない)。
@@ -527,10 +608,19 @@ export async function linkLineUser(
  * 触らない (解除 != データ削除。データ削除は GDPR `customers/redact` webhook /
  * cx-agent `/api/erase` の担当)。
  *
+ * ⚠ **この戻り値で「解除できたか」を判断しない** (2026-08-22 / P9)。連携の正本は
+ *   cx-agent の `customer_linkages` であり、ここはその写し。Web / LIFF から連携した
+ *   お客さまには写しが書かれていない期間があり、写しの有無で判定すると「台帳からは
+ *   外れたのに not_linked」という嘘になる。呼び出し側 (`DELETE /api/user/line-link`) は
+ *   cx-agent の `cleared_count` で判定する。
+ *
  * @param customerId Shopify numeric customer ID (サーバ確定値のみを渡すこと)
+ * @param expectedLineUserId 任意。指定すると **写しがこの LINE のものであるときだけ**消す。
+ *   世帯共有 (1 顧客に複数 LINE) で、家族の写しを取り違えて消さないため。
  */
 export async function unlinkLineUser(
-  customerId: string
+  customerId: string,
+  expectedLineUserId?: string
 ): Promise<{ success: boolean; action: "unlinked" | "not_linked" }> {
   const db = getAdminFirestore();
   const docRef = db.doc(userDoc(customerId));
@@ -542,6 +632,11 @@ export async function unlinkLineUser(
 
   const existing = snapshot.data()?.lineUserId;
   if (existing === undefined || existing === null) {
+    return { success: true, action: "not_linked" };
+  }
+  if (expectedLineUserId !== undefined && existing !== expectedLineUserId) {
+    /* 写しは別の LINE のもの。名指しで解除された LINE とは違うので触らない
+       (消すと、まだ連携している家族の写しが消える)。 */
     return { success: true, action: "not_linked" };
   }
 

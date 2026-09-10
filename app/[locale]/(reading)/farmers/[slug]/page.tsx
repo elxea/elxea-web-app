@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { getLocale, getTranslations } from "next-intl/server";
 import type { PortableTextBlock } from "@portabletext/types";
 
-import { getClient } from "@/sanity/lib/client";
+import { sanityFetch } from "@/sanity/lib/fetch";
 import {
   FARMER_BY_SLUG_QUERY,
   OTHER_FARMERS_QUERY,
@@ -14,7 +14,7 @@ import { AuthorByline } from "@/components/journal/author-byline";
 import { ArticleProse } from "@/components/journal/article-blocks";
 import { SpecBand } from "@/components/editorial/section-blocks";
 import { PortableText } from "@/components/sanity/portable-text";
-import { FollowButton } from "@/components/farmers/follow-button";
+import { FavoriteToggleButton } from "@/components/favorites/favorite-toggle-button";
 import { CommentSection } from "@/components/community/comment-section";
 import {
   FarmerCardGrid,
@@ -38,7 +38,7 @@ import {
   withSeedFarmerDetail,
 } from "@/lib/preview-seed";
 import { getProductByHandle } from "@/lib/shopify";
-import { formatPrice } from "@/lib/utils";
+import { formatPriceRange } from "@/lib/utils";
 
 /**
  * 農家詳細 — Figma【R2: 確定版】People 詳細テンプレ統合 (茶園セクション拡張)
@@ -128,10 +128,10 @@ export async function generateMetadata({
   // Fictional/seed farmers are hidden until real stories are approved.
   if (isFictionalSlug("farmer", slug)) return {};
   try {
-    const client = getClient();
-    const farmer: Farmer | null = await client.fetch(FARMER_BY_SLUG_QUERY, {
-      slug,
-      language: locale,
+    const farmer: Farmer | null = await sanityFetch({
+      query: FARMER_BY_SLUG_QUERY,
+      params: { slug, language: locale },
+      cache: { tag: "sanity:farmers" },
     });
     if (!farmer) return {};
     const image = farmer.photo?.asset
@@ -196,12 +196,18 @@ export default async function FarmerPage({
   let farmer: Farmer | null;
   let others: OtherFarmer[] = [];
   try {
-    const client = getClient();
-    farmer = await client.fetch(FARMER_BY_SLUG_QUERY, { slug, language: locale });
+    farmer = await sanityFetch({
+      query: FARMER_BY_SLUG_QUERY,
+      params: { slug, language: locale },
+      cache: { tag: "sanity:farmers" },
+    });
     if (farmer) {
       const fetched: OtherFarmer[] =
-        (await client.fetch(OTHER_FARMERS_QUERY, { slug, language: locale })) ??
-        [];
+        (await sanityFetch<OtherFarmer[]>({
+          query: OTHER_FARMERS_QUERY,
+          params: { slug, language: locale },
+          cache: { tag: "sanity:farmers" },
+        })) ?? [];
       others = filterOutFictional("farmer", fetched);
     }
   } catch {
@@ -262,7 +268,9 @@ export default async function FarmerPage({
       imageAlt: p.featuredImage?.altText ?? p.title,
       title: p.title,
       note: p.vendor || undefined,
-      meta: price ? formatPrice(price.amount, price.currencyCode) : undefined,
+      meta: price
+        ? formatPriceRange(price, p.priceRange?.maxVariantPrice)
+        : undefined,
     };
   });
 
@@ -439,20 +447,28 @@ export default async function FarmerPage({
       {/* 以下は Figma 確定版に枠が無い既存機能 (意図的差分)。購入導線より後に
           置き、読み物としての流れを壊さない。 */}
       <FarmerSection>
-        <FollowButton
-          farmerSlug={slug}
-          farmerName={farmer.name}
-          farmerImageUrl={
+        {/* 農家も「お気に入り」の 4 分類目 (J-5 決裁)。以前ここは「フォローする」
+            という別の動詞・別のコレクションだった。動詞も保存先も部品も、他の
+            3 種類と同じにする。 */}
+        <FavoriteToggleButton
+          kind="farmer"
+          targetId={slug}
+          title={farmer.name}
+          imageUrl={
             farmer.photo?.asset
               ? urlFor(farmer.photo).width(80).height(80).url()
               : null
           }
-          followLabel={t("follow")}
-          unfollowLabel={t("unfollow")}
-          followedMessage={t("followedMessage")}
-          unfollowedMessage={t("unfollowedMessage")}
-          errorMessage={tCommon("error")}
-          loginRequiredMessage={tCommon("loginRequired")}
+          appearance="panel"
+          labels={{
+            add: t("follow"),
+            remove: t("unfollow"),
+            saved: t("followSaved"),
+            added: t("followedMessage"),
+            removed: t("unfollowedMessage"),
+            error: tCommon("error"),
+            loginRequiredMessage: tCommon("loginRequired"),
+          }}
         />
       </FarmerSection>
 

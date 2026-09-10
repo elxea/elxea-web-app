@@ -10,11 +10,31 @@ name: CI
 # `feat/**` now runs a lean gate on every push. Heavy jobs (Chromatic) stay on
 # PRs, because they cost more than they return on a work-in-progress branch.
 #
-# There is no branch protection on this repo (GitHub Free + private = required
-# status checks are a paid feature; `gh api .../branches/main/protection` returns
-# 403 "Upgrade to GitHub Pro"). So CI here *inspects and reports* — it cannot
-# block a merge. Enforcement is the operational rule in docs/ci-gates.md: Boss
-# confirms CI green before merging.
+# Branch protection IS in effect on `main` (訂正 2026-08-27).
+#
+# The paragraph that used to sit here said the opposite — "there is no branch
+# protection on this repo (GitHub Free + private = required status checks are a
+# paid feature)" — and concluded that CI "inspects and reports, it cannot block
+# a merge". Both halves are now false, and the note had gone stale in two
+# separate ways at once:
+#
+#   1. The repository is **public**, so protection is not a paid feature here.
+#   2. `main` has required status checks configured. Measured 2026-08-27 with
+#      `gh api repos/elxea/elxea-web-app/branches/main/protection`:
+#      static-checks, unit-tests, coverage, build, storybook-tests, e2e-tests,
+#      identity-e2e — 7 required contexts.
+#
+# So a red check on those 7 blocks the merge button by itself. The operational
+# rule in docs/ci-gates.md still applies, but it is now a second layer rather
+# than the only one.
+#
+# Note what is NOT enforced, so nobody reads more into this than is there:
+# `enforce_admins` is false and `required_approving_review_count` is 0. An
+# admin can still merge without review; what they cannot do is merge red.
+#
+# Keep this comment honest: it is the kind of statement that decides how much
+# people trust the pipeline, and a wrong one is worse than none. If protection
+# changes, re-measure with the `gh api` call above rather than editing prose.
 on:
   push:
     branches: [main, developer, "feat/**"]
@@ -95,6 +115,63 @@ jobs:
         # caught it locally. CI and pre-push now check the same thing.
         run: pnpm typecheck
 
+      - name: Validate SoT registry
+        # 憲章 R5「『単一正本』を自称させない」の機械強制。同じ `@sot <concept>`
+        # が 2 箇所で宣言されていたら失敗する。散文で「ここが正本」と書くのは
+        # 何箇所でもできてしまい、実際 site-origin は 2 実装が別々の正規化規則で
+        # 並立していた (lib/site-url.ts と lib/env.ts)。
+        # 生成物 docs/sot-registry.md の drift もここで落ちる。
+        # 既存の static-checks に相乗りさせている (新規ジョブは作らない)。
+        run: pnpm check:sot
+
+      - name: Validate exception ratchets
+        # 憲章 R8「装置導入は全件移行 + 再流入止めで 1 セット」の機械強制。
+        # 各例外表 (eslint-suppressions / 各 lint ルールの ALLOWLIST・
+        # GRANDFATHERED / z-layer の免除 / expected-failure) の件数を
+        # ratchets.json に固定し、増えたら落とす。
+        #
+        # 「縮小方向にのみ更新する」は Wave 1-3 の各ルールに**コメントで**
+        # 書いてあっただけで、増やしても CI は緑のままだった。原則には強制機構が要る。
+        #
+        # 減った場合も落とす: 緩んだ枠を残すと、その分だけ黙って増やせてしまう。
+        # 直し方はどちらも `node scripts/ops/check-ratchet.mjs --update` の 1 回。
+        # 既存の static-checks に相乗りさせている (新規ジョブは作らない)。
+        run: node scripts/ops/check-ratchet.mjs --check
+
+      - name: No dead functions/lib
+        # T-2 (CDP 統合 Stage 0): `functions/lib/` の再流入を止める。
+        #
+        # 出所の TypeScript が無く (functions/src には index.ts と
+        # persona-keywords.json しか無い)、firebase.json にも functions
+        # セクションが無いのでデプロイ経路も無い、コンパイル済み JavaScript が
+        # コミットされていた。動かないのに、注文のペルソナ計算を追った人が
+        # 現役の実装だと誤読する置き場所になっていた。
+        #
+        # 消すだけだと、手元で tsc を回した拍子に生成物が戻り .gitignore にも
+        # 無いのでそのままコミットされる。憲章 R8 の「全件移行 + 再流入止めで
+        # 1 セット」。
+        #
+        # ミリ秒で終わる存在チェックなので、既存の static-checks に相乗り
+        # させている (新規ジョブは作らない)。
+        run: node scripts/ops/check-no-dead-functions-lib.mjs
+
+      - name: Validate interaction inventory
+        # 憲章 R9「押せるものは、全部台帳に載る」の機械強制。
+        # app/ components/ lib/ hooks/ を AST で走査し、ユーザーが押せるもの
+        # 5 種 (JSX の on* / 書き込み / 内部リンク / form action / addEventListener)
+        # を interaction-inventory.json と突き合わせる。押せるものが増えたのに
+        # 台帳に無ければ落ちる。応答の宣言 (response) が無い行があっても落ちる。
+        #
+        # なぜ要るのか: 「押した瞬間に効く」の lint は**書き込みしか見ておらず**、
+        # 表示切替 78 件は一度も数えられたことがなかった。商品画像カルーセルが
+        # 未取得 URL の取得待ちで固まる不具合 (本番実測 705〜1,865ms) は、
+        # 母集団に入っていないので原理的に見えなかった。
+        # 母集団を「押せるもの全部」に広げるのがこの検査。
+        #
+        # 数秒で終わる静的検査なので、既存の static-checks に相乗りさせている
+        # (新規ジョブは作らない — 緑の push 1 回 = 15 分 / docs/ci-gates.md)。
+        run: pnpm check:interactions
+
       - name: Validate design tokens
         # Fails the build (validate-tokens.ts exits 1) when tokens drift from
         # the Style Dictionary source. Previously defined as a script but never
@@ -117,6 +194,46 @@ jobs:
         # hand-written and silently drifted; this is what makes drift a build
         # failure instead of a discovery months later.
         run: pnpm validate:design-kit
+
+      # ⚠ このステップは **ジョブの最後に置く**。
+      #
+      # 他の検査と違い、これだけは **このリポジトリの外の状態** (cx-agent が
+      # デプロイ済みか) に結果が左右される。ジョブの途中に置くと、cx-agent 側が
+      # まだ出ていないというだけで後続のステップが 1 つも走らなくなり、
+      # 「このリポジトリの中の退行」が外部依存の失敗に隠れる。実際、最初に
+      # ratchet の直後へ置いたときは interaction inventory / design token /
+      # design-map / design-kit の 4 検査が丸ごと skip された。
+      #
+      # 外部に依存する検査は最後に置き、自分のリポジトリの検査を先に全部通す。
+      - name: Firebase project parity (E6')
+        # E6' (CDP 統合 Stage 0): web-app と cx-agent が **同じ Firebase
+        # プロジェクト** を見ていることを機械で確かめる。
+        #
+        # 2 リポは別ランタイムでありながら同じ Firestore を顧客カルテの置き場と
+        # して共有している。にもかかわらず接続先が一致しているかを確かめる手段が
+        # 無く、実際 2026-08 の設計審査では 3 案すべてが接続先を取り違えて推測した。
+        # 一致していれば同じ注文で persona が二重加算され、していなければ同じ人の
+        # カルテが 2 つに分裂する — どちらが起きているのかを、人が実機に入って
+        # secret を数えるまで誰も言えなかった。
+        #
+        # **不一致でも未設定でも到達不能でも落とす** (fail-closed)。とくに
+        # 「未設定」を緑にしないのが要点で、cx-agent 側には未設定でも黙って
+        # 動き続けられる縮退が各所にある。未設定を通すとこの検査は
+        # 「壊れているときだけ何も言わない」検査になる。
+        #
+        # ⚠ この検査は cx-agent 側に /health/firebase が **デプロイ済み** で
+        #   あることを前提にする。契約の片側なので、cx-agent を先にマージ・
+        #   デプロイしてからでないと緑にならない (404 で落ちる)。これは検査の
+        #   不具合ではなく「契約がまだ片側しか無い」ことの正しい報告である。
+        #
+        # 判定ロジックは scripts/ops/lib/firebase-project-parity.mjs に純関数で
+        # 切り出してあり、全分岐を __tests__/ops/firebase-project-parity.test.ts が
+        # ネットワーク無しで固定している。
+        #
+        # 既存の static-checks に相乗りさせている (新規ジョブは作らない)。
+        env:
+          CX_AGENT_HEALTH_URL: https://elxea-agent.setaka-on.workers.dev/health/firebase
+        run: node scripts/ops/check-firebase-project-parity.mjs
 
   unit-tests:
     name: unit-tests
@@ -265,6 +382,29 @@ jobs:
           NEXT_PUBLIC_SANITY_DATASET: production
           # SESSION_SECRET comes from the workflow-level `env` block.
 
+      - name: Edge bundle contains nothing the Edge Runtime cannot run
+        # `next build` が成功しても Vercel のデプロイは落ちうる。Edge Function に
+        # node:http / node:fs のような Node 専用モジュールが入っていると、出力を
+        # 配る段で "The Edge Function ... is referencing unsupported modules" に
+        # なる。この差のせいで 2026-08-27 に「required check は全部緑、マージ済み、
+        # だがデプロイできない main」が実際に発生した (憲章 Wave 1 / #164)。
+        #
+        # ビルド直後の成果物を検査してその場で落とす。deploy でしか分からなかった
+        # 失敗を、required check である build に前倒しする。
+        run: node scripts/ops/check-edge-bundle.mjs
+
+      - name: roji profile synthetic data reaches only through source.ts
+        # roji プロファイル (ミクロ⇔マクロ) の生成データ混入防止5層防御・層1
+        # (到達不能化) の裏取り。lib/profile/synthetic/** への import 経路を
+        # ESLint no-restricted-imports で lib/profile/source.ts の動的 import
+        # だけに絞っているが、CI 側でも独立に検査する (2本目の検査で1本目の穴を
+        # 塞ぐ・check-edge-bundle.mjs と同じ思想)。PROFILE_DEMO_MODE 導入
+        # (2026-09-05 Setaka決定) により本番でも synthetic がビルド成果物に
+        # 現れうるようになったため、検査対象は「ビルド成果物に含まれないこと」
+        # ではなく「import 経路が source.ts だけであること」(ソースレベル)。
+        # 詳細: scripts/check-synthetic-import-boundary.mjs の doc comment。
+        run: node scripts/check-synthetic-import-boundary.mjs
+
   storybook-tests:
     name: storybook-tests
     needs: static-checks
@@ -287,7 +427,13 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Install Playwright browsers
-        run: pnpm exec playwright install --with-deps chromium
+        # `playwright install --with-deps` を直接叩かない。内部の apt が
+        # ミラー障害で無限にストールし、job が timeout-minutes 上限まで
+        # ハングして cancelled になる (run 32275002652)。スクリプト側で
+        # apt 部分とダウンロード部分を分離し、hard timeout + リトライで
+        # 囲んでいる。詳細は scripts/ci/install-playwright.sh のヘッダ。
+        timeout-minutes: 10
+        run: bash scripts/ci/install-playwright.sh chromium
 
       - name: Run Storybook tests (a11y + interaction)
         # Stories run as vitest browser tests. Accessibility violations FAIL
@@ -318,7 +464,13 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Install Playwright browsers
-        run: pnpm exec playwright install --with-deps chromium
+        # `playwright install --with-deps` を直接叩かない。内部の apt が
+        # ミラー障害で無限にストールし、job が timeout-minutes 上限まで
+        # ハングして cancelled になる (run 32275002652)。スクリプト側で
+        # apt 部分とダウンロード部分を分離し、hard timeout + リトライで
+        # 囲んでいる。詳細は scripts/ci/install-playwright.sh のヘッダ。
+        timeout-minutes: 10
+        run: bash scripts/ci/install-playwright.sh chromium
 
       - name: Run E2E tests (with retries for flaky tests)
         # Reporters now come from playwright.config.ts (list + html + json +
@@ -383,6 +535,107 @@ jobs:
         with:
           name: playwright-report
           path: playwright-report/
+          retention-days: 7
+
+  identity-e2e:
+    name: identity-e2e
+    needs: static-checks
+    runs-on: ubuntu-latest
+    # 実測 (2026-08-23, 開発機): 偽サーバー 3 本の起動が数百 ms、dev サーバーの
+    # コールドコンパイルが最も重く、2 suite 合わせて 3〜5 分。上限はコールド
+    # Turbopack と runner の遅さに余裕を見て 20 分。
+    timeout-minutes: 20
+    env:
+      NODE_OPTIONS: --max-old-space-size=4096
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # auth-flow 側の S0 が <meta name="x-elxea-commit"> と
+          # `git rev-parse --short HEAD` を突き合わせる。浅いクローンでも HEAD は
+          # 読めるが、fetch-depth: 0 にしておくと SHA の解決が環境に依らない。
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        # e2e-tests と同じ理由でスクリプト経由 (apt ミラー障害でのハング対策)。
+        timeout-minutes: 10
+        run: bash scripts/ci/install-playwright.sh chromium
+
+      # Ring 2 は 2 つの config に分かれている。Next 16 は同じディレクトリから
+      # 2 つ目の dev サーバーを起動しないので、**逐次**に走らせる (並列にすると
+      # 後から起動した方が必ず落ちる)。
+      #
+      # 外へ出ていく先はすべてローカルの偽サーバー: 偽 LINE / 偽 cx-agent /
+      # 偽 Shopify Customer Account、および プロセス内の偽 Firestore。
+      # **本物の LINE / Shopify / Firestore / cx-agent には接続しない。**
+      # 資格情報は 1 つも要らない (合成値はどちらの config にも直書きしてある)。
+      - name: Run auth session flow (Ring 2)
+        run: pnpm exec playwright test --config e2e/playwright-auth-flow.config.ts
+        env:
+          CI: true
+          NEXT_PUBLIC_SANITY_PROJECT_ID: 5s8ahx87
+          NEXT_PUBLIC_SANITY_DATASET: production
+
+      - name: Reset Turbopack dev cache between the two suites
+        # Turbopack は dev のコンパイル結果を `.next/dev` に**永続化**する
+        # (`experimental.turbopackFileSystemCacheForDev` は 16.1.0 以降 既定 true)。
+        # 1 本目の dev サーバーは Playwright にプロセスごと止められるので、書き
+        # かけのグラフが残りうる。2 本目はそれを**復元して**起動するため、
+        # 復元したグラフが噛み合わないと turbo-tasks が panic する
+        # (main の run 32620718882 で実際に発生:
+        #  `inner_of_upper_lost_followers ... as they don't exist as upper or
+        #  follower edges`)。panic はコンパイル中のリクエストを中断させ、
+        # ブラウザ側には `net::ERR_ABORTED` として出るので、症状だけ見ると
+        # プロダクトの不具合に見える。
+        #
+        # 上流に修正は無い (vercel/next.js#89950 は未診断のままクローズ)。
+        # 公式に案内されている回避は「キャッシュを消す」なので、2 本目は必ず
+        # 冷えた状態から始める。復元で得ていた短縮は実測 0.5 秒程度
+        # (run 32650612439 の warmup ログ) で、捨てても釣りが来る。
+        #
+        # 消すのは dev の出力だけ。`.next/cache` (build 側) には触らない。
+        run: rm -rf .next/dev
+
+      - name: Run LINE linkage flow (Ring 2)
+        # `if: always()` にはしない。前段が落ちている時点で dev サーバーの前提が
+        # 壊れている可能性が高く、2 本目の失敗は原因ではなく症状になるため。
+        run: pnpm exec playwright test --config e2e/playwright-line-linkage.config.ts
+        env:
+          CI: true
+          NEXT_PUBLIC_SANITY_PROJECT_ID: 5s8ahx87
+          NEXT_PUBLIC_SANITY_DATASET: production
+
+      - name: Verify identity E2E test floor (空回り検知)
+        # 「0 件成功」で緑になるのを防ぐ。line-linkage suite が JUnit を出すので、
+        # そのテスト数が床を下回ったら落とす。suite 全体が testMatch の書き間違いで
+        # 1 件も拾われない、という壊れ方は静かなので機械で見る。
+        # 現在: ① ①' ② 〜 ⑤ とエッジ 3 件 (他人の LINE / 解除直後 / 照会の遅延)、
+        # S13 / S15 の計 11 件。増やしたらここも上げること。
+        # (2026-08-25: 実数 10 に対し床が 8 のまま置き去りになっていたのを、
+        #  ①' 追加に合わせて実数へ合わせ直した。)
+        if: always()
+        env:
+          TEST_FLOOR_IDENTITY_E2E: "11"
+        run: node scripts/ops/check-test-floor.mjs --file test-results/line-linkage-junit.xml --min "${TEST_FLOOR_IDENTITY_E2E}" --label identity-e2e
+
+      - name: Upload identity E2E results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: identity-e2e-results
+          path: test-results/
           retention-days: 7
 
   visual-regression:
@@ -486,7 +739,19 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Install Playwright browsers
-        run: pnpm exec playwright install --with-deps chromium
+        # `playwright install --with-deps` を直接叩かない。内部の apt が
+        # ミラー障害で無限にストールし、job が timeout-minutes 上限まで
+        # ハングして cancelled になる (run 32275002652)。スクリプト側で
+        # apt 部分とダウンロード部分を分離し、hard timeout + リトライで
+        # 囲んでいる。詳細は scripts/ci/install-playwright.sh のヘッダ。
+        #
+        # この job の timeout-minutes は 5 なので、ステップ側の上限は 3 に
+        # 絞る (10 にしても job 上限が先に来て意味がない)。リトライ予算も
+        # 1 回に落とし、smoke 全体が 5 分に収まるようにする。
+        timeout-minutes: 3
+        env:
+          PW_INSTALL_ATTEMPTS: "1"
+        run: bash scripts/ci/install-playwright.sh chromium
 
       - name: Run staging smoke tests
         # STAGING_URL が未設定のケースはこの job の `if:` (ship-gate 経由) で
@@ -654,7 +919,7 @@ jobs:
     # 一覧で「デプロイした緑」と混同されない。判定を変えるときは ship-gate 側を
     # 触ること (このファイルで出荷ブランチを書いているのは ship-gate だけ)。
     if: needs.ship-gate.outputs.armed == 'true'
-    needs: [static-checks, unit-tests, coverage, build, storybook-tests, e2e-tests, ship-gate]
+    needs: [static-checks, unit-tests, coverage, build, storybook-tests, e2e-tests, identity-e2e, ship-gate]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     # Second layer of serialisation, for the cross-workflow case: the workflow

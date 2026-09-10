@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
+import { env } from "@/lib/config";
 import { getAdminFirestore } from "@/lib/firebase/admin";
-import { sanityClient } from "@/sanity/lib/client";
+import { sanityFetch } from "@/sanity/lib/fetch";
 import {
   sendFarmerNotification,
   type FarmerNotificationItem,
 } from "@/lib/email/farmer-notification";
 import { siteUrl } from "@/lib/site-url";
+import { filterOutFictional } from "@/lib/fictional-content";
 
 /**
  * Cron job: Notify followers of new articles/products from followed farmers.
@@ -26,7 +28,7 @@ import { siteUrl } from "@/lib/site-url";
  * This prevents re-sending if the cron runs multiple times for the same day.
  */
 
-const CRON_SECRET = process.env.CRON_SECRET || "";
+const CRON_SECRET = env("CRON_SECRET") ?? "";
 /** How far back to look for new content (hours) */
 const LOOKBACK_HOURS = 25; // slightly over 24h to handle scheduling drift
 const SITE_URL = siteUrl();
@@ -79,7 +81,13 @@ async function fetchFarmersWithNewContent(
     imageUrl: string | null;
     excerpt: string | null;
     farmerSlugs: string[];
-  }> = await sanityClient.fetch(articlesQuery, { since: sinceISO });
+  }> = await sanityFetch({
+    query: articlesQuery,
+    params: { since: sinceISO },
+    // cron は「前回実行以降に増えた記事」を毎回実データで見る。名札で無効化
+    // する対象ではない (キャッシュに当たると同じ通知を送らない/送りすぎる)。
+    cache: { noStore: true },
+  });
 
   // Build a map: farmerSlug -> new articles
   const farmerArticleMap = new Map<string, (typeof articles)[0][]>();
@@ -101,8 +109,24 @@ async function fetchFarmersWithNewContent(
       "name": name
     }
   `;
-  const farmers: Array<{ slug: string; name: string }> =
-    await sanityClient.fetch(farmersQuery, { slugs: involvedSlugs });
+  const fetchedFarmers: Array<{ slug: string; name: string }> =
+    await sanityFetch({
+      query: farmersQuery,
+      params: { slugs: involvedSlugs },
+      cache: { noStore: true },
+    });
+
+  /**
+   * 架空の農家についてはメールを組み立てない。この経路は公開ページではなく
+   * フォロワーの受信箱に届くぶん、遮断の必要はむしろ強い — 架空の生産者名を
+   * 実在の顧客に断言したうえ、本文のリンク先 `/farmers/{slug}` は deny-list 側で
+   * 404 になるので、届いた時点で壊れている。`filterOutFictional` は `slug.current`
+   * を見るので、この射影 (`"slug": slug.current`) に合わせて形を渡す。
+   */
+  const farmers = filterOutFictional(
+    "farmer",
+    fetchedFarmers.map((f) => ({ ...f, slug: { current: f.slug } })),
+  ).map((f) => ({ ...f, slug: f.slug.current }));
 
   return farmers.map((f) => ({
     farmerSlug: f.slug,
@@ -131,29 +155,70 @@ type FollowerDoc = {
   customerName: string;
 };
 
+/**
+ * この農家を保存している人を集める。
+ *
+ * ## 2 か所を見て 1 つに束ねる (移行期の必須処理)
+ *
+ * 農家の保存先は `follows` から `favorites` (`type: "farmer"`) へ移した (J-5)。
+ * 移行スクリプトは**元の `follows` を消さない**ので、移行の前後どちらの時点でも
+ * 取りこぼしが出ないよう **両方を読んで人単位で束ねる**。
+ *
+ * 片方だけを読むと、その瞬間に配信が静かに止まる —
+ *   - `favorites` だけ … 移行を流す前は 0 件になる (デプロイした瞬間に配信停止)
+ *   - `follows` だけ  … 移行後に保存した人へ届かない (新規が永久に漏れる)
+ * どちらも「エラーは出ないのに誰にも届かない」形の壊れ方をする。
+ *
+ * 同じ人が両方に居るのは移行後の正常な状態なので、`customerId` で重複を落とす。
+ */
 async function getFollowersForFarmer(
   farmerSlug: string
 ): Promise<FollowerDoc[]> {
   const db = getAdminFirestore();
 
-  // Collection group query: all `follows` subcollections where farmerSlug matches
-  const snapshot = await db
-    .collectionGroup("follows")
-    .where("farmerSlug", "==", farmerSlug)
-    .get();
+  const [legacy, saved] = await Promise.all([
+    // 旧: users/{customerId}/follows/{docId}
+    db.collectionGroup("follows").where("farmerSlug", "==", farmerSlug).get(),
+    // 新: users/{customerId}/favorites/{docId} (type: "farmer" / targetId: slug)
+    db
+      .collectionGroup("favorites")
+      .where("type", "==", "farmer")
+      .where("targetId", "==", farmerSlug)
+      .get(),
+  ]);
 
-  return snapshot.docs.map((doc) => {
+  const byCustomer = new Map<string, FollowerDoc>();
+
+  for (const doc of legacy.docs) {
     const data = doc.data();
-    // Path: users/{customerId}/follows/{docId}
     const customerId = doc.ref.parent.parent?.id ?? "";
-    return {
+    if (!customerId) continue;
+    byCustomer.set(customerId, {
       farmerSlug: data.farmerSlug as string,
       farmerName: data.farmerName as string,
       customerId,
       customerEmail: data.customerEmail as string,
       customerName: data.customerName as string,
-    };
-  });
+    });
+  }
+
+  for (const doc of saved.docs) {
+    const data = doc.data();
+    const customerId = doc.ref.parent.parent?.id ?? "";
+    if (!customerId || byCustomer.has(customerId)) continue;
+    /* お気に入りの行は農家名 (`title`) しか持たない。宛先の氏名・メールは
+       ここでは分からないので空にしておく — 呼び出し側が Shopify から引き直す
+       ときに、推測した値で上書きされないようにする。 */
+    byCustomer.set(customerId, {
+      farmerSlug,
+      farmerName: (data.title as string) ?? farmerSlug,
+      customerId,
+      customerEmail: "",
+      customerName: "",
+    });
+  }
+
+  return [...byCustomer.values()];
 }
 
 /**

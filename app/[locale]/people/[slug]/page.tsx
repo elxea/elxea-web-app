@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getLocale, getTranslations } from "next-intl/server";
 
-import { getClient } from "@/sanity/lib/client";
+import { sanityFetch } from "@/sanity/lib/fetch";
 import {
   PERSON_BY_SLUG_QUERY,
   OTHER_PEOPLE_QUERY,
@@ -13,6 +13,7 @@ import { Breadcrumb } from "@/components/seo/breadcrumb";
 import { AuthorByline } from "@/components/journal/author-byline";
 import { ArticleCard } from "@/components/journal/article-card";
 import { CatalogGrid } from "@/components/catalog/catalog-list";
+import { FavoriteToggleButton } from "@/components/favorites/favorite-toggle-button";
 import { SpecBand } from "@/components/editorial/section-blocks";
 import { bodySmClass, captionClass } from "@/components/editorial/rule-list";
 import {
@@ -35,7 +36,7 @@ import {
   withSeedPersonDetail,
 } from "@/lib/preview-seed";
 import { getProductByHandle } from "@/lib/shopify";
-import { formatPrice } from "@/lib/utils";
+import { formatPriceRange } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 
 /**
@@ -146,8 +147,11 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   try {
-    const client = getClient();
-    const person: Person | null = await client.fetch(PERSON_BY_SLUG_QUERY, { slug });
+    const person: Person | null = await sanityFetch({
+      query: PERSON_BY_SLUG_QUERY,
+      params: { slug },
+      cache: { tag: "sanity:authors" },
+    });
     if (!person) return {};
     const image = person.image?.asset
       ? urlFor(person.image).width(800).url()
@@ -206,17 +210,29 @@ export default async function PeoplePage({
   let others: OtherPerson[] = [];
   let articles: Parameters<typeof ArticleCard>[0]["article"][] = [];
   try {
-    const client = getClient();
-    person = await client.fetch(PERSON_BY_SLUG_QUERY, { slug });
+    person = await sanityFetch({
+      query: PERSON_BY_SLUG_QUERY,
+      params: { slug },
+      cache: { tag: "sanity:authors" },
+    });
     if (person) {
-      others = (await client.fetch(OTHER_PEOPLE_QUERY, { slug })) ?? [];
+      others =
+        (await sanityFetch<OtherPerson[]>({
+          query: OTHER_PEOPLE_QUERY,
+          params: { slug },
+          cache: { tag: "sanity:authors" },
+        })) ?? [];
       // 旧実装は $start / $end を渡しておらず GROQ が失敗していた (上の注記参照)。
       articles =
-        (await client.fetch(ARTICLES_BY_AUTHOR_QUERY, {
-          language: locale,
-          authorSlug: slug,
-          start: 0,
-          end: ARTICLE_LIMIT,
+        (await sanityFetch({
+          query: ARTICLES_BY_AUTHOR_QUERY,
+          params: {
+            language: locale,
+            authorSlug: slug,
+            start: 0,
+            end: ARTICLE_LIMIT,
+          },
+          cache: { tag: "sanity:articles" },
         })) ?? [];
     }
   } catch {
@@ -237,6 +253,12 @@ export default async function PeoplePage({
   /* --- 1. PersonHead ------------------------------------------------------ */
 
   const heroImage = photoUrl(person.image, person._id, 640, 800);
+
+  /* お気に入りに保存する画像。**絶対 URL でなければ null**。
+     API の受け口が `z.string().url()` なので、プレビュー用の見本画像 (相対パス)
+     をそのまま渡すと 400 になる。Sanity の画像 URL は絶対なのでそのまま通る。 */
+  const favoriteImage =
+    heroImage && /^https?:\/\//.test(heroImage) ? heroImage : null;
 
   /* --- 3. THE WORK -------------------------------------------------------- */
 
@@ -274,7 +296,9 @@ export default async function PeoplePage({
       imageAlt: p.featuredImage?.altText ?? p.title,
       title: p.title,
       note: p.vendor || undefined,
-      meta: price ? formatPrice(price.amount, price.currencyCode) : undefined,
+      meta: price
+        ? formatPriceRange(price, p.priceRange?.maxVariantPrice)
+        : undefined,
     };
   });
 
@@ -304,6 +328,27 @@ export default async function PeoplePage({
         imageAlt={person.image?.alt ?? person.name}
         stats={person.stats}
         bylineLabel={person.interviewer ? t("interviewerLabel") : undefined}
+        /* この人を覚えておく (Setaka 決定 2026-08-25「人物ページに正式実装」)。
+           マイページ /account/favorites の「お気に入りの人」節に出る。
+           `targetId` は人の slug — Firestore の他の種類と同じく識別子は slug で、
+           locale を混ぜた複合キーにはしない (既存データ互換)。 */
+        actions={
+          <FavoriteToggleButton
+            kind="person"
+            targetId={person.slug.current}
+            title={person.name}
+            imageUrl={favoriteImage}
+            labels={{
+              add: t("saveAdd"),
+              remove: t("saveRemove"),
+              saved: t("saveSaved"),
+              added: t("saveAddedMessage"),
+              removed: t("saveRemovedMessage"),
+              error: t("saveErrorMessage"),
+              loginRequiredMessage: t("saveLoginRequiredMessage"),
+            }}
+          />
+        }
         byline={
           person.interviewer ? (
             <AuthorByline

@@ -1,7 +1,9 @@
 import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
+import { env } from "@/lib/config";
 import { getAdminFirestore } from "@/lib/firebase/admin";
+import { logger } from "@/lib/log";
 
 /**
  * Cron-triggered cleanup of the _webhookLogs idempotency collection.
@@ -21,7 +23,7 @@ import { getAdminFirestore } from "@/lib/firebase/admin";
  * Configured to run daily at 03:00 JST (18:00 UTC) via vercel.json.
  */
 
-const CRON_SECRET = process.env.CRON_SECRET || "";
+const CRON_SECRET = env("CRON_SECRET") ?? "";
 const BATCH_SIZE = 400; // Firestore batch write limit is 500; leave headroom
 
 function isAuthorizedCronRequest(authHeader: string | null): boolean {
@@ -32,7 +34,13 @@ function isAuthorizedCronRequest(authHeader: string | null): boolean {
   if (a.length !== b.length) return false;
   try {
     return crypto.timingSafeEqual(a, b);
-  } catch {
+  } catch (err) {
+    /* 長さは手前で揃えてあるので、ここに来ること自体が想定外。黙って
+       「不許可」にすると、掃除が止まっていることに誰も気付けない。 */
+    logger.error("api.cron-webhook-logs-cleanup.secret-compare-failed", err, {
+      route: "/api/cron/webhook-logs-cleanup",
+      operation: "cron-secret-compare",
+    });
     return false;
   }
 }

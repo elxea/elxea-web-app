@@ -9,9 +9,11 @@
  *   - scripts/seed-farmers.ts       farmer  (青山 修一 / 陳 玉芬 / ラジャン・メータ)
  *   - scripts/seed-dummy-content.ts farmer  (山田農園 / 田中茶園)
  *                                   teaMenu (春の煎茶 / 宇治玉露 / 加賀ほうじ茶)
- *                                   playlist (Morning Forest / Rain on Tea Leaves —
- *                                             tracks point at a placeholder bgm.mp3
- *                                             titled "テスト音源")
+ *
+ * Two further `farmer` docs (山田 健一 / 佐藤 美咲, created 2026-03-07) are not
+ * seed-script output but are equally invented — Setaka confirmed on 2026-08-22
+ * that elxea has no real producer profiles published yet, so every farmer doc
+ * currently in production is fictional. They are listed below too.
  *                                   event   (both bodies literally contain "ダミー")
  *
  * These docs describe invented producers, invented tea and invented events that
@@ -31,14 +33,25 @@
  *   - `author` (author-setaka / author-roji): "Setaka" may be a real person, so
  *     these are left visible pending Setaka's confirmation.
  *   - `article` / `journal` seed docs: not confirmed fictional by observation.
+ *   - `playlist` (Morning Forest / Rain on Tea Leaves): these WERE denied here
+ *     between 2026-08-22 and 2026-08-26 because their tracks point at a
+ *     placeholder bgm.mp3 titled "テスト音源". Setaka reversed that call on
+ *     2026-08-26 — the playlists and the self-built SoundCloud-style player are
+ *     what he wants back on the site, and the uploaded audio is the audio he
+ *     means. `playlist` is therefore absent from `FictionalDocType` entirely
+ *     rather than kept as an empty entry, so no read path can quietly re-hide
+ *     it without an explicit type change. Guarded by
+ *     __tests__/fictional-content.test.ts ("playlist is deliberately visible").
  *
- * This module replaces the former `lib/fictional-farmers.ts`; the farmer
- * entries below are byte-identical to the ones it carried, so farmer behaviour
- * is unchanged (guarded by __tests__/fictional-content.test.ts).
+ * This module replaces the former `lib/fictional-farmers.ts`. It started out
+ * byte-identical for `farmer`; the two 2026-03-07 docs above are the only
+ * additions since. Every entry is guarded by
+ * __tests__/fictional-content.test.ts, which also asserts — at source level —
+ * that each read path still consults this list.
  */
 
 /** Sanity `_type`s that currently have known fictional seed documents. */
-export type FictionalDocType = "farmer" | "teaMenu" | "playlist" | "event";
+export type FictionalDocType = "farmer" | "teaMenu" | "event";
 
 type DenyEntry = { readonly ids: readonly string[]; readonly slugs: readonly string[] };
 
@@ -57,6 +70,10 @@ const FICTIONAL_DOCS: Readonly<Record<FictionalDocType, DenyEntry>> = {
       // scripts/seed-dummy-content.ts
       "farmer-yamada",
       "farmer-tanaka",
+      // Hand-created 2026-03-07, confirmed fictional by Setaka 2026-08-22.
+      // Auto-generated Sanity ids, so the name is spelled out here.
+      "ChPy2hTrLaycRwOtl4DGV5", // 山田 健一
+      "ChPy2hTrLaycRwOtl4DGZd", // 佐藤 美咲
     ],
     slugs: [
       // scripts/seed-farmers.ts
@@ -66,17 +83,15 @@ const FICTIONAL_DOCS: Readonly<Record<FictionalDocType, DenyEntry>> = {
       // scripts/seed-dummy-content.ts
       "yamada-farm",
       "tanaka-tea-garden",
+      // Hand-created 2026-03-07, confirmed fictional by Setaka 2026-08-22.
+      "yamada-kenichi",
+      "sato-misaki",
     ],
   },
   teaMenu: {
     // scripts/seed-dummy-content.ts — all three teaMenu docs in production are seeds
     ids: ["tea-sencha-spring", "tea-gyokuro", "tea-hojicha"],
     slugs: ["spring-sencha", "uji-gyokuro", "kaga-hojicha"],
-  },
-  playlist: {
-    // scripts/seed-dummy-content.ts — tracks are the placeholder bgm.mp3
-    ids: ["playlist-morning-forest", "playlist-rain-on-leaves"],
-    slugs: ["morning-forest", "rain-on-tea-leaves"],
   },
   event: {
     // scripts/seed-dummy-content.ts — bodies contain the word "ダミー"

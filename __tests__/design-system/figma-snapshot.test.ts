@@ -7,6 +7,8 @@ import {
   stableStringify,
   extractRoute,
   buildSnapshot,
+  selectFrozenSections,
+  loadFrozenSections,
   type FigmaNode,
   type NormalizedNode,
   type ProposalFetch,
@@ -156,9 +158,11 @@ describe("buildSnapshot: 除外 (対象外) の明示計上", () => {
     const fetched: ProposalFetch = {
       fileName: "F",
       fileLastModified: "2026-07-13T00:00:00Z",
-      page: { id: "p", name: "Proposals" },
+      pages: [{ id: "p", name: "Common / Layouts" }],
       routeSections: [{ id: "s:1", route: "@/ja/x" }],
-      sectionsWithoutRoute: [{ id: "s:2", name: "表紙 Cover" }],
+      sectionsWithoutRoute: [
+        { id: "s:2", name: "表紙 Cover", reason: "not a frozen section (banner / annotation / unlabeled)" },
+      ],
       sectionDocs: {
         "s:1": {
           id: "s:1",
@@ -171,8 +175,9 @@ describe("buildSnapshot: 除外 (対象外) の明示計上", () => {
     const snap = buildSnapshot(fetched, "FILEKEY");
     expect(snap.counts.excluded_sections).toBe(1);
     expect(snap.excluded.sections_without_route).toEqual([
-      { id: "s:2", name: "表紙 Cover" },
+      { id: "s:2", name: "表紙 Cover", reason: "not a frozen section (banner / annotation / unlabeled)" },
     ]);
+    expect(snap.schema_version).toBe(2);
     expect(snap.counts.nodes).toBe(2); // section + text
   });
 });
@@ -183,5 +188,57 @@ describe("extractRoute: 施策① と同一挙動 (回帰防止)", () => {
   });
   it("route 無しは null", () => {
     expect(extractRoute("表紙 Cover")).toBeNull();
+  });
+});
+
+describe("selectFrozenSections: Layouts ページの凍結 section → route (2026-09-04 復旧)", () => {
+  const mapping = [
+    { section_id: "r2:1", title: "トップ", route: "@/ja" },
+    { section_id: "ad:1", title: "カート", route: "@/ja/cart", kind: "adopted" as const },
+  ];
+  const pages = (extra: FigmaNode[] = []): FigmaNode[] => [
+    {
+      id: "p:1",
+      name: "Common / Layouts",
+      type: "CANVAS",
+      children: [
+        { id: "r2:1", name: "【R2: 確定版】 トップ", type: "SECTION" },
+        { id: "ad:1", name: "【採用: 現状案で確定】 カート", type: "SECTION" },
+        { id: "ad:2", name: "【採用: C案 (R1-C) 確定】 About", type: "SECTION" },
+        { id: "tx:1", name: "採用バナー r2:1 トップ", type: "TEXT" },
+        ...extra,
+      ],
+    },
+  ];
+
+  it("対応表に載る section だけを route 付きで採用し、他は理由付きで excluded", () => {
+    const r = selectFrozenSections(pages(), mapping);
+    expect(r.routeSections).toEqual([
+      { id: "r2:1", route: "@/ja" },
+      { id: "ad:1", route: "@/ja/cart" },
+    ]);
+    expect(r.sectionsWithoutRoute.map((s) => s.id).sort()).toEqual(["ad:2", "tx:1"]);
+    expect(r.sectionsWithoutRoute.find((s) => s.id === "ad:2")?.reason).toMatch(/adopted section not in/);
+  });
+
+  it("未登録の【R2: 確定版】section は throw (silent drop 禁止)", () => {
+    const extra: FigmaNode[] = [{ id: "r2:9", name: "【R2: 確定版】 新ページ", type: "SECTION" }];
+    expect(() => selectFrozenSections(pages(extra), mapping)).toThrow(/r2:9/);
+  });
+
+  it("対応表にあるが Figma に無い section は throw (stale mapping を黙認しない)", () => {
+    const stale = [...mapping, { section_id: "gone:1", title: "消えた", route: "@/ja/gone" }];
+    expect(() => selectFrozenSections(pages(), stale)).toThrow(/gone:1/);
+  });
+
+  it("frozen-sections.json は読み込め、section_id / route が一意で route は @/ 形式", () => {
+    const entries = loadFrozenSections();
+    expect(entries.length).toBeGreaterThan(0);
+    const ids = entries.map((e) => e.section_id);
+    expect(new Set(ids).size).toBe(ids.length);
+    for (const e of entries) {
+      expect(e.section_id).toMatch(/^\d+:\d+$/);
+      expect(e.route).toMatch(/^@\/(ja(\/|$)|password$)/);
+    }
   });
 });

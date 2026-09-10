@@ -32,3 +32,32 @@ export function formatPrice(amount: string, currencyCode: string) {
     )
     .join("");
 }
+
+/** 下限価格に添える「以上」の記号。全角波ダッシュ (U+301C)。 */
+const RANGE_SUFFIX = "〜";
+
+/**
+ * バリアントで値段が変わる商品の一覧表記。
+ *
+ * ## なぜ最安値を裸で出さないのか
+ *
+ * 一覧のカードは `priceRange.minVariantPrice` を裸で出していた。一方、商品詳細は
+ * **既定バリアント**の値段を出す。既定バリアントは最安とは限らないので、同じ商品が
+ * 一覧 ¥1,598 → 詳細 ¥2,462 に「値上がりして見える」(実測: tea-ats-o-05 は
+ * XS 3袋 ¥1,598 / S 6袋 ¥2,462、詳細の初期選択は S 6袋)。金額は信頼に直結するので、
+ * 幅があるときは幅があると分かる形にする。
+ *
+ * 下限だけを出して「〜」を添える形にしているのは、カード 1 行に収まる長さで
+ * 「これは最低額であって確定額ではない」と伝えられるため。両端表記
+ * (`¥1,598〜¥2,462`) はカードの 1 行に収まらない幅になる。
+ */
+export function formatPriceRange(
+  min: { amount: string; currencyCode: string },
+  max?: { amount: string; currencyCode: string } | null,
+): string {
+  const low = formatPrice(min.amount, min.currencyCode);
+  if (!max) return low;
+  // 金額は文字列で来る ("1598.0" / "1598")。桁揃えの差を拾わないよう数値で比べる。
+  if (parseFloat(max.amount) <= parseFloat(min.amount)) return low;
+  return `${low}${RANGE_SUFFIX}`;
+}

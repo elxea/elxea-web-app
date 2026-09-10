@@ -229,6 +229,39 @@ export function ActionTile({
   label: string;
   className?: string;
 }) {
+  /* 写真が無いときは写真枠を確保しない (#9)。
+   *
+   * ImageCard は写真が無くても 416x300 の枠 (SP 343x247) を敷いてグレーの
+   * プレースホルダを描く。カテゴリ 6 件のうち写真があるのは 2 件だけなので、
+   * SP では節の高さ約 1,075px の大半が「何も無い灰色」になっていた
+   * (実測 2026-08-25 / img 2 件・リンク 6 件)。
+   *
+   * 行き先は消さない — 消すとカテゴリへの入口そのものが無くなる。写真の代わりに
+   * 高さ 44 (タップ域) の 1 行に畳んで、枠だけを詰める。写真が入稿されれば
+   * 自動で元の写真タイルに戻る (この分岐は入稿状態を見ているだけ)。 */
+  if (!image) {
+    return (
+      <Link
+        href={href}
+        data-slot="action-tile"
+        data-variant="compact"
+        className={cn(
+          "group flex min-h-11 items-center border-b border-border",
+          className
+        )}
+      >
+        <span
+          className={cn(
+            bodySmClass,
+            "text-foreground underline-offset-4 group-hover:underline"
+          )}
+        >
+          {label}
+        </span>
+      </Link>
+    );
+  }
+
   return (
     <Link
       href={href}
@@ -295,11 +328,19 @@ export function ChapterStatement({
   overline,
   title,
   body,
+  backdrop,
   className,
 }: {
   overline: string;
   title: string;
   body?: string;
+  /**
+   * 帯の背面に敷く層 (`SiteImageBackdrop`)。省略時は今日どおり地色のベタ塗り。
+   * 背面は `-z-10` で自分から出るので、帯側は `isolate` で重なり文脈を閉じ、
+   * `overflow-hidden` で写真をはみ出させない。文字色 (`text-primary-foreground`)
+   * は写真の有無で変えない — 可読性は覆いの濃さ側で担保する。
+   */
+  backdrop?: React.ReactNode;
   className?: string;
 }) {
   return (
@@ -307,8 +348,13 @@ export function ChapterStatement({
       data-slot="chapter-statement"
       /* 全幅の帯。Figma の上下余白は PC 163.5 / SP 126 → spacing scale の
          160 / 128 に丸める (Δ3.5 / Δ2 は忠実度対比表に記録)。 */
-      className={cn("bg-primary py-32 lg:py-40", className)}
+      className={cn(
+        "bg-primary py-32 lg:py-40",
+        backdrop && "relative isolate overflow-hidden",
+        className
+      )}
     >
+      {backdrop}
       <div className="page-container">
         {/* 本文の折返し幅は Figma 実測 480 = 30rem。 */}
         <div className="mx-auto flex max-w-120 flex-col items-center text-center">
@@ -342,6 +388,11 @@ export type ServiceGuideTile = {
   body: string;
   href: string;
   linkLabel: string;
+  /**
+   * タイル先頭の写真 (`SiteImageCard`)。未割当のときは呼び出し側が `null` を返すので、
+   * 写真が当たるまでタイルは今日どおりテキストだけで積まれる (灰色の空枠を出さない)。
+   */
+  figure?: React.ReactNode;
 };
 
 export type ServiceGuideAbout = {
@@ -382,6 +433,9 @@ export function ServiceGuideBlock({
               data-slot="service-guide-tile"
               className="flex flex-col border-t border-border pt-6"
             >
+              {/* 写真はタイルの罫線の下・キッカーの上。SP も PC も同じ順で積むので
+                  ブレークポイントごとの並べ替えは要らない。 */}
+              {tile.figure ? <div className="mb-4">{tile.figure}</div> : null}
               <p className={cn(overlineClass, "text-muted-foreground")}>
                 {tile.overline}
               </p>

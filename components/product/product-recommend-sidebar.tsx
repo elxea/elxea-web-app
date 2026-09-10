@@ -14,13 +14,14 @@ import Image from "next/image";
 import { Link } from "@/i18n/navigation";
 import { ImagePlaceholder } from "@/components/media/image-placeholder";
 import { getProducts } from "@/lib/shopify";
-import { formatPrice } from "@/lib/utils";
+import { formatPriceRange } from "@/lib/utils";
 import { getRecommendedProducts } from "@/lib/recommendations/product-engine";
 import { cookies } from "next/headers";
 import { decryptToken } from "@/lib/shopify/customer";
 import { getSession } from "@/lib/shopify/auth";
 import { getCustomer } from "@/lib/shopify/customer";
 import { extractCustomerId } from "@/lib/firebase/types";
+import { COOKIE_NAME } from "@/lib/auth/cookie-names";
 
 type Props = {
   heading?: string;
@@ -38,7 +39,7 @@ async function resolveCustomerId(): Promise<string | null> {
 
     // Fast path: cached from id_token
     const cookieStore = await cookies();
-    const cidEnc = cookieStore.get("shop_cid")?.value;
+    const cidEnc = cookieStore.get(COOKIE_NAME.shopCustomerId)?.value;
     if (cidEnc) {
       const customerId = decryptToken(cidEnc);
       if (customerId) return customerId;
@@ -84,7 +85,10 @@ export async function ProductRecommendSidebar({
 
       <ul className="space-y-4" role="list">
         {recommended.map((product) => {
-          const price = product.priceRange.minVariantPrice;
+          const price = formatPriceRange(
+            product.priceRange.minVariantPrice,
+            product.priceRange.maxVariantPrice
+          );
 
           return (
             <li key={product.id}>
@@ -113,7 +117,7 @@ export async function ProductRecommendSidebar({
                     {product.title}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {formatPrice(price.amount, price.currencyCode)}
+                    {price}
                   </p>
                 </div>
               </Link>

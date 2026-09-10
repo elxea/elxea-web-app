@@ -35,6 +35,8 @@
  *    このファイルの管轄外。
  */
 
+import { env } from "@/lib/config";
+
 /**
  * Vercel Blob 上の BGM 音源 (公開・CDN 配信)。
  * `NEXT_PUBLIC_BGM_URL` を設定するとそちらが優先される (検証用の差し替え)。
@@ -49,7 +51,7 @@ export const DEFAULT_BGM_URL =
  * 空で作った場合に `new Audio("")` で無音になるのを防ぐ)。
  */
 export function resolveBgmUrl(
-  override: string | undefined = process.env.NEXT_PUBLIC_BGM_URL
+  override: string | undefined = env("NEXT_PUBLIC_BGM_URL")
 ): string {
   const trimmed = override?.trim();
   return trimmed ? trimmed : DEFAULT_BGM_URL;

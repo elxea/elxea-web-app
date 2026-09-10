@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getLocale, getTranslations } from "next-intl/server";
 
-import { getClient } from "@/sanity/lib/client";
+import { sanityFetch } from "@/sanity/lib/fetch";
 import {
   OTHER_PLAYLISTS_QUERY,
   PLAYLIST_BY_SLUG_QUERY,
@@ -14,7 +14,6 @@ import { AuthorByline } from "@/components/journal/author-byline";
 import { ArticleProse } from "@/components/journal/article-blocks";
 import { SpecBand } from "@/components/editorial/section-blocks";
 import { PortableText } from "@/components/sanity/portable-text";
-import { isFictionalSlug } from "@/lib/fictional-content";
 import {
   CuratorQuote,
   PhotoCardGrid,
@@ -27,7 +26,7 @@ import {
   type PhotoCardItem,
 } from "@/components/playlist/playlist-detail";
 import { getProductByHandle } from "@/lib/shopify";
-import { formatPrice } from "@/lib/utils";
+import { formatPriceRange } from "@/lib/utils";
 import { formatArticleDate } from "@/lib/format-date";
 import { previewSeedEnabled, previewImageForKey } from "@/lib/preview-seed";
 import { toPlainText } from "@/lib/sanity-text";
@@ -118,9 +117,12 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  if (isFictionalSlug("playlist", slug)) return {};
   try {
-    const pl: Playlist | null = await getClient().fetch(PLAYLIST_BY_SLUG_QUERY, { slug });
+    const pl: Playlist | null = await sanityFetch({
+      query: PLAYLIST_BY_SLUG_QUERY,
+      params: { slug },
+      cache: { tag: "sanity:playlists" },
+    });
     if (!pl) return {};
     const image = pl.albumImage?.asset ? urlFor(pl.albumImage).width(800).url() : undefined;
     const descText = toPlainText(pl.description).slice(0, 160);
@@ -148,15 +150,21 @@ export default async function PlaylistDetailPage({
   const t = await getTranslations("playlist");
   const bt = await getTranslations("breadcrumb");
 
-  // Fictional/seed playlist -> behave as if the document does not exist.
-  if (isFictionalSlug("playlist", slug)) notFound();
-
   let pl: Playlist | null;
   let others: OtherPlaylist[] = [];
   try {
-    const client = getClient();
-    pl = await client.fetch(PLAYLIST_BY_SLUG_QUERY, { slug });
-    if (pl) others = (await client.fetch(OTHER_PLAYLISTS_QUERY, { slug })) ?? [];
+    pl = await sanityFetch({
+      query: PLAYLIST_BY_SLUG_QUERY,
+      params: { slug },
+      cache: { tag: "sanity:playlists" },
+    });
+    if (pl)
+      others =
+        (await sanityFetch<OtherPlaylist[]>({
+          query: OTHER_PLAYLISTS_QUERY,
+          params: { slug },
+          cache: { tag: "sanity:playlists" },
+        })) ?? [];
   } catch {
     return (
       <div className="page-container py-16">
@@ -240,7 +248,9 @@ export default async function PlaylistDetailPage({
       imageAlt: p.featuredImage?.altText ?? p.title,
       title: p.title,
       note: p.vendor || undefined,
-      meta: price ? formatPrice(price.amount, price.currencyCode) : undefined,
+      meta: price
+        ? formatPriceRange(price, p.priceRange?.maxVariantPrice)
+        : undefined,
     };
   });
 

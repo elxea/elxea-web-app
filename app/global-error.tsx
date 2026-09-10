@@ -1,8 +1,17 @@
 "use client";
 
-import * as Sentry from "@sentry/nextjs";
 import { useEffect } from "react";
 
+import { logger } from "@/lib/log";
+
+/**
+ * 画面がまるごと落ちたときの最後の受け皿。
+ *
+ * 記録は `lib/log` を通す (憲章 Wave 3 / R1)。素の `Sentry.captureException(error)`
+ * だと (1) どの受け皿で落ちたかが後から分からず (2) サーバ由来のメッセージに
+ * 顧客のメールアドレスが混ざったまま外へ出ていた。`digest` は Next がサーバの
+ * 例外に付ける識別子で、サーバ側のログと突き合わせる唯一の手がかりなので必ず残す。
+ */
 export default function GlobalError({
   error,
   reset,
@@ -11,7 +20,7 @@ export default function GlobalError({
   reset: () => void;
 }) {
   useEffect(() => {
-    Sentry.captureException(error);
+    logger.error("ui.boundary.global", error, { digest: error.digest });
   }, [error]);
 
   return (

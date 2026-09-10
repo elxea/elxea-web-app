@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { getLocale, getTranslations } from "next-intl/server";
 import type { PortableTextBlock } from "@portabletext/types";
 
-import { getClient } from "@/sanity/lib/client";
+import { sanityFetch } from "@/sanity/lib/fetch";
 import { TEA_MENU_BY_SLUG_QUERY } from "@/sanity/lib/queries";
 import { urlFor } from "@/sanity/lib/image";
 import { Link } from "@/i18n/navigation";
@@ -99,10 +99,10 @@ function presentSpecs(
 }
 
 async function fetchTea(slug: string, locale: string): Promise<TeaMenu | null> {
-  const client = getClient();
-  const tea: TeaMenu | null = await client.fetch(TEA_MENU_BY_SLUG_QUERY, {
-    slug,
-    language: locale,
+  const tea: TeaMenu | null = await sanityFetch({
+    query: TEA_MENU_BY_SLUG_QUERY,
+    params: { slug, language: locale },
+    cache: { tag: "sanity:tea-menus" },
   });
   // Preview 限定: production dataset に該当のお茶が無いと確定版の節を実寸計測
   // できないため、見本を返す。フラグ未設定なら null なので production は無影響。

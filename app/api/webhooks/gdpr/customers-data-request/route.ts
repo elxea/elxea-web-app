@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateWebhookRequest } from "@/lib/shopify/webhooks/verify";
 import { getAdminFirestore } from "@/lib/firebase/admin";
+import { logger } from "@/lib/log";
 import {
   userDoc,
   ordersCol,
@@ -102,7 +103,14 @@ export async function POST(request: NextRequest) {
     // (encrypted) exported data to that endpoint. Until then, only counts are
     // persisted to logs and the actual payload is discarded.
   } catch (error) {
-    console.error("[Webhook:GDPR] Error exporting customer data:", error);
+    /* 開示請求は法令上の義務。ここで落ちても Shopify には 200 を返す作りなので、
+       黙ると**請求に応えていないことが誰にも分からない**。載せるのは顧客 ID と
+       請求 ID とストアだけで、書き出した中身 (個人情報) は載せない。 */
+    logger.error("api.gdpr-customers-data-request.export-failed", error, {
+      customerId,
+      requestId: body.data_request?.id,
+      shopDomain: body.shop_domain,
+    });
   }
 
   return NextResponse.json({ received: true });

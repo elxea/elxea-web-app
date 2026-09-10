@@ -1,79 +1,67 @@
 "use client";
 
-import {
-  createContext,
-  useContext,
-  useOptimistic,
-  useTransition,
-  type ReactNode,
-} from "react";
+import { createContext, useCallback, useContext, type ReactNode } from "react";
 import type { Cart, CartItem } from "@/lib/shopify/types";
 import { addItem, updateItem, removeItem } from "@/lib/shopify/cart-actions";
+import { cartReducer } from "./cart-reducer";
+import { useOptimisticMutation } from "@/lib/interaction/use-optimistic-mutation";
+import type { WriteMode, WriteOutcome } from "@/lib/interaction/write-queue";
 
-type CartAction =
-  | { type: "ADD"; item: CartItem }
-  | { type: "UPDATE"; lineId: string; quantity: number }
+/** 書き込みが着地したかどうか。呼び出し側がその場で知らせ分けるために返す。 */
+export type CartWriteOutcome = WriteOutcome;
+
+/**
+ * カートへの申し込み。**画面の書き換え方と送り先を 1 つの値にまとめる**。
+ *
+ * `cartReducer` は `type` / `item` / `lineId` / `quantity` だけを見るので、
+ * ここに送信用の項目 (`merchandiseId` など) を足しても楽観更新の規則は変わらない
+ * (構造的に `CartAction` として通る)。
+ */
+type CartInput =
+  | { type: "ADD"; item: CartItem; merchandiseId: string; sellingPlanId?: string }
+  | { type: "UPDATE"; lineId: string; merchandiseId: string; quantity: number }
   | { type: "REMOVE"; lineId: string };
 
 type CartContextType = {
   cart: Cart | null;
   isPending: boolean;
-  addToCart: (merchandiseId: string, quantity?: number, sellingPlanId?: string) => Promise<void>;
-  updateQuantity: (lineId: string, merchandiseId: string, quantity: number) => Promise<void>;
-  removeFromCart: (lineId: string) => Promise<void>;
+  addToCart: (
+    merchandiseId: string,
+    quantity?: number,
+    sellingPlanId?: string,
+  ) => Promise<CartWriteOutcome>;
+  updateQuantity: (
+    lineId: string,
+    merchandiseId: string,
+    quantity: number,
+  ) => Promise<CartWriteOutcome>;
+  removeFromCart: (lineId: string) => Promise<CartWriteOutcome>;
 };
 
 const CartContext = createContext<CartContextType | null>(null);
 
-function cartReducer(state: Cart | null, action: CartAction): Cart | null {
-  if (!state) return state;
+/**
+ * 連打をどう捌くか。**送る値の性質で決まる** (`write-queue` の表を参照)。
+ *
+ * - 数量と削除は**絶対量**なので `"latest"`。5 連打しても往復は最大 2 本で、
+ *   最後に送られるのは必ず最新の数量。
+ * - 追加は**加算**なので `"all"`。ここを `"latest"` にすると「カートに追加」を
+ *   3 回押したのに 1 個しか入らない、という取りこぼしになる。
+ */
+function modeFor(input: CartInput): WriteMode {
+  return input.type === "ADD" ? "all" : "latest";
+}
 
-  switch (action.type) {
-    case "ADD": {
-      const existingLine = state.lines.find(
-        (l) => l.merchandise.id === action.item.merchandise.id
-      );
-      if (existingLine) {
-        return {
-          ...state,
-          totalQuantity: state.totalQuantity + action.item.quantity,
-          lines: state.lines.map((l) =>
-            l.id === existingLine.id
-              ? { ...l, quantity: l.quantity + action.item.quantity }
-              : l
-          ),
-        };
-      }
-      return {
-        ...state,
-        totalQuantity: state.totalQuantity + action.item.quantity,
-        lines: [...state.lines, action.item],
-      };
-    }
-    case "UPDATE": {
-      const line = state.lines.find((l) => l.id === action.lineId);
-      if (!line) return state;
-      const diff = action.quantity - line.quantity;
-      return {
-        ...state,
-        totalQuantity: state.totalQuantity + diff,
-        lines: state.lines.map((l) =>
-          l.id === action.lineId ? { ...l, quantity: action.quantity } : l
-        ),
-      };
-    }
-    case "REMOVE": {
-      const removedLine = state.lines.find((l) => l.id === action.lineId);
-      if (!removedLine) return state;
-      return {
-        ...state,
-        totalQuantity: state.totalQuantity - removedLine.quantity,
-        lines: state.lines.filter((l) => l.id !== action.lineId),
-      };
-    }
-    default:
-      return state;
-  }
+/**
+ * 連打をまとめる単位。
+ *
+ * 同じ行への数量変更と削除は同じ鍵にして直列化する (削除が数量変更を追い越すと、
+ * 消したはずの行が戻ってくる)。追加は変種ごとに 1 本の列にする — カートがまだ
+ * 無いときの `cartCreate` が同時に 2 本走ると、カートが 2 つ出来て片方の商品が
+ * 消えるため。
+ */
+function keyFor(input: CartInput): string {
+  return input.type === "ADD" ? `add:${input.merchandiseId}` : `line:${input.lineId}`;
 }
 
 export function CartProvider({
@@ -83,16 +71,44 @@ export function CartProvider({
   children: ReactNode;
   initialCart: Cart | null;
 }) {
-  const [optimisticCart, setOptimisticCart] = useOptimistic(
-    initialCart,
-    cartReducer
-  );
-  const [isPending, startTransition] = useTransition();
+  /**
+   * サーバへ送る。**絶対量 / 加算の区別は `modeFor` 側が持つ**ので、ここは
+   * 申し込みをそのまま対応する Server Action に流すだけ。
+   */
+  const send = useCallback((input: CartInput) => {
+    switch (input.type) {
+      case "ADD":
+        return addItem(input.merchandiseId, input.item.quantity, input.sellingPlanId);
+      case "UPDATE":
+        return updateItem(input.lineId, input.merchandiseId, input.quantity);
+      case "REMOVE":
+        return removeItem(input.lineId);
+    }
+  }, []);
 
-  async function handleAddToCart(merchandiseId: string, quantity = 1, sellingPlanId?: string) {
-    startTransition(async () => {
-      setOptimisticCart({
+  /**
+   * 失敗したときの言い直しは**呼び出し側の画面**が出す (文言が場所ごとに違い、
+   * i18n の辞書も画面側にあるため)。ここは `run` の戻り値で成否を渡すだけに留め、
+   * 共通機構の「黙って戻さない」という約束は各画面が `failed` を見て果たす。
+   */
+  const noop = useCallback(() => {}, []);
+
+  const cart = useOptimisticMutation<Cart | null, CartInput>({
+    operation: "cart.write",
+    value: initialCart,
+    reduce: cartReducer,
+    send,
+    keyOf: keyFor,
+    mode: modeFor,
+    onFailure: noop,
+  });
+
+  const addToCart = useCallback(
+    (merchandiseId: string, quantity = 1, sellingPlanId?: string) =>
+      cart.run({
         type: "ADD",
+        merchandiseId,
+        sellingPlanId,
         item: {
           id: `optimistic-${Date.now()}`,
           quantity,
@@ -103,56 +119,41 @@ export function CartProvider({
             product: { id: "", handle: "", title: "", featuredImage: null, vendor: "" },
             price: { amount: "0", currencyCode: "JPY" },
           },
-          cost: { totalAmount: { amount: "0", currencyCode: "JPY" } },
+          /* 追加した瞬間はまだ値段を知らない (サーバの応答で入れ替わる)。
+             0 のままにしてあるのは、`cart-money` の確かめが「1 個あたり × 数量」
+             と一致するかを見るので、嘘の金額を置くと確かめが通ってしまうため。 */
+          cost: {
+            totalAmount: { amount: "0", currencyCode: "JPY" },
+            amountPerQuantity: { amount: "0", currencyCode: "JPY" },
+          },
           sellingPlanAllocation: null,
         },
-      });
-      try {
-        await addItem(merchandiseId, quantity, sellingPlanId);
-      } catch (e) {
-        console.error("Failed to add to cart:", e);
-      }
-    });
-  }
+      }),
+    [cart],
+  );
 
-  async function handleUpdateQuantity(
-    lineId: string,
-    merchandiseId: string,
-    quantity: number
-  ) {
-    startTransition(async () => {
-      if (quantity === 0) {
-        setOptimisticCart({ type: "REMOVE", lineId });
-      } else {
-        setOptimisticCart({ type: "UPDATE", lineId, quantity });
-      }
-      try {
-        await updateItem(lineId, merchandiseId, quantity);
-      } catch (e) {
-        console.error("Failed to update cart:", e);
-      }
-    });
-  }
+  const updateQuantity = useCallback(
+    (lineId: string, merchandiseId: string, quantity: number) =>
+      /* 0 は「削除」。画面の書き換えも送り先も削除に寄せる。 */
+      quantity === 0
+        ? cart.run({ type: "REMOVE", lineId })
+        : cart.run({ type: "UPDATE", lineId, merchandiseId, quantity }),
+    [cart],
+  );
 
-  async function handleRemoveFromCart(lineId: string) {
-    startTransition(async () => {
-      setOptimisticCart({ type: "REMOVE", lineId });
-      try {
-        await removeItem(lineId);
-      } catch (e) {
-        console.error("Failed to remove from cart:", e);
-      }
-    });
-  }
+  const removeFromCart = useCallback(
+    (lineId: string) => cart.run({ type: "REMOVE", lineId }),
+    [cart],
+  );
 
   return (
     <CartContext.Provider
       value={{
-        cart: optimisticCart,
-        isPending,
-        addToCart: handleAddToCart,
-        updateQuantity: handleUpdateQuantity,
-        removeFromCart: handleRemoveFromCart,
+        cart: cart.value,
+        isPending: cart.isPending,
+        addToCart,
+        updateQuantity,
+        removeFromCart,
       }}
     >
       {children}

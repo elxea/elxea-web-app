@@ -50,9 +50,24 @@ pre-commit install --hook-type pre-commit --hook-type pre-push
 
 - Runtime: Next.js 16.2.1 + React 19.2.4 + TypeScript 5.9.3（App Router）
 - Styling: Tailwind CSS v4.2.1 + shadcn/ui（new-york）+ Radix UI + CVA
-- CMS: Sanity.io（コンテンツ）+ Notion（タスク・運用）
-- EC: Shopify Storefront API（ヘッドレス）
-- Auth/DB: Firebase（Firestore + Auth）
+- CMS: Sanity.io v5.18.0 + next-sanity 12.2.1（コンテンツ）+ Notion（タスク・運用）
+  - Next 16と併用できる。かつて「SanityがNext 16に非対応」という制約が設計判断の
+    前提に置かれていたが、**その制約はすでに消滅している**（上記2つの実バージョンが
+    Next 16.2.1上で動作中）。この前提でCache Components等を再検討してよい。
+- EC: Shopify Storefront API（ヘッドレス）+ Shopify Customer Account API（会員・定期便）
+- Auth: **Shopify Customer Account API（OAuth）とLINE Login（OIDC）の2系統**。
+  セッションはcookieで持つ（`lib/auth/cookies.ts` が正本）。
+  - ⚠ **Firebase Authは使っていない**（`firebase/auth` / `firebase-admin/auth` の
+    importはリポジトリ内に1件も無い）。以前ここには「Auth/DB: Firebase（Firestore +
+    Auth）」と書いてあったが誤り。`lib/firebase/auth-guard.ts` という紛らわしい名前の
+    ファイルはあるものの、その中身はShopifyセッション（`getSession`）とLINEセッション
+    （`readVerifiedLineUserIdFrom`）から本人を解決するもので、Firebaseの認証機能とは
+    無関係である。
+- DB: Firebase Firestore（`firebase-admin`）。**Firestoreのみ**を使う。
+  - **手元では本番Firestoreに繋がらない**（既定はfail-closed）。`pnpm dev` は止まるので、
+    エミュレーター（`pnpm emulator:start` + `pnpm dev:emulator`）か偽Firestore
+    （`E2E_FIRESTORE_STUB=1`）を選ぶ。判定の正本は `lib/firebase/firestore-target.ts`、
+    手順は `docs/firestore-local-emulator.md`。本番・Previewの挙動は従来どおり。
 - Deploy: Vercel
 - i18n: next-intl（日本語 primary）
 - Package Manager: pnpm
@@ -350,4 +365,10 @@ pnpm chromatic           # ビジュアルリグレッションテスト
 - 確認も二重に行う（パターン検索 + ビルド）
 
 ### 5. 完了報告時に検証結果を添える
-- 「修正しました」だけではなく、grep 結果（残存ゼロ）とビルド成功のエビデンスを必ず添える
+- 「修正しました」だけではなく、grep結果（残存ゼロ）とビルド成功のエビデンスを必ず添える
+
+### 6. 統合・置換・削除は「旧機能の行き先」を全件列挙する（必須）
+- ページ・部品を統合／置換／削除するPRは、**旧実装が持っていた機能（画面上のボタン・表示・状態を含む）を全件列挙し、それぞれの行き先（新実装のどこへ移設したか / 意図的に廃止か・その出典）を書く**。1の「全件列挙」がパターン単位なのに対し、こちらは**機能単位**の棚卸しで、記載様式は `.github/pull_request_template.md` の該当セクションが正本
+- 「新実装が正しく動く」ことの確認では代替にならない。**旧実装のファイルを開いて上から洗い出す**（気づいた分だけは不可）
+- QA・レビュー時は列挙と実装を突き合わせ、**行き先が空欄／未検証の項目が1つでもあればマージしない**
+- 背景: 著者ページ統合で保存ボタン、マイページ統合で種類別表示・削除ボタンが消失（2026-08）

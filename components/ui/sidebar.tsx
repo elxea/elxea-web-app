@@ -18,6 +18,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet"
 import { Skeleton } from "@/components/ui/skeleton"
+import { COOKIE_NAME } from "@/lib/auth/cookie-names"
 import {
   Tooltip,
   TooltipContent,
@@ -25,7 +26,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 
-const SIDEBAR_COOKIE_NAME = "sidebar_state"
+const SIDEBAR_COOKIE_NAME = COOKIE_NAME.sidebarState
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
 const SIDEBAR_WIDTH = "16rem"
 const SIDEBAR_WIDTH_MOBILE = "18rem"

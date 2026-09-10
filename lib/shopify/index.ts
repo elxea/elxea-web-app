@@ -1,6 +1,10 @@
 import { shopifyFetch, storefrontConfigured } from "./client";
+import { stripPlaceholderCopy } from "./placeholder-copy";
+import { SEED_ID_PREFIX } from "@/lib/preview-seed";
 import {
   previewSeedStorefrontEnabled,
+  seedCollectionProductHandles,
+  seedCollections,
   seedProductByHandle,
   seedProductCatalogue,
   seedSearchProducts,
@@ -9,6 +13,7 @@ import {
   GET_PRODUCTS_QUERY,
   GET_PRODUCT_BY_HANDLE_QUERY,
   GET_COLLECTIONS_QUERY,
+  GET_COLLECTION_PRODUCT_HANDLES_QUERY,
   SEARCH_PRODUCTS_QUERY,
   GET_CART_QUERY,
 } from "./queries";
@@ -64,6 +69,7 @@ export function normalizeMetafieldValue(value: string | undefined): string | nul
       .join("、");
     return joined || null;
   } catch {
+    // expected-failure: `[` 始まりでも JSON でない普通の文字列は普通にあり、素通しがここの答え。
     return trimmed;
   }
 }
@@ -116,6 +122,11 @@ function reshapeProduct(raw: Record<string, unknown>): Product {
 
   return {
     ...product,
+    /* 入稿待ちの印 (`【準備中】`) だけの説明文は、説明が無いものとして扱う。
+       画面・SEO の両方がこの 1 か所を通るので、ここで落とせば「売っているのに
+       準備中と書いてある」表示が全経路から消える。詳細は placeholder-copy.ts。 */
+    description: stripPlaceholderCopy(product.description),
+    descriptionHtml: stripPlaceholderCopy(product.descriptionHtml),
     variants: flattenConnection(
       product.variants as unknown as ShopifyConnection<ProductVariant & {
         sellingPlanAllocations: ShopifyConnection<SellingPlanAllocation>;
@@ -216,16 +227,77 @@ export async function getProductByHandle(handle: string) {
 }
 
 // Collections
-export async function getCollections(first = 20) {
+
+/**
+ * コレクション一覧。**中身があるかどうか (`hasProducts`) を必ず添える。**
+ *
+ * 空のコレクションは「押しても何も絞り込まれない入口」にしかならない
+ * (2026-08-27 実測: 本番 18 件中 12 件が 0 件。トップに出ていた
+ * 「お茶のコレクション」= `single-item` もその 1 つで、通しテスト E-3 の
+ * FAIL はこれが素通ししていたことによる)。判定を呼び出し側の推測に任せず、
+ * 取得の時点で答えを持たせる。
+ */
+export type CollectionSummary = Omit<Collection, "products"> & {
+  /** 1 件でも商品が所属しているか。 */
+  hasProducts: boolean;
+};
+
+export async function getCollections(first = 20): Promise<CollectionSummary[]> {
+  if (seededStorefrontActive()) {
+    return seedCollections()
+      .slice(0, first)
+      .map((c) => ({
+        id: `${SEED_ID_PREFIX}collection-${c.handle}`,
+        handle: c.handle,
+        title: c.title,
+        description: c.description,
+        image: null,
+        seo: { title: c.title, description: c.description },
+        hasProducts: c.productHandles.length > 0,
+      }));
+  }
+
   const data = await shopifyFetch<{
-    collections: ShopifyConnection<Collection>;
+    collections: ShopifyConnection<
+      Omit<Collection, "products"> & { products?: ShopifyConnection<{ id: string }> }
+    >;
   }>({
     query: GET_COLLECTIONS_QUERY,
     variables: { first },
     tags: ["collections"],
   });
 
-  return flattenConnection(data.collections);
+  return flattenConnection(data.collections).map(({ products, ...collection }) => ({
+    ...collection,
+    hasProducts: (products?.edges.length ?? 0) > 0,
+  }));
+}
+
+/**
+ * コレクションに所属する商品の handle。未知の handle は空配列。
+ *
+ * 商品一覧の絞り込みは productType 軸だが、コレクション名で来た `?category=` は
+ * productType に対応しないことがある。そのときだけこれを引いて所属で絞る
+ * (`lib/shopify/category-filter.ts` が判断の正本)。
+ */
+export async function getCollectionProductHandles(
+  handle: string,
+  first = 250,
+): Promise<string[]> {
+  if (seededStorefrontActive()) {
+    return seedCollectionProductHandles(handle).slice(0, first);
+  }
+
+  const data = await shopifyFetch<{
+    collection: { products: ShopifyConnection<{ handle: string }> } | null;
+  }>({
+    query: GET_COLLECTION_PRODUCT_HANDLES_QUERY,
+    variables: { handle, first },
+    tags: ["collections", "products"],
+  });
+
+  if (!data.collection) return [];
+  return flattenConnection(data.collection.products).map((p) => p.handle);
 }
 
 // コレクション詳細 (/collections/[handle]) の廃止 (2026-08-14) に伴い、

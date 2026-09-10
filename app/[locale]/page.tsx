@@ -3,6 +3,8 @@ import { Suspense } from "react";
 import { getLocale, getTranslations } from "next-intl/server";
 
 import { SiteImage } from "@/components/site-image";
+import { SiteImageBackdrop } from "@/components/site-image-backdrop";
+import { SiteImageCard } from "@/components/site-image-card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CatalogGrid } from "@/components/catalog/catalog-list";
 import {
@@ -11,6 +13,8 @@ import {
   SpecBand,
   TripleColumn,
 } from "@/components/editorial/section-blocks";
+import { bodySmClass, h4Class } from "@/components/editorial/rule-list";
+import { cn } from "@/lib/utils";
 import { ProductCard } from "@/components/product/product-card";
 import { Link } from "@/i18n/navigation";
 import {
@@ -25,8 +29,9 @@ import {
   TopSectionHead,
   type FeedItem,
 } from "@/components/marketing/top-blocks";
-import { getClient } from "@/sanity/lib/client";
+import { sanityFetch } from "@/sanity/lib/fetch";
 import { filterOutFictional } from "@/lib/fictional-content";
+import { excludeReservedTitles } from "@/lib/navigation/reserved-destinations";
 import {
   ARTICLES_QUERY,
   EVENTS_QUERY,
@@ -65,8 +70,11 @@ import {
  *
  * 既知の差分 (忠実度対比表 docs/fidelity/c8-1-fidelity.md と対応):
  * - 主見出しは Figma 52px (en/h1) だが全体裁定により 44px display (`.hero-display`)。
- * - Figma の「茶葉診断への入口 (お茶カルテ)」節 (8110:2514) は `/karte` /
- *   `/diagnosis` が未実装のため出していない (存在しないルートへリンクしない)。
+ * - Figma の「茶葉診断への入口 (お茶カルテ)」節 (8110:2514) はまだ出していない。
+ *   `/diagnosis` は CDP 統合 Stage 4 で実装済み (導線はフッターの「コンテンツ」列)
+ *   だが、`/karte` は未実装。加えてこの節をコードに起こす作業は「Figma 反映の
+ *   忠実度ゲート」(CLAUDE.md・数値対比表 + 別エージェントの忠実度監査) の対象で、
+ *   節を出すのはそのゲートを通す別タスクに残してある。
  * - カテゴリ 6 タイルと一報リストの文言は Figma の固定文言を焼かず実データから
  *   組む (商品一覧 R2 でチップ文言を productType から組んでいるのと同じ方針)。
  */
@@ -89,6 +97,29 @@ export async function generateMetadata(): Promise<Metadata> {
     },
   };
 }
+
+/**
+ * 導線ブロック 4 タイルの写真枠の共通指定。枠 id だけがタイルごとに違う。
+ * PC は 4 列 304px / SP は全幅なので `sizes` はその 2 段で足りる。
+ * `hideWhenUnassigned` — 新設枠なので、写真が当たるまでタイルは今日どおり
+ * テキストだけで積む (灰色の空枠を本番に出さない)。
+ */
+const guideFigureProps = {
+  aspectRatio: "3/2",
+  width: 608,
+  height: 405,
+  sizes: "(max-width: 1024px) 100vw, 304px",
+  hideWhenUnassigned: true,
+} as const;
+
+/** 定期便 4 項目の写真枠の共通指定 (PC は 4 列・SP は 2 列)。 */
+const subscriptionFigureProps = {
+  aspectRatio: "3/2",
+  width: 608,
+  height: 405,
+  sizes: "(max-width: 1024px) 50vw, 304px",
+  hideWhenUnassigned: true,
+} as const;
 
 export default async function HomePage() {
   const t = await getTranslations("homeR2");
@@ -153,10 +184,14 @@ export default async function HomePage() {
         <VoicesSection />
       </Suspense>
 
+      <LeafLiquorSection />
+
       <ChapterStatement
         overline="OUR PHILOSOPHY"
         title={t("chapterTitle")}
         body={t("chapterBody")}
+        /* 帯の背面に写真。文字は白抜きのままなので、可読性は覆い側で担保する。 */
+        backdrop={<SiteImageBackdrop slotId="site:top:philosophy-01" />}
       />
 
       <ServiceGuideBlock
@@ -170,6 +205,9 @@ export default async function HomePage() {
             body: t("guideTeaBody"),
             href: "/products",
             linkLabel: t("guideTeaLink"),
+            figure: (
+              <SiteImageCard slotId="site:top:overview-01" {...guideFigureProps} />
+            ),
           },
           {
             overline: "JOURNAL",
@@ -177,6 +215,9 @@ export default async function HomePage() {
             body: t("guideJournalBody"),
             href: "/journal",
             linkLabel: t("guideJournalLink"),
+            figure: (
+              <SiteImageCard slotId="site:top:overview-02" {...guideFigureProps} />
+            ),
           },
           {
             overline: "EVENT",
@@ -184,6 +225,9 @@ export default async function HomePage() {
             body: t("guideEventBody"),
             href: "/events",
             linkLabel: t("guideEventLink"),
+            figure: (
+              <SiteImageCard slotId="site:top:overview-03" {...guideFigureProps} />
+            ),
           },
           {
             /* Figma は「roji について」。専用の /roji ルートは無く、roji の実体は
@@ -193,6 +237,9 @@ export default async function HomePage() {
             body: t("guideRojiBody"),
             href: "/subscription",
             linkLabel: t("guideRojiLink"),
+            figure: (
+              <SiteImageCard slotId="site:top:overview-04" {...guideFigureProps} />
+            ),
           },
         ]}
         about={{
@@ -239,10 +286,10 @@ async function SeasonalSection() {
   try {
     articles = previewSeedEnabled()
       ? seedTopNotices()
-      : await getClient().fetch(ARTICLES_QUERY, {
-          language: locale,
-          start: 0,
-          end: 3,
+      : await sanityFetch({
+          query: ARTICLES_QUERY,
+          params: { language: locale, start: 0, end: 3 },
+          cache: { tag: "sanity:articles" },
         });
   } catch {
     return null;
@@ -332,15 +379,60 @@ const TOP_CATEGORY_COUNT = 6;
 /** Figma SP は 1 列 x 3 段 = 3 タイル (8109:46631 / 46634 / 46637)。 */
 const TOP_CATEGORY_COUNT_SP = 3;
 
+/**
+ * カテゴリータイルに出してはいけない名前 = サイトの主要な行き先の名前。
+ * 値は `messages` の `common.*` を引くので、名前の一覧をここに焼かない。
+ */
+const RESERVED_DESTINATION_KEYS = [
+  "products",
+  "subscription",
+  "collections",
+  "journal",
+  "events",
+  "teaMenu",
+  "playlists",
+  "about",
+  "faq",
+  "contact",
+  "shipping",
+  "search",
+  "cart",
+  "account",
+] as const;
+
 async function CategoriesSection() {
   const t = await getTranslations("homeR2");
+  const tCommon = await getTranslations("common");
 
   try {
     const { getCollections } = await import("@/lib/shopify");
-    const collections = (await getCollections(TOP_CATEGORY_COUNT)).slice(
-      0,
-      TOP_CATEGORY_COUNT
-    );
+    /* 主要な行き先と同じ名前のコレクションは落とす (監査 #18)。本番には
+       「イベント」という名前のコレクションがあり、タイルは「イベント」と
+       名乗るのに着地先は商品一覧だった (2026-08-26 実測)。入口が多いことより
+       先に、**同じ名前で違う場所へ連れて行くこと**が問題なので、そこだけ塞ぐ。
+       判定は `lib/navigation/reserved-destinations.ts` (テスト済み)。
+
+       写真があるカテゴリを先に並べる (#9)。
+       写真の無いカテゴリは `ActionTile` が 1 行に畳むので、混ざった順のままだと
+       写真タイルと 1 行タイルが市松に並んで段がガタつく。写真つきを前に寄せると
+       上段が写真・下段が一覧という素直な並びになり、SP で先頭 3 枚を出す
+       (下の `TOP_CATEGORY_COUNT_SP`) 判断とも噛み合う。
+
+       絞り込みは **取得件数の上限を掛ける前** に行う。後ろでやると、落とした
+       ぶんだけタイルが減る (6 件取って 1 件落とすと 5 件しか出ない)。 */
+    const collections = excludeReservedTitles(
+      /* 中身が空のコレクションは落とす (通しテスト E-3 / 2026-08-27)。本番の
+         18 件のうち商品が所属しているのは 6 件だけで、トップに出ていた
+         「お茶のコレクション」(`single-item`) は 0 件だった。押しても何も
+         絞り込まれないタイルは、入口ではなく行き止まりである。
+
+         落とす前提で取得件数を増やす (6 + 予約名 では足りない)。判定は
+         `getCollections` が返す `hasProducts` — 呼び出し側で件数を推測しない。 */
+      (await getCollections(50)).filter((c) => c.hasProducts),
+      RESERVED_DESTINATION_KEYS.map((key) => tCommon(key)),
+    )
+      .slice(0, TOP_CATEGORY_COUNT)
+      .sort((a, b) => Number(Boolean(b.image?.url)) - Number(Boolean(a.image?.url)));
     if (collections.length === 0) return null;
 
     /* Figma SP は上下 48 (8109:46629)。PC は 96。
@@ -359,10 +451,11 @@ async function CategoriesSection() {
             <ActionTile
               key={collection.handle}
               /* コレクション詳細 (/collections/[handle]) は 2026-08-14 に廃止。
-                 着地先は商品一覧のカテゴリ絞り込みに一本化する。絞り込みの軸は
-                 Shopify の productType なのでコレクション名を渡す。商品一覧側は
-                 未知の category を「すべて」に落とすので、名前が productType と
-                 一致しないコレクションでも 404 や 0 件にはならない。 */
+                 着地先は商品一覧の絞り込みに一本化し、コレクション名を渡す。
+                 商品一覧側は productType で拾えない名前を**コレクションの所属**
+                 で絞る (`lib/shopify/category-filter.ts`)。以前は未知の名前を
+                 黙って「すべて」に落としていたため、アソートセット / 定期便の
+                 タイルを押しても 12 件が全部出ていた (通しテスト E-3)。 */
               href={`/products?category=${encodeURIComponent(collection.title)}`}
               image={collection.image?.url}
               imageAlt={collection.image?.altText || collection.title}
@@ -394,7 +487,11 @@ async function JournalSection() {
   try {
     articles = previewSeedEnabled()
       ? seedTopNotices("journal")
-      : await getClient().fetch(FEATURED_ARTICLES_QUERY, { language: locale });
+      : await sanityFetch({
+          query: FEATURED_ARTICLES_QUERY,
+          params: { language: locale },
+          cache: { tag: "sanity:articles" },
+        });
   } catch {
     return null;
   }
@@ -434,7 +531,12 @@ async function EventsSection() {
       // Hide the fictional/seed events still present in the production dataset.
       : filterOutFictional(
           "event",
-          await getClient().fetch(EVENTS_QUERY, { language: locale }),
+          // 一覧 (`/events`) と同じ理由で時刻依存のため名札を貼らない。
+          await sanityFetch({
+            query: EVENTS_QUERY,
+            params: { language: locale },
+            cache: { noStore: true },
+          }),
         );
   } catch {
     return null;
@@ -477,10 +579,46 @@ async function SubscriptionSection() {
     <TopSection className="py-8 lg:py-16">
       <SpecBand
         items={[
-          { term: ts("included1Term"), value: ts("included1Value") },
-          { term: ts("included2Term"), value: ts("included2Value") },
-          { term: ts("included3Term"), value: ts("included3Value") },
-          { term: ts("included4Term"), value: ts("included4Value") },
+          {
+            term: ts("included1Term"),
+            value: ts("included1Value"),
+            figure: (
+              <SiteImageCard
+                slotId="site:top:subscription-item-01"
+                {...subscriptionFigureProps}
+              />
+            ),
+          },
+          {
+            term: ts("included2Term"),
+            value: ts("included2Value"),
+            figure: (
+              <SiteImageCard
+                slotId="site:top:subscription-item-02"
+                {...subscriptionFigureProps}
+              />
+            ),
+          },
+          {
+            term: ts("included3Term"),
+            value: ts("included3Value"),
+            figure: (
+              <SiteImageCard
+                slotId="site:top:subscription-item-03"
+                {...subscriptionFigureProps}
+              />
+            ),
+          },
+          {
+            term: ts("included4Term"),
+            value: ts("included4Value"),
+            figure: (
+              <SiteImageCard
+                slotId="site:top:subscription-item-04"
+                {...subscriptionFigureProps}
+              />
+            ),
+          },
         ]}
       />
     </TopSection>
@@ -507,7 +645,19 @@ async function VoicesSection() {
   try {
     voices = previewSeedEnabled()
       ? seedFarmerVoices()
-      : await getClient().fetch(TOP_FARMER_VOICES_QUERY, { language: locale });
+      : // 架空の農家プロフィールはこの節にも出さない。TOP_FARMER_VOICES_QUERY は
+        // `quote` の入った農家だけを引くので、いま本番にいる架空 4 件は quote 未入力の
+        // ぶん一件も釣れない — が、Studio で一言が入った瞬間にトップの一等地へ出て
+        // しまう。ほかの farmer 経路 (about / farmers/[slug] / sitemap) と同じく
+        // deny-list を通しておく。
+        filterOutFictional(
+          "farmer",
+          await sanityFetch<FarmerVoice[]>({
+            query: TOP_FARMER_VOICES_QUERY,
+            params: { language: locale },
+            cache: { tag: "sanity:farmers" },
+          }),
+        );
   } catch {
     return null;
   }
@@ -546,6 +696,95 @@ async function VoicesSection() {
           })}
         />
       </SectionBody>
+    </TopSection>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* 9. 葉と、水色 (LEAF & LIQUOR) — 3 製法の葉のかたちと水色                      */
+/*    (Figma PC 8728:2 / SP 8730:2。VOICES 直後・OUR PHILOSOPHY 直前)           */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * 写真枠 3 枠 (4:3 / PC 実寸 416x312・SP 343x257) の共通指定。
+ * `hideWhenUnassigned` — 新設枠なので、写真が当たるまでは枠ごと出さない
+ * (灰色の空枠を本番に出さない)。テキスト部 (キッカー / 見出し / リード /
+ * 産地名 / キャプション) は先に出す — SP はキャプションが「丸みのある葉 —
+ * 澄んだ黄金色」の対比圧縮形で、写真なしでも言語だけで 3 種の差が立つ設計
+ * のため、セクション全体は隠さない。
+ */
+const leafLiquorFigureProps = {
+  aspectRatio: "4/3",
+  width: 832,
+  height: 624,
+  sizes: "(max-width: 1024px) 100vw, 416px",
+  hideWhenUnassigned: true,
+} as const;
+
+async function LeafLiquorSection() {
+  const t = await getTranslations("homeR2");
+
+  /* slotId は check:site-slots の突き合わせのため文字列リテラルで書く
+     (ServiceGuideBlock / SpecBand の figure と同じ作法)。 */
+  const items = [
+    {
+      key: "leaf-liquor-01",
+      figure: (
+        <SiteImageCard slotId="site:top:leaf-liquor-01" {...leafLiquorFigureProps} />
+      ),
+      title: t("leafLiquor1Title"),
+      body: t("leafLiquor1Body"),
+      bodySp: t("leafLiquor1BodySp"),
+    },
+    {
+      key: "leaf-liquor-02",
+      figure: (
+        <SiteImageCard slotId="site:top:leaf-liquor-02" {...leafLiquorFigureProps} />
+      ),
+      title: t("leafLiquor2Title"),
+      body: t("leafLiquor2Body"),
+      bodySp: t("leafLiquor2BodySp"),
+    },
+    {
+      key: "leaf-liquor-03",
+      figure: (
+        <SiteImageCard slotId="site:top:leaf-liquor-03" {...leafLiquorFigureProps} />
+      ),
+      title: t("leafLiquor3Title"),
+      body: t("leafLiquor3Body"),
+      bodySp: t("leafLiquor3BodySp"),
+    },
+  ] as const;
+
+  return (
+    /* Figma 節余白: PC pt96 / pb64 (8728:2)、SP py32 (8730:2) — VOICES と同値。 */
+    <TopSection className="py-8 lg:pt-24 lg:pb-16">
+      {/* 8728:3 — キッカー 12px overline + 見出し 20px jp/h3 (VOICES と同じ
+          SectionHead。キッカー→見出しの間隔は PC 8 / SP 20)。 */}
+      <SectionHead overline="LEAF & LIQUOR" title={t("leafLiquorTitle")} />
+      {/* 8728:88 / 8730:17 — リード body-sm。PC は 3 文 (優劣を否定する一文を
+          含む・幅 640)、SP は 1 文への短縮形。既存 SP ボードの本文短縮運用
+          (Hero / About / VOICES) と同じく表示切替で持つ。 */}
+      <SectionBody>
+        <p className={cn(bodySmClass, "max-w-160 text-muted-foreground")}>
+          <span className="lg:hidden">{t("leafLiquorLeadSp")}</span>
+          <span className="hidden lg:inline">{t("leafLiquorLead")}</span>
+        </p>
+      </SectionBody>
+      {/* 8728:6 — PC 3 カラム gap32 / SP 縦積み gap20。カード内は IMG →
+          産地名 (jp/h4 16) → キャプション (body-sm 14) を PC gap12 / SP gap8。 */}
+      <div className="mt-5 grid grid-cols-1 gap-5 lg:mt-8 lg:grid-cols-3 lg:gap-8">
+        {items.map((item) => (
+          <div key={item.key} className="flex flex-col gap-2 lg:gap-3">
+            {item.figure}
+            <p className={cn(h4Class, "text-foreground")}>{item.title}</p>
+            <p className={cn(bodySmClass, "text-muted-foreground")}>
+              <span className="lg:hidden">{item.bodySp}</span>
+              <span className="hidden lg:inline">{item.body}</span>
+            </p>
+          </div>
+        ))}
+      </div>
     </TopSection>
   );
 }

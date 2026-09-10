@@ -1,20 +1,45 @@
-import { createHash, randomBytes, createCipheriv, createDecipheriv } from "crypto";
+import {
+  createHash,
+  randomBytes,
+  createCipheriv,
+  createDecipheriv,
+} from "crypto";
 
 import {
   matchesExpectedBillingDate,
   STALE_BILLING_CYCLE_VIEW,
 } from "@/lib/subscription-view";
 
+import { env, isTest } from "@/lib/config";
+import { logger } from "@/lib/log";
+
 import { SHOPIFY_API_VERSION } from "./api-version";
+import {
+  loadFailed,
+  loaded,
+  reportLoadFailure,
+  type LoadResult,
+} from "./load-result";
 import { reportSubscriptionFailure } from "./subscription-failure";
 
-const CLIENT_ID = process.env.SHOPIFY_CUSTOMER_ACCOUNT_CLIENT_ID || "";
-const SESSION_SECRET = process.env.SESSION_SECRET || "";
+const CLIENT_ID = env("SHOPIFY_CUSTOMER_ACCOUNT_CLIENT_ID") ?? "";
+
+// `SESSION_SECRET` is declared `raw` in lib/config/spec.ts — deliberately NOT
+// trimmed. It is a sha256 input for token encryption, so if the stored value
+// carries a trailing newline today, every cookie already issued was derived
+// *with* that newline. Trimming it here would change the derived key and log
+// every signed-in customer out. See the normalisation note in spec.ts.
+const SESSION_SECRET = env("SESSION_SECRET") ?? "";
 
 // Fail fast at module load time if SESSION_SECRET is missing.
 // This is used for token encryption; an empty secret would silently produce
 // insecure ciphertext.
-if (!SESSION_SECRET && typeof process !== "undefined" && process.env.NODE_ENV !== "test") {
+//
+// The old condition also carried a `typeof process !== "undefined"` guard. It
+// is dropped rather than translated: this module imports `node:crypto`, so it
+// only ever loads on the server, and `isTest()` resolves `NODE_ENV` through the
+// literal read in lib/config/spec.ts, which the bundler inlines anyway.
+if (!SESSION_SECRET && !isTest()) {
   throw new Error(
     "SESSION_SECRET environment variable is required for token encryption. " +
     "Set it in .env.local or your deployment environment.",
@@ -34,15 +59,26 @@ if (!SESSION_SECRET && typeof process !== "undefined" && process.env.NODE_ENV !=
 // existing production behaviour is unchanged.
 const DEFAULT_ACCOUNT_DOMAIN = "account.elxea.com";
 const AUTHORIZE_URL =
-  process.env.SHOPIFY_CUSTOMER_ACCOUNT_AUTHORIZE_URL ||
+  env("SHOPIFY_CUSTOMER_ACCOUNT_AUTHORIZE_URL") ??
   `https://${DEFAULT_ACCOUNT_DOMAIN}/authentication/oauth/authorize`;
 const TOKEN_URL =
-  process.env.SHOPIFY_CUSTOMER_ACCOUNT_TOKEN_URL ||
+  env("SHOPIFY_CUSTOMER_ACCOUNT_TOKEN_URL") ??
   `https://${DEFAULT_ACCOUNT_DOMAIN}/authentication/oauth/token`;
 const LOGOUT_URL =
-  process.env.SHOPIFY_CUSTOMER_ACCOUNT_LOGOUT_URL ||
+  env("SHOPIFY_CUSTOMER_ACCOUNT_LOGOUT_URL") ??
   `https://${DEFAULT_ACCOUNT_DOMAIN}/authentication/logout`;
-const CUSTOMER_API_URL = `https://shopify.com/${process.env.SHOPIFY_SHOP_ID}/account/customer/api/${SHOPIFY_API_VERSION}/graphql`;
+// Customer GraphQL API の向き先。
+//
+// AUTHORIZE / TOKEN / LOGOUT は既に env で差し替えられるのに、ここだけ固定だった。その結果、
+// 偽の Customer Account サーバーに向けて自動テストを回しても **この 1 本だけ本物の
+// shopify.com へ出ていく**（`SHOPIFY_SHOP_ID` 未設定なら `.../undefined/...` という
+// 存在しない URL へ）。「テストは外部に接続しない」を設計で担保するために、他の 3 本と
+// 同じ形で差し替えられるようにする。
+//
+// 未設定時の値は従来と完全に同一なので、本番の挙動は変わらない。
+const CUSTOMER_API_URL =
+  env("SHOPIFY_CUSTOMER_ACCOUNT_API_URL") ??
+  `https://shopify.com/${env("SHOPIFY_SHOP_ID")}/account/customer/api/${SHOPIFY_API_VERSION}/graphql`;
 
 export { LOGOUT_URL };
 
@@ -77,7 +113,20 @@ export function buildAuthorizeUrl({
   state: string;
   nonce: string;
   codeChallenge: string;
-  prompt?: "login" | "none" | "consent" | "select_account";
+  /**
+   * Shopify Customer Account API の authorize が受け付ける `prompt` は **`none`
+   * だけ**（= ログイン画面を出さず、セッションがあれば code を返し、無ければ
+   * `login_required` を返す）。OIDC 一般の `login` / `consent` / `select_account`
+   * は、この endpoint には存在しない。
+   *
+   * 型で `none` に絞ってあるのは事故の再発防止。ここには 2026-04-13 から
+   * `prompt=login` が入っており、2026-08-25 のメールログイン障害
+   * （Shopify 側でエラーになり callback に戻って来ない）の原因になった。詳細と
+   * 本番ログの根拠は `app/api/auth/login/route.ts` のコメント。
+   *
+   * Ref: https://shopify.dev/docs/api/customer/2025-07
+   */
+  prompt?: "none";
 }): string {
   const params = new URLSearchParams({
     client_id: CLIENT_ID,
@@ -89,11 +138,9 @@ export function buildAuthorizeUrl({
     code_challenge: codeChallenge,
     code_challenge_method: "S256",
   });
-  // Fix (shared PC / account switching): force re-authentication at IdP.
-  // Without this, Shopify SSO cookie silently re-authenticates the previous user
-  // on the next login attempt, making it impossible to switch accounts or
-  // leaking the previous user's session on shared devices.
-  // Ref: RFC 6749 §4.1.1, OIDC Core 1.0 §3.1.2.1
+  // 共有 PC / アカウント切り替えの担保は `/api/auth/logout` の RP-initiated logout
+  // （id_token_hint 付きで Shopify 側 SSO を落とす）が持つ。ここで prompt を使うのは
+  // 「画面を出さずにセッションの有無だけ確かめたい」場合の `none` に限られる。
   if (prompt) {
     params.set("prompt", prompt);
   }
@@ -329,6 +376,81 @@ export async function getCustomer(accessToken: string): Promise<Customer | null>
 }
 
 /**
+ * 顧客がいつ作られたかだけを聞く、独立した 1 本のクエリ。
+ *
+ * ## なぜ `CUSTOMER_QUERY` に `creationDate` を足さないのか
+ *
+ * `CUSTOMER_QUERY` はマイページ・注文一覧・ヘッダー表示が全部ぶら下がっている
+ * 基幹の問い合わせで、GraphQL は**未知のフィールドが 1 つでもあればクエリ全体を
+ * 拒否する**。歓迎メールという 1 つの用途のためにそこへフィールドを足すと、
+ * 将来 Shopify がこの項目を動かした日に、メールではなく**ログイン後の画面全部**が
+ * 落ちる。用途の狭い読み取りは、影響範囲も狭いところに置く。
+ *
+ * Ref: https://shopify.dev/docs/api/customer/2026-07/objects/Customer
+ *   （`creationDate: DateTime!` — 2026-07 で実在を確認済み・`api-version.ts` の固定版）
+ */
+const CUSTOMER_CREATION_DATE_QUERY = /* GraphQL */ `
+  query CustomerCreationDate {
+    customer {
+      creationDate
+    }
+  }
+`;
+
+/**
+ * 顧客レコードが作られた時刻を返す。**判定できなければ `null`**（例外は投げない）。
+ *
+ * 呼び出し側（歓迎メール）は `null` を「新しさを証明できなかった」として
+ * **送らない側**に倒す。ここが `null` と「古い顧客」を区別しないのは意図的で、
+ * どちらも「初回登録の証拠が無い」という同じ結論になるため。
+ */
+export async function getCustomerCreationDate(
+  accessToken: string,
+): Promise<Date | null> {
+  if (!accessToken) return null;
+
+  try {
+    const res = await fetch(CUSTOMER_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: accessToken,
+      },
+      body: JSON.stringify({ query: CUSTOMER_CREATION_DATE_QUERY }),
+      cache: "no-store",
+    });
+
+    if (!res.ok) {
+      console.warn(`[customer] creationDate query responded ${res.status}`);
+      return null;
+    }
+
+    const json = (await res.json()) as {
+      data?: { customer?: { creationDate?: unknown } | null } | null;
+      errors?: unknown[];
+    };
+    if (json.errors && json.errors.length > 0) {
+      console.warn("[customer] creationDate query returned GraphQL errors");
+      return null;
+    }
+
+    const raw = json.data?.customer?.creationDate;
+    if (typeof raw !== "string") return null;
+    const parsed = new Date(raw);
+    return Number.isFinite(parsed.getTime()) ? parsed : null;
+  } catch (err) {
+    /* 戻り値は null（＝新しさを証明できなかった）だが、**黙らせない**。
+       呼び出し側はこれを受けて歓迎メールを送らない側に倒すので、ここが静かに
+       落ち続けると「初回登録の人に歓迎メールが届かない」が誰にも気付かれずに
+       固定化する。元の実装がまさにその形で壊れていた。 */
+    reportLoadFailure("getCustomerCreationDate:transport", err, {
+      impact: "初回登録の判定ができず歓迎メールを送らなかった",
+    });
+    return null;
+  }
+}
+
+/**
  * Query used to prove that a subscription contract belongs to the customer who
  * owns `accessToken`.
  *
@@ -389,18 +511,42 @@ function gidNumericSuffix(gid: string): string | null {
  * Verify that `subscriptionContractId` belongs to the customer authenticated by
  * `accessToken`.
  *
- * Fail-closed by construction: every path that is not an explicit, matching
- * contract id returns `false` — transport failure, GraphQL error, null contract,
- * malformed GID, or an id that does not match what we asked for. A caller that
- * cannot prove ownership must be treated exactly like a caller that does not own
- * the contract.
+ * **Fail-closed は一切緩めていない。** 所有が積極的に証明できない限り操作は通らない。
+ * 変えたのは返り値の形だけで、判定そのものは以前と 1 対 1 に対応する。
+ *
+ * ## なぜ boolean をやめたか (設計憲章 R1 / R4)
+ *
+ * 以前は 3 つの全く違う事実がすべて `false` に潰れていた:
+ *
+ *   1. 他人の契約だった / 存在しない  … **答えが出ている**
+ *   2. Shopify が落ちていて確かめられなかった … **答えが出ていない**
+ *   3. GraphQL がエラーを返した … 同上
+ *
+ * 潰れていること自体は安全側だが、**運用が成立しない**。呼び出し側
+ * (`subscription-actions.ts`) は `false` を受けて `NOT_AUTHORIZED` を投げ、
+ * それが Sentry に上がる。つまり Sentry には「Subscription not found or not
+ * accessible」だけが並び、**本物の不正アクセスと Shopify の一時障害が同じ 1 行**に
+ * なる。どちらが起きているか事後にも分からないので、アラートを引くことができない。
+ * 一方で生の失敗理由 (`console.error` のみ) はどこにも集約されていなかった。
+ *
+ * 返り値:
+ *
+ *   - `{ ok: true, data: true }`  … 所有を証明できた
+ *   - `{ ok: true, data: false }` … 所有していないと**確定した** (不正・打ち間違い)
+ *   - `{ ok: false, reason }`     … **確かめられなかった** (Shopify 側の問題)
+ *
+ * 呼び出し側は後ろ 2 つをどちらも「操作させない」に落とす (fail-closed は不変) が、
+ * 記録と顧客向け文言は分けられる。顧客に返す文字列は従来どおり同一の一般化文言で、
+ * どの契約 ID が存在するかを探れないようにしてある。
  */
 export async function verifySubscriptionContractOwnership(
   accessToken: string,
   subscriptionContractId: string
-): Promise<boolean> {
-  if (!accessToken) return false;
-  if (!isSubscriptionContractGid(subscriptionContractId)) return false;
+): Promise<LoadResult<boolean>> {
+  /* 引数の時点で確定する不成立。外部に問い合わせていないので「確かめられなかった」
+     ではなく「所有していない」である。 */
+  if (!accessToken) return loaded(false);
+  if (!isSubscriptionContractGid(subscriptionContractId)) return loaded(false);
 
   let json: {
     data?: { customer?: { subscriptionContract?: { id?: string } | null } | null };
@@ -422,35 +568,46 @@ export async function verifySubscriptionContractOwnership(
     });
 
     if (!res.ok) {
-      console.error(
-        "[verifySubscriptionContractOwnership] Customer API error:",
-        res.status
+      reportLoadFailure(
+        "verifySubscriptionContractOwnership:http",
+        new Error(`Customer API responded ${res.status}`),
+        { status: res.status, impact: "所有者照合ができず操作を拒否した" },
       );
-      return false;
+      return loadFailed("upstream-unavailable");
     }
 
     json = await res.json();
   } catch (e) {
-    console.error("[verifySubscriptionContractOwnership] request failed:", e);
-    return false;
+    reportLoadFailure("verifySubscriptionContractOwnership:transport", e, {
+      impact: "所有者照合ができず操作を拒否した",
+    });
+    return loadFailed("upstream-unavailable");
   }
 
   if (json.errors && json.errors.length > 0) {
-    console.error(
-      "[verifySubscriptionContractOwnership] GraphQL errors:",
-      JSON.stringify(json.errors)
+    /* GraphQL のエラー本文は Sentry にだけ残す。顧客 ID やストアの内部状態を
+       含みうるので、呼び出し側へは reason しか渡さない。 */
+    reportLoadFailure(
+      "verifySubscriptionContractOwnership:graphql",
+      new Error("Customer API returned GraphQL errors"),
+      {
+        errors: JSON.stringify(json.errors),
+        impact: "所有者照合ができず操作を拒否した",
+      },
     );
-    return false;
+    return loadFailed("upstream-unavailable");
   }
 
+  /* ここから先は Shopify が正常に答えた。契約が返らない = その顧客のものではない
+     という**確定した答え**なので `ok: true, data: false`。 */
   const returnedId = json.data?.customer?.subscriptionContract?.id;
-  if (!returnedId) return false;
+  if (!returnedId) return loaded(false);
 
   // Compare on the numeric suffix so an equivalent-but-differently-formatted
   // GID from Shopify still matches, while a different contract never does.
   const requested = gidNumericSuffix(subscriptionContractId);
   const returned = gidNumericSuffix(returnedId);
-  return requested !== null && requested === returned;
+  return loaded(requested !== null && requested === returned);
 }
 
 export type UpcomingBillingCycle = {
@@ -534,7 +691,12 @@ export async function resolveNextBillingCycle(
 
     json = await res.json();
   } catch (e) {
-    console.error("[resolveNextBillingCycleIndex] request failed:", e);
+    /* 周期が引けないと「次回お届けをスキップ」の対象が決まらない。顧客には
+       操作が通らなかったようにしか見えないので、原因はこちら側で拾う。 */
+    logger.error("shopify.subscription.upcoming-cycles-fetch-failed", e, {
+      subscriptionId: subscriptionContractId,
+      operation: "resolveNextBillingCycle",
+    });
     return null;
   }
 
@@ -895,41 +1057,20 @@ export function decryptToken(encrypted: string): string | null {
     let decrypted = decipher.update(data, "base64", "utf8");
     decrypted += decipher.final("utf8");
     return decrypted;
-  } catch {
+  } catch (err) {
+    /* 復号できないのは SESSION_SECRET のローテーションか暗号文の破損で、原因は
+       こちら側にある。顧客には「ログインし直し」としか見えないので、まとまった数が
+       出たことに気付けるようにしておく (暗号文そのものは記録に載せない)。 */
+    logger.error("shopify.session.token-decrypt-failed", err, {
+      operation: "decryptToken",
+    });
     return null;
   }
 }
 
 // --- id_token helpers ---
-
-/**
- * Extract the numeric Shopify Customer ID from a Shopify Customer Account API id_token.
- *
- * The id_token is a JWT. Its payload contains:
- *   sub: "gid://shopify/Customer/12345"  (Customer GID)
- *
- * We decode the JWT payload without verifying the signature (the access_token
- * already proves the session is valid). This avoids an extra API round-trip on
- * every authenticated request.
- *
- * Returns the numeric portion (e.g. "12345") or null if decoding fails.
- */
-export function extractCustomerIdFromIdToken(idToken: string): string | null {
-  try {
-    const parts = idToken.split(".");
-    if (parts.length < 2) return null;
-
-    // Base64url → Base64 → JSON
-    const payload = parts[1].replace(/-/g, "+").replace(/_/g, "/");
-    const json = JSON.parse(Buffer.from(payload, "base64").toString("utf8"));
-
-    const sub: string | undefined = json.sub;
-    if (!sub) return null;
-
-    // sub is a GID: "gid://shopify/Customer/12345"
-    const match = sub.match(/(\d+)$/);
-    return match ? match[1] : null;
-  } catch {
-    return null;
-  }
-}
+//
+// **意図的に空**。id_token を「署名を見ずに開く」ヘルパーはここにあったが、`lib/shopify/id-token.ts`
+// の `verifyShopifyIdToken`（署名 / iss / aud / exp / nonce を全部見る）へ置き換えて削除した。
+// 設計書 v1.2 §5-4・実装項目 1-0b。復活させないこと — 未検証デコードが 1 つでも export されて
+// いると、次に id_token を読みたくなった人がそちらを呼ぶ。
