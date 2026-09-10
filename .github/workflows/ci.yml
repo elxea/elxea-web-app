@@ -28,9 +28,13 @@ name: CI
 # rule in docs/ci-gates.md still applies, but it is now a second layer rather
 # than the only one.
 #
-# Note what is NOT enforced, so nobody reads more into this than is there:
-# `enforce_admins` is false and `required_approving_review_count` is 0. An
-# admin can still merge without review; what they cannot do is merge red.
+# Note the exact shape of what is enforced, so nobody reads more or less into
+# it than is there. Re-measured 2026-09-11 with the `gh api` call above:
+# `enforce_admins` is now **true** (enabled 2026-09-11, per Setaka's decision
+# that direct pushes to `main` are forbidden to him too). Admins are no longer
+# exempt: nobody, the owner included, can push straight to `main` or merge red.
+# `required_approving_review_count` is still 0 — a merge needs no human
+# reviewer, it needs the 7 checks green.
 #
 # Keep this comment honest: it is the kind of statement that decides how much
 # people trust the pipeline, and a wrong one is worse than none. If protection
