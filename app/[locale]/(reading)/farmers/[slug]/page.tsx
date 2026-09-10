@@ -39,6 +39,7 @@ import {
 } from "@/lib/preview-seed";
 import { getProductByHandle } from "@/lib/shopify";
 import { formatPriceRange } from "@/lib/utils";
+import { ogImages } from "@/lib/og-image";
 
 /**
  * 農家詳細 — Figma【R2: 確定版】People 詳細テンプレ統合 (茶園セクション拡張)
@@ -143,7 +144,7 @@ export async function generateMetadata({
       description: farmer.meta || farmer.role || location || farmer.name,
       openGraph: {
         title: farmer.name,
-        images: image ? [{ url: image }] : [],
+        images: ogImages(image),
       },
     };
   } catch {

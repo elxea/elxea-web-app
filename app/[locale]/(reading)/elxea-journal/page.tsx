@@ -23,6 +23,7 @@ import {
 } from "@/components/journal/journal-list";
 import { urlFor } from "@/sanity/lib/image";
 import { previewImageForKey, previewSeedEnabled, withSeedJournals } from "@/lib/preview-seed";
+import { ogImages } from "@/lib/og-image";
 
 /**
  * elxea Journal 一覧 — Figma の凍結済み兄弟 R2 から導出した実装。
@@ -103,7 +104,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title: t("title"),
     description: t("description"),
-    openGraph: { title: t("title"), description: t("description") },
+    openGraph: { title: t("title"), description: t("description"), images: ogImages() },
   };
 }
 

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 
 import { DiagnosisForm } from "./diagnosis-form";
+import { ogImages } from "@/lib/og-image";
 
 /**
  * 茶葉診断（Web 入口） /ja/diagnosis — CDP 統合 Stage 4「使う側の解禁」/ 欠陥 D8。
@@ -32,7 +33,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title: t("title"),
     description: t("subtitle"),
-    openGraph: { title: t("title"), description: t("subtitle") },
+    openGraph: { title: t("title"), description: t("subtitle"), images: ogImages() },
   };
 }
 

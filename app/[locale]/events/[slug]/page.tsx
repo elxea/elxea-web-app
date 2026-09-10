@@ -34,6 +34,7 @@ import {
 } from "@/components/events/event-register-button";
 import { formatEventSchedule } from "@/lib/format-date";
 import { seedEventDetail } from "@/lib/preview-seed";
+import { ogImages } from "@/lib/og-image";
 
 /**
  * イベント詳細 — Figma【R2: 確定版】section 6657:7931
@@ -98,7 +99,7 @@ export async function generateMetadata({
     description: event.location ? `${event.title} — ${event.location}` : event.title,
     openGraph: {
       title: event.title,
-      images: image ? [{ url: image }] : [],
+      images: ogImages(image),
     },
   };
 }

@@ -26,6 +26,7 @@ import { formatArticleDate } from "@/lib/format-date";
 import { previewSeedEnabled, previewImageForKey } from "@/lib/preview-seed";
 import { toPlainText } from "@/lib/sanity-text";
 import type { PortableTextBlock } from "@portabletext/types";
+import { ogImages } from "@/lib/og-image";
 
 /**
  * プレイリスト一覧 — Figma【R2: 確定版】ジャーナル一覧整合 + 今月号特集枠 +
@@ -48,7 +49,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title: t("title"),
     description: t("description"),
-    openGraph: { title: t("title"), description: t("description") },
+    openGraph: { title: t("title"), description: t("description"), images: ogImages() },
   };
 }
 

@@ -31,6 +31,7 @@ import {
 } from "@/components/editorial/section-blocks";
 import { ImageCard } from "@/components/media/image-card";
 import { cn } from "@/lib/utils";
+import { ogImages } from "@/lib/og-image";
 
 /**
  * 商品詳細 — Figma【R2: 確定版】(PC 8056:1517 / SP 8057:1700)。
@@ -71,7 +72,7 @@ export async function generateMetadata({
       openGraph: {
         title: product.title,
         description: product.seo.description || product.description?.slice(0, 160),
-        images: product.featuredImage ? [{ url: product.featuredImage.url }] : [],
+        images: ogImages(product.featuredImage?.url),
       },
     };
   } catch {

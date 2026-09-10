@@ -29,6 +29,7 @@ import { cn } from "@/lib/utils";
 import { urlFor } from "@/sanity/lib/image";
 import { sanityFetch } from "@/sanity/lib/fetch";
 import { FARMERS_QUERY } from "@/sanity/lib/queries";
+import { ogImages } from "@/lib/og-image";
 
 /**
  * About — Figma【R2: 確定版】目次付き読み物型 (C案採用)
@@ -65,7 +66,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title: t("title"),
     description: t("subtitle"),
-    openGraph: { title: t("title"), description: t("subtitle") },
+    openGraph: { title: t("title"), description: t("subtitle"), images: ogImages() },
   };
 }
 

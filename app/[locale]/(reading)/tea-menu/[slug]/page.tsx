@@ -34,6 +34,7 @@ import {
 import { formatNetWeight, type NetWeightValue } from "@/lib/format-net-weight";
 import { seedTeaMenuDetail } from "@/lib/preview-seed";
 import { cn } from "@/lib/utils";
+import { ogImages } from "@/lib/og-image";
 
 /**
  * お茶メニュー詳細 — Figma【R2: 確定版】EC 系詳細の節骨格で実装。
@@ -128,7 +129,7 @@ export async function generateMetadata({
     return {
       title,
       description,
-      openGraph: { title, description, images: image ? [{ url: image }] : [] },
+      openGraph: { title, description, images: ogImages(image) },
     };
   } catch {
     return {};

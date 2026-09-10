@@ -10,6 +10,7 @@ import { Breadcrumb } from "@/components/seo/breadcrumb";
 import { EmptyState } from "@/components/ui/empty-state";
 import { pillClass } from "@/components/ui/pill-button";
 import { CatalogCard, CatalogGrid, ListPageHead } from "@/components/catalog/catalog-list";
+import { ogImages } from "@/lib/og-image";
 
 /**
  * コレクション一覧 — Figma【R2: 確定版】共通リストパターン
@@ -36,7 +37,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("common");
   return {
     title: t("collections"),
-    openGraph: { title: t("collections") },
+    openGraph: { title: t("collections"), images: ogImages() },
   };
 }
 

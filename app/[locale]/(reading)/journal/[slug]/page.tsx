@@ -36,6 +36,7 @@ import { ReadingProgress } from "@/components/journal/reading-progress";
 import { formatArticleDate } from "@/lib/format-date";
 import { readingMinutes } from "@/lib/journal/read-time";
 import { cn } from "@/lib/utils";
+import { ogImages } from "@/lib/og-image";
 
 /**
  * ジャーナル記事詳細 — Figma【R2: 確定版】実分量 + 記事末尾の関連リンク
@@ -93,7 +94,7 @@ export async function generateMetadata({
     return {
       title,
       description,
-      openGraph: { title, description, images: image ? [{ url: image }] : [] },
+      openGraph: { title, description, images: ogImages(image) },
     };
   } catch {
     return {};
