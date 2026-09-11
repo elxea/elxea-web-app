@@ -1,0 +1,263 @@
+{
+  "$schema": "https://elxea.com/image-slots.inventory.json",
+  "description": "Sanity スキーマ上の画像枠の全数。集合の正本は sanity/schemas/*.ts で、このファイルはそこから機械生成する (pnpm generate:image-slots)。rendered / note だけが手書き。巡回 (photo-gap-scan) はこれを読み、経路1-5 のどれもカバーしていない枠を uncovered-slot として報告する。",
+  "generatedBy": "pnpm generate:image-slots",
+  "slots": [
+    {
+      "id": "sanity:article:body[].ctaBlock.image",
+      "documentType": "article",
+      "path": "body[].ctaBlock.image",
+      "file": "sanity/schemas/blockContent.ts",
+      "rendered": true,
+      "note": "components/sanity/portable-text.tsx:112-121 (ctaBlock.image。PortableText 描画箇所は 7 ルート)"
+    },
+    {
+      "id": "sanity:article:body[].image",
+      "documentType": "article",
+      "path": "body[].image",
+      "file": "sanity/schemas/blockContent.ts",
+      "rendered": true,
+      "note": "components/sanity/portable-text.tsx:92 (blockContent の画像。PortableText 描画箇所は 7 ルート)"
+    },
+    {
+      "id": "sanity:article:cta.image",
+      "documentType": "article",
+      "path": "cta.image",
+      "file": "sanity/schemas/article.ts",
+      "rendered": false,
+      "note": "GROQ で取得するだけで JSX 到達ゼロ (死にフィールド)"
+    },
+    {
+      "id": "sanity:article:mainImage",
+      "documentType": "article",
+      "path": "mainImage",
+      "file": "sanity/schemas/article.ts",
+      "rendered": true,
+      "note": "記事本文ヘッダで描画。巡回 経路3 がカバー済み"
+    },
+    {
+      "id": "sanity:article:seo.ogImage",
+      "documentType": "article",
+      "path": "seo.ogImage",
+      "file": "sanity/schemas/seo.ts",
+      "rendered": false,
+      "note": "sanity/lib/queries.ts:628 で取得するだけ。描画にも metadata 生成にも到達しない (死にフィールド)"
+    },
+    {
+      "id": "sanity:article:thumbnail",
+      "documentType": "article",
+      "path": "thumbnail",
+      "file": "sanity/schemas/article.ts",
+      "rendered": true,
+      "note": "記事カード/一覧で描画。巡回 経路3 がカバー済み"
+    },
+    {
+      "id": "sanity:author:image",
+      "documentType": "author",
+      "path": "image",
+      "file": "sanity/schemas/author.ts",
+      "rendered": true,
+      "note": "/[locale]/people/[slug] の顔写真。巡回 経路5 がカバー済み (2026-09-11 追加)"
+    },
+    {
+      "id": "sanity:author:work[].photo",
+      "documentType": "author",
+      "path": "work[].photo",
+      "file": "sanity/schemas/author.ts",
+      "rendered": true,
+      "note": "app/[locale]/people/[slug]/page.tsx:193,265,385 (経路5 は author.image しか見ていない)"
+    },
+    {
+      "id": "sanity:event:description[].ctaBlock.image",
+      "documentType": "event",
+      "path": "description[].ctaBlock.image",
+      "file": "sanity/schemas/blockContent.ts",
+      "rendered": true,
+      "note": "components/sanity/portable-text.tsx:112-121 (ctaBlock.image。PortableText 描画箇所は 7 ルート)"
+    },
+    {
+      "id": "sanity:event:description[].image",
+      "documentType": "event",
+      "path": "description[].image",
+      "file": "sanity/schemas/blockContent.ts",
+      "rendered": true,
+      "note": "components/sanity/portable-text.tsx:92 (blockContent の画像。PortableText 描画箇所は 7 ルート)"
+    },
+    {
+      "id": "sanity:event:image",
+      "documentType": "event",
+      "path": "image",
+      "file": "sanity/schemas/event.ts",
+      "rendered": true,
+      "note": "app/[locale]/events/page.tsx:146 / app/[locale]/events/[slug]/page.tsx:200"
+    },
+    {
+      "id": "sanity:event:seo.ogImage",
+      "documentType": "event",
+      "path": "seo.ogImage",
+      "file": "sanity/schemas/seo.ts",
+      "rendered": false,
+      "note": "sanity/lib/queries.ts:628 で取得するだけ。描画にも metadata 生成にも到達しない (死にフィールド)"
+    },
+    {
+      "id": "sanity:farmer:bio[].ctaBlock.image",
+      "documentType": "farmer",
+      "path": "bio[].ctaBlock.image",
+      "file": "sanity/schemas/blockContent.ts",
+      "rendered": true,
+      "note": "components/sanity/portable-text.tsx:112-121 (ctaBlock.image。PortableText 描画箇所は 7 ルート)"
+    },
+    {
+      "id": "sanity:farmer:bio[].image",
+      "documentType": "farmer",
+      "path": "bio[].image",
+      "file": "sanity/schemas/blockContent.ts",
+      "rendered": true,
+      "note": "components/sanity/portable-text.tsx:92 (blockContent の画像。PortableText 描画箇所は 7 ルート)"
+    },
+    {
+      "id": "sanity:farmer:fieldSeasons[].photo",
+      "documentType": "farmer",
+      "path": "fieldSeasons[].photo",
+      "file": "sanity/schemas/farmer.ts",
+      "rendered": true,
+      "note": "app/[locale]/farmers/[slug]/page.tsx:237"
+    },
+    {
+      "id": "sanity:farmer:photo",
+      "documentType": "farmer",
+      "path": "photo",
+      "file": "sanity/schemas/farmer.ts",
+      "rendered": true,
+      "note": "app/[locale]/farmers/[slug]/page.tsx:230,311"
+    },
+    {
+      "id": "sanity:farmer:seo.ogImage",
+      "documentType": "farmer",
+      "path": "seo.ogImage",
+      "file": "sanity/schemas/seo.ts",
+      "rendered": false,
+      "note": "sanity/lib/queries.ts:628 で取得するだけ。描画にも metadata 生成にも到達しない (死にフィールド)"
+    },
+    {
+      "id": "sanity:farmer:work[].photo",
+      "documentType": "farmer",
+      "path": "work[].photo",
+      "file": "sanity/schemas/farmer.ts",
+      "rendered": true,
+      "note": "app/[locale]/farmers/[slug]/page.tsx:175,236,351"
+    },
+    {
+      "id": "sanity:journal:body[].ctaBlock.image",
+      "documentType": "journal",
+      "path": "body[].ctaBlock.image",
+      "file": "sanity/schemas/blockContent.ts",
+      "rendered": true,
+      "note": "components/sanity/portable-text.tsx:112-121 (ctaBlock.image。PortableText 描画箇所は 7 ルート)"
+    },
+    {
+      "id": "sanity:journal:body[].image",
+      "documentType": "journal",
+      "path": "body[].image",
+      "file": "sanity/schemas/blockContent.ts",
+      "rendered": true,
+      "note": "components/sanity/portable-text.tsx:92 (blockContent の画像。PortableText 描画箇所は 7 ルート)"
+    },
+    {
+      "id": "sanity:journal:mainImage",
+      "documentType": "journal",
+      "path": "mainImage",
+      "file": "sanity/schemas/journal.ts",
+      "rendered": true,
+      "note": "app/[locale]/elxea-journal/page.tsx:151"
+    },
+    {
+      "id": "sanity:journal:seo.ogImage",
+      "documentType": "journal",
+      "path": "seo.ogImage",
+      "file": "sanity/schemas/seo.ts",
+      "rendered": false,
+      "note": "sanity/lib/queries.ts:628 で取得するだけ。描画にも metadata 生成にも到達しない (死にフィールド)"
+    },
+    {
+      "id": "sanity:journal:thumbnail",
+      "documentType": "journal",
+      "path": "thumbnail",
+      "file": "sanity/schemas/journal.ts",
+      "rendered": true,
+      "note": "app/[locale]/elxea-journal/page.tsx:151,167"
+    },
+    {
+      "id": "sanity:page:body[].ctaBlock.image",
+      "documentType": "page",
+      "path": "body[].ctaBlock.image",
+      "file": "sanity/schemas/blockContent.ts",
+      "rendered": true,
+      "note": "components/sanity/portable-text.tsx:112-121 (ctaBlock.image。PortableText 描画箇所は 7 ルート)"
+    },
+    {
+      "id": "sanity:page:body[].image",
+      "documentType": "page",
+      "path": "body[].image",
+      "file": "sanity/schemas/blockContent.ts",
+      "rendered": true,
+      "note": "components/sanity/portable-text.tsx:92 (blockContent の画像。PortableText 描画箇所は 7 ルート)"
+    },
+    {
+      "id": "sanity:page:seo.ogImage",
+      "documentType": "page",
+      "path": "seo.ogImage",
+      "file": "sanity/schemas/seo.ts",
+      "rendered": false,
+      "note": "sanity/lib/queries.ts:628 で取得するだけ。描画にも metadata 生成にも到達しない (死にフィールド)"
+    },
+    {
+      "id": "sanity:playlist:albumImage",
+      "documentType": "playlist",
+      "path": "albumImage",
+      "file": "sanity/schemas/playlist.ts",
+      "rendered": true,
+      "note": "音盤で描画。巡回 経路4 がカバー済み"
+    },
+    {
+      "id": "sanity:playlist:body[].ctaBlock.image",
+      "documentType": "playlist",
+      "path": "body[].ctaBlock.image",
+      "file": "sanity/schemas/blockContent.ts",
+      "rendered": true,
+      "note": "components/sanity/portable-text.tsx:112-121 (ctaBlock.image。PortableText 描画箇所は 7 ルート)"
+    },
+    {
+      "id": "sanity:playlist:body[].image",
+      "documentType": "playlist",
+      "path": "body[].image",
+      "file": "sanity/schemas/blockContent.ts",
+      "rendered": true,
+      "note": "components/sanity/portable-text.tsx:92 (blockContent の画像。PortableText 描画箇所は 7 ルート)"
+    },
+    {
+      "id": "sanity:siteSettings:ogImage",
+      "documentType": "siteSettings",
+      "path": "ogImage",
+      "file": "sanity/schemas/siteSettings.ts",
+      "rendered": false,
+      "note": "sanity/lib/queries.ts で取得するだけ。metadata 生成から読まれていない (死にフィールド)"
+    },
+    {
+      "id": "sanity:teaMenu:photo",
+      "documentType": "teaMenu",
+      "path": "photo",
+      "file": "sanity/schemas/teaMenu.ts",
+      "rendered": true,
+      "note": "お茶メニューで描画。巡回 経路4 がカバー済み"
+    },
+    {
+      "id": "sanity:teaMenu:seo.ogImage",
+      "documentType": "teaMenu",
+      "path": "seo.ogImage",
+      "file": "sanity/schemas/seo.ts",
+      "rendered": false,
+      "note": "sanity/lib/queries.ts:628 で取得するだけ。描画にも metadata 生成にも到達しない (死にフィールド)"
+    }
+  ]
+}
