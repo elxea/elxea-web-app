@@ -1,0 +1,25 @@
+import { webkit } from "playwright";
+const base = "http://localhost:3577";
+const BANNER = 'text=このサイトではCookieを使用して';
+const out = {};
+const b = await webkit.launch();
+const ctx = await b.newContext();
+const p = await ctx.newPage();
+await p.goto(`${base}/ja`, { waitUntil: "networkidle" });
+out.banner_first = await p.locator(BANNER).first().isVisible();
+await p.getByRole("button", { name: "同意する" }).click();
+await p.waitForTimeout(800);
+out.ls = await p.evaluate(() => localStorage.getItem("cookie-consent"));
+await p.reload({ waitUntil: "networkidle" });
+await p.waitForTimeout(1500);
+out.banner_after_reload = await p.locator(BANNER).first().isVisible().catch(() => false);
+// simulate a *new* browsing session reusing the same storage state
+const state = await ctx.storageState();
+const ctx2 = await b.newContext({ storageState: state });
+const p2 = await ctx2.newPage();
+await p2.goto(`${base}/ja`, { waitUntil: "networkidle" });
+await p2.waitForTimeout(1500);
+out.banner_new_session = await p2.locator(BANNER).first().isVisible().catch(() => false);
+out.ls_new_session = await p2.evaluate(() => localStorage.getItem("cookie-consent"));
+console.log(JSON.stringify(out, null, 2));
+await b.close();
