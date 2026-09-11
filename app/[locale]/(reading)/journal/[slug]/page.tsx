@@ -6,6 +6,7 @@ import { getLocale, getTranslations } from "next-intl/server";
 import { sanityFetch } from "@/sanity/lib/fetch";
 import { ARTICLE_BY_SLUG_QUERY, RELATED_ARTICLES_QUERY } from "@/sanity/lib/queries";
 import { urlFor } from "@/sanity/lib/image";
+import { seoDescription, seoTitle } from "@/lib/seo/sanity-seo";
 import { getProductByHandle } from "@/lib/shopify";
 import { productTypeLabel } from "@/lib/shopify/product-type";
 import type { MembershipTier } from "@/lib/shopify/customer";
@@ -87,9 +88,8 @@ export async function generateMetadata({
       cache: { tag: "sanity:articles" },
     });
     if (!article) return {};
-    const seo = article.seo;
-    const title = seo?.title || article.title;
-    const description = seo?.description || article.excerpt?.slice(0, 160);
+    const title = seoTitle(article.seo, article.title);
+    const description = seoDescription(article.seo, article.excerpt?.slice(0, 160));
     const image = article.mainImage?.asset ? urlFor(article.mainImage).width(1200).url() : undefined;
     return {
       title,

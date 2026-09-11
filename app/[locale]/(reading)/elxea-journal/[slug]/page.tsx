@@ -6,6 +6,7 @@ import type { PortableTextBlock } from "@portabletext/types";
 import { sanityFetch } from "@/sanity/lib/fetch";
 import { JOURNAL_BY_SLUG_QUERY } from "@/sanity/lib/queries";
 import { urlFor } from "@/sanity/lib/image";
+import { seoDescription, seoTitle, type SanitySeo } from "@/lib/seo/sanity-seo";
 import { Section } from "@/components/layout/container";
 import { Breadcrumb } from "@/components/seo/breadcrumb";
 import { PortableText } from "@/components/sanity/portable-text";
@@ -113,7 +114,7 @@ type Journal = {
     albumImage?: { asset: object };
     spotifyUrl?: string;
   };
-  seo?: { title?: string; description?: string };
+  seo?: SanitySeo;
 };
 
 export async function generateMetadata({
@@ -130,9 +131,8 @@ export async function generateMetadata({
       cache: { tag: "sanity:journals" },
     });
     if (!journal) return {};
-    const seo = journal.seo;
-    const title = seo?.title || journal.title;
-    const description = seo?.description || journal.summary?.slice(0, 160);
+    const title = seoTitle(journal.seo, journal.title);
+    const description = seoDescription(journal.seo, journal.summary?.slice(0, 160));
     const image = journal.mainImage?.asset
       ? urlFor(journal.mainImage).width(1200).url()
       : undefined;

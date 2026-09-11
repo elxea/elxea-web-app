@@ -33,6 +33,7 @@ import {
 } from "@/components/editorial/section-blocks";
 import { formatNetWeight, type NetWeightValue } from "@/lib/format-net-weight";
 import { seedTeaMenuDetail } from "@/lib/preview-seed";
+import { seoDescription, seoTitle, type SanitySeo } from "@/lib/seo/sanity-seo";
 import { cn } from "@/lib/utils";
 import { ogImages } from "@/lib/og-image";
 
@@ -87,7 +88,7 @@ type TeaMenu = {
   brewingGuide?: { temperature?: string; water?: string; time?: string };
   relatedArticle?: { title: string; slug: { current: string } };
   shopifyHandle?: string;
-  seo?: { title?: string; description?: string };
+  seo?: SanitySeo;
 };
 
 /** 値が入っている行だけ残す (データが無い節・行は出さない方針)。 */
@@ -121,10 +122,11 @@ export async function generateMetadata({
   try {
     const tea = await fetchTea(slug, locale);
     if (!tea) return {};
-    const title = tea.seo?.title || tea.displayName;
-    const description =
-      tea.seo?.description ||
-      (typeof tea.description === "string" ? tea.description.slice(0, 160) : undefined);
+    const title = seoTitle(tea.seo, tea.displayName);
+    const description = seoDescription(
+      tea.seo,
+      typeof tea.description === "string" ? tea.description.slice(0, 160) : undefined
+    );
     const image = tea.photo?.asset ? urlFor(tea.photo).width(800).url() : tea.imageUrl;
     return {
       title,

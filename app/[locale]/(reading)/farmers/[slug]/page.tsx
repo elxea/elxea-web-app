@@ -9,6 +9,7 @@ import {
   OTHER_FARMERS_QUERY,
 } from "@/sanity/lib/queries";
 import { urlFor } from "@/sanity/lib/image";
+import { seoDescription, seoTitle, type SanitySeo } from "@/lib/seo/sanity-seo";
 import { Breadcrumb } from "@/components/seo/breadcrumb";
 import { AuthorByline } from "@/components/journal/author-byline";
 import { ArticleProse } from "@/components/journal/article-blocks";
@@ -107,6 +108,7 @@ type Farmer = {
   fieldHead?: string;
   fieldSeasons?: ProcessStep[];
   teasHead?: string;
+  seo?: SanitySeo;
 };
 
 type OtherFarmer = {
@@ -139,11 +141,17 @@ export async function generateMetadata({
       ? urlFor(farmer.photo).width(800).url()
       : undefined;
     const location = [farmer.region, farmer.country].filter(Boolean).join(", ");
+    const title = seoTitle(farmer.seo, farmer.name);
+    const description = seoDescription(
+      farmer.seo,
+      farmer.meta || farmer.role || location || farmer.name
+    );
     return {
-      title: farmer.name,
-      description: farmer.meta || farmer.role || location || farmer.name,
+      title,
+      description,
       openGraph: {
-        title: farmer.name,
+        title,
+        description,
         images: ogImages(image),
       },
     };
