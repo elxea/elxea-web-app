@@ -255,8 +255,9 @@ pnpm chromatic           # ビジュアルリグレッションテスト
    | フォント | **コードが正**（`--typography-family-sans` / `--typography-family-heading` / `-secondary` / `-mono` / `-special`） | 実体は `tokens/base.json` → `dist/tokens.css` の `@theme`。Adobe Fonts kit `fwg7gtf` を `layout.tsx` のJS embedで読み込む。Figma側フォントとの差分は仕様 |
    | ProductGrid 列数 | **3 列が正** | 承認済みレイアウト仕様 |
    | 写真ヒーロー | **コード実装が正** | 承認済みヒーロー構成 |
+   | ページ主見出し（h1）のサイズ | **コードが正**（PC 44px / SP 32px = `.page-title`。PCはdisplayトークン `--typography-style-display` 2.75rem、SPはbase h1 2rem） | Boss裁定2026-08-09「主見出しはPC 44 / SP 32を1ペアとする全体裁定。コードを正とし、旧値を残すFigma側を全ページ追従させる」。FigmaはR2確定版でも複数ページが旧値（PC 52や32 / SP 24）のままで、追従はdesigner側タスクAll Tasks ID-7507（未着手）。**個別ページのFigmaノードが52や32を持っていても【粗】としない**（例: `/ja/playlists` 一覧52/700・`/ja/playlists/[slug]` 詳細32・`/ja/contact`・`/ja/legal/privacy`）。DSのtypographyスケールに52pxは存在せず（36 / 44=display / 48 / 60）、Figma側の52px/700は生pxか新規トークンなしには表現できない。Decision Log: https://app.notion.com/p/3d770c9d064c81d09e47d4b0ee135795 |
 
-   ※本一覧に追加・変更する場合は Decision Log に記録してから反映する（記録なき仕様追加は認めない）。
+   ※本一覧に追加・変更する場合はDecision Logに記録してから反映する（記録なき仕様追加は認めない）。
 
 ## React / Next.js ベストプラクティス（Vercel Engineering 準拠）
 
