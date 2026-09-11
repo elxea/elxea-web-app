@@ -770,6 +770,72 @@ export const ENV_SPEC = {
     read: () => process.env.PROFILE_DEMO_MODE,
     schema: optionalTrimmed().transform((v) => v === "1" || v === "true"),
   },
+
+  /* ---------------- roji 音声 (Hume EVI) ----------------
+   * 正本: 設計書 D-1 https://app.notion.com/p/3d870c9d064c81798c41cd5135be44f0
+   *
+   * 音声はブラウザと Hume のあいだを直接流れ、このアプリのサーバを 1 バイトも
+   * 通らない。ここで宣言するのは「入場券を発行する窓口」
+   * (`app/api/voice/token/route.ts`) が要る値だけ。
+   *
+   * ## 5 本すべてを `trimmed` にしてある理由 (冒頭の正規化方針の適用)
+   *
+   * このファイルの方針は「**すでに発行済みの値がその鍵から作られているなら、
+   * 値を一切いじらない**」。`SESSION_SECRET` を `raw` にしてあるのは、発行済みの
+   * cookie が全部その改行込みで導出されているから。
+   *
+   * Hume の 2 本は逆で、**手元では何も作っていない** (Hume に渡すだけ) ので、
+   * 貼り付け由来の末尾改行を落としても無効化されるものが無い。むしろ
+   * 2026-08-22 に `LINE_LOGIN_CHANNEL_SECRET` の末尾改行で本番が落ちたのと
+   * **同じ形**の値なので、落とす側が正しい。`VOICE_SESSION_SECRET` も新設で、
+   * これに由来する発行済みの値はまだどこにも無い (`CHAT_SESSION_SECRET` と
+   * 同じ前提)。
+   *
+   * ## 未設定でも起動は止めない
+   *
+   * 止めるとサイト全体が音声の設定漏れで落ちる。窓口側が fail-closed で
+   * 503 / 404 を返し、文字チャットはそのまま使える。
+   */
+  HUME_API_KEY: {
+    read: () => process.env.HUME_API_KEY,
+    schema: optionalTrimmed(),
+  },
+  HUME_SECRET_KEY: {
+    read: () => process.env.HUME_SECRET_KEY,
+    schema: optionalTrimmed(),
+  },
+  /**
+   * 会話 ID を Hume へ渡してよい文字列に不可逆変換するための鍵
+   * (`lib/voice/session-id.ts`)。
+   *
+   * **`CHAT_SESSION_SECRET` と共用しない。** 共用すると、同じ会話 ID に対する
+   * 「cookie の署名」と「Hume に渡す handle」が同じ鍵から出る。片方が漏れたときに
+   * 両方の前提が崩れ、どちらかの生成規則を変えるときに他方を巻き込む。
+   */
+  VOICE_SESSION_SECRET: {
+    read: () => process.env.VOICE_SESSION_SECRET,
+    schema: optionalTrimmed(),
+  },
+  /**
+   * Hume EVI の設定 ID。**秘密ではない** (どの人格・どの音声で話すかの指定で、
+   * これ単体では何もつなげない)。ブラウザが Hume へ直接つなぐときに要るので
+   * `NEXT_PUBLIC_`。
+   */
+  NEXT_PUBLIC_HUME_CONFIG_ID: {
+    read: () => process.env.NEXT_PUBLIC_HUME_CONFIG_ID,
+    schema: optionalTrimmed(),
+  },
+  /**
+   * 音声を止めるスイッチ。**未設定なら無効**。
+   *
+   * Hume は無音でつないでいるだけでも課金され、残枠が約 21 秒しかない
+   * (設計書 D-5)。「設定を忘れたら有効」側に倒すと、気付かないうちに枠を
+   * 使い切る。真偽の読み方は `PROFILE_MICRO_MACRO` と同じ規則。
+   */
+  NEXT_PUBLIC_VOICE_ENABLED: {
+    read: () => process.env.NEXT_PUBLIC_VOICE_ENABLED,
+    schema: optionalTrimmed().transform((v) => v === "1" || v === "true"),
+  },
 } as const satisfies Record<string, EnvEntry>;
 
 /** Every variable name the application is allowed to read. */
