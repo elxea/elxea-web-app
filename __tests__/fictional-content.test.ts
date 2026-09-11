@@ -21,6 +21,14 @@
  * fictional on 2026-08-22, so they are blocked too and the old "does NOT block
  * the real (non-seed) farmers" assertion is gone — it asserted the opposite.
  *
+ * On `event` specifically: all four event docs in production are fictional.
+ * Two come from the seed script; 春の新茶テイスティング会 / 世界のお茶を巡る旅 —
+ * 台湾烏龍茶編 were hand-created on 2026-03-07 and were left visible because
+ * their bodies do not contain "ダミー". Setaka confirmed them fictional on
+ * 2026-09-11, so they are blocked too. Both are past-dated and so never showed
+ * in the `/events` list, but the detail route and sitemap.xml carry no date
+ * filter — that is the exposure these two entries close.
+ *
  * On `playlist` specifically: it was denied here from 2026-08-22 to 2026-08-26,
  * then Setaka reversed the call — the playlists and their audio are content he
  * wants public. The type is gone from the deny-list rather than emptied, and
@@ -67,6 +75,11 @@ const MUST_BLOCK: Record<FictionalDocType, Array<[id: string, slug: string]>> = 
   event: [
     ["event-tea-tasting", "spring-tea-tasting-2026"],
     ["event-brewing-workshop", "beginners-tea-workshop"],
+    // 春の新茶テイスティング会 / 世界のお茶を巡る旅 — 台湾烏龍茶編 —
+    // hand-created 2026-03-07, confirmed fictional by Setaka 2026-09-11.
+    // Sanity auto-generated the ids.
+    ["X9ORxzRbtqr9lSJFeKANyF", "2026-spring-tasting"],
+    ["X9ORxzRbtqr9lSJFeKAO3M", "2026-taiwan-oolong-workshop"],
   ],
 };
 
@@ -131,6 +144,33 @@ describe("fictional-content deny-list", () => {
       { _id: "farmer-tanaka", slug: { current: "tanaka-tea-garden" } },
     ];
     expect(filterOutFictional("farmer", production)).toEqual([]);
+  });
+
+  it("blocks every event doc currently in the production dataset", () => {
+    // Live GROQ against production on 2026-09-11
+    // (`*[_type=="event"]{_id,"slug":slug.current}`) returned exactly these
+    // four, and Setaka confirmed the two hand-created ones fictional the same
+    // day. So the whole set must be denied. A genuine event published later
+    // carries a new _id/slug and passes straight through (asserted below).
+    const production = [
+      { _id: "X9ORxzRbtqr9lSJFeKANyF", slug: { current: "2026-spring-tasting" } },
+      {
+        _id: "X9ORxzRbtqr9lSJFeKAO3M",
+        slug: { current: "2026-taiwan-oolong-workshop" },
+      },
+      { _id: "event-tea-tasting", slug: { current: "spring-tea-tasting-2026" } },
+      { _id: "event-brewing-workshop", slug: { current: "beginners-tea-workshop" } },
+    ];
+    expect(filterOutFictional("event", production)).toEqual([]);
+  });
+
+  it("still lets a future, genuinely-real event through", () => {
+    // The deny-list must stay a fixed list, not "hide all events" — the next
+    // real elxea event has to appear without touching this file.
+    const realEvent = [
+      { _id: "a-brand-new-sanity-id", slug: { current: "2027-autumn-tasting" } },
+    ];
+    expect(filterOutFictional("event", realEvent)).toEqual(realEvent);
   });
 
   it("still lets a future, genuinely-real farmer through", () => {
