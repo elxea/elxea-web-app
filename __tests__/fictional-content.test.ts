@@ -198,10 +198,17 @@ describe("fictional-content deny-list", () => {
     }
   });
 
-  it("does NOT block author docs (Setaka's call, not the code's)", () => {
+  it("author docs stay visible (Setaka's standing call, confirmed 2026-09-11)", () => {
     // "author" is intentionally absent from FictionalDocType, and no existing
     // type's deny-list may smuggle the author seed ids/slugs in. If someone adds
     // them without Setaka's sign-off, this assertion fails.
+    //
+    // 2026-09-11: this is no longer "unconfirmed, so left alone". Both docs were
+    // verified against the production dataset as seed output with zero articles
+    // (see the `author` paragraph in lib/fictional-content.ts), and Setaka still
+    // chose to keep them on the public surface as they are. The next audit that
+    // reports "fictional content is live" must be answered with that paragraph —
+    // not by adding an entry here, which is what this test blocks.
     expect(TYPES).not.toContain("author");
     for (const type of TYPES) {
       for (const id of ["author-setaka", "author-roji"]) {
