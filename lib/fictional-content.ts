@@ -10,11 +10,22 @@
  *   - scripts/seed-dummy-content.ts farmer  (山田農園 / 田中茶園)
  *                                   teaMenu (春の煎茶 / 宇治玉露 / 加賀ほうじ茶)
  *
+ *                                   event   (both bodies literally contain "ダミー")
+ *
  * Two further `farmer` docs (山田 健一 / 佐藤 美咲, created 2026-03-07) are not
  * seed-script output but are equally invented — Setaka confirmed on 2026-08-22
  * that elxea has no real producer profiles published yet, so every farmer doc
  * currently in production is fictional. They are listed below too.
- *                                   event   (both bodies literally contain "ダミー")
+ *
+ * Two further `event` docs (春の新茶テイスティング会 / 世界のお茶を巡る旅 —
+ * 台湾烏龍茶編, created 2026-03-07 in the same hand-authoring session as those
+ * farmers) are likewise not seed-script output and their bodies do not contain
+ * "ダミー", so they were left visible. Setaka confirmed them fictional on
+ * 2026-09-11, so they are listed below too and every event doc currently in
+ * production is denied. Both are already past-dated, so they never reached the
+ * `/events` list (`EVENTS_QUERY` keeps only `coalesce(endDate, date) >= now()`)
+ * — but the detail route and sitemap.xml are NOT date-filtered, so they stayed
+ * publicly reachable and indexable. That is what this entry closes.
  *
  * These docs describe invented producers, invented tea and invented events that
  * do NOT correspond to anything elxea actually sells or hosts, yet they render
@@ -94,9 +105,23 @@ const FICTIONAL_DOCS: Readonly<Record<FictionalDocType, DenyEntry>> = {
     slugs: ["spring-sencha", "uji-gyokuro", "kaga-hojicha"],
   },
   event: {
-    // scripts/seed-dummy-content.ts — bodies contain the word "ダミー"
-    ids: ["event-tea-tasting", "event-brewing-workshop"],
-    slugs: ["spring-tea-tasting-2026", "beginners-tea-workshop"],
+    ids: [
+      // scripts/seed-dummy-content.ts — bodies contain the word "ダミー"
+      "event-tea-tasting",
+      "event-brewing-workshop",
+      // Hand-created 2026-03-07, confirmed fictional by Setaka 2026-09-11.
+      // Auto-generated Sanity ids, so the title is spelled out here.
+      "X9ORxzRbtqr9lSJFeKANyF", // 春の新茶テイスティング会
+      "X9ORxzRbtqr9lSJFeKAO3M", // 世界のお茶を巡る旅 — 台湾烏龍茶編
+    ],
+    slugs: [
+      // scripts/seed-dummy-content.ts
+      "spring-tea-tasting-2026",
+      "beginners-tea-workshop",
+      // Hand-created 2026-03-07, confirmed fictional by Setaka 2026-09-11.
+      "2026-spring-tasting",
+      "2026-taiwan-oolong-workshop",
+    ],
   },
 } as const;
 
