@@ -10,6 +10,7 @@ import { getMembershipTier } from "@/lib/shopify/auth";
 import type { MembershipTier } from "@/lib/shopify/customer";
 import { MemberGate } from "@/components/account/member-gate";
 import { isFictionalSlug } from "@/lib/fictional-content";
+import { seoDescription, seoTitle } from "@/lib/seo/sanity-seo";
 import { Breadcrumb } from "@/components/seo/breadcrumb";
 import {
   EventBody,
@@ -94,11 +95,17 @@ export async function generateMetadata({
   if (!event) return {};
 
   const image = resolveEventImage(event);
+  const title = seoTitle(event.seo, event.title);
+  const description = seoDescription(
+    event.seo,
+    event.location ? `${event.title} — ${event.location}` : event.title
+  );
   return {
-    title: event.title,
-    description: event.location ? `${event.title} — ${event.location}` : event.title,
+    title,
+    description,
     openGraph: {
-      title: event.title,
+      title,
+      description,
       images: ogImages(image),
     },
   };

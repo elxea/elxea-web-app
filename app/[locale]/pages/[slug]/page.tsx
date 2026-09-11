@@ -5,6 +5,7 @@ import type { PortableTextBlock } from "@portabletext/types";
 
 import { sanityFetch } from "@/sanity/lib/fetch";
 import { PAGE_BY_SLUG_QUERY } from "@/sanity/lib/queries";
+import { seoDescription, seoTitle } from "@/lib/seo/sanity-seo";
 import { PortableText } from "@/components/sanity/portable-text";
 import { Breadcrumb } from "@/components/seo/breadcrumb";
 import { Section } from "@/components/layout/container";
@@ -76,7 +77,10 @@ export async function generateMetadata({
       cache: { tag: "sanity:pages" },
     });
     if (!page) return {};
-    return { title: page.title };
+    return {
+      title: seoTitle(page.seo, page.title),
+      description: seoDescription(page.seo),
+    };
   } catch {
     return {};
   }
