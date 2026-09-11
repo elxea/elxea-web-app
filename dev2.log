@@ -1,0 +1,20 @@
+
+> elxea-developer@0.1.0 dev /Users/setaka/github/elxea/products/.wt-ui3-splayout
+> node ./scripts/copy-maplibre-worker.mjs && next dev -p 3242
+
+[copy-maplibre-worker] maplibre-gl-worker.mjs, maplibre-gl-shared.mjs -> /Users/setaka/github/elxea/products/.wt-ui3-splayout/public/maplibre
+▲ Next.js 16.2.1 (Turbopack)
+- Local:         http://localhost:3242
+- Network:       http://192.168.11.6:3242
+- Environments: .env.local, .env
+✓ Ready in 7.2s
+⨯ Another next dev server is already running.
+
+- Local:        http://localhost:3241
+- PID:          50438
+- Dir:          /Users/setaka/github/elxea/products/.wt-ui3-splayout
+- Log:          .next/dev/logs/next-development.log
+
+Run kill 50438 to stop it.
+[?25h
+ ELIFECYCLE  Command failed with exit code 1.

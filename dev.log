@@ -1,0 +1,19 @@
+
+> elxea-developer@0.1.0 dev /Users/setaka/github/elxea/products/.wt-ui3-splayout
+> node ./scripts/copy-maplibre-worker.mjs && next dev -p 3241
+
+[copy-maplibre-worker] maplibre-gl-worker.mjs, maplibre-gl-shared.mjs -> /Users/setaka/github/elxea/products/.wt-ui3-splayout/public/maplibre
+▲ Next.js 16.2.1 (Turbopack)
+- Local:         http://localhost:3241
+- Network:       http://192.168.11.6:3241
+- Environments: .env.local, .env
+✓ Ready in 1098ms
+○ Compiling instrumentation Node.js ...
+○ Compiling instrumentation Edge ...
+⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+- Experiments (use with caution):
+  · clientTraceMetadata
+
+✓ Finished writing to filesystem cache in 15.8s
+[?25h
+ ELIFECYCLE  Command failed with exit code 143.

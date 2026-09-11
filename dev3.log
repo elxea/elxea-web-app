@@ -1,0 +1,372 @@
+
+> elxea-developer@0.1.0 dev /Users/setaka/github/elxea/products/.wt-ui3-splayout
+> node ./scripts/copy-maplibre-worker.mjs && next dev -p 3241
+
+[copy-maplibre-worker] maplibre-gl-worker.mjs, maplibre-gl-shared.mjs -> /Users/setaka/github/elxea/products/.wt-ui3-splayout/public/maplibre
+▲ Next.js 16.2.1 (Turbopack)
+- Local:         http://localhost:3241
+- Network:       http://192.168.11.6:3241
+- Environments: .env.local, .env
+✓ Ready in 2.3s
+⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+- Experiments (use with caution):
+  · clientTraceMetadata
+
+○ Compiling /[locale]/journal ...
+✓ Finished writing to filesystem cache in 20.8s
+[popular-articles] 集計に失敗したため「人気の記事」は空で表示されます (フォールバック: 特集優先・新しい順)。原因: missing-index。Firestore の複合インデックス (behaviorLog: action ASC + createdAt DESC / COLLECTION_GROUP) が未反映。firestore.indexes.json を Firestore へ反映してください (pnpm deploy:indexes)。 Error: 9 FAILED_PRECONDITION: The query requires an index. You can create it here: https://console.firebase.google.com/v1/r/project/elxea-ec/firestore/indexes?create_composite=Ckxwcm9qZWN0cy9lbHhlYS1lYy9kYXRhYmFzZXMvKGRlZmF1bHQpL2NvbGxlY3Rpb25Hcm91cHMvYmVoYXZpb3JMb2cvaW5kZXhlcy9fEAIaCgoGYWN0aW9uEAEaDQoJY3JlYXRlZEF0EAIaDAoIX19uYW1lX18QAg
+    at fetchPopularArticlesUncached (lib/journal/popular-articles.ts:67:6)
+    at async getPopularArticles (lib/journal/popular-articles.ts:198:12)
+  65 |     .orderBy("createdAt", "desc")
+  66 |     .limit(MAX_EVENTS)
+> 67 |     .get();
+     |      ^
+  68 |
+  69 |   const tally = new Map<string, number>();
+  70 |   for (const doc of snapshot.docs) { {
+  code: 9,
+  details: 'The query requires an index. You can create it here: https://console.firebase.google.com/v1/r/project/elxea-ec/firestore/indexes?create_composite=Ckxwcm9qZWN0cy9lbHhlYS1lYy9kYXRhYmFzZXMvKGRlZmF1bHQpL2NvbGxlY3Rpb25Hcm91cHMvYmVoYXZpb3JMb2cvaW5kZXhlcy9fEAIaCgoGYWN0aW9uEAEaDQoJY3JlYXRlZEF0EAIaDAoIX19uYW1lX18QAg',
+  metadata: Metadata {
+    internalRepr: Map(1) { 'x-debug-tracking-id' => [Array] },
+    opaqueData: Map(0) {},
+    options: {}
+  }
+}
+✓ Finished filesystem cache database compaction in 32.2s
+ GET /ja/journal 200 in 115s (next.js: 57s, proxy.ts: 1794ms, application-code: 56s)
+[popular-articles] 集計に失敗したため「人気の記事」は空で表示されます (フォールバック: 特集優先・新しい順)。原因: missing-index。Firestore の複合インデックス (behaviorLog: action ASC + createdAt DESC / COLLECTION_GROUP) が未反映。firestore.indexes.json を Firestore へ反映してください (pnpm deploy:indexes)。 Error: 9 FAILED_PRECONDITION: The query requires an index. You can create it here: https://console.firebase.google.com/v1/r/project/elxea-ec/firestore/indexes?create_composite=Ckxwcm9qZWN0cy9lbHhlYS1lYy9kYXRhYmFzZXMvKGRlZmF1bHQpL2NvbGxlY3Rpb25Hcm91cHMvYmVoYXZpb3JMb2cvaW5kZXhlcy9fEAIaCgoGYWN0aW9uEAEaDQoJY3JlYXRlZEF0EAIaDAoIX19uYW1lX18QAg
+    at fetchPopularArticlesUncached (lib/journal/popular-articles.ts:67:6)
+    at async getPopularArticles (lib/journal/popular-articles.ts:198:12)
+  65 |     .orderBy("createdAt", "desc")
+  66 |     .limit(MAX_EVENTS)
+> 67 |     .get();
+     |      ^
+  68 |
+  69 |   const tally = new Map<string, number>();
+  70 |   for (const doc of snapshot.docs) { {
+  code: 9,
+  details: 'The query requires an index. You can create it here: https://console.firebase.google.com/v1/r/project/elxea-ec/firestore/indexes?create_composite=Ckxwcm9qZWN0cy9lbHhlYS1lYy9kYXRhYmFzZXMvKGRlZmF1bHQpL2NvbGxlY3Rpb25Hcm91cHMvYmVoYXZpb3JMb2cvaW5kZXhlcy9fEAIaCgoGYWN0aW9uEAEaDQoJY3JlYXRlZEF0EAIaDAoIX19uYW1lX18QAg',
+  metadata: Metadata {
+    internalRepr: Map(1) { 'x-debug-tracking-id' => [Array] },
+    opaqueData: Map(0) {},
+    options: {}
+  }
+}
+ GET /ja/journal 200 in 26.4s (next.js: 507ms, proxy.ts: 2.1s, application-code: 23.8s)
+○ Compiling /api/chat/history ...
+ GET /api/chat/history?session_id=d825002e-7745-4939-837b-ef7c63a58f45 200 in 91s (next.js: 86s, application-code: 4.2s)
+✓ Finished writing to filesystem cache in 41s
+✓ Finished filesystem cache database compaction in 34.1s
+✓ Finished writing to filesystem cache in 41s
+ GET /ja/farmers 404 in 44s (next.js: 31.2s, proxy.ts: 471ms, application-code: 12.1s)
+✓ Finished filesystem cache database compaction in 18.7s
+✓ Finished filesystem cache database compaction in 33.5s
+ GET /ja/login 200 in 5.8s (next.js: 4.5s, proxy.ts: 17ms, application-code: 1270ms)
+ GET /api/chat/history?session_id=d825002e-7745-4939-837b-ef7c63a58f45 200 in 1930ms (next.js: 34ms, application-code: 1896ms)
+○ Compiling /api/line-login/init ...
+ POST /api/line-login/init 503 in 5.6s (next.js: 5.5s, application-code: 108ms)
+○ Compiling /[locale]/cart ...
+✓ Finished writing to filesystem cache in 13.8s
+ GET /ja/cart 200 in 30.3s (next.js: 26.9s, proxy.ts: 85ms, application-code: 3.4s)
+ GET /api/chat/history?session_id=d825002e-7745-4939-837b-ef7c63a58f45 200 in 1657ms (next.js: 162ms, application-code: 1495ms)
+○ Compiling /[locale]/subscription ...
+✓ Finished filesystem cache database compaction in 17.2s
+✓ Finished writing to filesystem cache in 80s
+✓ Finished filesystem cache database compaction in 13.2s
+✓ Finished filesystem cache database compaction in 29.5s
+✓ Finished writing to filesystem cache in 34.8s
+✓ Finished filesystem cache database compaction in 10.7s
+ GET /ja 200 in 6.1s (next.js: 369ms, proxy.ts: 584ms, application-code: 5.1s)
+[popular-articles] 集計に失敗したため「人気の記事」は空で表示されます (フォールバック: 特集優先・新しい順)。原因: missing-index。Firestore の複合インデックス (behaviorLog: action ASC + createdAt DESC / COLLECTION_GROUP) が未反映。firestore.indexes.json を Firestore へ反映してください (pnpm deploy:indexes)。 Error: 9 FAILED_PRECONDITION: The query requires an index. You can create it here: https://console.firebase.google.com/v1/r/project/elxea-ec/firestore/indexes?create_composite=Ckxwcm9qZWN0cy9lbHhlYS1lYy9kYXRhYmFzZXMvKGRlZmF1bHQpL2NvbGxlY3Rpb25Hcm91cHMvYmVoYXZpb3JMb2cvaW5kZXhlcy9fEAIaCgoGYWN0aW9uEAEaDQoJY3JlYXRlZEF0EAIaDAoIX19uYW1lX18QAg
+    at fetchPopularArticlesUncached (lib/journal/popular-articles.ts:67:6)
+    at async getPopularArticles (lib/journal/popular-articles.ts:198:12)
+  65 |     .orderBy("createdAt", "desc")
+  66 |     .limit(MAX_EVENTS)
+> 67 |     .get();
+     |      ^
+  68 |
+  69 |   const tally = new Map<string, number>();
+  70 |   for (const doc of snapshot.docs) { {
+  code: 9,
+  details: 'The query requires an index. You can create it here: https://console.firebase.google.com/v1/r/project/elxea-ec/firestore/indexes?create_composite=Ckxwcm9qZWN0cy9lbHhlYS1lYy9kYXRhYmFzZXMvKGRlZmF1bHQpL2NvbGxlY3Rpb25Hcm91cHMvYmVoYXZpb3JMb2cvaW5kZXhlcy9fEAIaCgoGYWN0aW9uEAEaDQoJY3JlYXRlZEF0EAIaDAoIX19uYW1lX18QAg',
+  metadata: Metadata {
+    internalRepr: Map(1) { 'x-debug-tracking-id' => [Array] },
+    opaqueData: Map(0) {},
+    options: {}
+  }
+}
+ GET /ja/journal 200 in 8.5s (next.js: 668ms, proxy.ts: 131ms, application-code: 7.7s)
+ GET /ja/journal/autumn-outdoor-tea-ceremony-matcha 200 in 4.4s (next.js: 372ms, proxy.ts: 145ms, application-code: 3.9s)
+ GET /ja/elxea-journal 200 in 4.0s (next.js: 444ms, proxy.ts: 142ms, application-code: 3.4s)
+ GET /ja/playlists 200 in 3.3s (next.js: 301ms, proxy.ts: 76ms, application-code: 2.9s)
+ GET /ja/tea-menu 200 in 4.4s (next.js: 109ms, proxy.ts: 43ms, application-code: 4.3s)
+ GET /ja/people 404 in 4.4s (next.js: 310ms, proxy.ts: 125ms, application-code: 3.9s)
+ GET /ja/farmers 404 in 3.0s (next.js: 328ms, proxy.ts: 316ms, application-code: 2.4s)
+ GET /ja/subscription 200 in 3.8s (next.js: 324ms, proxy.ts: 33ms, application-code: 3.4s)
+ GET /ja/search 200 in 2.2s (next.js: 210ms, proxy.ts: 49ms, application-code: 1959ms)
+[popular-articles] 集計に失敗したため「人気の記事」は空で表示されます (フォールバック: 特集優先・新しい順)。原因: missing-index。Firestore の複合インデックス (behaviorLog: action ASC + createdAt DESC / COLLECTION_GROUP) が未反映。firestore.indexes.json を Firestore へ反映してください (pnpm deploy:indexes)。 Error: 9 FAILED_PRECONDITION: The query requires an index. You can create it here: https://console.firebase.google.com/v1/r/project/elxea-ec/firestore/indexes?create_composite=Ckxwcm9qZWN0cy9lbHhlYS1lYy9kYXRhYmFzZXMvKGRlZmF1bHQpL2NvbGxlY3Rpb25Hcm91cHMvYmVoYXZpb3JMb2cvaW5kZXhlcy9fEAIaCgoGYWN0aW9uEAEaDQoJY3JlYXRlZEF0EAIaDAoIX19uYW1lX18QAg
+    at fetchPopularArticlesUncached (lib/journal/popular-articles.ts:67:6)
+    at async getPopularArticles (lib/journal/popular-articles.ts:198:12)
+  65 |     .orderBy("createdAt", "desc")
+  66 |     .limit(MAX_EVENTS)
+> 67 |     .get();
+     |      ^
+  68 |
+  69 |   const tally = new Map<string, number>();
+  70 |   for (const doc of snapshot.docs) { {
+  code: 9,
+  details: 'The query requires an index. You can create it here: https://console.firebase.google.com/v1/r/project/elxea-ec/firestore/indexes?create_composite=Ckxwcm9qZWN0cy9lbHhlYS1lYy9kYXRhYmFzZXMvKGRlZmF1bHQpL2NvbGxlY3Rpb25Hcm91cHMvYmVoYXZpb3JMb2cvaW5kZXhlcy9fEAIaCgoGYWN0aW9uEAEaDQoJY3JlYXRlZEF0EAIaDAoIX19uYW1lX18QAg',
+  metadata: Metadata {
+    internalRepr: Map(1) { 'x-debug-tracking-id' => [Array] },
+    opaqueData: Map(0) {},
+    options: {}
+  }
+}
+ GET /ja/journal 200 in 7.8s (next.js: 321ms, proxy.ts: 172ms, application-code: 7.3s)
+ GET /api/chat/history?session_id=81276556-99cd-4ddf-aa00-895579128437 200 in 2.6s (next.js: 105ms, application-code: 2.5s)
+[browser] Image with src "/logo.png" was detected as the Largest Contentful Paint (LCP). Please add the `loading="eager"` property if this image is above the fold.
+Read more: https://nextjs.org/docs/app/api-reference/components/image#loading
+ GET /ja/journal/autumn-outdoor-tea-ceremony-matcha 200 in 28.9s (next.js: 634ms, proxy.ts: 126ms, application-code: 28.2s)
+ GET /api/chat/history?session_id=81276556-99cd-4ddf-aa00-895579128437 200 in 12.5s (next.js: 9.5s, application-code: 2.9s)
+ GET /ja/elxea-journal 200 in 6.2s (next.js: 429ms, proxy.ts: 346ms, application-code: 5.5s)
+ GET /api/chat/history?session_id=81276556-99cd-4ddf-aa00-895579128437 200 in 1963ms (next.js: 279ms, application-code: 1685ms)
+ GET /ja/playlists 200 in 7.3s (next.js: 320ms, proxy.ts: 181ms, application-code: 6.8s)
+✓ Finished filesystem cache database compaction in 15.5s
+ GET /api/chat/history?session_id=81276556-99cd-4ddf-aa00-895579128437 200 in 6.5s (next.js: 122ms, application-code: 6.3s)
+ GET /ja/tea-menu 200 in 7.0s (next.js: 464ms, proxy.ts: 460ms, application-code: 6.1s)
+ GET /api/chat/history?session_id=81276556-99cd-4ddf-aa00-895579128437 200 in 1594ms (next.js: 190ms, application-code: 1405ms)
+[browser] GPUInitializationError: WebGL2 is required to display this map. We are sorry, but it seems that your browser does not support WebGL2, a technology for rendering 3D graphics on the web. Read more on https://wiki.openstreetmap.org/wiki/This_map_requires_WebGL
+    at TerroirOverviewMap.useEffect (components/viz/terroir/terroir-overview-map.tsx:160:13)
+    at TerroirOverviewBlock (components/viz/terroir/terroir-overview-block.tsx:64:7)
+    at TeaMenuList (app/[locale]/(reading)/tea-menu/page.tsx:178:7)
+    at TeaMenuPage (app/[locale]/(reading)/tea-menu/page.tsx:88:7)
+  158 |     let map: MapLibreMap | null = null;
+  159 |     try {
+> 160 |       map = new MapLibreMap({
+      |             ^
+  161 |         container: host,
+  162 |         style,
+  163 |         center: [data.center.lng, data.center.lat], (components/viz/terroir/terroir-overview-map.tsx:160:13)
+[browser] GPUInitializationError: WebGL2 is required to display this map. We are sorry, but it seems that your browser does not support WebGL2, a technology for rendering 3D graphics on the web. Read more on https://wiki.openstreetmap.org/wiki/This_map_requires_WebGL
+    at TerroirOverviewMap.useEffect (components/viz/terroir/terroir-overview-map.tsx:160:13)
+    at TerroirOverviewBlock (components/viz/terroir/terroir-overview-block.tsx:64:7)
+    at TeaMenuList (app/[locale]/(reading)/tea-menu/page.tsx:178:7)
+    at TeaMenuPage (app/[locale]/(reading)/tea-menu/page.tsx:88:7)
+  158 |     let map: MapLibreMap | null = null;
+  159 |     try {
+> 160 |       map = new MapLibreMap({
+      |             ^
+  161 |         container: host,
+  162 |         style,
+  163 |         center: [data.center.lng, data.center.lat], (components/viz/terroir/terroir-overview-map.tsx:160:13)
+ GET /ja/people 404 in 6.9s (next.js: 2.4s, proxy.ts: 973ms, application-code: 3.5s)
+✓ Finished filesystem cache database compaction in 19.5s
+ GET /ja/farmers 404 in 15.6s (next.js: 669ms, proxy.ts: 469ms, application-code: 14.5s)
+ GET /ja/login 200 in 2.3s (next.js: 372ms, proxy.ts: 233ms, application-code: 1729ms)
+ POST /api/line-login/init 503 in 350ms (next.js: 289ms, application-code: 62ms)
+ GET /api/chat/history?session_id=81276556-99cd-4ddf-aa00-895579128437 200 in 3.2s (next.js: 94ms, application-code: 3.1s)
+ GET /ja/login 200 in 7.3s (next.js: 1250ms, proxy.ts: 120ms, application-code: 5.9s)
+ POST /api/line-login/init 503 in 954ms (next.js: 330ms, application-code: 624ms)
+ GET /api/chat/history?session_id=81276556-99cd-4ddf-aa00-895579128437 200 in 7.6s (next.js: 1002ms, application-code: 6.6s)
+ GET /ja/cart 200 in 7.3s (next.js: 716ms, proxy.ts: 163ms, application-code: 6.4s)
+ GET /api/chat/history?session_id=81276556-99cd-4ddf-aa00-895579128437 200 in 1529ms (next.js: 64ms, application-code: 1465ms)
+ GET /ja/subscription 200 in 11.1s (next.js: 1244ms, proxy.ts: 304ms, application-code: 9.6s)
+ GET /api/chat/history?session_id=81276556-99cd-4ddf-aa00-895579128437 200 in 454ms (next.js: 72ms, application-code: 383ms)
+[browser] Image with src "https://cdn.shopify.com/s/files/1/0532/4226/5758/files/unnamed_6ac75710-bad6-4178-8e8c-823e8edb3de7.jpg?v=1773942336" was detected as the Largest Contentful Paint (LCP). Please add the `loading="eager"` property if this image is above the fold.
+Read more: https://nextjs.org/docs/app/api-reference/components/image#loading
+ GET /ja/search 200 in 7.7s (next.js: 247ms, proxy.ts: 273ms, application-code: 7.1s)
+ GET /api/chat/history?session_id=81276556-99cd-4ddf-aa00-895579128437 200 in 970ms (next.js: 156ms, application-code: 814ms)
+ GET /ja 200 in 19.4s (next.js: 477ms, proxy.ts: 738ms, application-code: 18.2s)
+✓ Finished writing to filesystem cache in 14.2s
+ GET /api/chat/history?session_id=81276556-99cd-4ddf-aa00-895579128437 200 in 582ms (next.js: 268ms, application-code: 314ms)
+✓ Finished filesystem cache database compaction in 26.0s
+✓ Finished filesystem cache database compaction in 31.8s
+ GET /ja 200 in 35.5s (next.js: 6.7s, proxy.ts: 2.5s, application-code: 26.2s)
+ GET /api/chat/history?session_id=d3ea35bd-94d3-4cf9-9720-266bda5ce72f 200 in 3.0s (next.js: 1313ms, application-code: 1684ms)
+[popular-articles] 集計に失敗したため「人気の記事」は空で表示されます (フォールバック: 特集優先・新しい順)。原因: missing-index。Firestore の複合インデックス (behaviorLog: action ASC + createdAt DESC / COLLECTION_GROUP) が未反映。firestore.indexes.json を Firestore へ反映してください (pnpm deploy:indexes)。 Error: 9 FAILED_PRECONDITION: The query requires an index. You can create it here: https://console.firebase.google.com/v1/r/project/elxea-ec/firestore/indexes?create_composite=Ckxwcm9qZWN0cy9lbHhlYS1lYy9kYXRhYmFzZXMvKGRlZmF1bHQpL2NvbGxlY3Rpb25Hcm91cHMvYmVoYXZpb3JMb2cvaW5kZXhlcy9fEAIaCgoGYWN0aW9uEAEaDQoJY3JlYXRlZEF0EAIaDAoIX19uYW1lX18QAg
+    at fetchPopularArticlesUncached (lib/journal/popular-articles.ts:67:6)
+    at async getPopularArticles (lib/journal/popular-articles.ts:198:12)
+  65 |     .orderBy("createdAt", "desc")
+  66 |     .limit(MAX_EVENTS)
+> 67 |     .get();
+     |      ^
+  68 |
+  69 |   const tally = new Map<string, number>();
+  70 |   for (const doc of snapshot.docs) { {
+  code: 9,
+  details: 'The query requires an index. You can create it here: https://console.firebase.google.com/v1/r/project/elxea-ec/firestore/indexes?create_composite=Ckxwcm9qZWN0cy9lbHhlYS1lYy9kYXRhYmFzZXMvKGRlZmF1bHQpL2NvbGxlY3Rpb25Hcm91cHMvYmVoYXZpb3JMb2cvaW5kZXhlcy9fEAIaCgoGYWN0aW9uEAEaDQoJY3JlYXRlZEF0EAIaDAoIX19uYW1lX18QAg',
+  metadata: Metadata {
+    internalRepr: Map(1) { 'x-debug-tracking-id' => [Array] },
+    opaqueData: Map(0) {},
+    options: {}
+  }
+}
+ GET /ja/journal 200 in 14.6s (next.js: 904ms, proxy.ts: 227ms, application-code: 13.5s)
+ GET /api/chat/history?session_id=d3ea35bd-94d3-4cf9-9720-266bda5ce72f 200 in 1176ms (next.js: 24ms, application-code: 1152ms)
+[browser] Image with src "/logo.png" was detected as the Largest Contentful Paint (LCP). Please add the `loading="eager"` property if this image is above the fold.
+Read more: https://nextjs.org/docs/app/api-reference/components/image#loading
+ GET /api/chat/history?session_id=d3ea35bd-94d3-4cf9-9720-266bda5ce72f 200 in 2.7s (next.js: 160ms, application-code: 2.5s)
+ GET /ja/journal/autumn-outdoor-tea-ceremony-matcha 200 in 7.0s (next.js: 125ms, proxy.ts: 71ms, application-code: 6.8s)
+[browser] Image with src "/logo.png" was detected as the Largest Contentful Paint (LCP). Please add the `loading="eager"` property if this image is above the fold.
+Read more: https://nextjs.org/docs/app/api-reference/components/image#loading
+ GET /api/chat/history?session_id=d3ea35bd-94d3-4cf9-9720-266bda5ce72f 200 in 1980ms (next.js: 292ms, application-code: 1688ms)
+ GET /ja/journal/chiran-fukamushi-tea-kagoshima 200 in 16.6s (next.js: 1047ms, proxy.ts: 607ms, application-code: 15.0s)
+ GET /ja/elxea-journal 200 in 3.7s (next.js: 387ms, proxy.ts: 357ms, application-code: 2.9s)
+ GET /api/chat/history?session_id=d3ea35bd-94d3-4cf9-9720-266bda5ce72f 200 in 3.2s (next.js: 33ms, application-code: 3.1s)
+ GET /ja/playlists 200 in 5.2s (next.js: 149ms, proxy.ts: 89ms, application-code: 5.0s)
+ GET /api/chat/history?session_id=d3ea35bd-94d3-4cf9-9720-266bda5ce72f 200 in 658ms (next.js: 96ms, application-code: 563ms)
+Failed to fetch site settings: TypeError: fetch failed
+    at ignore-listed frames {
+  isNetworkError: true,
+  request: {
+    timeout: { connect: 300000, socket: 300000 },
+    maxRedirects: 0,
+    maxRetries: undefined,
+    retryDelay: undefined,
+    lineage: undefined,
+    method: 'GET',
+    uri: '/data/query/production?query=%0A++*%5B_type+%3D%3D+%22siteSettings%22%5D%5B0%5D+%7B%0A++++title%2C%0A++++description%2C%0A++++ogImage%2C%0A++++navigation%5B%5D+%7B%0A++++++label%2C%0A++++++labelEn%2C%0A++++++href%2C%0A++++++order%2C%0A++++++showInHeader%2C%0A++++++showInFooter%2C%0A++++++footerGroup%0A++++%7D%2C%0A++++footerGroups%5B%5D+%7B%0A++++++key%2C%0A++++++label%2C%0A++++++labelEn%2C%0A++++++order%0A++++%7D%2C%0A++++footerText%2C%0A++++socialLinks%0A++%7D%0A',
+    json: true,
+    body: undefined,
+    query: { returnQuery: 'false' },
+    headers: {
+      Accept: 'application/json',
+      Authorization: 'Bearer skymQkpQfkFVz7ZL93mwtqPcVMEcjZqmELsu1IuuvJiT1ctQuXJR31EiZjaRGassvJPiy8VXyrbJ4yx7TY55Uvyq3PqO1lOWiSCBsYhdMfJ2KUhwar1lyMsmxXPaeFCp1HEbllDyC0OQgePrHBl8w8DFhZ3sfT61VNDi49QC970CpmUZq4c6'
+    },
+    token: undefined,
+    tag: undefined,
+    returnQuery: false,
+    perspective: undefined,
+    resultSourceMap: undefined,
+    lastLiveEventId: undefined,
+    cacheMode: undefined,
+    canUseCdn: true,
+    signal: undefined,
+    fetch: undefined,
+    useAbortSignal: false,
+    useCdn: undefined,
+    url: 'https://5s8ahx87.api.sanity.io/v2024-01-01/data/query/production?query=%0A++*%5B_type+%3D%3D+%22siteSettings%22%5D%5B0%5D+%7B%0A++++title%2C%0A++++description%2C%0A++++ogImage%2C%0A++++navigation%5B%5D+%7B%0A++++++label%2C%0A++++++labelEn%2C%0A++++++href%2C%0A++++++order%2C%0A++++++showInHeader%2C%0A++++++showInFooter%2C%0A++++++footerGroup%0A++++%7D%2C%0A++++footerGroups%5B%5D+%7B%0A++++++key%2C%0A++++++label%2C%0A++++++labelEn%2C%0A++++++order%0A++++%7D%2C%0A++++footerText%2C%0A++++socialLinks%0A++%7D%0A&returnQuery=false',
+    proxy: undefined,
+    withCredentials: false,
+    attemptNumber: 5
+  },
+  [cause]: Error: read ECONNRESET
+      at ignore-listed frames {
+    errno: -54,
+    code: 'ECONNRESET',
+    syscall: 'read'
+  }
+}
+ GET /ja/tea-menu 200 in 28.4s (next.js: 1011ms, proxy.ts: 383ms, application-code: 27.0s)
+ GET /api/chat/history?session_id=d3ea35bd-94d3-4cf9-9720-266bda5ce72f 200 in 4.3s (next.js: 139ms, application-code: 4.2s)
+[browser] GPUInitializationError: WebGL2 is required to display this map. We are sorry, but it seems that your browser does not support WebGL2, a technology for rendering 3D graphics on the web. Read more on https://wiki.openstreetmap.org/wiki/This_map_requires_WebGL
+    at TerroirOverviewMap.useEffect (components/viz/terroir/terroir-overview-map.tsx:160:13)
+    at TerroirOverviewBlock (components/viz/terroir/terroir-overview-block.tsx:64:7)
+    at TeaMenuList (app/[locale]/(reading)/tea-menu/page.tsx:178:7)
+    at TeaMenuPage (app/[locale]/(reading)/tea-menu/page.tsx:88:7)
+  158 |     let map: MapLibreMap | null = null;
+  159 |     try {
+> 160 |       map = new MapLibreMap({
+      |             ^
+  161 |         container: host,
+  162 |         style,
+  163 |         center: [data.center.lng, data.center.lat], (components/viz/terroir/terroir-overview-map.tsx:160:13)
+[browser] GPUInitializationError: WebGL2 is required to display this map. We are sorry, but it seems that your browser does not support WebGL2, a technology for rendering 3D graphics on the web. Read more on https://wiki.openstreetmap.org/wiki/This_map_requires_WebGL
+    at TerroirOverviewMap.useEffect (components/viz/terroir/terroir-overview-map.tsx:160:13)
+    at TerroirOverviewBlock (components/viz/terroir/terroir-overview-block.tsx:64:7)
+    at TeaMenuList (app/[locale]/(reading)/tea-menu/page.tsx:178:7)
+    at TeaMenuPage (app/[locale]/(reading)/tea-menu/page.tsx:88:7)
+  158 |     let map: MapLibreMap | null = null;
+  159 |     try {
+> 160 |       map = new MapLibreMap({
+      |             ^
+  161 |         container: host,
+  162 |         style,
+  163 |         center: [data.center.lng, data.center.lat], (components/viz/terroir/terroir-overview-map.tsx:160:13)
+ GET /ja/login 200 in 7.0s (next.js: 1387ms, proxy.ts: 213ms, application-code: 5.4s)
+ POST /api/line-login/init 503 in 820ms (next.js: 529ms, application-code: 292ms)
+ GET /api/chat/history?session_id=d3ea35bd-94d3-4cf9-9720-266bda5ce72f 200 in 2.2s (next.js: 53ms, application-code: 2.2s)
+ GET /ja/login 200 in 5.2s (next.js: 135ms, proxy.ts: 12ms, application-code: 5.1s)
+ POST /api/line-login/init 503 in 287ms (next.js: 145ms, application-code: 142ms)
+ GET /api/chat/history?session_id=d3ea35bd-94d3-4cf9-9720-266bda5ce72f 200 in 1209ms (next.js: 608ms, application-code: 601ms)
+ GET /ja/cart 200 in 1621ms (next.js: 135ms, proxy.ts: 36ms, application-code: 1450ms)
+ GET /api/chat/history?session_id=d3ea35bd-94d3-4cf9-9720-266bda5ce72f 200 in 3.1s (next.js: 153ms, application-code: 3.0s)
+ GET /ja/subscription 200 in 4.6s (next.js: 671ms, proxy.ts: 330ms, application-code: 3.6s)
+ GET /api/chat/history?session_id=d3ea35bd-94d3-4cf9-9720-266bda5ce72f 200 in 2.6s (next.js: 182ms, application-code: 2.4s)
+ GET /ja/search 200 in 2.7s (next.js: 346ms, proxy.ts: 183ms, application-code: 2.2s)
+ GET /api/chat/history?session_id=d3ea35bd-94d3-4cf9-9720-266bda5ce72f 200 in 1397ms (next.js: 221ms, application-code: 1176ms)
+✓ Compiled in 8.6s
+ GET /ja 200 in 28.8s (next.js: 4.4s, proxy.ts: 1338ms, application-code: 23.1s)
+[popular-articles] 集計に失敗したため「人気の記事」は空で表示されます (フォールバック: 特集優先・新しい順)。原因: missing-index。Firestore の複合インデックス (behaviorLog: action ASC + createdAt DESC / COLLECTION_GROUP) が未反映。firestore.indexes.json を Firestore へ反映してください (pnpm deploy:indexes)。 Error: 9 FAILED_PRECONDITION: The query requires an index. You can create it here: https://console.firebase.google.com/v1/r/project/elxea-ec/firestore/indexes?create_composite=Ckxwcm9qZWN0cy9lbHhlYS1lYy9kYXRhYmFzZXMvKGRlZmF1bHQpL2NvbGxlY3Rpb25Hcm91cHMvYmVoYXZpb3JMb2cvaW5kZXhlcy9fEAIaCgoGYWN0aW9uEAEaDQoJY3JlYXRlZEF0EAIaDAoIX19uYW1lX18QAg
+    at fetchPopularArticlesUncached (lib/journal/popular-articles.ts:67:6)
+    at async getPopularArticles (lib/journal/popular-articles.ts:198:12)
+  65 |     .orderBy("createdAt", "desc")
+  66 |     .limit(MAX_EVENTS)
+> 67 |     .get();
+     |      ^
+  68 |
+  69 |   const tally = new Map<string, number>();
+  70 |   for (const doc of snapshot.docs) { {
+  code: 9,
+  details: 'The query requires an index. You can create it here: https://console.firebase.google.com/v1/r/project/elxea-ec/firestore/indexes?create_composite=Ckxwcm9qZWN0cy9lbHhlYS1lYy9kYXRhYmFzZXMvKGRlZmF1bHQpL2NvbGxlY3Rpb25Hcm91cHMvYmVoYXZpb3JMb2cvaW5kZXhlcy9fEAIaCgoGYWN0aW9uEAEaDQoJY3JlYXRlZEF0EAIaDAoIX19uYW1lX18QAg',
+  metadata: Metadata {
+    internalRepr: Map(1) { 'x-debug-tracking-id' => [Array] },
+    opaqueData: Map(0) {},
+    options: {}
+  }
+}
+ GET /api/chat/history?session_id=8926a488-4447-41bb-ab2a-2ecda629cff7 200 in 9.5s (next.js: 1473ms, application-code: 8.0s)
+ GET /ja/journal 200 in 49s (next.js: 14.7s, proxy.ts: 1907ms, application-code: 32.3s)
+ GET /api/chat/history?session_id=8926a488-4447-41bb-ab2a-2ecda629cff7 200 in 1462ms (next.js: 167ms, application-code: 1294ms)
+[browser] Image with src "/logo.png" was detected as the Largest Contentful Paint (LCP). Please add the `loading="eager"` property if this image is above the fold.
+Read more: https://nextjs.org/docs/app/api-reference/components/image#loading
+ GET /ja/journal/autumn-outdoor-tea-ceremony-matcha 200 in 11.3s (next.js: 778ms, proxy.ts: 594ms, application-code: 9.9s)
+ GET /api/chat/history?session_id=8926a488-4447-41bb-ab2a-2ecda629cff7 200 in 2.2s (next.js: 148ms, application-code: 2.0s)
+ GET /ja/journal/chiran-fukamushi-tea-kagoshima 200 in 7.0s (next.js: 182ms, proxy.ts: 111ms, application-code: 6.7s)
+ GET /api/chat/history?session_id=8926a488-4447-41bb-ab2a-2ecda629cff7 200 in 1195ms (next.js: 88ms, application-code: 1108ms)
+ GET /ja/elxea-journal 200 in 5.6s (next.js: 948ms, proxy.ts: 77ms, application-code: 4.6s)
+ GET /api/chat/history?session_id=8926a488-4447-41bb-ab2a-2ecda629cff7 200 in 696ms (next.js: 111ms, application-code: 585ms)
+ GET /ja/playlists 200 in 3.7s (next.js: 1022ms, proxy.ts: 105ms, application-code: 2.5s)
+ GET /api/chat/history?session_id=8926a488-4447-41bb-ab2a-2ecda629cff7 200 in 682ms (next.js: 100ms, application-code: 582ms)
+ GET /ja/tea-menu 200 in 5.1s (next.js: 813ms, proxy.ts: 2.0s, application-code: 2.2s)
+ GET /api/chat/history?session_id=8926a488-4447-41bb-ab2a-2ecda629cff7 200 in 629ms (next.js: 44ms, application-code: 585ms)
+[browser] GPUInitializationError: WebGL2 is required to display this map. We are sorry, but it seems that your browser does not support WebGL2, a technology for rendering 3D graphics on the web. Read more on https://wiki.openstreetmap.org/wiki/This_map_requires_WebGL
+    at TerroirOverviewMap.useEffect (components/viz/terroir/terroir-overview-map.tsx:160:13)
+    at TerroirOverviewBlock (components/viz/terroir/terroir-overview-block.tsx:64:7)
+    at TeaMenuList (app/[locale]/(reading)/tea-menu/page.tsx:178:7)
+    at TeaMenuPage (app/[locale]/(reading)/tea-menu/page.tsx:88:7)
+  158 |     let map: MapLibreMap | null = null;
+  159 |     try {
+> 160 |       map = new MapLibreMap({
+      |             ^
+  161 |         container: host,
+  162 |         style,
+  163 |         center: [data.center.lng, data.center.lat], (components/viz/terroir/terroir-overview-map.tsx:160:13)
+[browser] GPUInitializationError: WebGL2 is required to display this map. We are sorry, but it seems that your browser does not support WebGL2, a technology for rendering 3D graphics on the web. Read more on https://wiki.openstreetmap.org/wiki/This_map_requires_WebGL
+    at TerroirOverviewMap.useEffect (components/viz/terroir/terroir-overview-map.tsx:160:13)
+    at TerroirOverviewBlock (components/viz/terroir/terroir-overview-block.tsx:64:7)
+    at TeaMenuList (app/[locale]/(reading)/tea-menu/page.tsx:178:7)
+    at TeaMenuPage (app/[locale]/(reading)/tea-menu/page.tsx:88:7)
+  158 |     let map: MapLibreMap | null = null;
+  159 |     try {
+> 160 |       map = new MapLibreMap({
+      |             ^
+  161 |         container: host,
+  162 |         style,
+  163 |         center: [data.center.lng, data.center.lat], (components/viz/terroir/terroir-overview-map.tsx:160:13)
+ GET /ja/login 200 in 1724ms (next.js: 548ms, proxy.ts: 9ms, application-code: 1166ms)
+ POST /api/line-login/init 503 in 42ms (next.js: 37ms, application-code: 5ms)
+ GET /api/chat/history?session_id=8926a488-4447-41bb-ab2a-2ecda629cff7 200 in 553ms (next.js: 17ms, application-code: 537ms)
+ GET /ja/login 200 in 3.3s (next.js: 20ms, proxy.ts: 18ms, application-code: 3.2s)
+ POST /api/line-login/init 503 in 280ms (next.js: 149ms, application-code: 131ms)
+ GET /api/chat/history?session_id=8926a488-4447-41bb-ab2a-2ecda629cff7 200 in 3.7s (next.js: 254ms, application-code: 3.5s)
+ GET /ja/cart 200 in 1815ms (next.js: 163ms, proxy.ts: 10ms, application-code: 1642ms)
+ GET /api/chat/history?session_id=8926a488-4447-41bb-ab2a-2ecda629cff7 200 in 382ms (next.js: 66ms, application-code: 316ms)
+ GET /ja/subscription 200 in 1224ms (next.js: 166ms, proxy.ts: 32ms, application-code: 1026ms)
+ GET /api/chat/history?session_id=8926a488-4447-41bb-ab2a-2ecda629cff7 200 in 454ms (next.js: 29ms, application-code: 425ms)
+ GET /ja/search 200 in 1185ms (next.js: 163ms, proxy.ts: 54ms, application-code: 968ms)
+ GET /api/chat/history?session_id=8926a488-4447-41bb-ab2a-2ecda629cff7 200 in 256ms (next.js: 5ms, application-code: 251ms)
+ GET /ja/journal/autumn-outdoor-tea-ceremony-matcha 200 in 3.3s (next.js: 81ms, proxy.ts: 381ms, application-code: 2.8s)
+ GET /ja/journal/autumn-outdoor-tea-ceremony-matcha 200 in 1687ms (next.js: 64ms, proxy.ts: 10ms, application-code: 1613ms)
+[?25h
+ ELIFECYCLE  Command failed with exit code 143.
