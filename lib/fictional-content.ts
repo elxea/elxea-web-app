@@ -41,8 +41,23 @@
  * genuine content.
  *
  * Deliberately NOT listed here:
- *   - `author` (author-setaka / author-roji): "Setaka" may be a real person, so
- *     these are left visible pending Setaka's confirmation.
+ *   - `author` (author-setaka / author-roji): SETTLED — DO NOT ADD THESE.
+ *     The open question in the previous version of this note ("Setaka may be a
+ *     real person") is closed. Both docs are seed-script output and carry no
+ *     articles; the three authors that actually write on the site arrive from
+ *     the Notion sync with `notion-author-` ids (GROQ against production,
+ *     2026-09-11: author-roji 0 articles / author-setaka 0 / asako-sato 6 /
+ *     masayuki-kubo 7 / setaka-on 6). So yes, they are invented in the same
+ *     sense as the farmers above — and Setaka still decided on 2026-09-11 to
+ *     LEAVE THEM ON THE PUBLIC SURFACE UNCHANGED: no deny-list entry, no
+ *     Sanity edit, no hiding. Being fictional is therefore not, on its own, a
+ *     reason to deny a doc here; a separate decision to hide it is.
+ *     When an audit reports "fictional content is publicly visible" and the
+ *     hits are these two, the answer is this paragraph, not a new entry.
+ *     Reversing it needs Setaka's sign-off, exactly like the playlist note
+ *     below. Machine-guarded by __tests__/fictional-content.test.ts
+ *     ("author docs stay visible"). Decision Log:
+ *     https://app.notion.com/p/3d870c9d064c818b9f3af738ed328a59
  *   - `article` / `journal` seed docs: not confirmed fictional by observation.
  *   - `playlist` (Morning Forest / Rain on Tea Leaves): these WERE denied here
  *     between 2026-08-22 and 2026-08-26 because their tracks point at a
@@ -51,7 +66,9 @@
  *     what he wants back on the site, and the uploaded audio is the audio he
  *     means. `playlist` is therefore absent from `FictionalDocType` entirely
  *     rather than kept as an empty entry, so no read path can quietly re-hide
- *     it without an explicit type change. Guarded by
+ *     it without an explicit type change. Reaffirmed by Setaka on 2026-09-11
+ *     (same call as the two authors above: the four seed-derived docs stay on
+ *     the public surface as they are). Guarded by
  *     __tests__/fictional-content.test.ts ("playlist is deliberately visible").
  *
  * This module replaces the former `lib/fictional-farmers.ts`. It started out

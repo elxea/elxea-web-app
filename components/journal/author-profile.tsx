@@ -1,6 +1,7 @@
 import Image from "next/image";
 import { Link } from "@/i18n/navigation";
 import { urlFor } from "@/sanity/lib/image";
+import { PersonPlaceholder } from "@/components/media/person-placeholder";
 
 type AuthorProfileProps = {
   author: {
@@ -29,27 +30,33 @@ export function AuthorProfile({ author, writtenByLabel }: AuthorProfileProps) {
         {writtenByLabel}
       </p>
       <div className="flex items-start gap-4">
-        {author.image?.asset && (
-          authorLink ? (
-            <Link href={authorLink} className="flex-shrink-0">
-              <Image
-                src={urlFor(author.image).width(80).height(80).url()}
-                alt={author.name}
-                width={80}
-                height={80}
-                className="rounded-full size-12 object-cover"
-              />
-            </Link>
-          ) : (
+        {/* 写真が無いときは以前このスロットごと消えていた (`author.image?.asset &&`)。
+            本番の著者は 5 名とも写真未設定なので、記事末尾のプロフィールが
+            氏名だけ左端に寄った崩れた見た目になっていた。頭文字の面を出して
+            レイアウトを保つ。Sanity には何も書かない (台帳では未設定のまま)。 */}
+        {(() => {
+          const avatar = author.image?.asset ? (
             <Image
               src={urlFor(author.image).width(80).height(80).url()}
               alt={author.name}
               width={80}
               height={80}
-              className="rounded-full size-12 object-cover flex-shrink-0"
+              className="rounded-full size-12 object-cover"
             />
-          )
-        )}
+          ) : (
+            <PersonPlaceholder
+              name={author.name}
+              className="rounded-full size-12"
+            />
+          );
+          return authorLink ? (
+            <Link href={authorLink} className="flex-shrink-0">
+              {avatar}
+            </Link>
+          ) : (
+            <div className="flex-shrink-0">{avatar}</div>
+          );
+        })()}
         <div className="space-y-1">
           {authorLink ? (
             <Link
