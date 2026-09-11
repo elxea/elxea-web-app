@@ -1,0 +1,13 @@
+import { chromium } from "playwright";
+const b = await chromium.launch();
+const p = await b.newContext({viewport:{width:1440,height:900}}).then(c=>c.newPage());
+const errs=[]; p.on("pageerror",e=>errs.push("pageerror: "+e.message));
+p.on("console",m=>{if(m.type()==="error")errs.push("console: "+m.text())});
+await p.goto("https://elxea-web-bhq2a6fz0-setaka1103s-projects.vercel.app/ja/tea-menu",{waitUntil:"domcontentloaded"});
+await p.waitForTimeout(4000);
+console.log("viz slots before scroll:", await p.evaluate(()=>[...document.querySelectorAll("[data-slot]")].map(e=>e.getAttribute("data-slot")).filter(s=>/terroir|viz|flavor|aroma/.test(s))));
+await p.evaluate(()=>window.scrollTo(0,document.body.scrollHeight));
+await p.waitForTimeout(5000);
+console.log("viz slots after scroll:", await p.evaluate(()=>[...document.querySelectorAll("[data-slot]")].map(e=>e.getAttribute("data-slot")).filter(s=>/terroir|viz|flavor|aroma/.test(s))));
+console.log("errors:", errs.slice(0,8));
+await b.close();
