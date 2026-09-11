@@ -1,5 +1,5 @@
 /**
- * 操作の 3 分類。**サイト全体でここが正本**。
+ * 操作の 4 分類。**サイト全体でここが正本**。
  *
  * 「押したのに何も起きない時間」をゼロにするのが目的だが、**何でも楽観更新に
  * すればよいわけではない**。取り消しの利かない操作を先に見せると、外れたときに
@@ -13,8 +13,21 @@
  * | `optimistic` | やり直しの利くトグル・数量 (お気に入り / カート増減 / 表示切替) | **結果を先に見せる** | **閉じない** | `useOptimisticMutation` |
  * | `pessimistic-commit` | 金銭・契約 (決済確定 / 定期便の停止・解約・頻度変更 / スキップ) | **進行を 0.3 秒以内に見せる** | 閉じる (二重送信を防ぐ) | `usePessimisticMutation` |
  * | `pessimistic-form` | フォーム送信 (問い合わせ / 記録の投稿 / 連携解除) | **進行を 0.3 秒以内に見せる** | 送信ボタンだけ閉じる | `usePessimisticMutation` |
+ * | `request-response` | 応答の本体が要る往復 (音声の入場券 / 会話のストリーム開始) | **進行を 0.3 秒以内に見せる** | **閉じない** (最中の再入は相乗り) | `createRequestCoalescer` |
  *
- * ## 共通の約束 (3 分類すべて)
+ * ## 4 本目はなぜ要ったのか (2026-09-12 / 音声の配線)
+ *
+ * 上 3 つの一次操作は**成否しか返さない** (`WriteOutcome`)。押した結果が画面の値で
+ * 完結する操作はそれで足りるが、**サーバが渡してくるものを持ち帰らないと次が
+ * 始まらない**操作がある。音声の入場券 (`access_token` / `session_handle`) と、
+ * 会話のストリーム (SSE の本体) の 2 つで、どちらも「押した瞬間に効く」の対象
+ * **である**のに、機構として噛み合わないという理由だけで通り道の外に置かれていた
+ * (`components/chat/elxea-chat-transport.ts` が例外表に入っているのがそれ)。
+ *
+ * だから例外表を 1 行増やすのではなく、**通り道の側に応答を返せる形を足した**。
+ * 約束 (下の「共通の約束」) は 3 分類とまったく同じものを負う。
+ *
+ * ## 共通の約束 (4 分類すべて)
  *
  *   1. **0.3 秒以内に必ず画面が変わる** — 結果 (`optimistic`) か進行 (`pessimistic-*`)。
  *      「押したがまだ何も変わらない」状態を作らない。
@@ -44,6 +57,7 @@ export const MUTATION_CLASSES = [
   "optimistic",
   "pessimistic-commit",
   "pessimistic-form",
+  "request-response",
 ] as const;
 
 export type MutationClass = (typeof MUTATION_CLASSES)[number];
@@ -61,11 +75,15 @@ export function immediateFeedbackFor(mutationClass: MutationClass): "result" | "
 /**
  * その操作自身の入口を、往復のあいだ閉じるか。
  *
- * `optimistic` だけが `false`。**ここが「2 秒動かない」の正体**だったので、
+ * 閉じるのは**悲観の 2 つだけ**。**ここが「2 秒動かない」の正体**だったので、
  * 既定を開けておく側に倒してある。
+ *
+ * `request-response` が `false` なのは、二重送信の実害が無い一方で「押したのに
+ * 何も起きない」の実害はそのまま在るから。最中の再入は弾かずに
+ * **いま飛んでいる往復へ相乗りさせる** (`createRequestCoalescer`)。
  */
 export function locksWhilePendingFor(mutationClass: MutationClass): boolean {
-  return mutationClass !== "optimistic";
+  return mutationClass === "pessimistic-commit" || mutationClass === "pessimistic-form";
 }
 
 /**

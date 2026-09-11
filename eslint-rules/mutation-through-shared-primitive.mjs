@@ -51,8 +51,15 @@
  *
  *   - やり直しの利く操作 → `useOptimisticMutation`
  *   - 金銭・契約・フォーム → `usePessimisticMutation`
+ *   - **応答の本体が要る往復** (入場券の取得・ストリームの開始)
+ *     → `createRequestCoalescer` (2026-09-12 追加)
  *
- * どちらを使うかは `lib/interaction/mutation-classes.ts` の表で決める。
+ * どれを使うかは `lib/interaction/mutation-classes.ts` の表で決める。
+ *
+ * 3 本目を足したのは、成否しか返さない 2 本では**機構として噛み合わない**書き込みが
+ * あり、それが下の `ALLOWLIST` の 1 行目 (`elxea-chat-transport.ts`) の理由その
+ * ものだったから。噛み合わないものを表へ逃がすのではなく、**通り道の側に載る形を
+ * 足す**のが正しい直し方で、この 3 本目はそのために在る。
  *
  * ■ 逃げ道 (意図的に狭くしてある)
  *
@@ -134,7 +141,7 @@ const rule = {
     schema: [],
     messages: {
       bypass:
-        "この書き込みが共通の通り道を通っていません。`useOptimisticMutation` (やり直しの利く操作) か `usePessimisticMutation` (金銭・契約・フォーム) を使ってください。分類は lib/interaction/mutation-classes.ts の表で決めます。直に呼ぶと、押した瞬間の反応・失敗時の巻き戻し・言い直し・連打の整理がどれも付いてきません。",
+        "この書き込みが共通の通り道を通っていません。`useOptimisticMutation` (やり直しの利く操作) / `usePessimisticMutation` (金銭・契約・フォーム) / `createRequestCoalescer` (応答の本体が要る往復) のいずれかを使ってください。分類は lib/interaction/mutation-classes.ts の表で決めます。直に呼ぶと、押した瞬間の反応・失敗時の巻き戻し・言い直し・連打の整理がどれも付いてきません。応答が返らないから通せない、と思ったときは ALLOWLIST に足すのではなく通り道の側に形を足します (それが `createRequestCoalescer` の由来)。",
     },
   },
 

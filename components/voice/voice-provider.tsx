@@ -49,6 +49,7 @@ import {
 } from "react";
 
 import { useChatContext } from "@/components/chat/chat-provider";
+import { createRequestCoalescer } from "@/lib/interaction/request-coalescer";
 import {
   announceAudioPhase,
   type AudioOwner,
@@ -736,14 +737,37 @@ export function createVoiceController(
 // ブラウザ側の実配線 (ports の既定実装)
 // ---------------------------------------------------------------------------
 
+/**
+ * 入場券の窓口への往復。**共通の通り道 (`lib/interaction`) を通す**。
+ *
+ * 券は `access_token` と `session_handle` という**応答の本体**が要るので、
+ * 成否しか返さない既存の 2 本には載らない。載る形を通り道の側に足したのが
+ * `createRequestCoalescer` で、これがその 1 件目の利用者
+ * (分類の正本は `lib/interaction/mutation-classes.ts` の `request-response`)。
+ *
+ * ここに置くことで付いてくるもの: マイクを連打されても**往復は 1 本**に
+ * まとまり、2 回目以降も**同じ応答を受け取る** (弾かない・黙って捨てない)。
+ * 直に `fetch` を書くと、この整理がどれも付いてこない。
+ */
+const voiceTokenRequests = createRequestCoalescer<void, VoiceTokenResponse>({
+  operation: "voice.token",
+});
+
 /** 入場券を取る。**POST のみ** (窓口が GET を受けない・設計書 D-1)。 */
 export async function fetchVoiceToken(): Promise<VoiceTokenResponse> {
-  const res = await fetch("/api/voice/token", {
-    method: "POST",
-    credentials: "same-origin",
+  const outcome = await voiceTokenRequests.run("voice.token", undefined, async () => {
+    const res = await fetch("/api/voice/token", {
+      method: "POST",
+      credentials: "same-origin",
+    });
+    if (!res.ok) throw new Error(`voice token request failed: ${res.status}`);
+    return (await res.json()) as VoiceTokenResponse;
   });
-  if (!res.ok) throw new Error(`voice token request failed: ${res.status}`);
-  return (await res.json()) as VoiceTokenResponse;
+  /* 呼び出し側 (`createVoiceController`) は例外で受ける作りなので、ここで
+     結末を例外へ戻す。通り道の側は相乗りした全員へ同じものを配るために
+     値で返している (投げると受け取り手が呼び出し順に依存する)。 */
+  if (outcome.status === "failed") throw outcome.error;
+  return outcome.data;
 }
 
 /** マイクが 1 本でもあるか。許可前でも `kind` は読める。 */
