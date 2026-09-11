@@ -12,6 +12,7 @@ import { urlFor } from "@/sanity/lib/image";
 import { previewSeedEnabled, seedEvents } from "@/lib/preview-seed";
 import { isPastEvent, isSameEventDay } from "@/lib/format-date";
 import { filterOutFictional } from "@/lib/fictional-content";
+import { ogImages } from "@/lib/og-image";
 
 /** 一覧カード 1 件が使うフィールド (Sanity / preview seed の共通部分)。 */
 type EventCard = {
@@ -41,7 +42,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title: t("events"),
     description: te("lead"),
-    openGraph: { title: t("events"), description: te("lead") },
+    openGraph: { title: t("events"), description: te("lead"), images: ogImages() },
   };
 }
 

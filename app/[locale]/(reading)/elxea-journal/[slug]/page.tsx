@@ -35,6 +35,7 @@ import {
   withSeedJournalDetail,
 } from "@/lib/preview-seed";
 import { cn } from "@/lib/utils";
+import { ogImages } from "@/lib/og-image";
 
 /**
  * elxea Journal 記事詳細 — Figma【R2: 確定版】本文完結 + 末尾のみ回遊
@@ -138,7 +139,7 @@ export async function generateMetadata({
     return {
       title,
       description,
-      openGraph: { title, description, images: image ? [{ url: image }] : [] },
+      openGraph: { title, description, images: ogImages(image) },
     };
   } catch {
     return {};

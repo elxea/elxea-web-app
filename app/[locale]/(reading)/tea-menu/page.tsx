@@ -21,6 +21,7 @@ import {
   ListPageHead,
   MoreRow,
 } from "@/components/catalog/catalog-list";
+import { ogImages } from "@/lib/og-image";
 
 /**
  * お茶メニュー — Figma【R2: 確定版】共通リストパターン
@@ -39,6 +40,7 @@ export async function generateMetadata(): Promise<Metadata> {
     openGraph: {
       title: t("title"),
       description: t("description"),
+      images: ogImages(),
     },
   };
 }

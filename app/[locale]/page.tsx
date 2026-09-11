@@ -46,6 +46,7 @@ import {
   seedFarmerVoices,
   seedTopNotices,
 } from "@/lib/preview-seed";
+import { ogImages } from "@/lib/og-image";
 
 /**
  * トップページ (/ja) — Figma【R2: 確定版】トップ (必須5本 + 追加4 /
@@ -94,6 +95,10 @@ export async function generateMetadata(): Promise<Metadata> {
     openGraph: {
       title: brandedTitle,
       description: th("heroLead"),
+      /* トップは「elxea.com を共有した」ときに読まれる URL そのもの。ここで
+       * `images` を省くとレイアウトの既定ごと消えて og:image が出なくなる
+       * (2026-09-11 の本番実測で実際にそうなっていた・`lib/og-image.ts`)。 */
+      images: ogImages(),
     },
   };
 }

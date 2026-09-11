@@ -8,6 +8,7 @@ import { bodySmClass, captionClass, h4Class } from "@/components/editorial/rule-
 import { cn } from "@/lib/utils";
 
 import { NoteFeed, type SignsNote } from "./note-feed";
+import { ogImages } from "@/lib/og-image";
 
 /**
  * みんなの気配 (/signs) — Figma【R1-B: Vivino のコミュニティノートを定石に】
@@ -36,7 +37,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title: t("title"),
     description: t("lead"),
-    openGraph: { title: t("title"), description: t("lead") },
+    openGraph: { title: t("title"), description: t("lead"), images: ogImages() },
   };
 }
 

@@ -31,6 +31,7 @@ import { formatArticleDate } from "@/lib/format-date";
 import { previewSeedEnabled, previewImageForKey } from "@/lib/preview-seed";
 import { toPlainText } from "@/lib/sanity-text";
 import type { PortableTextBlock } from "@portabletext/types";
+import { ogImages } from "@/lib/og-image";
 
 /**
  * プレイリスト詳細 — Figma【R2: 確定版】People 詳細テンプレ整合 +
@@ -132,7 +133,7 @@ export async function generateMetadata({
       openGraph: {
         title: pl.title,
         description: descText || undefined,
-        images: image ? [{ url: image }] : [],
+        images: ogImages(image),
       },
     };
   } catch {

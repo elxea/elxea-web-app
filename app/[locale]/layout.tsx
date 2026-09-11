@@ -16,6 +16,7 @@ import { AudioDock } from "@/components/audio/audio-dock";
 import { sanityFetch } from "@/sanity/lib/fetch";
 import { SITE_SETTINGS_QUERY } from "@/sanity/lib/queries";
 import { env } from "@/lib/config";
+import { OG_IMAGE, ogImages } from "@/lib/og-image";
 
 export const metadata: Metadata = {
   title: {
@@ -32,14 +33,18 @@ export const metadata: Metadata = {
     ],
     apple: [{ url: "/apple-touch-icon.png", sizes: "180x180" }],
   },
+  /* 既定の共有カード。**ここだけに書いても全ページには効かない** — Next.js は
+   * `openGraph` をオブジェクト単位で置換するので、子セグメントが `openGraph` を
+   * 返した時点でこの `images` は消える。だから各ページ側でも `ogImages()` を
+   * 明示的に渡す (理由と実測は `lib/og-image.ts`)。 */
   openGraph: {
     type: "website",
     siteName: "elxea",
-    images: [{ url: "/og-image.png", width: 1200, height: 630, alt: "elxea - Single-Origin Japanese Tea" }],
+    images: ogImages(),
   },
   twitter: {
     card: "summary_large_image",
-    images: ["/og-image.png"],
+    images: [OG_IMAGE.url],
   },
   other: {
     "theme-color": "#333333",

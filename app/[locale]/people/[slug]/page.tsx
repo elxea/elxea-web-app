@@ -38,6 +38,7 @@ import {
 import { getProductByHandle } from "@/lib/shopify";
 import { formatPriceRange } from "@/lib/utils";
 import { cn } from "@/lib/utils";
+import { ogImages } from "@/lib/og-image";
 
 /**
  * People 詳細 — Figma「【採用: 作り手の共通テンプレ】 People 詳細」
@@ -161,7 +162,7 @@ export async function generateMetadata({
       description: person.meta || person.role || person.bio?.slice(0, 160) || person.name,
       openGraph: {
         title: person.name,
-        images: image ? [{ url: image }] : [],
+        images: ogImages(image),
       },
     };
   } catch {

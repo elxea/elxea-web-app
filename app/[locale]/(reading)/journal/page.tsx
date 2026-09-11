@@ -39,6 +39,7 @@ import {
   canUseSpeculativeBundle,
   resolveActiveCategory,
 } from "@/lib/journal/active-category";
+import { ogImages } from "@/lib/og-image";
 
 /**
  * ジャーナル一覧 — Figma【R2: 確定版】共通リストパターン整合 + 特集枠 +
@@ -65,7 +66,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title: t("title"),
     description: t("description"),
-    openGraph: { title: t("title"), description: t("description") },
+    openGraph: { title: t("title"), description: t("description"), images: ogImages() },
   };
 }
 
