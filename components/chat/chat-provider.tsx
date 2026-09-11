@@ -70,6 +70,39 @@ interface ChatContextValue {
   lineUserId: string | null;
   /** Get ISO timestamp for a message (from metadata or runtime map) */
   getMessageTimestamp: (messageId: string) => string | undefined;
+
+  /* -------------------------------------------------------------------------
+     音声 (roji) との接続点。設計書 D-4「会話を分裂させない」の 4 点。
+     https://app.notion.com/p/3d870c9d064c81798c41cd5135be44f0
+     ------------------------------------------------------------------------- */
+
+  /**
+   * 音声が動いているか。文字入力と音声を**互いに**無効化するための旗。
+   *
+   * 立っているあいだ `sendMessage` は何もしない (同じ会話に 2 本の生成が走るのを
+   * 防ぐ)。画面側もこの旗を見て入力欄を無効化する。
+   */
+  voiceActive: boolean;
+  /**
+   * 音声の開始・終了を伝える。
+   *
+   * `false` を渡した時点で**履歴の作り置きを捨てる**。文字の送信処理が送信のたびに
+   * やっているのと同じこと (設計書 D-4 (3))。やらないと、次にこのタブでチャットを
+   * 開いたとき「声で話した分だけ抜けた履歴」が出る。
+   */
+  setVoiceActive: (active: boolean) => void;
+  /**
+   * 外から 1 通足す口。
+   *
+   * 音声は Hume とブラウザのあいだを直接流れるので、発言は `useChat` の送信経路を
+   * 通らない。履歴の取り直しを待つと数秒遅れるため、Hume から「利用者がこう言った」
+   * 「こう返した」が届いた時点でここから会話に足す (設計書 D-4 (2))。
+   */
+  appendVoiceMessage: (
+    role: VoiceMessageRole,
+    text: string,
+    timestamp?: string,
+  ) => void;
 }
 
 const ChatContext = createContext<ChatContextValue | null>(null);
@@ -182,10 +215,69 @@ const IS_MOCK = env("NEXT_PUBLIC_CHAT_MOCK") === "true";
 // History API types
 // ---------------------------------------------------------------------------
 
-/** Metadata attached to UIMessage for cross-channel display */
+/**
+ * Metadata attached to UIMessage for cross-channel display.
+ *
+ * `"voice"` は 3 本目のチャネル。LINE / サイトの 2 本はすでに印が付いていて履歴も
+ * それを保って復元されるので、音声はその仕組みにそのまま乗る (新しい会話の入れ物を
+ * 作らない)。印を画面に出すかどうかは別の判断 — 吹き出し側は `=== "line"` しか
+ * 見ていないので、増やしても描画は壊れない。
+ */
 export interface ChatMessageMeta {
-  channel?: "line" | "web";
+  channel?: "line" | "web" | "voice";
   timestamp?: string; // ISO 8601
+}
+
+/** 音声から足せる発言の種別。 */
+export type VoiceMessageRole = "user" | "assistant";
+
+/**
+ * 音声から届いた 1 通を、会話一覧に足せる形に組み立てる。
+ *
+ * 印 (`channel: "voice"`) をここでしか付けないので、音声の発言が印なしで混ざる
+ * 経路が作れない。純関数にしてあるのはテストから直接縛るため。
+ */
+export function buildVoiceMessage(
+  role: VoiceMessageRole,
+  text: string,
+  timestamp: string = new Date().toISOString(),
+): UIMessage {
+  return {
+    id: randomId(),
+    role,
+    parts: [{ type: "text" as const, text }],
+    metadata: { channel: "voice", timestamp } satisfies ChatMessageMeta,
+  };
+}
+
+/**
+ * 文字の送信を止めるべきか。
+ *
+ * `sendMessage` の中に条件を散らすと「音声中でも送れる経路」が後から生えるので、
+ * 判定を 1 つの純関数に集めてテストで縛る。
+ *
+ *   - 空文字 (空白のみを含む) は送らない
+ *   - 会話 ID が未解決のうちは送らない (どの会話に入るか決まっていない)
+ *   - **音声が動いているあいだは送らない** (設計書 D-4「同時進行の禁止」)
+ */
+export function isTextSendBlocked(args: {
+  text: string;
+  sessionId: string;
+  voiceActive: boolean;
+}): boolean {
+  return !args.text.trim() || !args.sessionId || args.voiceActive;
+}
+
+/**
+ * 音声が終わったときに履歴の作り置きを捨てる。
+ *
+ * 声で話した分はこのタブの作り置きに入っていない。捨てないと、次にこのタブで
+ * チャットを開いたときに**声で話した分だけ抜けた履歴**が出る (設計書 D-4 (3))。
+ * 鍵は identity ごとに分かれているので全消しする — 自分の分だけ狙って消すより
+ * 取りこぼしが無い (文字の送信処理と同じ判断)。
+ */
+export function discardHistoryCacheForVoice(storage: Storage): void {
+  clearAllHistoryCache(storage);
 }
 
 interface HistoryApiMessage {
@@ -517,10 +609,51 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     loadHistory();
   }, [isOpen, loadHistory]);
 
+  /* -------------------------------------------------------------------------
+     音声 (roji) との接続点。設計書 D-4。
+     ------------------------------------------------------------------------- */
+
+  /** 音声が動いているか。文字送信と音声を互いに無効化する唯一の旗。 */
+  const [voiceActive, setVoiceActiveState] = useState(false);
+
+  /**
+   * 音声から 1 通足す。
+   *
+   * 末尾に足すだけ。履歴の引き直し (`hydrateHistory`) は「まだ 1 通も無いとき」しか
+   * 上書きしないので、ここで足した音声の発言が後からの履歴で消えることはない。
+   */
+  const appendVoiceMessage = useCallback(
+    (role: VoiceMessageRole, text: string, timestamp?: string) => {
+      if (!text.trim()) return;
+      setMessages((prev) => [...prev, buildVoiceMessage(role, text, timestamp)]);
+    },
+    [setMessages],
+  );
+
+  /**
+   * 音声の開始・終了。
+   *
+   * 終了側で作り置きを捨てるのは設計書 D-4 (3)。**音声が 1 通も残さずに終わった
+   * ときも捨てる** — 捨てて困ることは無い (次に引き直すだけ) が、捨て損ねると
+   * 抜けた履歴が残る。取りこぼす側の害のほうが大きいので、常に捨てる。
+   */
+  const setVoiceActive = useCallback((active: boolean) => {
+    setVoiceActiveState(active);
+    if (active) return;
+    if (typeof window !== "undefined") {
+      discardHistoryCacheForVoice(window.sessionStorage);
+    }
+    /* 次に開かれたときに引き直せるよう鍵も戻す (捨てただけだと
+       `historyLoadedRef` が立ったままで二度と引かない)。 */
+    historyLoadedRef.current = false;
+  }, []);
+
   // 新しいメッセージ送信時にプロダクトカードとクイックリプライをクリア
   const sendMessage = useCallback(
     (text: string) => {
-      if (!text.trim() || !sessionId) return;
+      /* 音声中は送らない (同じ会話に 2 本の生成が走るのを防ぐ)。判定は
+         `isTextSendBlocked` が正本 — ここには条件を書かない。 */
+      if (isTextSendBlocked({ text, sessionId, voiceActive })) return;
       setIsOpen(true);
       setProductCards([]);
       setQuickReplies([]);
@@ -533,7 +666,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         metadata: { timestamp: new Date().toISOString() } satisfies ChatMessageMeta,
       });
     },
-    [rawSendMessage, sessionId],
+    [rawSendMessage, sessionId, voiceActive],
   );
 
   const clearQuickReplies = useCallback(() => {
@@ -581,8 +714,11 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       isAuthenticated,
       lineUserId,
       getMessageTimestamp,
+      voiceActive,
+      setVoiceActive,
+      appendVoiceMessage,
     }),
-    [messages, status, isOpen, pathname, sessionId, sendMessage, error, productCards, quickReplies, clearQuickReplies, isAuthenticated, lineUserId, getMessageTimestamp],
+    [messages, status, isOpen, pathname, sessionId, sendMessage, error, productCards, quickReplies, clearQuickReplies, isAuthenticated, lineUserId, getMessageTimestamp, voiceActive, setVoiceActive, appendVoiceMessage],
   );
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;

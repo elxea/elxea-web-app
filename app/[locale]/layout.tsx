@@ -11,6 +11,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { LenisProvider } from "@/components/providers/lenis-provider";
 import { ChatProvider } from "@/components/chat/chat-provider";
 import { ChatBar } from "@/components/chat/chat-bar";
+import { VoiceProvider } from "@/components/voice/voice-provider";
 import { ArticleAudioProvider } from "@/components/audio/article-audio-provider";
 import { AudioDock } from "@/components/audio/audio-dock";
 import { sanityFetch } from "@/sanity/lib/fetch";
@@ -143,6 +144,9 @@ export default async function LocaleLayout({
           <ArticleAudioProvider>
           <CartProviderWrapper>
             <ChatProvider>
+              {/* 音声は会話の一部であって別系統ではない。会話の入れ物の
+                  **内側**に置くこと (外側だと `useChatContext()` が落ちる)。 */}
+              <VoiceProvider>
               <LenisProvider>
                 <Header navItems={headerNavItems} />
                 <main className="flex-1">{children}</main>
@@ -152,6 +156,7 @@ export default async function LocaleLayout({
                 <CookieConsent />
                 <Toaster />
               </LenisProvider>
+              </VoiceProvider>
             </ChatProvider>
           </CartProviderWrapper>
           </ArticleAudioProvider>
