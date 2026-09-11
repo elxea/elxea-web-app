@@ -125,6 +125,11 @@ export type FarmerHeadProps = {
   meta?: React.ReactNode;
   image?: string;
   imageAlt?: string;
+  /**
+   * 写真が無いときに敷く面 (ImageCard の `placeholder` にそのまま渡す)。
+   * 渡さなければ従来どおり無地。人物詳細は `<PersonPlaceholder>` を渡す。
+   */
+  imagePlaceholder?: React.ReactNode;
   /** 実数表示 (YEARS / STORIES)。空配列なら罫線ごと出さない。 */
   stats?: readonly FarmerStat[];
   /** クレジットの見出し (例「聞き手」)。 */
@@ -167,6 +172,7 @@ export function FarmerHead({
   meta,
   image,
   imageAlt,
+  imagePlaceholder,
   stats,
   bylineLabel,
   byline,
@@ -197,6 +203,7 @@ export function FarmerHead({
           height={800}
           sizes="(max-width: 1024px) 100vw, 640px"
           priority
+          placeholder={imagePlaceholder}
         />
 
         {/* Figma の HeroText は PC で写真上端から +96 下げた位置に始まる。 */}
@@ -450,6 +457,8 @@ export type FarmerCardItem = {
   key: string;
   image?: string;
   imageAlt?: string;
+  /** 写真が無いときに敷く面 (ImageCard の `placeholder`)。既定は無地。 */
+  placeholder?: React.ReactNode;
   /** リンクにするとき。無ければ非リンク。 */
   href?: string;
   title: React.ReactNode;
@@ -500,6 +509,7 @@ export function FarmerCardGrid({
             height={260}
             sizes="(max-width: 1024px) 100vw, 416px"
             hover={Boolean(item.href)}
+            placeholder={item.placeholder}
           />
         );
 

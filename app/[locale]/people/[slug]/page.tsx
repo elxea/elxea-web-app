@@ -9,6 +9,7 @@ import {
   ARTICLES_BY_AUTHOR_QUERY,
 } from "@/sanity/lib/queries";
 import { urlFor } from "@/sanity/lib/image";
+import { PersonPlaceholder } from "@/components/media/person-placeholder";
 import { Breadcrumb } from "@/components/seo/breadcrumb";
 import { AuthorByline } from "@/components/journal/author-byline";
 import { ArticleCard } from "@/components/journal/article-card";
@@ -316,6 +317,9 @@ export default async function PeoplePage({
       imageAlt: other.image?.alt ?? other.name,
       title: other.name,
       note: other.role || undefined,
+      // 顔写真がまだ無い人は頭文字の面にする。Sanity には書き込まないので
+      // 写真枠の欠落検出 (経路5) からは消えない。
+      placeholder: <PersonPlaceholder name={other.name} />,
     }));
 
   return (
@@ -327,6 +331,7 @@ export default async function PeoplePage({
         meta={person.meta}
         image={heroImage}
         imageAlt={person.image?.alt ?? person.name}
+        imagePlaceholder={<PersonPlaceholder name={person.name} />}
         stats={person.stats}
         bylineLabel={person.interviewer ? t("interviewerLabel") : undefined}
         /* この人を覚えておく (Setaka 決定 2026-08-25「人物ページに正式実装」)。

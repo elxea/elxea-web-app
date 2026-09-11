@@ -26,6 +26,16 @@ type ImageCardProps = {
   style?: React.CSSProperties;
   /** Children rendered inside the container (overrides default image rendering) */
   children?: React.ReactNode;
+  /**
+   * 画像が無いときに敷く面。既定は無地の `<ImagePlaceholder />`。
+   *
+   * `children` との違い: `children` は画像の有無に関わらず描画を丸ごと
+   * 置き換えるので、写真が入ったときも出てしまう。こちらは **空のときだけ**
+   * 差し替わるので、「写真が無いあいだの見せ方」を枠ごとに変えられる
+   * (人物枠は `<PersonPlaceholder name={...} />` を渡して頭文字を出す)。
+   * 渡さなければ従来どおり無地。
+   */
+  placeholder?: React.ReactNode;
 };
 
 /**
@@ -37,6 +47,7 @@ type ImageCardProps = {
  * Usage:
  *   <ImageCard image={url} alt="..." />           // with image
  *   <ImageCard />                                  // placeholder only
+ *   <ImageCard placeholder={<PersonPlaceholder name={n} />} />  // 空のときだけ差し替え
  *   <ImageCard aspectRatio="16/9">{custom}</ImageCard>  // custom children
  */
 export function ImageCard({
@@ -51,6 +62,7 @@ export function ImageCard({
   hover,
   style,
   children,
+  placeholder,
 }: ImageCardProps) {
   return (
     <div
@@ -73,7 +85,7 @@ export function ImageCard({
           priority={priority}
         />
       ) : (
-        <ImagePlaceholder />
+        placeholder ?? <ImagePlaceholder />
       )}
     </div>
   );
