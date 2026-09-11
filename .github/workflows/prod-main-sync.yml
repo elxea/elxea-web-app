@@ -1,0 +1,64 @@
+name: prod-main-sync
+
+# P2 / 追加(a): 本番(Vercel) と main の一致監視 (認識割れの検知)
+#
+# 本番の正本は main (docs/ops/production-source-of-truth.md)。この workflow は
+# Vercel の本番デプロイに付いた git SHA (deploy.yml の --meta) を読み、
+# origin/main HEAD と一致するかを照合する。
+#
+# これは検知 (detection) であって強制ではない。ズレたら runbook に従い
+# 24h 以内に是正する運用で担保する。ここではズレたら CI を失敗させ、
+# GitHub Actions のサマリに理由を出す (通知の起点)。
+
+on:
+  schedule:
+    # 毎日 00:10 / 12:10 UTC (JST 09:10 / 21:10) の 2 回照合
+    - cron: "10 0,12 * * *"
+  workflow_dispatch: {}
+
+concurrency:
+  group: prod-main-sync
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: check-prod-main-sync
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      # VERCEL_ORG_ID / VERCEL_PROJECT_ID は秘密ではない (deploy.yml と同値)
+      VERCEL_ORG_ID: team_6ut7roUVtRU2EGbPVR9DNTy6
+      VERCEL_PROJECT_ID: prj_sVwjaJwPAKxRcKu3wVejiqGPt5o6
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Full history so the monitor can resolve the production commit SHA and
+          # compute whether main is ahead only by deploy-ignored paths (docs).
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Check prod ↔ main sync
+        id: check
+        run: |
+          node scripts/ops/check-prod-main-sync.mjs --fail-on-drift | tee sync-report.json
+
+      - name: Summarize
+        if: always()
+        run: |
+          {
+            echo "## prod ↔ main sync"
+            echo '```json'
+            cat sync-report.json 2>/dev/null || echo "(no report)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
