@@ -1,0 +1,245 @@
+{
+  "config": {
+    "configFile": "/Users/setaka/github/elxea/products/elxea-web-app-wt-uifix/e2e/playwright-auth-flow.config.ts",
+    "rootDir": "/Users/setaka/github/elxea/products/elxea-web-app-wt-uifix/e2e",
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/Users/setaka/github/elxea/products/elxea-web-app-wt-uifix/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "",
+        "name": "",
+        "testDir": "/Users/setaka/github/elxea/products/elxea-web-app-wt-uifix/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/auth-session-flow.spec.ts",
+          "**/gate0-auth-probe.spec.ts"
+        ],
+        "timeout": 30000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "json",
+        {
+          "outputFile": "test-results/auth-flow-report.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "runAgents": "none",
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.58.2",
+    "workers": 1,
+    "webServer": {
+      "command": "pnpm dev --port 3310",
+      "url": "http://127.0.0.1:3310",
+      "reuseExistingServer": true,
+      "timeout": 180000,
+      "env": {
+        "AUTH_COOKIE_APEX": "elxea.test",
+        "NEXTAUTH_URL": "http://www.elxea.test:3310",
+        "LINE_ALLOWED_CALLBACK_HOSTS": "www.elxea.test",
+        "SHOPIFY_CUSTOMER_ACCOUNT_LOGOUT_URL": "https://shopify.test/authentication/00000000/logout",
+        "NEXT_PUBLIC_SENTRY_DSN": "",
+        "PREVIEW_SEED_STOREFRONT": "1",
+        "NEXT_PUBLIC_SANITY_PROJECT_ID": "",
+        "NEXT_PUBLIC_SANITY_DATASET": "production",
+        "VERCEL_GIT_COMMIT_SHA": "e7121ae",
+        "SITE_PASSWORD": ""
+      }
+    }
+  },
+  "suites": [
+    {
+      "title": "gate0-auth-probe.spec.ts",
+      "file": "gate0-auth-probe.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "stage 0 — today's code must be red",
+          "file": "gate0-auth-probe.spec.ts",
+          "line": 44,
+          "column": 15,
+          "specs": [
+            {
+              "title": "0-pre: the fake apex loads with zero console errors",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 9950,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "[gate0][0-pre] platform: {\"isSecureContext\":false,\"hasRandomUUID\":false,\"hasSubtle\":false,\"origin\":\"http://www.elxea.test:3310\"}\n"
+                        },
+                        {
+                          "text": "[gate0][0-pre] console errors: 1\n"
+                        },
+                        {
+                          "text": "[gate0][0-pre]   ERR pageerror: crypto.randomUUID is not a function\n"
+                        },
+                        {
+                          "text": "[gate0][0-pre] non-baseURL hosts contacted: use.typekit.net, p.typekit.net\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-08-17T16:32:51.616Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "888a5063163dd4546a7d-3127933e6a81b78bcc76",
+              "file": "gate0-auth-probe.spec.ts",
+              "line": 48,
+              "column": 7
+            },
+            {
+              "title": "0a-iii: shared-domain LINE cookies survive logout on unpatched code",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 5666,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "[gate0][0a-iii] BEFORE logout: /ja/account renders LINE view = true\n"
+                        },
+                        {
+                          "text": "[gate0][0a-iii] remaining Domain-scoped LINE cookies after logout: line_auth@.elxea.test, line_session@.elxea.test, line_uid@.elxea.test, line_user@.elxea.test\n"
+                        },
+                        {
+                          "text": "[gate0][0a-iii] stub hits during logout: [{\"hits\":7,\"path\":\"/authentication/00000000/logout\",\"hasIdTokenHint\":false,\"hasPostLogoutRedirectUri\":true,\"verdict\":400}]\n"
+                        },
+                        {
+                          "text": "[gate0][0a-iii] /ja/account after logout landed on: /ja/account\n"
+                        },
+                        {
+                          "text": "[gate0][0a-iii] AFTER logout: /ja/account still renders LINE view = true\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-08-17T16:33:05.913Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "888a5063163dd4546a7d-1a9399ac9646413b5c8b",
+              "file": "gate0-auth-probe.spec.ts",
+              "line": 122,
+              "column": 7
+            },
+            {
+              "title": "0b: unauthenticated logout leaves the site and the contract answers 400",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 3636,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "[gate0][0b] stub hits: [{\"hits\":8,\"path\":\"/authentication/00000000/logout\",\"hasIdTokenHint\":false,\"hasPostLogoutRedirectUri\":true,\"verdict\":400}]\n"
+                        },
+                        {
+                          "text": "[gate0][0b] non-2xx observed: [400 /authentication/00000000/logout]\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-08-17T16:33:11.625Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "888a5063163dd4546a7d-ed42d4d408a62105bf55",
+              "file": "gate0-auth-probe.spec.ts",
+              "line": 217,
+              "column": 7
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-08-17T16:32:47.536Z",
+    "duration": 27954.422,
+    "expected": 3,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}
