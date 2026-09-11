@@ -111,7 +111,7 @@
 </table>
 **今すぐ着手できる進行中案件（2026-07-03 時点・詳細は §21）**
 - **OFE デザインガイドライン**（Project「Branding for OMRON Field Engineering」）: ダミー 14 章の本文執筆が次アクション。→ §13(b)・§21.3。
-- **elxea Web App**（Project「Web App Development for elxea」）: **本番稼働**（elxea.com・SITE_PASSWORD ゲート）。スキーマ v2 運用・Figma 製本完了・同期ガバナンス稼働。→ §21.1。
+- **elxea Web App**（Project「elxea Web — EC & Media（旧: Web App Development for elxea）」）: **本番稼働**（elxea.com・SITE_PASSWORD ゲート）。スキーマ v2 運用・Figma 製本完了・同期ガバナンス稼働。→ §21.1。
 - **elxea Design System**（Project「elxea Design System」）: 全 6 章完成・In progress（常設資産）。→ §21.2。
 ## 1. 目的とスコープ
 **目的**: 全メディアのデザインリソースを二重管理なく一貫管理し、「内容先行 → クライアントレビュー → 凍結 → 行へ変換 → Figma/コード翻訳」のワークフローを、担当が誰でも同じ手順で回せるようにする。
@@ -408,7 +408,7 @@
 ## 9. 成果物と Project の階層
 事実は次の階層で位置づける。上から下へ「誰の・どの案件の・どの成果物の・どの構成の・何の中身か」が一意に辿れる。
 - **Company（会社）** → All Projects の Company / Client 欄。CIRCL / elxea / クライアント会社。
-- **Project（案件）** → All Projects `22263392-2e8d-4f63-912b-c74a4299e0be`。「Web App Development for elxea」等。すべての行が Project でひもづく。
+- **Project（案件）** → All Projects `22263392-2e8d-4f63-912b-c74a4299e0be`。「elxea Web — EC & Media」等。すべての行が Project でひもづく。
 - **成果物（1 本＝ 1 行）** → **Design Assets 台帳** `81987020-c817-4481-9af3-132184c02a96` の 1 行（薄い索引：媒体・進捗・プレビュー）。
 - **構成（章 / ページ）** → **Structure List** の行（順番＋種類＋本文）。1 成果物が複数の構成行を持つときは、各構成行の **成果物リレーション**（§4 追加列）で台帳の 1 行へ束ねる。
 - **中身** → 行の本文（文章）＋ Figma / コード（数値・レイアウト・実装）。
@@ -964,7 +964,7 @@ i-9(1) は HF の『何を』（DS 部品インスタンス＋トークンのみ
 <td>2ca70c9d-064c-804a-b9c0-d46acd3f317d / In progress</td>
 </tr>
 <tr>
-<td>Web App Development for elxea（作業入口）</td>
+<td>elxea Web — EC & Media（作業入口）</td>
 <td>22870c9d-064c-80cf-af4e-ff9204e25701 / In progress</td>
 </tr>
 <tr>
@@ -978,7 +978,7 @@ i-9(1) は HF の『何を』（DS 部品インスタンス＋トークンのみ
 **関連 skill（共有）**: `design-asset-record`（台帳登録）/ `figma-page-naming`（Figma ページ命名）/ `notion-record`（記録）/ `task-protocol`（タスク）/ `delegation-protocol`（委譲）。
 ## 21. 現状スナップショット（§21.1 as of 2026-07-13 / §21.2・§21.3 は前版 2026-07-03 から変更なし）
 ### 21.1 elxea Web App（本番稼働・スキーマ v2 運用・同期ガバナンス稼働・as of 2026-07-13）
-- **見つけ方**: 作業入口 PJ ＝「Web App Development for elxea」（`22870c9d-064c-80cf-af4e-ff9204e25701` / In progress）。参照 cockpit ＝ 同 PJ ページの「Design Structure」節（Structure List view を Project でフィルタ済 ＋ Workspace URL・全員向け保存）。現在値は Structure List を **Project=Web App ＋ 種類 (Type)** でフィルタして確認。
+- **見つけ方**: 作業入口 PJ ＝「elxea Web — EC & Media」（`22870c9d-064c-80cf-af4e-ff9204e25701` / In progress）。参照 cockpit ＝ 同 PJ ページの「Design Structure」節（Structure List view を Project でフィルタ済 ＋ Workspace URL・全員向け保存）。現在値は Structure List を **Project=Web App ＋ 種類 (Type)** でフィルタして確認。
 - **状態**: スキーマ v2 運用（§4 の 13 列で新規行）。旧 Section List / Component の linked view は撤去済（部品の正本＝コード＋Storybook）。ページ行は Web App PJ 単独に一本化済（掃除 Devlog `39170c9d-064c-8154-bd72-e2fcbc40d166`／35 行）。
 - **リリース状態**: elxea.com で **本番稼働**（2026-07-12 公開）。公開ゲート = SITE_PASSWORD（維持）。production branch = `main`。リリース手順の正本は R8 リリース Runbook `39a70c9d-064c-81f4-92c8-ca0eef1161a9`。
 - **デプロイ**: Vercel 無料プラン維持（Setaka 決定）。push-to-main → GitHub Actions（`deploy.yml`・Vercel CLI: pull→build --prod→deploy --prebuilt --prod）で全自動。認証はリポジトリシークレット経由（値は非記載）。org 私有リポの Vercel Git 連携（Hobby 不可）は不使用。**docs-only push はデプロイ対象外**（`paths-ignore`: `**/*.md` / `docs/**` / `LICENSE`）＝本 mirror 更新はライブに影響しない。
