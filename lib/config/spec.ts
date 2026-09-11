@@ -449,6 +449,28 @@ export const ENV_SPEC = {
     read: () => process.env.SHOPIFY_STORE_DOMAIN,
     schema: optionalTrimmed(),
   },
+  /**
+   * Which Shopify store a maintenance script is allowed to mutate.
+   *
+   * Declared here for the same reason as `NEXT_PUBLIC_SANITY_DATASET` above,
+   * and it is the same exception to "variables only `scripts/**` use are absent
+   * on purpose": the resolver that reads it (`lib/shopify/write-target.ts`)
+   * lives under `lib/**`, so it resolves through `envSnapshot()`. A name absent
+   * from this registry could not be found there at all, and
+   * `SHOPIFY_STORE_TARGET=... npx tsx scripts/shopify-product-tags.ts` would
+   * silently stop resolving — turning an explicit declaration of intent back
+   * into "no target named", which is the failure this guard exists to prevent.
+   *
+   * Deliberately distinct from `SHOPIFY_STORE_DOMAIN`: that one says which store
+   * the loaded credentials belong to, this one says which store the operator
+   * means to touch. Collapsing them would re-create the bug — holding
+   * production credentials would once again be read as intent to write to
+   * production.
+   */
+  SHOPIFY_STORE_TARGET: {
+    read: () => process.env.SHOPIFY_STORE_TARGET,
+    schema: optionalTrimmed(),
+  },
   SHOPIFY_SHOP_ID: {
     read: () => process.env.SHOPIFY_SHOP_ID,
     schema: optionalTrimmed(),

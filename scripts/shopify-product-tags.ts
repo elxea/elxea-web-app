@@ -1,7 +1,12 @@
 /**
  * Shopify product tag enrichment script
- * Run with: pnpm tsx scripts/shopify-product-tags.ts
- * Dry run:   pnpm tsx scripts/shopify-product-tags.ts --dry-run
+ * Run with: pnpm tsx scripts/shopify-product-tags.ts --store <domain>
+ * Dry run:   pnpm tsx scripts/shopify-product-tags.ts --store <domain> --dry-run
+ *
+ * There is no default store. `--dry-run` is opt-in, so a bare invocation used to
+ * mutate whichever shop the on-disk credentials happened to belong to; the
+ * target must now be named explicitly and a live shop additionally requires
+ * --i-know-this-is-production (see lib/shopify/write-target.ts).
  *
  * Adds tea-type and flavor-profile tags to Shopify products for
  * persona×product recommendation affinity mapping.
@@ -16,7 +21,19 @@
 import { readFileSync } from "fs";
 import { join } from "path";
 
+import {
+  assertCredentialsMatchStoreOrExit,
+  resolveWriteStoreOrExit,
+} from "../lib/shopify/write-target";
+
 // ─── Config ──────────────────────────────────────────────────
+
+const SCRIPT_NAME = "scripts/shopify-product-tags.ts";
+
+// Fail-closed: resolved before any credential is read and before any Admin API
+// call. Exits non-zero (writing nothing) when the target store is unnamed, or
+// when it is a live shop without the explicit confirmation flag.
+const REQUESTED_STORE = resolveWriteStoreOrExit({ scriptName: SCRIPT_NAME });
 
 // Load token from elxea-broadcaster .env.local
 const broadcasterEnvPath = join(
@@ -42,6 +59,14 @@ if (!SHOPIFY_ACCESS_TOKEN || !SHOPIFY_STORE_DOMAIN) {
   console.error("Missing SHOPIFY_ACCESS_TOKEN or SHOPIFY_STORE_DOMAIN");
   process.exit(1);
 }
+
+// The credentials file is not a declaration of intent: refuse when the operator
+// named one store but is holding another store's Admin API token.
+assertCredentialsMatchStoreOrExit(
+  SCRIPT_NAME,
+  REQUESTED_STORE,
+  SHOPIFY_STORE_DOMAIN,
+);
 
 const isDryRun = process.argv.includes("--dry-run");
 
