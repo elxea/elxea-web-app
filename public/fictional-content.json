@@ -1,0 +1,74 @@
+{
+  "$comment": [
+    "fictional-content.json — 本番サイトが「作り話なので表に出さない」ドキュメントの一覧。",
+    "",
+    "【この JSON を手で編集しない】",
+    "正本は elxea-web-app の lib/fictional-content.ts。隠す理由・確認日・据え置きの判断は",
+    "すべてそちらの doc comment にある。編集したら pnpm generate:fictional-content を走らせる。",
+    "食い違ったまま本番に出ないよう pnpm check:fictional-content が build の前段で落とす。",
+    "",
+    "【誰が読むか】",
+    "elxea-asset-hub。Sanity を直接読むため、このファイルを読まないと本番に無いページの",
+    "写真枠を『空き枠』として並べてしまう。deny-list の中身をアセットハブ側に複製しない。",
+    "",
+    "【読み手への約束】",
+    "docTypes のキーが『このサイトが deny-list を持っている _type』の全体。",
+    "ここに無い _type (author / journal / playlist 等) は、隠す対象がそもそも無いという意味で、",
+    "『まだ調べていない』ではない。ids と slugs は同じ 1 件を両方から引けるようにしたもの",
+    "(一覧は _id を持ち、詳細ルートと sitemap は slug しか持たないため)。",
+    "",
+    "【version はスキーマの版であって中身の版ではない】",
+    "deny-list に 1 件足す・消すでは上げない。上げてよいのはこの JSON の書き方を変えたときだけ。"
+  ],
+  "version": 1,
+  "generatedBy": "scripts/gen-fictional-content.ts",
+  "generatedFrom": "lib/fictional-content.ts",
+  "docTypes": {
+    "farmer": {
+      "ids": [
+        "ChPy2hTrLaycRwOtl4DGV5",
+        "ChPy2hTrLaycRwOtl4DGZd",
+        "farmer-aoyama-shuichi",
+        "farmer-chen-yufen",
+        "farmer-rajan-mehta",
+        "farmer-tanaka",
+        "farmer-yamada"
+      ],
+      "slugs": [
+        "aoyama-shuichi",
+        "chen-yufen",
+        "rajan-mehta",
+        "sato-misaki",
+        "tanaka-tea-garden",
+        "yamada-farm",
+        "yamada-kenichi"
+      ]
+    },
+    "teaMenu": {
+      "ids": [
+        "tea-gyokuro",
+        "tea-hojicha",
+        "tea-sencha-spring"
+      ],
+      "slugs": [
+        "kaga-hojicha",
+        "spring-sencha",
+        "uji-gyokuro"
+      ]
+    },
+    "event": {
+      "ids": [
+        "X9ORxzRbtqr9lSJFeKANyF",
+        "X9ORxzRbtqr9lSJFeKAO3M",
+        "event-brewing-workshop",
+        "event-tea-tasting"
+      ],
+      "slugs": [
+        "2026-spring-tasting",
+        "2026-taiwan-oolong-workshop",
+        "beginners-tea-workshop",
+        "spring-tea-tasting-2026"
+      ]
+    }
+  }
+}
