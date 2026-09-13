@@ -7,7 +7,8 @@ import {
 } from "./lib/auth/cookies";
 import { env } from "./lib/config";
 import { routing } from "./i18n/routing";
-import { defaultLocale, disabledLocales } from "./i18n/config";
+import { defaultLocale, disabledLocales, locales } from "./i18n/config";
+import pageVisibility from "./config/page-visibility.json";
 
 const intlMiddleware = createMiddleware(routing);
 
@@ -21,6 +22,81 @@ const DISABLED_LOCALE_PREFIX =
   disabledLocales.length > 0
     ? new RegExp(`^/(?:${disabledLocales.join("|")})(?=/|$)`)
     : null;
+
+/**
+ * ページ単位の公開制御。正本は `config/page-visibility.json` の 1 ファイルだけ。
+ *
+ * ## なぜリポ内の JSON なのか (Notion を直接読まない理由)
+ *
+ * 「どのページを本番に出すか」を人が編集する面は Notion の Structure List だが、
+ * **本番の判定はこの JSON だけを見る**。理由は 3 つ:
+ *
+ *   1. Notion の障害がサイトの障害にならない。middleware が外部 API を待つ作りに
+ *      すると、Notion が落ちた瞬間に全ページの応答が止まる。
+ *   2. Notion 上の誤操作 (行をドラッグして消した等) が、そのまま本番に出ない。
+ *      コードに入れておけば PR と履歴が挟まる。
+ *   3. 既に同じ形が動いている。画像枠 (`public/site-slots.manifest.json`) が
+ *      「ローカル JSON が SoT / 生成物とゲートで機械検査」で回っているので、
+ *      2 つ目の流儀を作らずに済む。
+ *
+ * Notion からこの JSON へ反映する配線は別 (Step 2) で作る。
+ *
+ * ## 既定は非公開 (fail-closed)
+ *
+ * 宣言に無いルートは「非公開」として扱う。ただし **404 を返す主体は
+ * middleware ではなく Next 自身**になる (下の `visibility === undefined` の
+ * 分岐を参照)。`scripts/check-page-visibility.ts` が build の前段で
+ * 「app/ の実ルートは全部宣言にあること」を強制するので、実在するページが
+ * 宣言から漏れた状態はそもそもデプロイできない。
+ */
+const LOCALE_PREFIX = new RegExp(`^/(?:${locales.join("|")})(?=/|$)`);
+
+/** 静的ルート (`/journal` 等) の公開可否。 */
+const VISIBILITY_STATIC = new Map<string, boolean>(
+  pageVisibility.routes
+    .filter((entry) => !entry.route.includes("["))
+    .map((entry) => [entry.route, entry.visible] as const),
+);
+
+/** 動的ルート (`/journal/[slug]` 等) の公開可否。セグメントに割ってから照合する。 */
+const VISIBILITY_DYNAMIC = pageVisibility.routes
+  .filter((entry) => entry.route.includes("["))
+  .map((entry) => ({
+    segments: entry.route.split("/").filter(Boolean),
+    visible: entry.visible,
+  }));
+
+/**
+ * この path の公開可否を引く。`undefined` は「宣言に無い」= 未登録。
+ *
+ * locale 接頭辞は外してから引く (`/ja/journal` と `/journal` は宣言の同じ 1 行が
+ * 受け持つ)。静的な宣言を先に見るので、`/journal/category` は
+ * `/journal/[slug]` ではなく自分の行に当たる。
+ */
+function lookupVisibility(pathname: string): boolean | undefined {
+  const stripped = pathname.replace(LOCALE_PREFIX, "");
+  const normalized =
+    stripped === ""
+      ? "/"
+      : stripped.length > 1 && stripped.endsWith("/")
+        ? stripped.slice(0, -1)
+        : stripped;
+
+  const exact = VISIBILITY_STATIC.get(normalized);
+  if (exact !== undefined) return exact;
+
+  const segments = normalized.split("/").filter(Boolean);
+  for (const candidate of VISIBILITY_DYNAMIC) {
+    if (candidate.segments.length !== segments.length) continue;
+    const matched = candidate.segments.every(
+      (segment, i) =>
+        (segment.startsWith("[") && segment.endsWith("]")) || segment === segments[i],
+    );
+    if (matched) return candidate.visible;
+  }
+
+  return undefined;
+}
 
 const SITE_PASSWORD = env("SITE_PASSWORD");
 
@@ -244,6 +320,50 @@ export default async function middleware(request: NextRequest) {
       redirectUrl.search = request.nextUrl.search;
       return NextResponse.redirect(redirectUrl, 301);
     }
+  }
+
+  /* 非公開にしているページを 404 にする (`config/page-visibility.json` が正本)。
+   *
+   * ## 置き場所の理由 (既存の 3 つのゲートとの関係)
+   *
+   * - **サイト全体の閲覧ゲートより後**。ゲートが立っている間も、cookie を
+   *   持っている人はここまで来る = 公開前でもこの判定の効き方を実機で確認できる。
+   *   逆にすると、ゲート中は全部 `/password` に飛ぶのでこの判定が一度も走らない。
+   * - **`/dev/*` の本番 404 より後**。`/dev/*` は上のブロックで return 済みなので
+   *   ここには来ない (公開制御の対象外・`outOfScope` に明記してある)。
+   * - **`disabledLocales` の転送より後**。`/en/...` は先に `/ja/...` へ 301 される。
+   *   公開可否は locale ごとではなく「ページ」ごとの判断なので、転送を先に済ませて
+   *   から 1 回だけ引く。
+   * - **`/account` の認証ガードより前**。非公開にしたページは「存在しない」のが
+   *   正しい見え方で、ログイン画面へ飛ばすと「その面がある」ことを教えてしまう。
+   *
+   * ## 未登録 (`undefined`) を素通しにしている理由
+   *
+   * 「宣言に無い = 非公開」は変わらないが、ここで 404 を返さずに Next へ渡す。
+   * build の前段で `check:page-visibility` が「app/ の実ルートは全部宣言に載って
+   * いること」を強制するため、**未登録の path は実在するページではない**。つまり
+   * 素通ししても行き先は Next の 404 で、結果は同じ。違うのは見た目だけで、
+   * Next に渡すと `app/[locale]/not-found.tsx` の 404 が出る。ここで平文を返すと、
+   * URL を打ち間違えた人全員がブランドの無い平文 404 を見ることになる。
+   *
+   * ## 分かっている割り切り (Step 1)
+   *
+   * 非公開ページは平文 404、打ち間違いはブランド 404 なので、応答の見た目で
+   * 「この URL は存在するが隠されている」と分かってしまう。いまは全ルートが
+   * 公開なのでこの分岐は本番で一度も走らず、実害は無い。実際に非公開にする
+   * ページが出る段で、両者を同じ 404 に揃える。
+   */
+  const visibility = lookupVisibility(pathname);
+  if (visibility === false) {
+    return new NextResponse("Not Found", {
+      status: 404,
+      headers: {
+        "content-type": "text/plain; charset=utf-8",
+        // 公開に切り替えたときに古い 404 が残らないようにする
+        "cache-control": "no-store",
+        "x-robots-tag": "noindex, nofollow",
+      },
+    });
   }
 
   // Check if this is an /account route that needs auth
