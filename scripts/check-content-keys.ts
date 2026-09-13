@@ -32,7 +32,7 @@ const ROOT = path.resolve(__dirname, "..");
 /** 実ファイルを検査する。戻り値が空なら整合。 */
 export function checkContentKeys(
   jsonPath = CONTENT_KEYS_PATH,
-  env: NodeJS.ProcessEnv = process.env,
+  env: Record<string, string | undefined> = process.env,
 ): string[] {
   const rel = path.relative(ROOT, jsonPath);
   if (!existsSync(jsonPath)) {

@@ -77,7 +77,7 @@ const COMMENT: readonly string[] = [
 ];
 
 /** 合言葉を読む。無ければ throw (黙って弱い符号を作らない)。 */
-export function requireSecret(env: NodeJS.ProcessEnv = process.env): string {
+export function requireSecret(env: Record<string, string | undefined> = process.env): string {
   const secret = env[SECRET_ENV];
   if (typeof secret !== "string" || secret.trim() === "") {
     throw new Error(
