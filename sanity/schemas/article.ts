@@ -40,6 +40,24 @@ export const article = defineType({
           title: "代替テキスト",
           type: "string",
         }),
+        // ここから下は同期 (scripts/sync-notion-to-sanity.ts) が読み書きする
+        // 出所の記録。人が編集する項目ではないので Studio では隠す。
+        // 語彙の正本は elxea-asset-hub `lib/asset-provenance.ts`、
+        // 判定は `lib/sanity/image-provenance.ts`。
+        defineField({
+          name: "assignedBy",
+          title: "出所 (agent / human / unknown)",
+          type: "string",
+          hidden: true,
+          readOnly: true,
+        }),
+        defineField({
+          name: "agentAlt",
+          title: "エージェントが最後に書いた代替テキスト",
+          type: "string",
+          hidden: true,
+          readOnly: true,
+        }),
       ],
     }),
     defineField({
@@ -52,6 +70,24 @@ export const article = defineType({
           name: "alt",
           title: "代替テキスト",
           type: "string",
+        }),
+        // ここから下は同期 (scripts/sync-notion-to-sanity.ts) が読み書きする
+        // 出所の記録。人が編集する項目ではないので Studio では隠す。
+        // 語彙の正本は elxea-asset-hub `lib/asset-provenance.ts`、
+        // 判定は `lib/sanity/image-provenance.ts`。
+        defineField({
+          name: "assignedBy",
+          title: "出所 (agent / human / unknown)",
+          type: "string",
+          hidden: true,
+          readOnly: true,
+        }),
+        defineField({
+          name: "agentAlt",
+          title: "エージェントが最後に書いた代替テキスト",
+          type: "string",
+          hidden: true,
+          readOnly: true,
         }),
       ],
     }),
