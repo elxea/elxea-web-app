@@ -35,6 +35,10 @@ import {
   resolveArticleImages,
   type ArticleImageSource,
 } from "../lib/notion/article-image";
+import {
+  planImageFieldWrite,
+  type ExistingImageField,
+} from "../lib/sanity/image-provenance";
 import { createHash } from "crypto";
 import {
   MissingEnvError,
@@ -1004,6 +1008,54 @@ async function syncPages(): Promise<SyncCounts> {
 
 // ─── Main Sync ───────────────────────────────────────────────
 
+/** 1 記事ぶんの「画像フィールドの現状」。無い項目は未設定。 */
+interface ArticleImageState {
+  mainImage?: ExistingImageField;
+  thumbnail?: ExistingImageField;
+}
+
+/**
+ * 記事画像の現状 (説明文と出所) を Sanity からまとめて読む。
+ *
+ * 読めたかどうかを `ok` で返すのが要点。読めなかったときに「新規扱い」で
+ * 種を入れると、人間が調整した説明文を塗り潰してしまう。読めないときは
+ * **説明文に一切触らない** 側へ倒すため、呼び出し側は `ok` を見る。
+ *
+ * `hotspot` / `crop` はここでも読まない。同期が書かない項目なので判断に要らない。
+ */
+async function fetchArticleImageState(
+  client: SanityClient
+): Promise<{ ok: boolean; byId: Map<string, ArticleImageState> }> {
+  const byId = new Map<string, ArticleImageState>();
+  const projection =
+    '{ "exists": true, alt, assignedBy, agentAlt }';
+  try {
+    const rows = await client.fetch<
+      {
+        _id: string;
+        mainImage: ExistingImageField | null;
+        thumbnail: ExistingImageField | null;
+      }[]
+    >(
+      `*[_type == "article"]{ _id, "mainImage": mainImage${projection}, ` +
+        `"thumbnail": thumbnail${projection} }`
+    );
+    for (const row of rows) {
+      byId.set(row._id, {
+        ...(row.mainImage ? { mainImage: row.mainImage } : {}),
+        ...(row.thumbnail ? { thumbnail: row.thumbnail } : {}),
+      });
+    }
+    return { ok: true, byId };
+  } catch (err) {
+    // 落とさない。読めないなら「説明文を書かない」に倒して同期は続ける。
+    console.warn(
+      `  WARN: 画像の現状を読めなかったため、説明文は更新しない: ${errText(err)}`
+    );
+    return { ok: false, byId };
+  }
+}
+
 async function sync(): Promise<SyncCounts> {
   currentPhase = "input";
 
@@ -1123,6 +1175,9 @@ async function sync(): Promise<SyncCounts> {
     `  Categories: ${categoryMap.size}, Tags: ${tagMap.size}, Authors: ${authorMap.size}\n`
   );
 
+  // 画像フィールドの現状 (人が直した説明文がそこにあるか) を先にまとめて読む。
+  const imageState = await fetchArticleImageState(sanity);
+
   // 3. Process each entry
   let synced = 0;
   let errors = 0;
@@ -1179,26 +1234,60 @@ async function sync(): Promise<SyncCounts> {
       // Asset Hub URL columns first, legacy `Featured Image` as fallback. When
       // the two resolve to the same url we upload once and share the asset ref
       // (the historic behaviour where thumbnail mirrored mainImage).
+      //
+      // 書くのは `asset` と (書いてよいときだけ) `alt` / 出所だけ。
+      // **`hotspot` / `crop` は書かない** — 人間がアセットハブ / Studio で
+      // 調整するトリミング位置であり、Notion 側に正本が無い。書かなければ
+      // 消えない (ドットパス展開は scripts/lib/sanity-upsert.ts が担当)。
+      const sanityId = `notion-${entry.slug}`;
+      const existingImages = imageState.byId.get(sanityId);
+      const imageDecisions: string[] = [];
+
+      /**
+       * 画像フィールドを組み立てる。説明文を書いてよいかは出所で決める
+       * (agent と分かっているものだけ更新し、human も unknown も触らない)。
+       * 現状が読めていない (`imageState.ok === false`) ときは説明文に触らない。
+       */
+      const buildImageField = (
+        assetRef: { _type: "reference"; _ref: string },
+        field: "mainImage" | "thumbnail"
+      ): Record<string, unknown> => {
+        if (!imageState.ok) {
+          imageDecisions.push(`${field}=state-unreadable`);
+          return { _type: "image", asset: assetRef };
+        }
+        const plan = planImageFieldWrite(entry.title, existingImages?.[field]);
+        imageDecisions.push(`${field}=${plan.decision}`);
+        return { _type: "image", asset: assetRef, ...plan.fields };
+      };
+
       let mainImage: unknown = undefined;
       let thumbnail: unknown = undefined;
       const sameImage =
         entry.thumbnailImageUrl === entry.headerImageUrl;
+      let headerAssetRef: { _type: "reference"; _ref: string } | null = null;
       if (entry.headerImageUrl) {
         if (DRY_RUN) {
           mainImage = { _dryRun: true, _sourceUrl: entry.headerImageUrl };
         } else {
-          const assetRef = await uploadImageToSanity(
+          headerAssetRef = await uploadImageToSanity(
             sanity,
             entry.headerImageUrl,
             `${entry.slug}-header`
           );
-          if (assetRef) {
-            mainImage = { _type: "image", asset: assetRef, alt: entry.title };
+          if (headerAssetRef) {
+            mainImage = buildImageField(headerAssetRef, "mainImage");
           }
         }
       }
       if (sameImage) {
-        thumbnail = mainImage;
+        // 画像そのものは共有するが、説明文の判定はフィールドごとに別に行う
+        // (サムネイルだけ人が直している場合があるため)。
+        if (DRY_RUN) {
+          thumbnail = mainImage;
+        } else if (headerAssetRef) {
+          thumbnail = buildImageField(headerAssetRef, "thumbnail");
+        }
       } else if (entry.thumbnailImageUrl) {
         if (DRY_RUN) {
           thumbnail = { _dryRun: true, _sourceUrl: entry.thumbnailImageUrl };
@@ -1209,13 +1298,12 @@ async function sync(): Promise<SyncCounts> {
             `${entry.slug}-thumbnail`
           );
           if (assetRef) {
-            thumbnail = { _type: "image", asset: assetRef, alt: entry.title };
+            thumbnail = buildImageField(assetRef, "thumbnail");
           }
         }
       }
 
       // 3e. Build Sanity document
-      const sanityId = `notion-${entry.slug}`;
       const doc: Record<string, unknown> & { _id: string; _type: string } = {
         _id: sanityId,
         _type: "article",
@@ -1263,7 +1351,10 @@ async function sync(): Promise<SyncCounts> {
         );
       } else {
         await upsertFromNotion(sanity, doc);
-        console.log(`  -> synced to Sanity: ${sanityId}`);
+        console.log(
+          `  -> synced to Sanity: ${sanityId}` +
+            (imageDecisions.length > 0 ? ` (alt: ${imageDecisions.join(", ")})` : "")
+        );
       }
 
       synced++;

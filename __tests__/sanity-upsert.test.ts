@@ -116,7 +116,7 @@ describe("planNotionUpsert", () => {
     expect(plan.setIfMissing.seo).toEqual({});
   });
 
-  it("_type を持つ値 (slug / image / reference) は丸ごと置き換える", () => {
+  it("_type を持つ値 (slug / reference) は丸ごと置き換える。画像だけは例外", () => {
     const doc = notionArticleDoc();
     doc.mainImage = { _type: "image", asset: { _ref: "image-abc" }, alt: "a" };
     doc.category = { _type: "reference", _ref: "notion-category-farm" };
@@ -126,11 +126,15 @@ describe("planNotionUpsert", () => {
       _type: "slug",
       current: "tsushima-oishi-farm-interview",
     });
-    expect(plan.set.mainImage).toEqual({
-      _type: "image",
-      asset: { _ref: "image-abc" },
-      alt: "a",
-    });
+    // 画像は 2026-09-13 からドットパス展開に変えた。丸ごと置き換えると
+    // Sanity 側にしか無い hotspot / crop (人が調整するトリミング位置) が
+    // 毎回の同期で消えるため (scripts/lib/sanity-upsert.ts 冒頭のコメント)。
+    expect(plan.set.mainImage).toBeUndefined();
+    expect(plan.set["mainImage.asset"]).toEqual({ _ref: "image-abc" });
+    expect(plan.set["mainImage.alt"]).toBe("a");
+    expect(plan.setIfMissing.mainImage).toEqual({ _type: "image" });
+    expect(plan.set["mainImage.hotspot"]).toBeUndefined();
+    expect(plan.set["mainImage.crop"]).toBeUndefined();
     expect(plan.set.category).toEqual({
       _type: "reference",
       _ref: "notion-category-farm",

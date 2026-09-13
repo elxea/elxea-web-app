@@ -37,8 +37,21 @@
  * オブジェクトだけは `seo.metaDescription` のようなドットパスに展開し、
  * 親が無い場合に備えて `setIfMissing({ seo: {} })` を先に置く。
  *
- * 逆に `_type` を持つ値 (slug / image / reference) と配列は、Notion 側が
+ * 逆に `_type` を持つ値 (slug / reference / geopoint) と配列は、Notion 側が
  * 値の全体を持っているので丸ごと置き換えてよい。
+ *
+ * ## 画像 (`_type: "image"`) だけは例外 (2026-09-13)
+ *
+ * 画像は `_type` を持つが、**値の全体を Notion 側が持っていない**。
+ * トリミング位置 (`hotspot` / `crop`) は Sanity 側にしか無く、しかも
+ * 人間がアセットハブ / Studio で調整する項目である。丸ごと置き換えると
+ * 同期のたびにそれが消える (実測: origin/main 3de76d5 の `mainImage` /
+ * `thumbnail`)。そこで画像は `mainImage.asset` のようなドットパスに展開し、
+ * **doc に載せたサブフィールドだけ**を書く。載せていない `hotspot` / `crop`
+ * には触れないので、人間の調整が次の同期で消えない。
+ *
+ * 親が無い場合に備えて `setIfMissing({ mainImage: { _type: "image" } })` を
+ * 先に置く (`_type` が無い画像オブジェクトは Studio が描画できないため)。
  */
 
 export type SanityDocLike = Record<string, unknown> & {
@@ -75,13 +88,25 @@ export interface UpsertCapableClient {
  * `_type` や `_ref` を持つものは Sanity の値オブジェクト (slug / image /
  * reference) なので展開せず丸ごと置き換える。
  */
-function isMergeableObject(value: unknown): value is Record<string, unknown> {
+function isPlainObject(value: unknown): value is Record<string, unknown> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     return false;
   }
   const proto = Object.getPrototypeOf(value);
-  if (proto !== Object.prototype && proto !== null) return false;
+  return proto === Object.prototype || proto === null;
+}
+
+function isMergeableObject(value: unknown): value is Record<string, unknown> {
+  if (!isPlainObject(value)) return false;
   return !("_type" in value) && !("_ref" in value) && !("_key" in value);
+}
+
+/**
+ * Sanity の画像フィールドか。`hotspot` / `crop` を巻き添えで消さないために
+ * ドットパス展開する対象 (理由はファイル冒頭のコメント)。
+ */
+function isImageObject(value: unknown): value is Record<string, unknown> {
+  return isPlainObject(value) && value._type === "image" && !("_key" in value);
 }
 
 /**
@@ -101,6 +126,20 @@ export function planNotionUpsert(doc: SanityDocLike): UpsertPlan {
   for (const [key, value] of Object.entries(rest)) {
     // undefined は「Notion が値を持っていない」= 触らない、を意味する。
     if (value === undefined) continue;
+
+    if (isImageObject(value)) {
+      // `_type` 以外のサブフィールドだけをドットパスで書く。
+      // doc に載っていない `hotspot` / `crop` には触れない = 消えない。
+      const entries = Object.entries(value).filter(
+        ([sub, subValue]) => sub !== "_type" && subValue !== undefined
+      );
+      // 親が無ければ `_type` だけの器を作る (中身は下の set が入れる)。
+      setIfMissing[key] = { _type: "image" };
+      for (const [sub, subValue] of entries) {
+        set[`${key}.${sub}`] = subValue;
+      }
+      continue;
+    }
 
     if (isMergeableObject(value)) {
       // 空オブジェクトは触らない (親だけ作っても意味がない)。
