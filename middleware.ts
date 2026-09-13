@@ -7,8 +7,9 @@ import {
 } from "./lib/auth/cookies";
 import { env } from "./lib/config";
 import { routing } from "./i18n/routing";
-import { defaultLocale, disabledLocales, locales } from "./i18n/config";
+import { defaultLocale, disabledLocales } from "./i18n/config";
 import pageVisibility from "./config/page-visibility.json";
+import { buildVisibilityIndex, lookupVisibility } from "./lib/page-visibility";
 
 const intlMiddleware = createMiddleware(routing);
 
@@ -48,55 +49,16 @@ const DISABLED_LOCALE_PREFIX =
  * 分岐を参照)。`scripts/check-page-visibility.ts` が build の前段で
  * 「app/ の実ルートは全部宣言にあること」を強制するので、実在するページが
  * 宣言から漏れた状態はそもそもデプロイできない。
- */
-const LOCALE_PREFIX = new RegExp(`^/(?:${locales.join("|")})(?=/|$)`);
-
-/** 静的ルート (`/journal` 等) の公開可否。 */
-const VISIBILITY_STATIC = new Map<string, boolean>(
-  pageVisibility.routes
-    .filter((entry) => !entry.route.includes("["))
-    .map((entry) => [entry.route, entry.visible] as const),
-);
-
-/** 動的ルート (`/journal/[slug]` 等) の公開可否。セグメントに割ってから照合する。 */
-const VISIBILITY_DYNAMIC = pageVisibility.routes
-  .filter((entry) => entry.route.includes("["))
-  .map((entry) => ({
-    segments: entry.route.split("/").filter(Boolean),
-    visible: entry.visible,
-  }));
-
-/**
- * この path の公開可否を引く。`undefined` は「宣言に無い」= 未登録。
  *
- * locale 接頭辞は外してから引く (`/ja/journal` と `/journal` は宣言の同じ 1 行が
- * 受け持つ)。静的な宣言を先に見るので、`/journal/category` は
- * `/journal/[slug]` ではなく自分の行に当たる。
+ * ## 判定の実体は `lib/page-visibility.ts`
+ *
+ * ここが持つのは「実物の宣言」だけで、引き方 (locale 接頭辞を外す / 静的を動的より
+ * 先に見る) は宣言を引数で受け取る純粋関数に出してある。middleware の中に判定を
+ * 置いたままだと、判定を確かめるのに宣言 JSON をモジュールごと差し替えるしかなく、
+ * その差し替えがテストランナーの内部事情で間に合わないことがあった (詳細は
+ * `lib/page-visibility.ts` の冒頭)。索引は起動時に 1 回だけ組む。
  */
-function lookupVisibility(pathname: string): boolean | undefined {
-  const stripped = pathname.replace(LOCALE_PREFIX, "");
-  const normalized =
-    stripped === ""
-      ? "/"
-      : stripped.length > 1 && stripped.endsWith("/")
-        ? stripped.slice(0, -1)
-        : stripped;
-
-  const exact = VISIBILITY_STATIC.get(normalized);
-  if (exact !== undefined) return exact;
-
-  const segments = normalized.split("/").filter(Boolean);
-  for (const candidate of VISIBILITY_DYNAMIC) {
-    if (candidate.segments.length !== segments.length) continue;
-    const matched = candidate.segments.every(
-      (segment, i) =>
-        (segment.startsWith("[") && segment.endsWith("]")) || segment === segments[i],
-    );
-    if (matched) return candidate.visible;
-  }
-
-  return undefined;
-}
+const VISIBILITY_INDEX = buildVisibilityIndex(pageVisibility.routes);
 
 const SITE_PASSWORD = env("SITE_PASSWORD");
 
@@ -353,7 +315,7 @@ export default async function middleware(request: NextRequest) {
    * 公開なのでこの分岐は本番で一度も走らず、実害は無い。実際に非公開にする
    * ページが出る段で、両者を同じ 404 に揃える。
    */
-  const visibility = lookupVisibility(pathname);
+  const visibility = lookupVisibility(VISIBILITY_INDEX, pathname);
   if (visibility === false) {
     return new NextResponse("Not Found", {
       status: 404,

@@ -12,21 +12,61 @@
  *   4. 宣言そのものが **現状と等価** — Step 1 は仕組みを入れるだけで、
  *      どのページを出すかは変えない、という約束の機械的な裏取り。
  *
- * `middleware.ts` は `SITE_PASSWORD` / `VERCEL_ENV` と公開宣言を**モジュール
- * 読み込み時**に読む。したがって差し替えるたびに `vi.resetModules()` してから
- * 動的 import する。import 文で済ませると全ケースが最初の状態を共有する。
+ * ## テストの組み方 (2026-09-14 — 不安定だったのを直した)
+ *
+ * 初版は全ケースを middleware 経由で確かめていた。`middleware.ts` は宣言を
+ * **モジュール読み込み時**に読むので、宣言を変えるたびに `vi.resetModules()` →
+ * `vi.doMock(JSON)` → 動的 import、という手順を踏んでいた。この `vi.doMock` は
+ * 登録時にモジュール ID の解決を挟むため、直後の import に**間に合わないことが
+ * ある**。間に合わないと実物の宣言 (全ルート公開) が読まれ、非公開を期待した
+ * ケースだけが 200 を返して落ちる。QA 実測で 10 回中 2 回再現した。
+ *
+ * そこで判定を `lib/page-visibility.ts` の**純粋関数**に出し、引き方の検証は
+ * モックを一切使わずそこで行う (下の「判定そのもの」)。middleware を読み直すのは
+ * 「既存ゲートとの順番」を見るケースだけに絞り、そこでも `vi.doMock` ではなく
+ * **ファイル先頭で 1 回だけ登録する `vi.mock` + 可変 state** にした。登録が
+ * import より後になりようがないので、差し替えが間に合わない状態が起き得ない。
  */
+import { readFileSync } from "node:fs";
+
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { NextRequest, NextResponse } from "next/server";
 
-import realVisibility from "@/config/page-visibility.json";
 import {
+  buildVisibilityIndex,
+  lookupVisibility,
+  type PageVisibilityDeclaration,
+} from "@/lib/page-visibility";
+import {
+  MANIFEST_PATH,
   diffRoutes,
   listRouteFiles,
   toUrlPath,
   validateManifest,
   type PageVisibilityManifest,
 } from "@/scripts/check-page-visibility";
+
+/**
+ * middleware が読む宣言の差し替え口。
+ *
+ * `vi.mock` はファイル先頭へ巻き上げられて **import より前に** 登録されるので、
+ * 「モックが間に合わない」状態が原理的に起きない。中身は `vi.hoisted` の可変
+ * state を getter 越しに返すだけなので、各ケースは state を書き換えてから
+ * middleware を読み直せばよい。
+ *
+ * このモックは `import ... from "@/config/page-visibility.json"` にだけ効く。
+ * 実物の宣言を検査する describe は `readFileSync` で読むので影響を受けない
+ * (`scripts/check-page-visibility.ts` も同じくファイルとして読む)。
+ */
+const visibilityState = vi.hoisted(() => ({
+  routes: [] as { route: string; visible: boolean }[],
+}));
+
+vi.mock("@/config/page-visibility.json", () => ({
+  get default() {
+    return { version: 1, routes: visibilityState.routes, outOfScope: [] };
+  },
+}));
 
 /**
  * i18n 層だけをスタブする。理由は middleware-site-password.test.ts と同じで、
@@ -40,12 +80,10 @@ vi.mock("next-intl/middleware", () => ({
   default: () => (_request: NextRequest) => NextResponse.next(),
 }));
 
-type Fixture = Pick<PageVisibilityManifest, "routes">;
-
 /** 宣言を差し替えたうえで middleware を読み直す。 */
 async function loadMiddleware(
-  fixture?: Fixture,
-  env: { sitePassword?: string; vercelEnv?: string; nodeEnv?: string } = {},
+  fixture: { routes: PageVisibilityDeclaration[] },
+  env: { sitePassword?: string; vercelEnv?: string } = {},
 ) {
   if (env.sitePassword === undefined) delete process.env.SITE_PASSWORD;
   else process.env.SITE_PASSWORD = env.sitePassword;
@@ -53,15 +91,9 @@ async function loadMiddleware(
   if (env.vercelEnv === undefined) delete process.env.VERCEL_ENV;
   else process.env.VERCEL_ENV = env.vercelEnv;
 
-  vi.resetModules();
-  if (fixture) {
-    vi.doMock("@/config/page-visibility.json", () => ({
-      default: { version: 1, routes: fixture.routes, outOfScope: [] },
-    }));
-  } else {
-    vi.doUnmock("@/config/page-visibility.json");
-  }
+  visibilityState.routes = fixture.routes;
 
+  vi.resetModules();
   const mod = await import("@/middleware");
   return mod.default;
 }
@@ -77,13 +109,67 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  vi.doUnmock("@/config/page-visibility.json");
+  visibilityState.routes = [];
   vi.resetModules();
   delete process.env.SITE_PASSWORD;
   delete process.env.VERCEL_ENV;
 });
 
-describe("非公開と宣言したページ", () => {
+/**
+ * 判定そのもの。middleware も宣言 JSON も通さないので、結果は宣言と path だけで
+ * 決まる (モック・モジュール読み込み順・実行環境に一切依存しない)。
+ */
+describe("判定そのもの (lib/page-visibility.ts)", () => {
+  const index = (routes: PageVisibilityDeclaration[]) => buildVisibilityIndex(routes);
+
+  it("locale 接頭辞の有無で答えが変わらない (宣言の 1 行が全 locale を受け持つ)", () => {
+    const i = index([{ route: "/journal", visible: false }]);
+    expect(lookupVisibility(i, "/ja/journal")).toBe(false);
+    expect(lookupVisibility(i, "/en/journal")).toBe(false);
+    expect(lookupVisibility(i, "/journal")).toBe(false);
+  });
+
+  it("動的ルートの型を 1 行で止められる", () => {
+    const i = index([{ route: "/products/[handle]", visible: false }]);
+    expect(lookupVisibility(i, "/ja/products/sencha-01")).toBe(false);
+    // セグメント数が違うものは食わない
+    expect(lookupVisibility(i, "/ja/products")).toBeUndefined();
+    expect(lookupVisibility(i, "/ja/products/sencha-01/reviews")).toBeUndefined();
+  });
+
+  it('トップ ("/") も止められる', () => {
+    const i = index([{ route: "/", visible: false }]);
+    expect(lookupVisibility(i, "/ja")).toBe(false);
+    expect(lookupVisibility(i, "/")).toBe(false);
+    expect(lookupVisibility(i, "/ja/")).toBe(false);
+  });
+
+  it("静的な宣言が動的な宣言より優先される (/journal/category は /journal/[slug] に食われない)", () => {
+    const i = index([
+      { route: "/journal/[slug]", visible: false },
+      { route: "/journal/category", visible: true },
+    ]);
+    expect(lookupVisibility(i, "/ja/journal/category")).toBe(true);
+    expect(lookupVisibility(i, "/ja/journal/anything-else")).toBe(false);
+  });
+
+  it("末尾スラッシュを同じ行として扱う", () => {
+    const i = index([{ route: "/journal", visible: true }]);
+    expect(lookupVisibility(i, "/ja/journal/")).toBe(true);
+  });
+
+  it("宣言に無い path は undefined (= 未登録。404 にするかは呼び出し側の判断)", () => {
+    const i = index([{ route: "/journal", visible: true }]);
+    expect(lookupVisibility(i, "/ja/totally-unknown")).toBeUndefined();
+  });
+
+  it("locale に見えるだけのセグメントを locale として落とさない (/entry)", () => {
+    const i = index([{ route: "/entry", visible: false }]);
+    expect(lookupVisibility(i, "/entry")).toBe(false);
+  });
+});
+
+describe("非公開と宣言したページ (middleware)", () => {
   it("404 を返す (locale 接頭辞あり)", async () => {
     const middleware = await loadMiddleware({
       routes: [{ route: "/journal", visible: false }],
@@ -100,40 +186,15 @@ describe("非公開と宣言したページ", () => {
     const res = await middleware(request(`${ORIGIN}/journal`));
     expect(res.status).toBe(404);
   });
-
-  it("動的ルートの型を 1 行で止められる", async () => {
-    const middleware = await loadMiddleware({
-      routes: [{ route: "/products/[handle]", visible: false }],
-    });
-    const res = await middleware(request(`${ORIGIN}/ja/products/sencha-01`));
-    expect(res.status).toBe(404);
-  });
-
-  it("トップ (\"/\") も止められる", async () => {
-    const middleware = await loadMiddleware({ routes: [{ route: "/", visible: false }] });
-    expect((await middleware(request(`${ORIGIN}/ja`))).status).toBe(404);
-    expect((await middleware(request(`${ORIGIN}/`))).status).toBe(404);
-  });
 });
 
-describe("公開と宣言したページ", () => {
+describe("公開と宣言したページ (middleware)", () => {
   it("404 にならない", async () => {
     const middleware = await loadMiddleware({
       routes: [{ route: "/journal", visible: true }],
     });
     const res = await middleware(request(`${ORIGIN}/ja/journal`));
     expect(res.status).not.toBe(404);
-  });
-
-  it("静的な宣言が動的な宣言より優先される (/journal/category は /journal/[slug] に食われない)", async () => {
-    const middleware = await loadMiddleware({
-      routes: [
-        { route: "/journal/[slug]", visible: false },
-        { route: "/journal/category", visible: true },
-      ],
-    });
-    expect((await middleware(request(`${ORIGIN}/ja/journal/category`))).status).not.toBe(404);
-    expect((await middleware(request(`${ORIGIN}/ja/journal/anything-else`))).status).toBe(404);
   });
 
   it("宣言に無い path は middleware が 404 を作らず Next に渡す (ブランドの 404 を残すため)", async () => {
@@ -191,13 +252,20 @@ describe("既存ゲートとの干渉", () => {
 });
 
 describe("宣言そのもの (config/page-visibility.json)", () => {
+  /**
+   * 上の `vi.mock` に掴まれないよう、実物はファイルとして読む
+   * (ビルドゲート `scripts/check-page-visibility.ts` が本番で読むのと同じ経路)。
+   */
+  const realVisibility = JSON.parse(
+    readFileSync(MANIFEST_PATH, "utf8"),
+  ) as PageVisibilityManifest;
+
   it("形が正しい", () => {
     expect(validateManifest(realVisibility)).toEqual([]);
   });
 
   it("app/ の実ルートと一致している (ビルドゲートと同じ判定)", () => {
-    const manifest = realVisibility as unknown as PageVisibilityManifest;
-    expect(diffRoutes(manifest, listRouteFiles())).toEqual([]);
+    expect(diffRoutes(realVisibility, listRouteFiles())).toEqual([]);
   });
 
   it("Step 1 の初期値は現状と等価 — 非公開にしたページは 1 つも無い", () => {
