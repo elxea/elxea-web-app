@@ -34,7 +34,8 @@ export type SiteSlotId =
   | "site:subscription:first-delivery-02"
   | "site:subscription:first-delivery-03"
   | "site:subscription:story-01"
-  | "site:subscription:next-month-01";
+  | "site:subscription:next-month-01"
+  | "site:social-share:og-image-01";
 
 /** 同じ集合を実行時にも使えるようにしたもの (order 昇順)。 */
 export const SITE_SLOT_IDS: readonly SiteSlotId[] = [
@@ -62,4 +63,5 @@ export const SITE_SLOT_IDS: readonly SiteSlotId[] = [
   "site:subscription:first-delivery-03",
   "site:subscription:story-01",
   "site:subscription:next-month-01",
+  "site:social-share:og-image-01",
 ] as const;

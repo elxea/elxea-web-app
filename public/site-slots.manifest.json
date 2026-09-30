@@ -437,6 +437,24 @@
           "fit": "cover"
         }
       ]
+    },
+    {
+      "id": "site:social-share:og-image-01",
+      "label": "SNS・LINE で共有したときのカードの写真 (トップ・About・一覧のページなど、自分の写真を持たないページの既定。商品・記事などは各自の写真が出る)",
+      "page": "social-share",
+      "required": false,
+      "order": 900,
+      "surfaces": [
+        {
+          "id": "og",
+          "label": "共有カード (1200x630)",
+          "ratio": {
+            "width": 1200,
+            "height": 630
+          },
+          "fit": "cover"
+        }
+      ]
     }
   ]
 }

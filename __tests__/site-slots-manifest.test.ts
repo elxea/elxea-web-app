@@ -21,7 +21,7 @@ import {
   validateSiteSlotsManifest,
   type SiteSlot,
 } from '@/lib/site-slots';
-import { scanSource } from '@/scripts/check-site-slots';
+import { mayUseSlots, scanSource } from '@/scripts/check-site-slots';
 
 const ROOT = path.resolve(__dirname, '..');
 const MANIFEST_PATH = path.join(ROOT, 'public', 'site-slots.manifest.json');
@@ -342,6 +342,33 @@ describe('scanSource — 何を「使用」と数えるか', () => {
     );
     expect(usages).toEqual([]);
     expect(dynamic).toHaveLength(1);
+  });
+});
+
+describe('scanSource — サーバ側で枠を読む呼び出し (getSiteImage / getSiteAsset)', () => {
+  it('枠 id の文字列リテラルで呼べば使用に数える', () => {
+    const { usages, dynamic } = scanSource(
+      'app/api/og-image/route.ts',
+      'const a = await getSiteAsset("site:social-share:og-image-01", "");\n' +
+        'const b = await getSiteImage(`site:top:hero-01`, "");',
+    );
+    expect(usages.map((u) => u.id)).toEqual(['site:social-share:og-image-01', 'site:top:hero-01']);
+    expect(dynamic).toEqual([]);
+  });
+
+  it('変数で呼ぶ呼び出し (SiteImage の中の getSiteImage(slotId, …)) は数えない。宣言に無い id は数えてゲートで落ちる', () => {
+    expect(scanSource('components/x.tsx', 'const r = await getSiteImage(slotId, src);').usages).toEqual([]);
+    expect(scanSource('lib/x.ts', 'getSiteAsset("site:nowhere:x-01", "")').usages.map((u) => u.id)).toEqual([
+      'site:nowhere:x-01',
+    ]);
+  });
+
+  it('足切り: slotId も呼び出しも無いファイルだけを飛ばす', () => {
+    expect(mayUseSlots('export const x = 1;')).toBe(false);
+    expect(mayUseSlots('<SiteImage slotId="site:top:hero-01" />')).toBe(true);
+    expect(mayUseSlots('await getSiteAsset("site:social-share:og-image-01", "")')).toBe(true);
+    // 関数の名前を言うだけ (呼ばない) では対象にしない。
+    expect(mayUseSlots('// getSiteAsset を使う')).toBe(false);
   });
 });
 

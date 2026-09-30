@@ -16,7 +16,7 @@ import { AudioDock } from "@/components/audio/audio-dock";
 import { sanityFetch } from "@/sanity/lib/fetch";
 import { SITE_SETTINGS_QUERY } from "@/sanity/lib/queries";
 import { env } from "@/lib/config";
-import { OG_IMAGE, ogImages } from "@/lib/og-image";
+import { OG_DEFAULT_IMAGE_URL, ogImages } from "@/lib/og-image";
 
 export const metadata: Metadata = {
   title: {
@@ -44,7 +44,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    images: [OG_IMAGE.url],
+    images: [OG_DEFAULT_IMAGE_URL],
   },
   other: {
     "theme-color": "#333333",

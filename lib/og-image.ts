@@ -59,6 +59,15 @@ export const OG_IMAGE = {
   alt: "elxea — Single-Origin Japanese Tea",
 } as const;
 
+/**
+ * 既定の共有カードの画像枠 (public/site-slots.manifest.json)。Asset hub の「サイトに出す」から
+ * 写真を入れて配信すると、`/api/og-image` がその切り抜きを返す。当たっていなければ OG_IMAGE。
+ */
+export const OG_SLOT_ID = "site:social-share:og-image-01" as const;
+
+/** 既定の共有カードの URL。`app/api/og-image/route.ts` が枠の写真か OG_IMAGE を返す。 */
+export const OG_DEFAULT_IMAGE_URL = "/api/og-image";
+
 /** `openGraph.images` に渡せる型 (Next.js の `Metadata["openGraph"]["images"]`)。 */
 type OgImages = NonNullable<NonNullable<Metadata["openGraph"]>["images"]>;
 
@@ -69,5 +78,5 @@ type OgImages = NonNullable<NonNullable<Metadata["openGraph"]>["images"]>;
  *            **空配列を返すことはない** — 空配列は og:image を消すため。
  */
 export function ogImages(url?: string | null): OgImages {
-  return url ? [{ url }] : [{ ...OG_IMAGE }];
+  return url ? [{ url }] : [{ ...OG_IMAGE, url: OG_DEFAULT_IMAGE_URL }];
 }

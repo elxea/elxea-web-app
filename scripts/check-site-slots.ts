@@ -54,6 +54,20 @@ const SCAN_EXTENSIONS = new Set(['.ts', '.tsx']);
  */
 const SLOT_ID_ATTRIBUTE = 'slotId';
 
+/**
+ * サーバ側で枠を読む関数 (lib/site-assets)。JSX の SiteImage を持たない枠 (例: 既定の共有カード
+ * app/api/og-image/route.ts) は、これを枠 id の文字列リテラルで呼ぶことが「使用」になる。
+ */
+const SLOT_READ_CALLS: readonly string[] = ['getSiteImage', 'getSiteAsset'];
+
+/**
+ * AST を組む前の足切り。slotId 属性も、枠を読む関数の呼び出しも出てこないファイルは対象外。
+ * (以前は slotId だけを見ていたので、呼び出しだけで枠を使うファイルは読まれもしなかった)
+ */
+export function mayUseSlots(source: string): boolean {
+  return source.includes(SLOT_ID_ATTRIBUTE) || SLOT_READ_CALLS.some((n) => source.includes(`${n}(`));
+}
+
 interface Usage {
   id: string;
   file: string;
@@ -86,6 +100,18 @@ export function scanSource(
     sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1;
 
   const visit = (node: ts.Node): void => {
+    // サーバ側で枠を読む呼び出し getSiteImage("site:...") / getSiteAsset("site:...") も使用に数える
+    // (JSX の SiteImage を持たない枠。例: 既定の共有カード app/api/og-image/route.ts)。
+    // 文字列リテラルの id だけを数え、変数の呼び出しは数えない (dynamic にもしない)。
+    if (
+      ts.isCallExpression(node) &&
+      ts.isIdentifier(node.expression) &&
+      SLOT_READ_CALLS.includes(node.expression.text) &&
+      node.arguments.length > 0 &&
+      (ts.isStringLiteral(node.arguments[0]) || ts.isNoSubstitutionTemplateLiteral(node.arguments[0]))
+    ) {
+      usages.push({ id: (node.arguments[0] as ts.StringLiteral).text, file, line: lineOf(node) });
+    }
     if (
       ts.isJsxAttribute(node) &&
       ts.isIdentifier(node.name) &&
@@ -147,8 +173,7 @@ export function scanUsages(root: string = ROOT): {
   for (const dir of SCAN_DIRS) {
     for (const file of listSourceFiles(path.join(root, dir))) {
       const source = readFileSync(file, 'utf8');
-      // AST を組む前の足切り。slotId という語が 1 度も出ないファイルは対象外。
-      if (!source.includes(SLOT_ID_ATTRIBUTE)) continue;
+      if (!mayUseSlots(source)) continue;
       const found = scanSource(file, source);
       usages.push(...found.usages);
       dynamic.push(...found.dynamic);

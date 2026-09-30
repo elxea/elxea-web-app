@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 
-import { OG_IMAGE, ogImages } from "@/lib/og-image";
+import { OG_DEFAULT_IMAGE_URL, OG_IMAGE, ogImages } from "@/lib/og-image";
 
 /**
  * 共有カード画像 (og:image) が消えないことを守る検査。
@@ -178,12 +178,12 @@ describe("og:image のフォールバック", () => {
 
 describe("ogImages()", () => {
   it("引数なしなら既定の 1 枚を返す (空配列を返さない)", () => {
-    expect(ogImages()).toEqual([{ ...OG_IMAGE }]);
+    expect(ogImages()).toEqual([{ ...OG_IMAGE, url: OG_DEFAULT_IMAGE_URL }]);
   });
 
   it("undefined / null / 空文字も既定に落とす", () => {
     for (const value of [undefined, null, ""] as const) {
-      expect(ogImages(value)).toEqual([{ ...OG_IMAGE }]);
+      expect(ogImages(value)).toEqual([{ ...OG_IMAGE, url: OG_DEFAULT_IMAGE_URL }]);
     }
   });
 
