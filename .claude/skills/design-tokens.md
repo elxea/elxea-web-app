@@ -6,7 +6,7 @@ elxea デザインシステムのトークン編集・ビルド・検証を行�
 
 ```
 tokens/
-  base.json              ← 正本（W3C DTCG 形式、9カテゴリ、250+ トークン）
+  base.json              ← Figmaの値の写し（正本はFigma。figma-sync.md）。W3C DTCG形式、9カテゴリ、250+ トークン
   overrides/
     cjk.json             ← 日本語タイポグラフィオーバーライド
 dist/
@@ -81,7 +81,7 @@ pnpm diff:tokens HEAD~3   # vs 3コミット前
 
 ## トークン変更手順
 
-1. `tokens/base.json` を編集
+1. Figmaで値を直す → 書き出し（Variable Exporter）で `tokens/base.json` に写す（詳しい手順はfigma-sync.mdの「ワークフロー」の2）
 2. `pnpm validate:tokens` で整合性チェック
 3. `pnpm build:tokens` で CSS 再生成
 4. `pnpm design-catalog` で視覚確認（elxea Design System カタログの Active Components ページ）
