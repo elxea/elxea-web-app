@@ -33,6 +33,8 @@ import path from 'node:path';
 import { extractImageSlots } from './lib/image-slots-extract';
 import type { ImageSlot } from './lib/image-slots-extract';
 import { INVENTORY_PATH, SCHEMA_DIR } from './gen-image-slots';
+import { SANITY_SLOT_SURFACES } from '../lib/sanity-image-surfaces';
+import type { SlotSurface } from '../lib/sanity-image-surfaces';
 
 const ROOT = path.resolve(__dirname, '..');
 
@@ -43,6 +45,7 @@ interface RawSlot {
   file?: unknown;
   rendered?: unknown;
   note?: unknown;
+  surfaces?: unknown;
 }
 
 /** inventory の形だけを見る (スキーマとの突き合わせは別)。 */
@@ -79,6 +82,35 @@ export function validateInventoryShape(raw: unknown): string[] {
     }
     if (typeof s.note !== 'string') errors.push(`${at}: note が文字列でない (${s.id})`);
   });
+  return errors;
+}
+
+/**
+ * 宣言の `surfaces` (主な表示の比) が正本 (lib/sanity-image-surfaces.ts。描画のコードが
+ * 切り抜きに使う幅と高さ) と同じかを見る。ずれると Asset hub が別の比の窓で位置を
+ * Sanity の hotspot に写し、サイトの切り抜きが Asset hub の見本と食い違う。
+ */
+export function diffSurfaces(
+  fromInventory: RawSlot[],
+  expected: Readonly<Record<string, readonly SlotSurface[]>> = SANITY_SLOT_SURFACES,
+): string[] {
+  const errors: string[] = [];
+  const ids = new Set(fromInventory.map((s) => String(s.id)));
+  for (const id of Object.keys(expected)) {
+    if (!ids.has(id)) errors.push(`lib/sanity-image-surfaces.ts に ${id} があるが inventory に無い`);
+  }
+  for (const s of fromInventory) {
+    const id = String(s.id);
+    const want = expected[id];
+    const got = s.surfaces;
+    if (got === undefined && want === undefined) continue;
+    if (JSON.stringify(got ?? null) !== JSON.stringify(want ?? null)) {
+      errors.push(
+        `${id}: surfaces が lib/sanity-image-surfaces.ts と違う ` +
+          `(inventory=${JSON.stringify(got ?? null)} / 正本=${JSON.stringify(want ?? null)})`,
+      );
+    }
+  }
   return errors;
 }
 
@@ -133,7 +165,7 @@ function main(): void {
 
   const fromInventory = (raw as { slots: RawSlot[] }).slots;
   const fromSchema = extractImageSlots(SCHEMA_DIR, ROOT);
-  const errors = diffSlots(fromSchema, fromInventory);
+  const errors = [...diffSlots(fromSchema, fromInventory), ...diffSurfaces(fromInventory)];
   if (errors.length > 0) fail(errors);
 
   const unjudged = fromInventory.filter((s) => s.rendered === null).map((s) => String(s.id));

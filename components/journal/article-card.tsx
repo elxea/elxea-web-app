@@ -5,6 +5,7 @@ import { bodySmClass, captionClass } from "@/components/editorial/rule-list";
 import { formatArticleDate } from "@/lib/format-date";
 import { previewSeedEnabled, previewImageForKey } from "@/lib/preview-seed";
 import { cn } from "@/lib/utils";
+import { ARTICLE_CARD_IMAGE } from "@/lib/sanity-image-surfaces";
 
 /**
  * ArticleCard — Figma `ArticleCard — elxea/Journal S3` (実測 8073:45001)。
@@ -84,7 +85,7 @@ export function ArticleCard({
   // Preview-only: articles without imagery fall back to a stable local
   // placeholder photo so cards render at layout density. No effect when unset.
   const resolvedImage = image?.asset
-    ? urlFor(image).width(600).height(400).url()
+    ? urlFor(image).width(ARTICLE_CARD_IMAGE.width).height(ARTICLE_CARD_IMAGE.height).url()
     : previewSeedEnabled()
       ? previewImageForKey(article._id)
       : undefined;
