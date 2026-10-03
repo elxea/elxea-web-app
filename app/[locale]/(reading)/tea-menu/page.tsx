@@ -22,6 +22,7 @@ import {
   MoreRow,
 } from "@/components/catalog/catalog-list";
 import { ogImages } from "@/lib/og-image";
+import { TEA_MENU_CARD_IMAGE } from "@/lib/sanity-image-surfaces";
 
 /**
  * お茶メニュー — Figma【R2: 確定版】共通リストパターン
@@ -208,7 +209,12 @@ async function TeaMenuList({ params }: { params: SearchParams }) {
             key={item._id}
             href={`/tea-menu/${item.slug.current}`}
             image={
-              item.photo?.asset ? urlFor(item.photo).width(600).height(400).url() : undefined
+              item.photo?.asset
+                ? urlFor(item.photo)
+                    .width(TEA_MENU_CARD_IMAGE.width)
+                    .height(TEA_MENU_CARD_IMAGE.height)
+                    .url()
+                : undefined
             }
             imageAlt={item.photo?.alt || item.displayName}
             imageStyle={item.color ? { backgroundColor: item.color } : undefined}

@@ -6,7 +6,8 @@
  *   pnpm generate:image-slots   ... 生成 (スキーマに画像枠を足したら必ず走らせる)
  *   pnpm check:image-slots      ... 一致検査 (build の前段でも走る / 不一致なら exit 1)
  *
- * 手で書く場所は各枠の `rendered` と `note` の 2 つだけ。枠の集合そのものは
+ * 手で書く場所は各枠の `rendered` と `note` の 2 つだけ。`surfaces` (主な表示の比) は
+ * lib/sanity-image-surfaces.ts (描画のコードが切り抜きに使う幅と高さ) から写す。枠の集合そのものは
  * スキーマが唯一の正本で、ここは**写し取るだけ**。再生成しても既存の
  * `rendered` / `note` は id で引き当てて引き継ぐ (人の判断を消さない)。
  *
@@ -29,6 +30,8 @@ import path from 'node:path';
 
 import { extractImageSlots } from './lib/image-slots-extract';
 import type { ImageSlot } from './lib/image-slots-extract';
+import { SANITY_SLOT_SURFACES } from '../lib/sanity-image-surfaces';
+import type { SlotSurface } from '../lib/sanity-image-surfaces';
 
 const ROOT = path.resolve(__dirname, '..');
 export const SCHEMA_DIR = path.join(ROOT, 'sanity', 'schemas');
@@ -39,6 +42,8 @@ export interface InventorySlot extends ImageSlot {
   rendered: boolean | null;
   /** 判断の根拠 (file:line 等)。人が書く。 */
   note: string;
+  /** 主な表示の比 (surfaces[0] が一覧)。lib/sanity-image-surfaces.ts から写す。無い枠は持たない。 */
+  surfaces?: readonly SlotSurface[];
 }
 
 export interface Inventory {
@@ -52,7 +57,8 @@ const DESCRIPTION =
   'Sanity スキーマ上の画像枠の全数。集合の正本は sanity/schemas/*.ts で、' +
   'このファイルはそこから機械生成する (pnpm generate:image-slots)。' +
   'rendered / note だけが手書き。巡回 (photo-gap-scan) はこれを読み、' +
-  '経路1-5 のどれもカバーしていない枠を uncovered-slot として報告する。';
+  '経路1-5 のどれもカバーしていない枠を uncovered-slot として報告する。' +
+  'surfaces (主な表示の比) は lib/sanity-image-surfaces.ts (描画のコードの切り抜きの幅と高さ) から写す。';
 
 /** 既存 inventory から id -> {rendered, note} を引く (無ければ空)。 */
 export function readAnnotations(
@@ -77,6 +83,7 @@ export function readAnnotations(
 export function buildInventory(
   slots: ImageSlot[],
   annotations: Map<string, { rendered: boolean | null; note: string }>,
+  surfaces: Readonly<Record<string, readonly SlotSurface[]>> = SANITY_SLOT_SURFACES,
 ): Inventory {
   return {
     $schema: 'https://elxea.com/image-slots.inventory.json',
@@ -84,7 +91,13 @@ export function buildInventory(
     generatedBy: 'pnpm generate:image-slots',
     slots: slots.map((s) => {
       const a = annotations.get(s.id);
-      return { ...s, rendered: a?.rendered ?? null, note: a?.note ?? '' };
+      const own = surfaces[s.id];
+      return {
+        ...s,
+        rendered: a?.rendered ?? null,
+        note: a?.note ?? '',
+        ...(own ? { surfaces: own.map((x) => ({ ...x, ratio: { ...x.ratio } })) } : {}),
+      };
     }),
   };
 }

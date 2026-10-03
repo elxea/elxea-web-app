@@ -1,6 +1,6 @@
 {
   "$schema": "https://elxea.com/image-slots.inventory.json",
-  "description": "Sanity スキーマ上の画像枠の全数。集合の正本は sanity/schemas/*.ts で、このファイルはそこから機械生成する (pnpm generate:image-slots)。rendered / note だけが手書き。巡回 (photo-gap-scan) はこれを読み、経路1-5 のどれもカバーしていない枠を uncovered-slot として報告する。",
+  "description": "Sanity スキーマ上の画像枠の全数。集合の正本は sanity/schemas/*.ts で、このファイルはそこから機械生成する (pnpm generate:image-slots)。rendered / note だけが手書き。巡回 (photo-gap-scan) はこれを読み、経路1-5 のどれもカバーしていない枠を uncovered-slot として報告する。surfaces (主な表示の比) は lib/sanity-image-surfaces.ts (描画のコードの切り抜きの幅と高さ) から写す。",
   "generatedBy": "pnpm generate:image-slots",
   "slots": [
     {
@@ -217,7 +217,18 @@
       "path": "albumImage",
       "file": "sanity/schemas/playlist.ts",
       "rendered": true,
-      "note": "音盤で描画。巡回 経路4 がカバー済み"
+      "note": "音盤で描画。巡回 経路4 がカバー済み",
+      "surfaces": [
+        {
+          "id": "list",
+          "label": "プレイリスト一覧のカード (ArticleCard。特集の 1 件を除く全件)",
+          "ratio": {
+            "width": 600,
+            "height": 400
+          },
+          "fit": "cover"
+        }
+      ]
     },
     {
       "id": "sanity:playlist:body[].ctaBlock.image",
@@ -249,7 +260,18 @@
       "path": "photo",
       "file": "sanity/schemas/teaMenu.ts",
       "rendered": true,
-      "note": "お茶メニューで描画。巡回 経路4 がカバー済み"
+      "note": "お茶メニューで描画。巡回 経路4 がカバー済み",
+      "surfaces": [
+        {
+          "id": "list",
+          "label": "お茶メニュー一覧のカード (CatalogCard)",
+          "ratio": {
+            "width": 600,
+            "height": 400
+          },
+          "fit": "cover"
+        }
+      ]
     },
     {
       "id": "sanity:teaMenu:seo.ogImage",
