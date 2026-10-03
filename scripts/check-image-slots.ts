@@ -14,7 +14,9 @@
  *   (b) inventory にあるのにスキーマから消えた
  *       → 巡回は存在しない枠を探し続け、報告が実体とずれる。
  *
- * あわせて inventory 自体の妥当性 (id の組み立て方・rendered の型・id 昇順) も見る。
+ * あわせて inventory 自体の妥当性 (id の組み立て方・rendered の型・id 昇順・書き方の版・
+ * area と alt。描画される枠は両方が要る・1 つの文書の型の場所は 1 つ) と、スキーマから
+ * 作り直した inventory と中身が同じこと (手書きの欄は id で引き継ぐ) も見る。
  * どれか 1 つでも崩れていれば exit 1。
  *
  * 直し方は常に同じ: `pnpm generate:image-slots` を走らせ、新しく `rendered: null`
@@ -30,9 +32,17 @@
 import { readFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
 
+import {
+  IMAGE_SLOTS_FORMAT,
+  IMAGE_SLOT_ALT_RECIPES,
+  canonicalJson,
+  isImageSlotAltRecipe,
+  isImageSlotArea,
+} from '../lib/image-slots-v2';
+
 import { extractImageSlots } from './lib/image-slots-extract';
 import type { ImageSlot } from './lib/image-slots-extract';
-import { INVENTORY_PATH, SCHEMA_DIR } from './gen-image-slots';
+import { INVENTORY_PATH, SCHEMA_DIR, annotationsOf, buildInventory } from './gen-image-slots';
 
 const ROOT = path.resolve(__dirname, '..');
 
@@ -42,6 +52,8 @@ interface RawSlot {
   path?: unknown;
   file?: unknown;
   rendered?: unknown;
+  area?: unknown;
+  alt?: unknown;
   note?: unknown;
 }
 
@@ -51,6 +63,12 @@ export function validateInventoryShape(raw: unknown): string[] {
   if (typeof raw !== 'object' || raw === null) return ['inventory はオブジェクトではない'];
   const slots = (raw as { slots?: unknown }).slots;
   if (!Array.isArray(slots)) return ['inventory に slots[] が無い'];
+  const format = (raw as { format?: unknown }).format;
+  if (format !== IMAGE_SLOTS_FORMAT) {
+    errors.push(`format が ${IMAGE_SLOTS_FORMAT} でない (${JSON.stringify(format)})`);
+  }
+  /** 1 つの文書の型の場所は 1 つ (asset-hub は文書を 1 つの単位で書く)。 */
+  const areaOfType = new Map<string, { area: string; id: string }>();
 
   const seen = new Set<string>();
   let previousId = '';
@@ -78,6 +96,36 @@ export function validateInventoryShape(raw: unknown): string[] {
       errors.push(`${at}: rendered は true / false / null のいずれか (${s.id})`);
     }
     if (typeof s.note !== 'string') errors.push(`${at}: note が文字列でない (${s.id})`);
+
+    if (!(s.area === null || isImageSlotArea(s.area))) {
+      errors.push(
+        `${at}: area は null か 英小文字・数字・ハイフンの場所の名前 (${s.id}: ${JSON.stringify(s.area)})`,
+      );
+    }
+    if (!(s.alt === null || isImageSlotAltRecipe(s.alt))) {
+      errors.push(
+        `${at}: alt は null か ${IMAGE_SLOT_ALT_RECIPES.join(' / ')} (${s.id}: ${JSON.stringify(s.alt)})`,
+      );
+    }
+    if (s.rendered === true) {
+      if (s.area === null || s.area === undefined) {
+        errors.push(`${at}: 描画される枠なのに area (入れた状態の場所) が無い (${s.id})`);
+      }
+      if (s.alt === null || s.alt === undefined) {
+        errors.push(`${at}: 描画される枠なのに alt (説明文の作り方) が無い (${s.id})`);
+      }
+    }
+    if (typeof s.documentType === 'string' && isImageSlotArea(s.area)) {
+      const first = areaOfType.get(s.documentType);
+      if (!first) {
+        areaOfType.set(s.documentType, { area: s.area, id: s.id });
+      } else if (first.area !== s.area) {
+        errors.push(
+          `${at}: 同じ文書の型 ${s.documentType} で area が分かれている ` +
+            `(${first.id}=${first.area} / ${s.id}=${s.area})`,
+        );
+      }
+    }
   });
   return errors;
 }
@@ -135,6 +183,15 @@ function main(): void {
   const fromSchema = extractImageSlots(SCHEMA_DIR, ROOT);
   const errors = diffSlots(fromSchema, fromInventory);
   if (errors.length > 0) fail(errors);
+
+  // 作り直した inventory (集合はスキーマ・手書きの欄は id で引き継ぐ) と中身が同じか。
+  const rebuilt = buildInventory(fromSchema, annotationsOf(raw));
+  if (canonicalJson(rebuilt) !== canonicalJson(raw)) {
+    fail([
+      `${path.relative(ROOT, INVENTORY_PATH)} をスキーマから作り直すと中身が変わる ` +
+        '(並び・説明・書き方の版・手書きでない欄を手で崩した) — pnpm generate:image-slots を走らせること',
+    ]);
+  }
 
   const unjudged = fromInventory.filter((s) => s.rendered === null).map((s) => String(s.id));
   console.log(

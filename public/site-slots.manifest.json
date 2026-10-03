@@ -1,20 +1,31 @@
 {
   "$comment": [
-    "site-slots.manifest.json — このサイトが持つ画像枠の宣言 (SoT / 単一正本)。",
+    "site-slots.manifest.json — このサイトが持つページの画像枠の宣言 (書き方 image-slots/v2)。",
     "",
-    "【この 1 ファイルだけを書き換える】",
-    "ページを足す・レイアウトを変えて写真枠が増減したら、編集するのはここだけ。",
+    "【枠の集合はコードから作る (2026-10-04 段3 U1)】",
+    "どの枠があるか (id の集合) の正本はコード — SiteImage の slotId と、サーバ側で枠を読む",
+    "getSiteImage / getSiteAsset の文字列リテラル。pnpm generate:site-slots がコードを読んで",
+    "このファイルを作り直す。手で書くのは各枠の属性 (label・area・alt・required・order・",
+    "surfaces・validFrom/To) だけで、作り直しても id で引き継がれる。新しい枠は属性が空の",
+    "まま入り、書くまで build が落ちる。",
     "asset-hub はこのファイルを URL で読み、載っている枠を『空き枠』として出す。",
     "asset-hub 側に枠定義を書かない (向きは サイトが宣言 → asset-hub が読む)。",
     "",
+    "【area と alt】",
+    "area は入れた状態の場所 (asset-hub の cdn/intake/<org>/<area>.json・INTAKE_AREAS の元)。",
+    "alt は説明文の作り方の名前 (ページの枠は code = SiteImage の alt をコードが持つ)。",
+    "決まりは lib/image-slots-v2.ts。届け先の種類の欄は持たない (枠の鍵の頭で決まる)。",
+    "",
     "【編集したら必ず】",
-    "  pnpm generate:site-slots   ... lib/site-slots.generated.ts (id の union 型) を作り直す",
-    "  pnpm check:site-slots      ... manifest とコードの突き合わせ (build の前段でも走る)",
+    "  pnpm generate:site-slots   ... このファイルと lib/site-slots.generated.ts (id の union 型) を作り直す",
+    "  pnpm check:site-slots      ... 宣言とコードの突き合わせ・作り直した物との一致 (build の前段でも走る)",
     "生成物を作り直さないと build が落ちる。落ちること自体がガード。",
     "",
     "【version は「スキーマの版」であって「中身の版」ではない (2026-09-01 訂正)】",
     "枠を足す・消す・比率を変えるだけでは version を上げない。据え置きが正しい。",
     "上げてよいのは『この JSON の書き方そのもの』を変えたとき (項目の追加・意味の変更) だけ。",
+    "ただし asset-hub が読まない鍵 (media・area・alt・format) を足すだけなら上げない。asset-hub は",
+    "未知の鍵を無視するので、上げると読めなくなるだけ (2026-10-04 段3 U1 は version 1 のまま)。",
     "",
     "ここには以前『slots に 1 件でも変更を入れたら version を +1 する』と書いてあったが、",
     "それに従うと本番が壊れる。読み手である asset-hub は version を **スキーマ版** として",
@@ -47,6 +58,7 @@
     "期間限定 LP・季節ページ用。省略時は常時有効。枠を消すときは slots から削るのでは",
     "なく validTo を入れて履歴を残すのが既定 (削ると asset-hub 側で割当が孤児になる)。"
   ],
+  "format": "image-slots/v2",
   "version": 1,
   "org": "ELX",
   "slots": [
@@ -54,6 +66,8 @@
       "id": "site:top:hero-01",
       "label": "トップ Hero (KV)",
       "page": "top",
+      "area": "top",
+      "alt": "code",
       "required": true,
       "order": 10,
       "surfaces": [
@@ -76,6 +90,8 @@
       "id": "site:top:leaf-liquor-01",
       "label": "トップ「葉と、水色」1 枚目 — 嬉野・釜炒り (丸くよれた茶葉マクロ + 澄んだ黄金色の水色。3 枚は画角・光源・背景・湯呑みを統一した同一シリーズで)",
       "page": "top",
+      "area": "top",
+      "alt": "code",
       "required": false,
       "order": 15,
       "surfaces": [
@@ -91,6 +107,8 @@
       "id": "site:top:leaf-liquor-02",
       "label": "トップ「葉と、水色」2 枚目 — 知覧・浅蒸し (針状に細くよられた茶葉 + 淡い若草色の水色。1 枚目と同一の画角・光・背景で)",
       "page": "top",
+      "area": "top",
+      "alt": "code",
       "required": false,
       "order": 16,
       "surfaces": [
@@ -106,6 +124,8 @@
       "id": "site:top:leaf-liquor-03",
       "label": "トップ「葉と、水色」3 枚目 — 川根・中蒸し (細かくくだけた茶葉 + とろりと濃い緑の水色。1・2 枚目と同一条件で)",
       "page": "top",
+      "area": "top",
+      "alt": "code",
       "required": false,
       "order": 17,
       "surfaces": [
@@ -121,6 +141,8 @@
       "id": "site:top:philosophy-01",
       "label": "トップ「OUR PHILOSOPHY」帯の背景写真",
       "page": "top",
+      "area": "top",
+      "alt": "code",
       "required": false,
       "order": 20,
       "surfaces": [
@@ -143,6 +165,8 @@
       "id": "site:top:overview-01",
       "label": "トップ「elxea でできること」1 枚目 (TEA)",
       "page": "top",
+      "area": "top",
+      "alt": "code",
       "required": false,
       "order": 30,
       "surfaces": [
@@ -158,6 +182,8 @@
       "id": "site:top:overview-02",
       "label": "トップ「elxea でできること」2 枚目 (JOURNAL)",
       "page": "top",
+      "area": "top",
+      "alt": "code",
       "required": false,
       "order": 40,
       "surfaces": [
@@ -173,6 +199,8 @@
       "id": "site:top:overview-03",
       "label": "トップ「elxea でできること」3 枚目 (EVENT)",
       "page": "top",
+      "area": "top",
+      "alt": "code",
       "required": false,
       "order": 50,
       "surfaces": [
@@ -188,6 +216,8 @@
       "id": "site:top:overview-04",
       "label": "トップ「elxea でできること」4 枚目 (ROJI)",
       "page": "top",
+      "area": "top",
+      "alt": "code",
       "required": false,
       "order": 60,
       "surfaces": [
@@ -203,6 +233,8 @@
       "id": "site:top:subscription-item-01",
       "label": "トップ 定期便 4 項目 1 枚目 (茶葉 3 種)",
       "page": "top",
+      "area": "top",
+      "alt": "code",
       "required": false,
       "order": 70,
       "surfaces": [
@@ -218,6 +250,8 @@
       "id": "site:top:subscription-item-02",
       "label": "トップ 定期便 4 項目 2 枚目 (淹れ方の栞)",
       "page": "top",
+      "area": "top",
+      "alt": "code",
       "required": false,
       "order": 80,
       "surfaces": [
@@ -233,6 +267,8 @@
       "id": "site:top:subscription-item-03",
       "label": "トップ 定期便 4 項目 3 枚目 (生産者の便り)",
       "page": "top",
+      "area": "top",
+      "alt": "code",
       "required": false,
       "order": 90,
       "surfaces": [
@@ -248,6 +284,8 @@
       "id": "site:top:subscription-item-04",
       "label": "トップ 定期便 4 項目 4 枚目 (お届け)",
       "page": "top",
+      "area": "top",
+      "alt": "code",
       "required": false,
       "order": 100,
       "surfaces": [
@@ -263,6 +301,8 @@
       "id": "site:about:us-01",
       "label": "About「01 わたしたちのこと」本文の隣の写真",
       "page": "about",
+      "area": "about",
+      "alt": "code",
       "required": false,
       "order": 110,
       "surfaces": [
@@ -285,6 +325,8 @@
       "id": "site:about:origin-01",
       "label": "About 産地タイル 1 枚目 (左上)",
       "page": "about",
+      "area": "about",
+      "alt": "code",
       "required": false,
       "order": 120,
       "surfaces": [
@@ -300,6 +342,8 @@
       "id": "site:about:origin-02",
       "label": "About 産地タイル 2 枚目",
       "page": "about",
+      "area": "about",
+      "alt": "code",
       "required": false,
       "order": 130,
       "surfaces": [
@@ -315,6 +359,8 @@
       "id": "site:about:origin-03",
       "label": "About 産地タイル 3 枚目",
       "page": "about",
+      "area": "about",
+      "alt": "code",
       "required": false,
       "order": 140,
       "surfaces": [
@@ -330,6 +376,8 @@
       "id": "site:about:origin-04",
       "label": "About 産地タイル 4 枚目",
       "page": "about",
+      "area": "about",
+      "alt": "code",
       "required": false,
       "order": 150,
       "surfaces": [
@@ -345,6 +393,8 @@
       "id": "site:about:philosophy-01",
       "label": "About「NO RIGHT ANSWER」帯の背景写真",
       "page": "about",
+      "area": "about",
+      "alt": "code",
       "required": false,
       "order": 160,
       "surfaces": [
@@ -367,6 +417,8 @@
       "id": "site:subscription:first-delivery-01",
       "label": "定期便LP「初回お届け」3 枚組 1 枚目",
       "page": "subscription",
+      "area": "subscription",
+      "alt": "code",
       "required": false,
       "order": 210,
       "surfaces": [
@@ -382,6 +434,8 @@
       "id": "site:subscription:first-delivery-02",
       "label": "定期便LP「初回お届け」3 枚組 2 枚目",
       "page": "subscription",
+      "area": "subscription",
+      "alt": "code",
       "required": false,
       "order": 220,
       "surfaces": [
@@ -397,6 +451,8 @@
       "id": "site:subscription:first-delivery-03",
       "label": "定期便LP「初回お届け」3 枚組 3 枚目",
       "page": "subscription",
+      "area": "subscription",
+      "alt": "code",
       "required": false,
       "order": 230,
       "surfaces": [
@@ -412,6 +468,8 @@
       "id": "site:subscription:story-01",
       "label": "定期便LP「語り」の正方形写真",
       "page": "subscription",
+      "area": "subscription",
+      "alt": "code",
       "required": false,
       "order": 240,
       "surfaces": [
@@ -427,6 +485,8 @@
       "id": "site:subscription:next-month-01",
       "label": "定期便LP「次月のお届け」の写真",
       "page": "subscription",
+      "area": "subscription",
+      "alt": "code",
       "required": false,
       "order": 250,
       "surfaces": [
@@ -442,16 +502,15 @@
       "id": "site:social-share:og-image-01",
       "label": "SNS・LINE で共有したときのカードの写真 (トップ・About・一覧のページなど、自分の写真を持たないページの既定。商品・記事などは各自の写真が出る)",
       "page": "social-share",
+      "area": "social-share",
+      "alt": "code",
       "required": false,
       "order": 900,
       "surfaces": [
         {
           "id": "og",
           "label": "共有カード (1200x630)",
-          "ratio": {
-            "width": 1200,
-            "height": 630
-          },
+          "ratio": { "width": 1200, "height": 630 },
           "fit": "cover"
         }
       ]
