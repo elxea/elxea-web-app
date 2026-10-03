@@ -7,7 +7,8 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 import { describe, expect, it } from 'vitest';
@@ -22,6 +23,14 @@ import {
   type SiteSlot,
 } from '@/lib/site-slots';
 import { mayUseSlots, scanSource } from '@/scripts/check-site-slots';
+import {
+  GENERATED_PATH,
+  buildManifest,
+  readSlotIds,
+  renderGenerated,
+  renderManifest,
+} from '@/scripts/gen-site-slots';
+import { scanUsages, usedSlotIds } from '@/scripts/lib/site-slots-scan';
 
 const ROOT = path.resolve(__dirname, '..');
 const MANIFEST_PATH = path.join(ROOT, 'public', 'site-slots.manifest.json');
@@ -41,12 +50,29 @@ function regenerate(): void {
   execFileSync('npx', ['tsx', 'scripts/gen-site-slots.ts'], { cwd: ROOT, stdio: 'ignore' });
 }
 
+/** 作り直し (gen-site-slots) を子プロセスで走らせ、終了コードと出力を返す。 */
+function runGenerate(): { code: number; output: string } {
+  try {
+    const output = execFileSync('npx', ['tsx', 'scripts/gen-site-slots.ts'], {
+      cwd: ROOT,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    return { code: 0, output };
+  } catch (err) {
+    const e = err as { status?: number; stdout?: string; stderr?: string };
+    return { code: e.status ?? 1, output: `${e.stdout ?? ''}${e.stderr ?? ''}` };
+  }
+}
+
 /** 検査を通る最小の枠。各テストがここから 1 か所だけ壊す。 */
 function validSlot(overrides: Partial<SiteSlot> = {}): SiteSlot {
   return {
     id: 'site:top:hero-01',
     label: 'トップ Hero',
     page: 'top',
+    area: 'top',
+    alt: 'code',
     required: true,
     order: 10,
     surfaces: [
@@ -57,7 +83,7 @@ function validSlot(overrides: Partial<SiteSlot> = {}): SiteSlot {
 }
 
 function validManifest(slots: SiteSlot[] = [validSlot()]) {
-  return { version: 1, org: 'ELX', slots };
+  return { format: 'image-slots/v2', version: 1, org: 'ELX', slots };
 }
 
 /** ゲートを子プロセスで走らせ、終了コードと出力を返す。 */
@@ -465,5 +491,206 @@ describe('check:site-slots ゲート (子プロセス実行)', () => {
     } finally {
       writeFileSync(MANIFEST_PATH, original, 'utf8');
     }
+  });
+});
+
+/**
+ * 段3 U1: 枠の集合はコードから作り、手書きの属性は id で引き継ぐ (image-slots/v2)。
+ * build の守りを壊して落ちること (足す・消す・名前を変える・属性を落とす・手で崩す) と、
+ * 作り直して差が 0 であることを確かめる。
+ */
+describe('image-slots/v2 — ページの枠の集合をコードから作る', () => {
+  it('リポジトリの宣言をコードから作り直すと 1 バイトも変わらない (差 0)', () => {
+    const file = readFileSync(MANIFEST_PATH, 'utf8');
+    const { usages, dynamic } = scanUsages(ROOT);
+    expect(dynamic).toEqual([]);
+    const { manifest, problems } = buildManifest(usedSlotIds(usages), JSON.parse(file));
+    expect(problems).toEqual([]);
+    expect(renderManifest(manifest)).toBe(file);
+    expect(renderGenerated(readSlotIds(MANIFEST_PATH))).toBe(readFileSync(GENERATED_PATH, 'utf8'));
+  });
+
+  it('全枠が area と alt を持ち、ページの枠の alt はコードが持つ (code)。version は 1 のまま', () => {
+    for (const slot of SITE_SLOTS) {
+      expect(slot.area, slot.id).toMatch(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
+      expect(slot.alt, slot.id).toBe('code');
+    }
+    expect(SITE_SLOTS_MANIFEST.format).toBe('image-slots/v2');
+    // version は asset-hub が読める上限 (1) と比べられる。欄を足しても上げない。
+    expect(SITE_SLOTS_MANIFEST.version).toBe(1);
+  });
+
+  it('宣言に exit (届け先の種類) の欄を持たない (段2設計のつなぎ J7)', () => {
+    for (const slot of SITE_SLOTS) expect(Object.keys(slot)).not.toContain('exit');
+  });
+
+  it('buildManifest: 手書きの属性は id で引き継ぎ、新しい枠は属性が空のまま入る', () => {
+    const prev = validManifest([validSlot()]);
+    const { manifest, problems } = buildManifest(['site:top:hero-01', 'site:top:new-01'], prev);
+    expect(problems).toEqual([]);
+    const slots = manifest.slots as SiteSlot[];
+    expect(slots[0]).toEqual(validSlot());
+    expect(slots[1]).toEqual({ id: 'site:top:new-01', page: 'top' });
+    expect(validateSiteSlotsManifest(manifest).join('\n')).toContain('slots[1]: label');
+  });
+
+  it('buildManifest: コードから消えた枠は validTo が無ければ problems に出し、宣言からは落とさない', () => {
+    const { manifest, problems } = buildManifest([], validManifest([validSlot()]));
+    expect(problems.join('\n')).toContain('site:top:hero-01');
+    expect((manifest.slots as SiteSlot[]).map((s) => s.id)).toEqual(['site:top:hero-01']);
+    const retired = buildManifest([], validManifest([validSlot({ validTo: '2026-01-31' })]));
+    expect(retired.problems).toEqual([]);
+  });
+
+  /**
+   * 壊し方の試験は一時の写し (public/・lib/・app/ だけ) で走らせる。本物の page.tsx や宣言を
+   * 書き換えると、並んで走るほかの試験がその瞬間のファイルを読んで揺れるため。
+   */
+  function makeFixture(): {
+    dir: string;
+    page: string;
+    manifest: string;
+    generated: string;
+    gate: () => { code: number; output: string };
+    generate: () => { code: number; output: string };
+  } {
+    const dir = mkdtempSync(path.join(tmpdir(), 'u1-site-slots-'));
+    for (const d of ['public', 'lib', 'app']) mkdirSync(path.join(dir, d));
+    const manifest = path.join(dir, 'public', 'site-slots.manifest.json');
+    const generated = path.join(dir, 'lib', 'site-slots.generated.ts');
+    const page = path.join(dir, 'app', 'page.tsx');
+    copyFileSync(MANIFEST_PATH, manifest);
+    copyFileSync(GENERATED_PATH, generated);
+    writeFileSync(
+      page,
+      SITE_SLOT_IDS.map((id, i) => `export const P${i} = () => <SiteImage slotId="${id}" />;`).join(
+        '\n',
+      ) + '\n',
+      'utf8',
+    );
+    const run = (script: string) => () => {
+      try {
+        const output = execFileSync('npx', ['tsx', script], {
+          cwd: ROOT,
+          encoding: 'utf8',
+          stdio: ['ignore', 'pipe', 'pipe'],
+          env: { ...process.env, SITE_SLOTS_ROOT: dir },
+        });
+        return { code: 0, output };
+      } catch (err) {
+        const e = err as { status?: number; stdout?: string; stderr?: string };
+        return { code: e.status ?? 1, output: `${e.stdout ?? ''}${e.stderr ?? ''}` };
+      }
+    };
+    return {
+      dir,
+      page,
+      manifest,
+      generated,
+      gate: run('scripts/check-site-slots.ts'),
+      generate: run('scripts/gen-site-slots.ts'),
+    };
+  }
+
+  function withFixture(body: (f: ReturnType<typeof makeFixture>) => void): void {
+    const f = makeFixture();
+    try {
+      body(f);
+    } finally {
+      rmSync(f.dir, { recursive: true, force: true });
+    }
+  }
+
+  it('写しは壊す前に検査を通り、作り直しても差 0 (試験の前提)', () => {
+    withFixture((f) => {
+      expect(f.gate().code).toBe(0);
+      const before = readFileSync(f.manifest, 'utf8');
+      expect(f.generate().code).toBe(0);
+      expect(readFileSync(f.manifest, 'utf8')).toBe(before);
+    });
+  });
+
+  it('[壊し方: 足す] コードに枠を足すと exit 1。作り直しても属性を書くまで exit 1', () => {
+    withFixture((f) => {
+      const originalGenerated = readFileSync(f.generated, 'utf8');
+      writeFileSync(
+        f.page,
+        `${readFileSync(f.page, 'utf8')}export const Probe = () => <SiteImage slotId="site:top:probe-01" />;\n`,
+        'utf8',
+      );
+      const before = f.gate();
+      expect(before.code).toBe(1);
+      expect(before.output).toContain('site:top:probe-01');
+
+      const gen = f.generate();
+      expect(gen.code).toBe(1);
+      expect(gen.output).toContain('属性の足りない枠');
+      // 宣言には骨だけ入り、union 型は作り直さない
+      expect(readFileSync(f.manifest, 'utf8')).toContain('site:top:probe-01');
+      expect(readFileSync(f.generated, 'utf8')).toBe(originalGenerated);
+
+      const after = f.gate();
+      expect(after.code).toBe(1);
+      expect(after.output).toContain('area');
+      expect(after.output).toContain('alt');
+    });
+  });
+
+  it('[壊し方: 消す] validTo なしでコードから消すと exit 1。作り直しは書かずに止まる', () => {
+    withFixture((f) => {
+      const [first, ...rest] = readFileSync(f.page, 'utf8').split('\n');
+      writeFileSync(f.page, rest.join('\n'), 'utf8');
+      const removed = /slotId="([^"]+)"/.exec(first)?.[1] ?? '';
+      const originalManifest = readFileSync(f.manifest, 'utf8');
+
+      const gate = f.gate();
+      expect(gate.code).toBe(1);
+      expect(gate.output).toContain(removed);
+
+      const gen = f.generate();
+      expect(gen.code).toBe(1);
+      expect(gen.output).toContain('validTo');
+      expect(readFileSync(f.manifest, 'utf8')).toBe(originalManifest);
+    });
+  });
+
+  it('[壊し方: 名前を変える] コードの枠の名前を変えると、古い名前と新しい名前の両方で exit 1', () => {
+    withFixture((f) => {
+      const oldId = SITE_SLOT_IDS[0];
+      const newId = `${oldId}-renamed`;
+      const source = readFileSync(f.page, 'utf8');
+      writeFileSync(f.page, source.replace(`slotId="${oldId}"`, `slotId="${newId}"`), 'utf8');
+      const { code, output } = f.gate();
+      expect(code).toBe(1);
+      expect(output).toContain(`"${oldId}"`);
+      expect(output).toContain(`"${newId}"`);
+    });
+  });
+
+  it.each(['area', 'alt', 'label', 'surfaces', 'order'] as const)(
+    '[壊し方: 属性を落とす] 宣言の 1 枠から %s を落とすと exit 1',
+    (key) => {
+      withFixture((f) => {
+        const parsed = JSON.parse(readFileSync(f.manifest, 'utf8')) as {
+          slots: Record<string, unknown>[];
+        };
+        delete parsed.slots[1][key];
+        writeFileSync(f.manifest, renderManifest(parsed), 'utf8');
+        const { code, output } = f.gate();
+        expect(code).toBe(1);
+        expect(output).toContain(key);
+      });
+    },
+  );
+
+  it('[壊し方: 手で並びを崩す] 作り直した物と中身が違えば exit 1', () => {
+    withFixture((f) => {
+      const parsed = JSON.parse(readFileSync(f.manifest, 'utf8')) as { slots: unknown[] };
+      [parsed.slots[0], parsed.slots[1]] = [parsed.slots[1], parsed.slots[0]];
+      writeFileSync(f.manifest, renderManifest(parsed), 'utf8');
+      const { code, output } = f.gate();
+      expect(code).toBe(1);
+      expect(output).toContain('作り直すと中身が変わります');
+    });
   });
 });

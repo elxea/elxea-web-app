@@ -6,9 +6,13 @@
  *   pnpm generate:image-slots   ... 生成 (スキーマに画像枠を足したら必ず走らせる)
  *   pnpm check:image-slots      ... 一致検査 (build の前段でも走る / 不一致なら exit 1)
  *
- * 手で書く場所は各枠の `rendered` と `note` の 2 つだけ。枠の集合そのものは
- * スキーマが唯一の正本で、ここは**写し取るだけ**。再生成しても既存の
- * `rendered` / `note` は id で引き当てて引き継ぐ (人の判断を消さない)。
+ * 手で書く場所は各枠の `rendered`・`area`・`alt`・`note` の 4 つだけ。枠の集合そのものは
+ * スキーマが唯一の正本で、ここは**写し取るだけ**。再生成しても既存の手書きの欄は
+ * id で引き当てて引き継ぐ (人の判断を消さない)。
+ *
+ * `area` (入れた状態の場所) と `alt` (説明文の作り方の名前) は書き方 image-slots/v2 で
+ * 足した欄 (段3設計 2節・9節 U1。決まりは lib/image-slots-v2.ts)。描画される枠
+ * (`rendered: true`) は両方が要り、空なら check:image-slots が build を落とす。
  *
  * 新しく現れた枠は `rendered: null` (未判定) で入る。null のままだと巡回が
  * 「未判定の枠がある」と報告し続けるので、判断を先送りしても消えない。
@@ -27,6 +31,8 @@
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
 
+import { IMAGE_SLOTS_FORMAT, type ImageSlotAltRecipe, isImageSlotAltRecipe } from '../lib/image-slots-v2';
+
 import { extractImageSlots } from './lib/image-slots-extract';
 import type { ImageSlot } from './lib/image-slots-extract';
 
@@ -37,12 +43,25 @@ export const INVENTORY_PATH = path.join(ROOT, 'public', 'image-slots.inventory.j
 export interface InventorySlot extends ImageSlot {
   /** 本番 JSX に到達するか。true=描画される / false=死にフィールド / null=未判定 */
   rendered: boolean | null;
+  /** 入れた状態の場所 (asset-hub の cdn/intake/<org>/<area>.json)。描画されない枠は null。 */
+  area: string | null;
+  /** 説明文の作り方の名前。描画されない枠は null。 */
+  alt: ImageSlotAltRecipe | null;
   /** 判断の根拠 (file:line 等)。人が書く。 */
+  note: string;
+}
+
+/** 手で書く欄 (id で引き継ぐ)。 */
+export interface InventoryAnnotation {
+  rendered: boolean | null;
+  area: string | null;
+  alt: ImageSlotAltRecipe | null;
   note: string;
 }
 
 export interface Inventory {
   $schema: string;
+  format: string;
   description: string;
   generatedBy: string;
   slots: InventorySlot[];
@@ -51,40 +70,51 @@ export interface Inventory {
 const DESCRIPTION =
   'Sanity スキーマ上の画像枠の全数。集合の正本は sanity/schemas/*.ts で、' +
   'このファイルはそこから機械生成する (pnpm generate:image-slots)。' +
-  'rendered / note だけが手書き。巡回 (photo-gap-scan) はこれを読み、' +
+  'rendered / area / alt / note だけが手書き (area = 入れた状態の場所・alt = 説明文の作り方の名前)。巡回 (photo-gap-scan) はこれを読み、' +
   '経路1-5 のどれもカバーしていない枠を uncovered-slot として報告する。';
 
-/** 既存 inventory から id -> {rendered, note} を引く (無ければ空)。 */
-export function readAnnotations(
-  inventoryPath: string,
-): Map<string, { rendered: boolean | null; note: string }> {
-  const out = new Map<string, { rendered: boolean | null; note: string }>();
-  if (!existsSync(inventoryPath)) return out;
-  const raw: unknown = JSON.parse(readFileSync(inventoryPath, 'utf8'));
-  const slots = (raw as { slots?: unknown }).slots;
+/** inventory の中身から id -> 手書きの欄を引く。形の崩れた値は null / 空に倒す。 */
+export function annotationsOf(raw: unknown): Map<string, InventoryAnnotation> {
+  const out = new Map<string, InventoryAnnotation>();
+  const slots = (raw as { slots?: unknown } | null)?.slots;
   if (!Array.isArray(slots)) return out;
   for (const s of slots as Record<string, unknown>[]) {
     if (typeof s?.id !== 'string') continue;
     out.set(s.id, {
       rendered: typeof s.rendered === 'boolean' ? s.rendered : null,
+      area: typeof s.area === 'string' ? s.area : null,
+      alt: isImageSlotAltRecipe(s.alt) ? s.alt : null,
       note: typeof s.note === 'string' ? s.note : '',
     });
   }
   return out;
 }
 
+/** 既存 inventory のファイルから id -> 手書きの欄を引く (無ければ空)。 */
+export function readAnnotations(inventoryPath: string): Map<string, InventoryAnnotation> {
+  if (!existsSync(inventoryPath)) return new Map();
+  return annotationsOf(JSON.parse(readFileSync(inventoryPath, 'utf8')));
+}
+
 /** スキーマの枠 + 既存注釈 -> inventory オブジェクト (書き込みはしない)。 */
 export function buildInventory(
   slots: ImageSlot[],
-  annotations: Map<string, { rendered: boolean | null; note: string }>,
+  annotations: Map<string, InventoryAnnotation>,
 ): Inventory {
   return {
     $schema: 'https://elxea.com/image-slots.inventory.json',
+    format: IMAGE_SLOTS_FORMAT,
     description: DESCRIPTION,
     generatedBy: 'pnpm generate:image-slots',
     slots: slots.map((s) => {
       const a = annotations.get(s.id);
-      return { ...s, rendered: a?.rendered ?? null, note: a?.note ?? '' };
+      return {
+        ...s,
+        rendered: a?.rendered ?? null,
+        area: a?.area ?? null,
+        alt: a?.alt ?? null,
+        note: a?.note ?? '',
+      };
     }),
   };
 }

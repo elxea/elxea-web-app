@@ -1,12 +1,12 @@
 /**
  * 自動生成ファイル — 直接編集しないこと。
  *
- * 生成元: public/site-slots.manifest.json (SoT)
+ * 生成元: public/site-slots.manifest.json (枠の集合はコードの slotId から作る)
  * 生成コマンド: pnpm generate:site-slots
  * 一致検査: pnpm check:site-slots (build の前段で走る)
  *
- * 枠を足す・消すときに編集するのは public/site-slots.manifest.json だけ。
- * このファイルはそこから作り直す。
+ * 枠を足す・消すときは、コードの SiteImage を直して pnpm generate:site-slots を走らせ、
+ * 新しい枠の属性を public/site-slots.manifest.json に書く。このファイルはそこから作り直す。
  */
 
 /** manifest が宣言している枠 id の union。これ以外の id は型で弾かれる。 */
