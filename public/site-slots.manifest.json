@@ -56,7 +56,11 @@
     "",
     "【validFrom / validTo (任意)】",
     "期間限定 LP・季節ページ用。省略時は常時有効。枠を消すときは slots から削るのでは",
-    "なく validTo を入れて履歴を残すのが既定 (削ると asset-hub 側で割当が孤児になる)。"
+    "なく validTo を入れて履歴を残すのが既定 (削ると asset-hub 側で割当が孤児になる)。",
+    "",
+    "【default_image (コードから作る・手で書かない)】",
+    "枠が空のときにサイトのコードが出す既定の写真の道 (public の下)。正本はコードの定数で、作り直しのときに写す",
+    "(今は OGP の枠だけ = lib/og-image.ts の OG_IMAGE.url)。asset-hub はこれを読んで、既定の写真を R2 と台帳に寄せる。"
   ],
   "format": "image-slots/v2",
   "version": 1,
@@ -513,7 +517,8 @@
           "ratio": { "width": 1200, "height": 630 },
           "fit": "cover"
         }
-      ]
+      ],
+      "default_image": "/og-image.jpg"
     }
   ]
 }
