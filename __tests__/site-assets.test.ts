@@ -49,6 +49,8 @@ const DECL: SiteSlot = {
   id: SLOT,
   label: "トップ Hero (KV)",
   page: "top",
+  area: "top",
+  alt: "code",
   required: true,
   order: 10,
   surfaces: [

@@ -17,8 +17,9 @@
  *          型 (`SiteSlotId`) でも弾かれるが、動的な文字列は型をすり抜けるので
  *          ここでも見る。
  *
- * あわせて、SoT (JSON) と生成物 (`lib/site-slots.generated.ts`) の一致、および
- * JSON 自体の妥当性も見る。どれか 1 つでも崩れていれば exit 1。
+ * あわせて、SoT (JSON) と生成物 (`lib/site-slots.generated.ts`) の一致、JSON 自体の
+ * 妥当性 (area・alt を含む属性)、コードから作り直した宣言 (`scripts/gen-site-slots.ts`) と
+ * 中身が同じことも見る。どれか 1 つでも崩れていれば exit 1。
  *
  * package.json の `build` が `next build` の前に本スクリプトを走らせる。
  * 単体でも `pnpm check:site-slots` で実行できる。
@@ -26,161 +27,26 @@
  * Exit codes: 0 = 整合 / 1 = 不整合
  */
 
-import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
 
-import ts from 'typescript';
-
+import { canonicalJson } from '../lib/image-slots-v2';
 import { isSiteSlotActive, validateSiteSlotsManifest } from '../lib/site-slots-schema';
 import type { SiteSlot } from '../lib/site-slots-schema';
 
-import { GENERATED_PATH, MANIFEST_PATH, readSlotIds, renderGenerated } from './gen-site-slots';
+import {
+  GENERATED_PATH,
+  MANIFEST_PATH,
+  SITE_SLOTS_ROOT,
+  buildManifest,
+  readSlotIds,
+  renderGenerated,
+} from './gen-site-slots';
+import { scanUsages, usedSlotIds, type Usage } from './lib/site-slots-scan';
 
-const ROOT = path.resolve(__dirname, '..');
+export { mayUseSlots, scanSource, scanUsages } from './lib/site-slots-scan';
 
-/** コードを走査する対象。ここに無いディレクトリで枠を使っても検出できない。 */
-const SCAN_DIRS = ['app', 'components', 'lib', 'sanity'];
-const SCAN_EXTENSIONS = new Set(['.ts', '.tsx']);
-
-/**
- * 「使用」と数える唯一の形は **JSX 属性 `slotId` の文字列リテラル**。
- *
- * 以前は任意の引用文字列を正規表現で拾っていたが、それだと
- * `// legacy: "site:top:hero-01"` のようなコメントが実使用の代わりになり、
- * SiteImage を消してコメントだけ残したときにゲートが黙って通っていた
- * (QA NC9 の偽陰性)。逆にコメントを足しただけで落ちる偽陽性も起きた (NC8)。
- * どちらも「文字列が出現したか」を見ていたのが原因なので、AST で
- * 「その文字列が JSX 属性 slotId の値か」を見るようにした。
- */
-const SLOT_ID_ATTRIBUTE = 'slotId';
-
-/**
- * サーバ側で枠を読む関数 (lib/site-assets)。JSX の SiteImage を持たない枠 (例: 既定の共有カード
- * app/api/og-image/route.ts) は、これを枠 id の文字列リテラルで呼ぶことが「使用」になる。
- */
-const SLOT_READ_CALLS: readonly string[] = ['getSiteImage', 'getSiteAsset'];
-
-/**
- * AST を組む前の足切り。slotId 属性も、枠を読む関数の呼び出しも出てこないファイルは対象外。
- * (以前は slotId だけを見ていたので、呼び出しだけで枠を使うファイルは読まれもしなかった)
- */
-export function mayUseSlots(source: string): boolean {
-  return source.includes(SLOT_ID_ATTRIBUTE) || SLOT_READ_CALLS.some((n) => source.includes(`${n}(`));
-}
-
-interface Usage {
-  id: string;
-  file: string;
-  line: number;
-}
-
-/**
- * 1 ファイル分のソースから、JSX 属性 `slotId` の使用箇所を集める。
- *
- * 文字列リテラルで書かれていれば使用として数え、そうでなければ (変数・関数呼び出し・
- * 埋め込みのあるテンプレート文字列等) `dynamic` に入れる。dynamic は manifest との
- * 突き合わせができないので、呼び出し側がエラーにする。
- */
-export function scanSource(
-  file: string,
-  source: string,
-): { usages: Usage[]; dynamic: { file: string; line: number }[] } {
-  const usages: Usage[] = [];
-  const dynamic: { file: string; line: number }[] = [];
-
-  const sourceFile = ts.createSourceFile(
-    file,
-    source,
-    ts.ScriptTarget.Latest,
-    /* setParentNodes */ true,
-    file.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
-  );
-
-  const lineOf = (node: ts.Node): number =>
-    sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1;
-
-  const visit = (node: ts.Node): void => {
-    // サーバ側で枠を読む呼び出し getSiteImage("site:...") / getSiteAsset("site:...") も使用に数える
-    // (JSX の SiteImage を持たない枠。例: 既定の共有カード app/api/og-image/route.ts)。
-    // 文字列リテラルの id だけを数え、変数の呼び出しは数えない (dynamic にもしない)。
-    if (
-      ts.isCallExpression(node) &&
-      ts.isIdentifier(node.expression) &&
-      SLOT_READ_CALLS.includes(node.expression.text) &&
-      node.arguments.length > 0 &&
-      (ts.isStringLiteral(node.arguments[0]) || ts.isNoSubstitutionTemplateLiteral(node.arguments[0]))
-    ) {
-      usages.push({ id: (node.arguments[0] as ts.StringLiteral).text, file, line: lineOf(node) });
-    }
-    if (
-      ts.isJsxAttribute(node) &&
-      ts.isIdentifier(node.name) &&
-      node.name.text === SLOT_ID_ATTRIBUTE
-    ) {
-      const init = node.initializer;
-      let literal: string | undefined;
-
-      if (init && ts.isStringLiteral(init)) {
-        // slotId="site:top:hero-01"
-        literal = init.text;
-      } else if (init && ts.isJsxExpression(init) && init.expression) {
-        const expr = init.expression;
-        // slotId={"site:top:hero-01"} / slotId={`site:top:hero-01`}
-        if (ts.isStringLiteral(expr) || ts.isNoSubstitutionTemplateLiteral(expr)) {
-          literal = expr.text;
-        }
-      }
-
-      if (literal !== undefined) {
-        usages.push({ id: literal, file, line: lineOf(node) });
-      } else {
-        dynamic.push({ file, line: lineOf(node) });
-      }
-    }
-    ts.forEachChild(node, visit);
-  };
-
-  visit(sourceFile);
-  return { usages, dynamic };
-}
-
-function listSourceFiles(dir: string): string[] {
-  const out: string[] = [];
-  const walk = (d: string) => {
-    if (!existsSync(d)) return;
-    for (const name of readdirSync(d)) {
-      if (name === 'node_modules' || name.startsWith('.')) continue;
-      const full = path.join(d, name);
-      if (statSync(full).isDirectory()) {
-        walk(full);
-      } else if (SCAN_EXTENSIONS.has(path.extname(full)) && !full.endsWith('.d.ts')) {
-        out.push(full);
-      }
-    }
-  };
-  walk(dir);
-  return out;
-}
-
-/** ソースを走査して、枠 id の使用箇所と、静的に読めない slotId を集める。 */
-export function scanUsages(root: string = ROOT): {
-  usages: Usage[];
-  dynamic: { file: string; line: number }[];
-} {
-  const usages: Usage[] = [];
-  const dynamic: { file: string; line: number }[] = [];
-
-  for (const dir of SCAN_DIRS) {
-    for (const file of listSourceFiles(path.join(root, dir))) {
-      const source = readFileSync(file, 'utf8');
-      if (!mayUseSlots(source)) continue;
-      const found = scanSource(file, source);
-      usages.push(...found.usages);
-      dynamic.push(...found.dynamic);
-    }
-  }
-  return { usages, dynamic };
-}
+const ROOT = SITE_SLOTS_ROOT;
 
 function rel(p: string): string {
   return path.relative(ROOT, p);
@@ -225,7 +91,7 @@ function main(): void {
   }
 
   // 4) コード側の使用箇所を集める
-  const { usages, dynamic } = scanUsages();
+  const { usages, dynamic } = scanUsages(ROOT);
   const used = new Map<string, Usage[]>();
   for (const u of usages) {
     const list = used.get(u.id) ?? [];
@@ -273,6 +139,19 @@ function main(): void {
       `${rel(d.file)}:${d.line}: slotId が文字列リテラルではありません。` +
         'manifest との突き合わせができないので、リテラルで書いてください',
     );
+  }
+
+  // (d) コードから作り直した宣言と中身が同じか (集合はコード・属性は id で引き継ぐ)。
+  //     (a)(b) が無くても、手で枠の並び・説明・書き方の版を崩したらここで止まる。
+  //     (a) と同じ枠は buildManifest が残すので、ここで二重には出ない。
+  if (dynamic.length === 0) {
+    const rebuilt = buildManifest(usedSlotIds(usages), raw).manifest;
+    if (canonicalJson(rebuilt) !== canonicalJson(raw)) {
+      problems.push(
+        `${rel(MANIFEST_PATH)} をコードから作り直すと中身が変わります — ` +
+          '`pnpm generate:site-slots` を実行してください (属性は id で引き継がれます)',
+      );
+    }
   }
 
   console.log(

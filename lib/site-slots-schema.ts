@@ -8,7 +8,19 @@
  *
  * ここは値をひとつも持たない — SoT は `public/site-slots.manifest.json` だけ。
  * 述語は特定の枠をハードコードせず、実物を読んで検査する。
+ *
+ * 枠の集合 (id) はコードの SiteImage の slotId から作る (`scripts/gen-site-slots.ts`)。
+ * 手で書くのは各枠の属性 (label・area・alt・required・order・surfaces・validFrom/To) だけで、
+ * 作り直しても id で引き継がれる。area・alt の決まりは `lib/image-slots-v2.ts`。
  */
+
+import {
+  IMAGE_SLOTS_FORMAT,
+  IMAGE_SLOT_ALT_RECIPES,
+  isImageSlotAltRecipe,
+  isImageSlotArea,
+  type ImageSlotAltRecipe,
+} from './image-slots-v2';
 
 /** 収め方。cover = はみ出しを切る / contain = 切らずに収める (余白が付く)。 */
 export type SiteSlotFit = 'cover' | 'contain';
@@ -55,6 +67,10 @@ export interface SiteSlot {
   label: string;
   /** どのページか (`site:<page>:...` の page と一致させる)。 */
   page: string;
+  /** 入れた状態の場所 (asset-hub の cdn/intake/<org>/<area>.json)。 */
+  area: string;
+  /** 説明文の作り方の名前。ページの枠は今すべて `code` (SiteImage の alt)。 */
+  alt: ImageSlotAltRecipe;
   /** 必須枠か。false = 空でも運用が成り立つ枠。 */
   required: boolean;
   /** 並び順。配列順への暗黙依存をやめるために持つ。 */
@@ -67,6 +83,8 @@ export interface SiteSlot {
 
 /** manifest 全体。 */
 export interface SiteSlotsManifest {
+  /** 書き方の版 (`image-slots/v2`)。version とは別 (version は asset-hub が読める上限と比べる数)。 */
+  format: string;
   version: number;
   org: string;
   slots: SiteSlot[];
@@ -111,6 +129,9 @@ export function validateSiteSlotsManifest(raw: unknown): string[] {
   if (typeof m.org !== 'string' || m.org.length === 0) {
     push('org は空でない文字列である必要があります');
   }
+  if (m.format !== IMAGE_SLOTS_FORMAT) {
+    push(`format は "${IMAGE_SLOTS_FORMAT}" である必要があります (見つかった値: ${JSON.stringify(m.format)})`);
+  }
   if (!Array.isArray(m.slots)) {
     return [...errors, 'slots は配列である必要があります'];
   }
@@ -143,6 +164,18 @@ export function validateSiteSlotsManifest(raw: unknown): string[] {
     }
     if (typeof s.page !== 'string' || s.page.trim().length === 0) {
       push(`${where}: page は空でない文字列である必要があります`);
+    }
+    if (!isImageSlotArea(s.area)) {
+      push(
+        `${where}: area (入れた状態の場所) は英小文字・数字・ハイフンの名前である必要があります ` +
+          `(見つかった値: ${JSON.stringify(s.area)})`,
+      );
+    }
+    if (!isImageSlotAltRecipe(s.alt)) {
+      push(
+        `${where}: alt (説明文の作り方) は ${IMAGE_SLOT_ALT_RECIPES.join(' / ')} のどれかである必要があります ` +
+          `(見つかった値: ${JSON.stringify(s.alt)})`,
+      );
     }
     if (typeof s.required !== 'boolean') {
       push(`${where}: required は boolean である必要があります`);
