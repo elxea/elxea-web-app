@@ -5,7 +5,9 @@ import {
   isWrapper,
   isUndecorated,
   extractRoute,
+  measureFrozenSections,
 } from "@/scripts/design-system/figma-ds-instance-rate";
+import { loadFrozenSections } from "@/scripts/design-system/figma-snapshot-lib";
 
 /**
  * wrapper 除外ルールの fixture 単体テスト。
@@ -195,5 +197,88 @@ describe("figma-ds-instance-rate: wrapper 除外ルール", () => {
         children: [instance("i") as never],
       } as never)
     ).toBe(true);
+  });
+});
+
+/**
+ * 区画の引き方 (2026-10-06): 母集団は frozen-sections.json の凍結区画。
+ * 選択 (selectFrozenSections) は figma-snapshot.test.ts で検証済みのため、ここでは
+ * 「選ばれた区画 → 区画ごとの率 / route 合算 / 全体の率」の決定論を検証する。
+ */
+describe("figma-ds-instance-rate: 凍結区画からの計測 (measureFrozenSections)", () => {
+  const mapping = [
+    { section_id: "1:1", title: "トップ", route: "@/ja" },
+    { section_id: "2:1", title: "イベント詳細", route: "@/ja/events/[slug]" },
+    { section_id: "2:2", title: "イベント申込", route: "@/ja/events/[slug]" },
+  ];
+  const sec = (id: string, children: N[]): N => ({ id, name: id, type: "SECTION", children });
+  const text = (id: string): N => ({ id, name: id, type: "TEXT" });
+  const docs = {
+    // 1 instance / 2 total
+    "1:1": sec("1:1", [instance("a"), text("t1")]),
+    // 2 instance / 2 total
+    "2:1": sec("2:1", [instance("b"), instance("c")]),
+    // 1 instance / 4 total
+    "2:2": sec("2:2", [instance("d"), text("t2"), text("t3"), text("t4")]),
+  };
+  const fetched = {
+    routeSections: [
+      { id: "2:2", route: "@/ja/events/[slug]" },
+      { id: "1:1", route: "@/ja" },
+      { id: "2:1", route: "@/ja/events/[slug]" },
+    ],
+    sectionDocs: docs as never,
+  };
+
+  it("区画ごとの率を出し、title は frozen-sections.json から引く", () => {
+    const { sections } = measureFrozenSections(fetched, mapping);
+    expect(sections.map((s) => [s.section_id, s.title, s.instances, s.total, s.rate])).toEqual([
+      ["1:1", "トップ", 1, 2, 0.5],
+      ["2:1", "イベント詳細", 2, 2, 1],
+      ["2:2", "イベント申込", 1, 4, 0.25],
+    ]);
+  });
+
+  it("同じ route の区画は routes[] で合算する (baseline のキー = route 名が重複しない)", () => {
+    const { routes } = measureFrozenSections(fetched, mapping);
+    expect(routes.map((r) => r.name)).toEqual(["@/ja", "@/ja/events/[slug]"]);
+    const ev = routes[1];
+    expect([ev.instances, ev.total, ev.rate]).toEqual([3, 6, 0.5]);
+    expect(ev.section_ids).toEqual(["2:1", "2:2"]);
+    expect(ev.node_id).toBe("2:1,2:2");
+    // drift-audit-design.sh が読む欄
+    for (const r of routes) {
+      expect(Object.keys(r)).toEqual(expect.arrayContaining(["name", "rate", "instances", "total"]));
+    }
+  });
+
+  it("全体の率 = 全区画の合算", () => {
+    const { overall } = measureFrozenSections(fetched, mapping);
+    expect(overall).toEqual({ instances: 4, total: 8, rate: 0.5 });
+  });
+
+  it("document 欠落の区画は throw (穴のまま率を出さない)", () => {
+    expect(() =>
+      measureFrozenSections(
+        { routeSections: [{ id: "9:9", route: "@/ja" }], sectionDocs: {} },
+        mapping
+      )
+    ).toThrow(/no document/);
+  });
+
+  it("対応表に無い区画 id は throw (選択と対応表の食い違いを黙認しない)", () => {
+    expect(() =>
+      measureFrozenSections(
+        { routeSections: [{ id: "9:9", route: "@/ja" }], sectionDocs: { "9:9": sec("9:9", []) } as never },
+        mapping
+      )
+    ).toThrow(/not in frozen-sections.json/);
+  });
+
+  it("実物の frozen-sections.json を読め、合算後の route 数は区画数を超えない", () => {
+    const real = loadFrozenSections();
+    const routes = new Set(real.map((m) => m.route));
+    expect(real.length).toBeGreaterThan(0);
+    expect(routes.size).toBeLessThanOrEqual(real.length);
   });
 });
