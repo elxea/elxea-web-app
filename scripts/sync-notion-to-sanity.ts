@@ -58,6 +58,7 @@ import {
   resolveTeaOriginPlace,
   resolveTeaSupplier,
 } from "../lib/roji/tea-origins";
+import { bodyImageKeyOf } from "./lib/notion-block-key";
 
 // ─── Config ──────────────────────────────────────────────────
 
@@ -433,10 +434,13 @@ async function blocksToPortableText(
               : null;
 
         if (imageUrl) {
+          // 本文の画像の _key は Notion のブロックの id (段3設計 9節 U7c)。Asset hub の配信の枠
+          // `article:<slug>:body-<ブロックの id>` と同じ鍵にして、同期のたびに変わらないようにする。
+          const imageKey = bodyImageKeyOf(block.id) ?? genKey();
           if (dryRun) {
             result.push({
               _type: "image",
-              _key: genKey(),
+              _key: imageKey,
               _dryRun: true,
               _sourceUrl: imageUrl,
             });
@@ -448,7 +452,7 @@ async function blocksToPortableText(
                 .join("");
               result.push({
                 _type: "image",
-                _key: genKey(),
+                _key: imageKey,
                 asset: assetRef,
                 ...(captionText ? { caption: captionText } : {}),
                 alt: captionText || "",
