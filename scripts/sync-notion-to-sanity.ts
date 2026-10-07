@@ -59,6 +59,7 @@ import {
   resolveTeaSupplier,
 } from "../lib/roji/tea-origins";
 import { bodyImageKeyOf } from "./lib/notion-block-key";
+import { uploadImageToSanity } from "./lib/sanity-image-upload";
 
 // ─── Config ──────────────────────────────────────────────────
 
@@ -302,25 +303,6 @@ function richTextToSpans(
   }
 
   return { children, markDefs };
-}
-
-async function uploadImageToSanity(
-  client: SanityClient,
-  imageUrl: string,
-  filename?: string
-): Promise<{ _type: "reference"; _ref: string } | null> {
-  try {
-    const response = await fetch(imageUrl);
-    if (!response.ok) return null;
-    const buffer = Buffer.from(await response.arrayBuffer());
-    const asset = await client.assets.upload("image", buffer, {
-      filename: filename || "notion-image",
-    });
-    return { _type: "reference", _ref: asset._id };
-  } catch (err) {
-    console.error(`  Failed to upload image: ${imageUrl}`, err);
-    return null;
-  }
 }
 
 async function blocksToPortableText(
