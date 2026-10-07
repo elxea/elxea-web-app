@@ -694,3 +694,17 @@ describe('image-slots/v2 — ページの枠の集合をコードから作る', 
     });
   });
 });
+
+describe('default_image (既定の写真の道・正本はコードの定数)', () => {
+  it('OGP の枠の default_image は lib/og-image.ts の OG_IMAGE.url と同じ (宣言は作り直しで写すだけ)', async () => {
+    const { OG_IMAGE, OG_SLOT_ID } = await import('../lib/og-image');
+    const { DEFAULT_IMAGES } = await import('../scripts/gen-site-slots');
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const m = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'public', 'site-slots.manifest.json'), 'utf8'));
+    const og = m.slots.find((s: { id: string }) => s.id === OG_SLOT_ID);
+    expect(og.default_image).toBe(OG_IMAGE.url);
+    expect(DEFAULT_IMAGES).toEqual({ [OG_SLOT_ID]: OG_IMAGE.url });
+    expect(m.slots.filter((s: { default_image?: string }) => s.default_image).length).toBe(1);
+  });
+});

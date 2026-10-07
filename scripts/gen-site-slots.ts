@@ -27,6 +27,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 import { IMAGE_SLOTS_FORMAT } from '../lib/image-slots-v2';
+import { OG_IMAGE, OG_SLOT_ID } from '../lib/og-image';
 import { validateSiteSlotsManifest } from '../lib/site-slots-schema';
 
 import { scanUsages, usedSlotIds } from './lib/site-slots-scan';
@@ -100,8 +101,15 @@ export const MANIFEST_COMMENT: readonly string[] = [
     "",
     "【validFrom / validTo (任意)】",
     "期間限定 LP・季節ページ用。省略時は常時有効。枠を消すときは slots から削るのでは",
-    "なく validTo を入れて履歴を残すのが既定 (削ると asset-hub 側で割当が孤児になる)。"
+    "なく validTo を入れて履歴を残すのが既定 (削ると asset-hub 側で割当が孤児になる)。",
+    "",
+    "【default_image (コードから作る・手で書かない)】",
+    "枠が空のときにサイトのコードが出す既定の写真の道 (public の下)。正本はコードの定数で、作り直しのときに写す",
+    "(今は OGP の枠だけ = lib/og-image.ts の OG_IMAGE.url)。asset-hub はこれを読んで、既定の写真を R2 と台帳に寄せる。"
   ];
+
+/** 枠 -> 既定の写真の道 (正本はコードの定数。宣言には作り直しのときに写すだけ)。 */
+export const DEFAULT_IMAGES: Readonly<Record<string, string>> = Object.freeze({ [OG_SLOT_ID]: OG_IMAGE.url });
 
 /** 1 枠の属性の並び (出力の鍵の順)。id 以外は手で書く属性で、id で引き継ぐ。 */
 const SLOT_KEYS = [
@@ -160,6 +168,7 @@ export function buildManifest(
       const v = key === 'id' ? id : before[key];
       if (v !== undefined) out[key] = v;
     }
+    if (DEFAULT_IMAGES[id]) out.default_image = DEFAULT_IMAGES[id];
     return out;
   });
   slots.sort((a, b) => {
