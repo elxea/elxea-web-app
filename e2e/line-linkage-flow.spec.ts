@@ -391,7 +391,7 @@ test.describe.serial("LINE ログイン・メール連携・合体", () => {
 
     /* 画面に「連携できた」が出る。`error` で戻っていないことをここで固定する。 */
     await expect(page.getByTestId("line-linkage-notice-success")).toBeVisible();
-    await expect(page.getByTestId("line-linkage-linked")).toBeVisible();
+    await expect(page.locator("main").getByTestId("line-linkage-linked")).toBeVisible();
 
     /* 連携の正本（cx-agent の台帳）にも載っていること。画面表示だけだと、
      * 台帳に書けていないのに成功と表示する退行が見えない。 */
@@ -453,7 +453,10 @@ test.describe.serial("LINE ログイン・メール連携・合体", () => {
 
     /* --- ③ 連携する = 合体が起きる --- */
     await linkLineFromAccount(page);
-    await expect(page.getByTestId("line-linkage-linked")).toBeVisible();
+    /* 連携済みの表示は main に絞って見る (①' と同じ)。マイページは本文を <Suspense> で流すので、
+     * 読み込みの途中に main の外へ隠れた写しが一瞬でき、絞らないと 2 つ拾って strict mode で落ちる
+     * (#212 の CI 37480972862 で 2 回)。見ている中身 (連携済みが見える) は変えない。 */
+    await expect(page.locator("main").getByTestId("line-linkage-linked")).toBeVisible();
 
     expect(
       await listFavoriteTitles(page),
@@ -533,7 +536,7 @@ test.describe.serial("LINE ログイン・メール連携・合体", () => {
 
     /* --- 再連携 --- */
     await linkLineFromAccount(page);
-    await expect(page.getByTestId("line-linkage-linked")).toBeVisible();
+    await expect(page.locator("main").getByTestId("line-linkage-linked")).toBeVisible();
     expect(
       (await readLedger(request)).find((e) => e.lineUserId === user.userId)?.shopifyCustomerId,
       "再連携が台帳に載っていない",
