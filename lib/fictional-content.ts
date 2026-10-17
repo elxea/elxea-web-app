@@ -80,7 +80,6 @@
 
 /** Sanity `_type`s that currently have known fictional seed documents. */
 export type FictionalDocType = "farmer" | "teaMenu" | "event";
-
 type DenyEntry = { readonly ids: readonly string[]; readonly slugs: readonly string[] };
 
 /**
@@ -141,6 +140,17 @@ const FICTIONAL_DOCS: Readonly<Record<FictionalDocType, DenyEntry>> = {
     ],
   },
 } as const;
+
+/**
+ * Every covered `_type` at runtime, derived from `FICTIONAL_DOCS` itself so it
+ * cannot drift from the table above. Used by
+ * `scripts/gen-fictional-content.ts` to project this module into
+ * `public/fictional-content.json` — the file the asset hub reads so it does not
+ * carry its own copy of the list.
+ */
+export const FICTIONAL_DOC_TYPES: readonly FictionalDocType[] = Object.freeze(
+  Object.keys(FICTIONAL_DOCS) as FictionalDocType[],
+);
 
 function toSets(
   pick: (entry: DenyEntry) => readonly string[],
