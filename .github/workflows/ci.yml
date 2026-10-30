@@ -473,7 +473,12 @@ jobs:
   storybook-tests:
     name: storybook-tests
     needs: static-checks
-    runs-on: ubuntu-latest
+    # Playwright を使うジョブは ubuntu-24.04 に固定する (e2e-tests・identity-e2e・
+    # staging-smoke も同じ)。2026-10-30、ubuntu-latest が ubuntu-26.04 を指すように
+    # なり、Playwright 1.58.2 が "Playwright does not support chromium on
+    # ubuntu26.04-x64" で入らず、この 3 つの必須ジョブが落ちた (run 41054998870)。
+    # Playwright を ubuntu-26.04 対応の版に上げたら ubuntu-latest に戻してよい。
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Checkout
@@ -508,7 +513,8 @@ jobs:
   e2e-tests:
     name: e2e-tests
     needs: static-checks
-    runs-on: ubuntu-latest
+    # Playwright のため ubuntu-24.04 に固定 (理由は storybook-tests の注)。
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
       NODE_OPTIONS: --max-old-space-size=4096
@@ -605,7 +611,8 @@ jobs:
   identity-e2e:
     name: identity-e2e
     needs: static-checks
-    runs-on: ubuntu-latest
+    # Playwright のため ubuntu-24.04 に固定 (理由は storybook-tests の注)。
+    runs-on: ubuntu-24.04
     # 実測 (2026-08-23, 開発機): 偽サーバー 3 本の起動が数百 ms、dev サーバーの
     # コールドコンパイルが最も重く、2 suite 合わせて 3〜5 分。上限はコールド
     # Turbopack と runner の遅さに余裕を見て 20 分。
@@ -785,7 +792,8 @@ jobs:
       github.ref == 'refs/heads/main' && github.event_name == 'push'
       && needs.ship-gate.outputs.staging_configured == 'true'
     needs: [unit-tests, e2e-tests, ship-gate]
-    runs-on: ubuntu-latest
+    # Playwright のため ubuntu-24.04 に固定 (理由は storybook-tests の注)。
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - name: Checkout
