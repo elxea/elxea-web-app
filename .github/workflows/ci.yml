@@ -87,6 +87,67 @@ env:
   SESSION_SECRET: ci-build-only-placeholder-not-a-secret
 
 jobs:
+  # 鍵の検査 (gitleaks + repo-hygiene)。2026-10-30 追加 (ID-10367 件6の(3))。
+  #
+  # なぜ: 2026-08-22 の決定「elxea-web-app は public 維持」の前提が「secret は
+  # リポに置かず CI の secret-scan で担保する」だったのに、この CI には鍵の検査の
+  # 段が無かった (gitleaks は手元の pre-commit だけ)。
+  #
+  # 中身は elxea の共通 CI (elxea/.github の .github/workflows/ci.yml) の
+  # `secret-scan` ジョブと同じ段 (gitleaks の CLI + circl-tyo/repo-hygiene)。
+  # `uses: elxea/.github/.github/workflows/ci.yml@main` で呼ばないのは、呼ばれる
+  # 側の elxea/.github が private で、このリポが public だから。public の呼び出し
+  # 元が使えるのは public の再利用ワークフローだけ (GitHub Docs "Reusing workflow
+  # configurations" の Access の表)。elxea-cx-agent で同じ呼び出しが 2026-08 に
+  # "workflow was not found" で恒常 failure になった (同リポ ci.yml の注)。
+  # 共通 CI の secret-scan の段を変えたら、ここも同じに直すこと。
+  #
+  # 本番の出し (deploy-production) の needs には入れない。共通 CI と同じく
+  # 「検査して赤く見せる」までで、出しは止めない (main に入った鍵は出しを
+  # 止めても公開リポから消えないため)。必須チェック (branch protection) にも
+  # 入れていない。
+  #
+  # 検知ルールの正本はリポ直下の .gitleaks.toml。
+  # PR は base..head の履歴 (足して消した鍵も拾う)、push は作業ツリー全体を見る。
+  secret-scan:
+    name: secret-scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # gitleaks/gitleaks-action@v2 は org 所有リポで GITLEAKS_LICENSE を要求する
+      # ので使わない。CLI (Docker イメージ) は鍵が要らない。版は固定する。
+      - name: gitleaks (secret scan, CLI / no license key needed)
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          IMG=ghcr.io/gitleaks/gitleaks:v8.30.1
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            docker run --rm -v "$PWD:/repo" -w /repo "$IMG" \
+              git . --no-banner --config .gitleaks.toml --redact --verbose \
+              --log-opts="$BASE_SHA..$HEAD_SHA"
+          else
+            docker run --rm -v "$PWD:/repo" -w /repo "$IMG" \
+              dir . --no-banner --config .gitleaks.toml --redact --verbose
+          fi
+
+      # 入れてはいけないファイル (記録の写し・dump・.env・手元の設定・鍵の拡張子)、
+      # 大きなファイル、足された行の個人情報の形、試験用フォルダの本番データの写し。
+      # 赤になるのは、この回で入れてはいけない名前が足されたときだけ。既に入って
+      # いる物は job summary で知らせる。gitleaks が赤でも走らせる。
+      # public の複合アクションを、タグ v0.1.0 の commit で固定 (共通 CI と同じ)。
+      - name: repo-hygiene
+        if: always()
+        uses: circl-tyo/repo-hygiene@4f83b3a77401b6808c135e92fc52bd48b1d838f2 # v0.1.0
+        with:
+          fail_on_new_forbidden_names: "true"
+
   static-checks:
     name: static-checks
     runs-on: ubuntu-latest
@@ -412,7 +473,12 @@ jobs:
   storybook-tests:
     name: storybook-tests
     needs: static-checks
-    runs-on: ubuntu-latest
+    # Playwright を使うジョブは ubuntu-24.04 に固定する (e2e-tests・identity-e2e・
+    # staging-smoke も同じ)。2026-10-30、ubuntu-latest が ubuntu-26.04 を指すように
+    # なり、Playwright 1.58.2 が "Playwright does not support chromium on
+    # ubuntu26.04-x64" で入らず、この 3 つの必須ジョブが落ちた (run 41054998870)。
+    # Playwright を ubuntu-26.04 対応の版に上げたら ubuntu-latest に戻してよい。
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Checkout
@@ -447,7 +513,8 @@ jobs:
   e2e-tests:
     name: e2e-tests
     needs: static-checks
-    runs-on: ubuntu-latest
+    # Playwright のため ubuntu-24.04 に固定 (理由は storybook-tests の注)。
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
       NODE_OPTIONS: --max-old-space-size=4096
@@ -544,7 +611,8 @@ jobs:
   identity-e2e:
     name: identity-e2e
     needs: static-checks
-    runs-on: ubuntu-latest
+    # Playwright のため ubuntu-24.04 に固定 (理由は storybook-tests の注)。
+    runs-on: ubuntu-24.04
     # 実測 (2026-08-23, 開発機): 偽サーバー 3 本の起動が数百 ms、dev サーバーの
     # コールドコンパイルが最も重く、2 suite 合わせて 3〜5 分。上限はコールド
     # Turbopack と runner の遅さに余裕を見て 20 分。
@@ -724,7 +792,8 @@ jobs:
       github.ref == 'refs/heads/main' && github.event_name == 'push'
       && needs.ship-gate.outputs.staging_configured == 'true'
     needs: [unit-tests, e2e-tests, ship-gate]
-    runs-on: ubuntu-latest
+    # Playwright のため ubuntu-24.04 に固定 (理由は storybook-tests の注)。
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - name: Checkout

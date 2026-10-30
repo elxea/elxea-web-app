@@ -22,6 +22,7 @@
 
 | job | `feat/**` push | PR (全base) | `main` / `developer` push | 内容 |
 |---|---|---|---|---|
+| `secret-scan` | 実行 | 実行 | 実行 | gitleaks (PRはbase..headの履歴・pushは作業ツリー全体) + repo-hygiene (入れてはいけないファイル名)。共通CI (`elxea/.github`) の同名ジョブと同じ段。本番の出しは止めない |
 | `static-checks` | 実行 | 実行 | 実行 | `lint` → `typecheck` → `validate:tokens` → `validate:design-map` → `validate:design-kit` |
 | `unit-tests` | 実行 | 実行 | 実行 | `vitest --project unit` (JUnitをartifact化) |
 | `coverage` | 実行 | 実行 | 実行 | `pnpm test:coverage`。閾値割れでFAIL |
@@ -41,7 +42,8 @@
 
 | 検査 | ローカルpre-push | CI |
 |---|---|---|
-| gitleaks / shellcheck | 実行 (pre-commit stage) | 無し |
+| gitleaks | 実行 (pre-commit stage) | `secret-scan` |
+| shellcheck | 実行 (pre-commit stage) | 無し |
 | lint / typecheck | 実行 | `static-checks` |
 | unit (`--project unit`) | 実行 | `unit-tests` |
 | storybook (ブラウザ) | **走らせない** | `storybook-tests` |
@@ -245,7 +247,7 @@ CIが渡すenv:
 
 ## CIに無いもの (現時点で意図的に未着手)
 
-- **gitleaks / shellcheck** — `.pre-commit-config.yaml` にあり**ローカルのみ**。他マシン・CIではsecretが素通りする
+- **shellcheck** — `.pre-commit-config.yaml` にあり**ローカルのみ** (gitleaksは2026-10-30からCIの `secret-scan` でも走る)
 - **クロスブラウザ** — `playwright.config.ts` に `projects` が無くchromium単独。WebKit (iOS Safari) 検証は0件
 - **ページ単位のa11y** — axeはStorybook経由で部品にのみ強制。組み上がったページ (45ページ) には未適用
 - **パフォーマンス** — Lighthouse / web-vitals / バンドルサイズ予算いずれも無し
